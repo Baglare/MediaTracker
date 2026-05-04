@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="280" viewBox="0 0 200 280">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#8b5cf6"/>
+      <stop offset="100%" style="stop-color:#7c3aed"/>
+    </linearGradient>
+  </defs>
+  <rect width="200" height="280" rx="12" fill="url(#bg)"/>
+  <text x="100" y="130" text-anchor="middle" fill="rgba(255,255,255,0.3)" font-size="48" font-family="sans-serif">📺</text>
+  <text x="100" y="170" text-anchor="middle" fill="rgba(255,255,255,0.5)" font-size="14" font-family="sans-serif" font-weight="600">Dizi</text>
+</svg>
