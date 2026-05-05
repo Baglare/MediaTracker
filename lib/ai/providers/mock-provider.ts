@@ -26,6 +26,21 @@ function sourceLabel(c: AiCandidate): string {
   }
 }
 
+function libraryReason(c: AiCandidate): string {
+  const parts = [
+    c.status ? `durum: ${c.status}` : null,
+    typeof c.currentProgress === "number" && typeof c.totalProgress === "number" && c.totalProgress > 0
+      ? `ilerleme: ${c.currentProgress}/${c.totalProgress}`
+      : null,
+    c.favorite ? "favorilerinde" : null,
+    typeof c.userRating === "number" ? `puan: ${c.userRating}/10` : null,
+    c.lastActivityAt ? `son aktivite: ${new Date(c.lastActivityAt).toLocaleDateString("tr-TR")}` : null,
+  ].filter(Boolean);
+  return parts.length > 0
+    ? `Kütüphanendeki somut sinyaller öne çıkarıyor: ${parts.join(", ")}.`
+    : "Kütüphanendeki tamamlanmamış ve devam etmeye uygun adaylardan biri.";
+}
+
 function candidateToRec(c: AiCandidate, i: number): AiRecommendation {
   const isLib = c.source === "library";
   return {
@@ -39,8 +54,8 @@ function candidateToRec(c: AiCandidate, i: number): AiRecommendation {
     overview: c.overview,
     fitLabel: pickFitLabel(i, isLib),
     reason: isLib
-      ? "Profilindeki güçlü sinyallere dayanan seçim."
-      : "Mesajınla örtüşen bir aday — kütüphane sinyallerine yakın.",
+      ? libraryReason(c)
+      : `Doğrulanmış ${sourceLabel(c)} adayı; ${c.genres?.slice(0, 3).join(", ") || c.type} metadata'sı isteğinle eşleşebilecek sinyal veriyor.`,
     inLibrary: isLib,
     candidate: c,
   };

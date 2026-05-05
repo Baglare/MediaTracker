@@ -13,8 +13,30 @@ import {
   LibraryProfile,
   AiIntent,
   AiSettings,
+  AiRetrievalPlan,
+  AiCandidateIdea,
 } from "../types";
 import { summarizeProfile } from "../profile-builder";
+import { MediaType } from "@/lib/types";
+
+export type GeminiProviderErrorCode =
+  | "rate_limit"
+  | "gemini_key_missing"
+  | "parse_error"
+  | "api_error";
+
+export class GeminiProviderError extends Error {
+  code: GeminiProviderErrorCode;
+  status?: number;
+  provider = "gemini" as const;
+
+  constructor(code: GeminiProviderErrorCode, message: string, status?: number) {
+    super(message);
+    this.name = "GeminiProviderError";
+    this.code = code;
+    this.status = status;
+  }
+}
 
 const MODEL = process.env.GEMINI_MODEL || "gemini-2.0-flash";
 const ENDPOINT = (key: string) =>
@@ -36,14 +58,15 @@ function describeCandidates(candidates: AiCandidate[]): string {
     .join("\n");
 }
 
-function buildPrompt(args: {
+function buildRankingPrompt(args: {
   message: string;
   profile: LibraryProfile | null;
   intent: AiIntent;
   settings: AiSettings;
   candidates: AiCandidate[];
+  retrievalPlan?: AiRetrievalPlan | null;
 }): string {
-  const { message, profile, intent, settings, candidates } = args;
+  const { message, profile, intent, settings, candidates, retrievalPlan } = args;
   const profileBlock = settings.useProfile && profile
     ? `Kütüphane profili (özet): ${summarizeProfile(profile)}`
     : "Kütüphane profili kullanılmıyor.";
@@ -51,8 +74,8 @@ function buildPrompt(args: {
     ? `Kişisel notlar: ${profile.notes.map((n) => `${n.title}: ${n.note}`).join(" | ")}`
     : "Kişisel notlar dahil değil.";
   const webBlock = settings.useWebResearch
-    ? "Web araştırması açık: topluluk genel kanısı için kendi bilgine başvurabilirsin (kısa cümle, kaynak iddia etme)."
-    : "Web araştırması kapalı: communitySignal alanını boş bırak.";
+    ? "AI bilgi sinyali açık: genel model bilgini kısa communitySignal için kullanabilirsin; gerçek web/grounding yaptığını iddia etme."
+    : "AI bilgi sinyali kapalı: communitySignal alanını boş bırak.";
 
   return [
     "Sen bir medya tavsiye danışmanısın. Türkçe cevap ver.",
@@ -61,11 +84,24 @@ function buildPrompt(args: {
     profileBlock,
     notesBlock,
     webBlock,
+    retrievalPlan
+      ? `Retrieval plan: ${JSON.stringify({
+          taskType: retrievalPlan.taskType,
+          interpretation: retrievalPlan.interpretation,
+          targetMediaTypes: retrievalPlan.targetMediaTypes,
+          sourceTypes: retrievalPlan.sourceTypes,
+          preferenceSignals: retrievalPlan.preferenceSignals,
+          avoidSignals: retrievalPlan.avoidSignals,
+        })}`
+      : "Retrieval plan yok.",
     "",
     "ADAY HAVUZU (yalnızca buradan seç, asla başka başlık uydurma):",
     describeCandidates(candidates) || "(boş)",
     "",
     "Görev: Aday havuzundan en uygun 3-5 öneriyi seç. Her öneri için 'externalSource' ve 'externalId' alanlarını listedeki köşeli parantez değerleriyle birebir döndür.",
+    "reason somut olsun: kullanıcı isteği + aday metadata + profil sinyalini bağla. risk alanına gerçek uyumsuzluk yaz; yoksa null.",
+    "Cross-media önerilerde tema/ton/deneyim çevirisi yaptığını reason içinde belirt.",
+    "Aday havuzu zayıfsa assistantMessage içinde bunu açıkça söyle; yine de yalnızca havuzdan seç.",
     "Uymayan adaylardan 1-3 tanesi için kısa not ver (rejectedCandidates).",
     "Sadece geçerli JSON döndür, başka hiçbir şey yazma. Şema:",
     `{
@@ -105,26 +141,289 @@ interface ParsedJson {
   rejectedCandidates?: { title?: string; reason?: string }[];
 }
 
-function extractJson(text: string): ParsedJson | null {
+function extractJson<T = ParsedJson>(text: string): T | null {
   const stripped = text.trim().replace(/^```(?:json)?/i, "").replace(/```$/i, "").trim();
   try {
-    return JSON.parse(stripped);
+    return JSON.parse(stripped) as T;
   } catch {
     const m = stripped.match(/\{[\s\S]*\}/);
     if (!m) return null;
     try {
-      return JSON.parse(m[0]);
+      return JSON.parse(m[0]) as T;
     } catch {
       return null;
     }
   }
 }
 
+function isRateLimitResponse(status: number, bodyText: string) {
+  return status === 429 || /TooManyRequests|rate.?limit|quota/i.test(bodyText);
+}
+
+async function fetchGeminiJson(
+  key: string,
+  body: Record<string, unknown>,
+  context: string
+): Promise<GeminiResponse> {
+  let res: Response;
+  try {
+    res = await fetch(ENDPOINT(key), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : `${error}`;
+    throw new GeminiProviderError("api_error", `Gemini ${context} network error: ${message}`);
+  }
+
+  if (!res.ok) {
+    const bodyText = await res.text().catch(() => "");
+    if (isRateLimitResponse(res.status, bodyText)) {
+      throw new GeminiProviderError("rate_limit", `Gemini ${context} rate limit`, res.status);
+    }
+    throw new GeminiProviderError(
+      "api_error",
+      `Gemini ${context} HTTP ${res.status}: ${bodyText.slice(0, 200)}`,
+      res.status
+    );
+  }
+
+  try {
+    return await res.json();
+  } catch {
+    throw new GeminiProviderError("parse_error", `Gemini ${context} response parse error`);
+  }
+}
+
+function buildPlanningPrompt(args: {
+  message: string;
+  profile: LibraryProfile | null;
+  intent: AiIntent;
+  settings: AiSettings;
+  refinement?: {
+    previousPlan: AiRetrievalPlan | null;
+    candidateCount: number;
+  };
+}): string {
+  const { message, profile, intent, settings, refinement } = args;
+  const profileBlock = settings.useProfile && profile
+    ? summarizeProfile(profile)
+    : "Profil kullanılmıyor veya yok.";
+  const refineBlock = refinement
+    ? `Önceki plan ${refinement.candidateCount} aday getirdi. En fazla bir kez daha, daha iyi ama hâlâ gerçek kaynaklarda aranabilir sorgular üret. Önceki plan: ${JSON.stringify(refinement.previousPlan)}`
+    : "İlk retrieval planını üret.";
+
+  return [
+    "Sen medya tavsiye sistemi için arama planlayıcısın. Türkçe düşün, sadece geçerli JSON döndür.",
+    `Kullanıcı mesajı: """${message}"""`,
+    `Heuristik intent: ${JSON.stringify(intent)}`,
+    `Library profile: ${profileBlock}`,
+    refineBlock,
+    "",
+    "Kurallar:",
+    "- Aday başlığı uydurma; sadece arama planı yaz.",
+    "- targetMediaTypes belirsizse ve kullanıcı genel olarak 'bir şey öner' diyorsa needsClarification true yap; rastgele TVmaze/OpenLibrary/AniList araması planlama.",
+    "- anime/manga/manhwa/manhua için source anilist, tv için tvmaze, book için openlibrary kullan.",
+    "- movie/film için source tmdb yazabilirsin ama TMDB pasif olduğu için arama sonucu gelmeyeceğini bil; mümkünse clarification iste.",
+    "- Zevk kararını keyword filtresine bırakma; arama sorgularını kullanıcı isteği, profil ve referanslardan üret.",
+    "- searchPlans en fazla 6 plan, her plan en fazla 4 query içersin.",
+    "",
+    `Şema:
+{
+  "taskType": "reference_based|cross_media_translation|library_based|mood_based|avoidance_analysis|general_recommendation",
+  "interpretation": string,
+  "targetMediaTypes": ["tv"|"anime"|"manga"|"manhwa"|"manhua"|"book"|"movie"],
+  "sourceContext": string,
+  "sourceTypes": ["tv"|"anime"|"manga"|"manhwa"|"manhua"|"book"|"movie"],
+  "preferenceSignals": string[],
+  "avoidSignals": string[],
+  "needsClarification": boolean,
+  "clarificationQuestion": string|null,
+  "searchPlans": [
+    { "source": "anilist"|"tvmaze"|"openlibrary"|"tmdb", "mediaType": "tv"|"anime"|"manga"|"manhwa"|"manhua"|"book"|"movie", "queries": string[], "reason": string }
+  ]
+}`,
+  ].join("\n");
+}
+
+function buildCandidateIdeasPrompt(args: {
+  message: string;
+  profile: LibraryProfile | null;
+  intent: AiIntent;
+  settings: AiSettings;
+  retrievalPlan?: AiRetrievalPlan | null;
+  refinement?: {
+    previousIdeas: AiCandidateIdea[];
+    verifiedCount: number;
+  };
+}): string {
+  const { message, profile, intent, settings, retrievalPlan, refinement } = args;
+  const profileBlock = settings.useProfile && profile
+    ? summarizeProfile(profile)
+    : "Profil kullanılmıyor veya yok.";
+  const notesBlock = settings.usePersonalNotes && profile?.notes?.length
+    ? profile.notes.map((n) => `${n.title}: ${n.note}`).join(" | ")
+    : "Kişisel not yok.";
+  const refineBlock = refinement
+    ? `Önceki aday fikirlerinden yalnızca ${refinement.verifiedCount} tanesi doğrulandı. Aynı başlıkları tekrar etme. Önceki fikirler: ${JSON.stringify(refinement.previousIdeas)}`
+    : "İlk aday fikirlerini üret.";
+
+  return [
+    "Sen medya tavsiye sistemi için aday başlık fikirleri üreten bir asistansın. Sadece JSON döndür.",
+    "Kaynak doğrulaması yaptığını iddia etme. Sadece doğrulanabilir başlık fikirleri üret.",
+    `Kullanıcı mesajı: """${message}"""`,
+    `Intent: ${JSON.stringify(intent)}`,
+    `Retrieval plan/context: ${JSON.stringify(retrievalPlan || null)}`,
+    `Library profile: ${profileBlock}`,
+    `Notlar: ${notesBlock}`,
+    refineBlock,
+    "",
+    "Kurallar:",
+    "- Her fikir gerçek kaynaklarda title search ile bulunabilecek spesifik bir başlık olmalı.",
+    "- Hedef medya türüne kesin uy: target book ise sadece book, target anime ise sadece anime üret.",
+    "- Cross-media isteklerde source zevkini hedef türe çevir: tema, ton, tempo, karakter dinamiği, deneyim.",
+    "- Referans başlığın kendisini veya sequel/season/recap/movie/special varyantını fikir olarak verme.",
+    "- Kitap fikirlerinde mümkünse author ver; searchHint kısa ve title/author odaklı olsun.",
+    "- En fazla 10 fikir üret.",
+    "",
+    `Şema:
+{
+  "ideas": [
+    {
+      "title": string,
+      "mediaType": "tv"|"anime"|"manga"|"manhwa"|"manhua"|"book"|"movie",
+      "author": string|null,
+      "studio": string|null,
+      "year": number|null,
+      "whyItMightFit": string,
+      "searchHint": string
+    }
+  ]
+}`,
+  ].join("\n");
+}
+
+function isMediaType(value: unknown): value is MediaType {
+  return typeof value === "string" && ["movie", "tv", "anime", "manga", "manhwa", "manhua", "book"].includes(value);
+}
+
+function normalizePlanShape(parsed: Partial<AiRetrievalPlan> | null, intent: AiIntent): AiRetrievalPlan {
+  return {
+    taskType: parsed?.taskType || intent.kind,
+    interpretation: String(parsed?.interpretation || ""),
+    targetMediaTypes: (parsed?.targetMediaTypes || []).filter(isMediaType),
+    sourceContext: parsed?.sourceContext ? String(parsed.sourceContext) : undefined,
+    sourceTypes: (parsed?.sourceTypes || []).filter(isMediaType),
+    preferenceSignals: (parsed?.preferenceSignals || []).map(String).slice(0, 12),
+    avoidSignals: (parsed?.avoidSignals || []).map(String).slice(0, 12),
+    needsClarification: Boolean(parsed?.needsClarification),
+    clarificationQuestion: parsed?.clarificationQuestion ? String(parsed.clarificationQuestion) : undefined,
+    searchPlans: (parsed?.searchPlans || [])
+      .map((p) => ({
+        source: p.source,
+        mediaType: p.mediaType,
+        queries: (p.queries || []).map(String).filter(Boolean).slice(0, 4),
+        reason: String(p.reason || ""),
+      }))
+      .filter((p) =>
+        ["anilist", "tvmaze", "openlibrary", "tmdb", "library"].includes(p.source) &&
+        isMediaType(p.mediaType)
+      )
+      .slice(0, 6),
+  };
+}
+
+export async function generateGeminiRetrievalPlan(args: {
+  message: string;
+  profile: LibraryProfile | null;
+  intent: AiIntent;
+  settings: AiSettings;
+  refinement?: {
+    previousPlan: AiRetrievalPlan | null;
+    candidateCount: number;
+  };
+}): Promise<AiRetrievalPlan> {
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) throw new GeminiProviderError("gemini_key_missing", "GEMINI_API_KEY missing");
+
+  const prompt = buildPlanningPrompt(args);
+  const data = await fetchGeminiJson(
+    key,
+    {
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: {
+        responseMimeType: "application/json",
+        temperature: args.refinement ? 0.55 : 0.35,
+      },
+    },
+    "planning"
+  );
+  const text = data.candidates?.[0]?.content?.parts?.map((p) => p.text || "").join("") || "";
+  const parsed = extractJson<Partial<AiRetrievalPlan>>(text);
+  if (!parsed) {
+    throw new GeminiProviderError("parse_error", "Gemini planning returned invalid JSON");
+  }
+  return normalizePlanShape(parsed, args.intent);
+}
+
+interface CandidateIdeasJson {
+  ideas?: Partial<AiCandidateIdea>[];
+}
+
+export async function generateGeminiCandidateIdeas(args: {
+  message: string;
+  profile: LibraryProfile | null;
+  intent: AiIntent;
+  settings: AiSettings;
+  retrievalPlan?: AiRetrievalPlan | null;
+  refinement?: {
+    previousIdeas: AiCandidateIdea[];
+    verifiedCount: number;
+  };
+}): Promise<AiCandidateIdea[]> {
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) throw new GeminiProviderError("gemini_key_missing", "GEMINI_API_KEY missing");
+
+  const prompt = buildCandidateIdeasPrompt(args);
+  const data = await fetchGeminiJson(
+    key,
+    {
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: {
+        responseMimeType: "application/json",
+        temperature: args.refinement ? 0.7 : 0.55,
+      },
+    },
+    "candidate ideas"
+  );
+  const text = data.candidates?.[0]?.content?.parts?.map((p) => p.text || "").join("") || "";
+  const parsed = extractJson<CandidateIdeasJson>(text);
+  if (!parsed) {
+    throw new GeminiProviderError("parse_error", "Gemini candidate ideas returned invalid JSON");
+  }
+  return (parsed?.ideas || [])
+    .map((idea): Partial<AiCandidateIdea> => ({
+      title: String(idea.title || "").trim(),
+      mediaType: idea.mediaType,
+      author: idea.author ? String(idea.author).trim() : undefined,
+      studio: idea.studio ? String(idea.studio).trim() : undefined,
+      year: typeof idea.year === "number" ? idea.year : undefined,
+      whyItMightFit: String(idea.whyItMightFit || "").trim(),
+      searchHint: idea.searchHint ? String(idea.searchHint).trim() : undefined,
+    }))
+    .filter((idea): idea is AiCandidateIdea =>
+      !!idea.title &&
+      isMediaType(idea.mediaType)
+    )
+    .slice(0, 10);
+}
+
 function buildTransparency(settings: AiSettings): string {
   const parts = [
     settings.useProfile ? "kütüphane profil özeti" : null,
     settings.useRecentActivity ? "son aktivite özeti" : null,
-    `web araştırması ${settings.useWebResearch ? "açık" : "kapalı"}`,
+    `AI bilgi sinyali ${settings.useWebResearch ? "açık" : "kapalı"}`,
     `kişisel notlar ${settings.usePersonalNotes ? "dahil" : "değil"}`,
     settings.deepResearch ? "derin araştırma modu" : null,
   ].filter(Boolean);
@@ -142,36 +441,35 @@ function sourceLabel(s: AiCandidate["source"]): string {
 
 export const geminiProvider: AiProvider = {
   name: "gemini",
-  async generate({ message, profile, intent, settings, candidates }) {
+  isAvailable() {
+    return !!process.env.GEMINI_API_KEY;
+  },
+  generateRetrievalPlan(args) {
+    return generateGeminiRetrievalPlan(args);
+  },
+  async generate({ message, profile, intent, settings, candidates, retrievalPlan }) {
     const key = process.env.GEMINI_API_KEY;
-    if (!key) throw new Error("GEMINI_API_KEY missing");
+    if (!key) throw new GeminiProviderError("gemini_key_missing", "GEMINI_API_KEY missing");
     if (candidates.length === 0) {
-      throw new Error("No candidates to rank");
+      throw new GeminiProviderError("api_error", "No candidates to rank");
     }
 
-    const prompt = buildPrompt({ message, profile, intent, settings, candidates });
-    const res = await fetch(ENDPOINT(key), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    const prompt = buildRankingPrompt({ message, profile, intent, settings, candidates, retrievalPlan });
+    const data = await fetchGeminiJson(
+      key,
+      {
         contents: [{ role: "user", parts: [{ text: prompt }] }],
         generationConfig: {
           responseMimeType: "application/json",
           temperature: 0.7,
         },
-      }),
-    });
-
-    if (!res.ok) {
-      const body = await res.text().catch(() => "");
-      throw new Error(`Gemini HTTP ${res.status}: ${body.slice(0, 200)}`);
-    }
-
-    const data: GeminiResponse = await res.json();
+      },
+      "ranking"
+    );
     const text = data.candidates?.[0]?.content?.parts?.map((p) => p.text || "").join("") || "";
     const parsed = extractJson(text);
     if (!parsed || !Array.isArray(parsed.recommendations)) {
-      throw new Error("Gemini returned non-JSON or invalid shape");
+      throw new GeminiProviderError("parse_error", "Gemini returned non-JSON or invalid shape");
     }
 
     // Adayları map'le
@@ -208,7 +506,7 @@ export const geminiProvider: AiProvider = {
     }
 
     if (recommendations.length === 0) {
-      throw new Error("Gemini chose no valid candidate");
+      throw new GeminiProviderError("parse_error", "Gemini chose no valid candidate");
     }
 
     const out: AiRecommendResponse = {

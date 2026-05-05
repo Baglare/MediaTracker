@@ -24,14 +24,21 @@ const AVOIDANCE_HINTS = [
 
 const TYPE_TOKENS: Record<string, MediaType> = {
   film: "movie",
+  filmler: "movie",
   movie: "movie",
   dizi: "tv",
+  diziler: "tv",
+  dizilere: "tv",
+  dizilerden: "tv",
   tv: "tv",
   anime: "anime",
+  animeler: "anime",
   manga: "manga",
   manhwa: "manhwa",
   manhua: "manhua",
   kitap: "book",
+  kitaplar: "book",
+  kitaplara: "book",
   book: "book",
 };
 

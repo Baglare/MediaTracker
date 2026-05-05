@@ -40,6 +40,57 @@ interface AiCandidate {
   libraryItemId?: string;
 }
 
+interface AiRetrievalDebug {
+  taskType?: string;
+  targetMediaTypes?: MediaType[];
+  sourceTypes?: MediaType[];
+  sourceContext?: string;
+  preferenceSignals?: string[];
+  avoidSignals?: string[];
+  needsClarification?: boolean;
+  clarificationQuestion?: string;
+  searchPlans?: {
+    source: string;
+    mediaType: MediaType;
+    queries: string[];
+    reason: string;
+  }[];
+  candidateIdeasCount?: number;
+  verifiedCount?: number;
+  verificationSourceCounts?: Record<string, number>;
+  rejectedUnverifiedCount?: number;
+  fallbackSearchUsed?: boolean;
+  executedQueries?: { source: string; mediaType: MediaType; query: string; resultCount: number }[];
+  sourceCandidateCounts?: Record<string, number>;
+  filterSummary?: {
+    before: number;
+    after: number;
+    removed: number;
+    reasons: Record<string, number>;
+  };
+  finalCandidateCount?: number;
+  refinedPassUsed?: boolean;
+  providerFallback?: boolean;
+  notes?: string[];
+}
+
+interface AiDebugInfo {
+  provider?: string;
+  attemptedProviders?: string[];
+  selectedProvider?: string;
+  providerErrors?: Record<string, string>;
+  providerError?: "rate_limit" | "gemini_key_missing" | "openrouter_key_missing" | "groq_key_missing" | "parse_error" | "api_error" | "openrouter_skipped_paid_model";
+  geminiCallCount?: number;
+  openrouterCallCount?: number;
+  groqCallCount?: number;
+  rateLimitHit?: boolean;
+  fallbackReason?: string;
+  fellBackToMock?: boolean;
+  note?: string;
+  usedModel?: string;
+  retrieval?: AiRetrievalDebug;
+}
+
 interface AiRecommendation {
   id: string;
   title: string;
@@ -63,6 +114,7 @@ interface RejectedCandidate {
 }
 
 interface AiMessage {
+  id: string;
   role: "user" | "assistant";
   content: string;
 }
@@ -75,6 +127,7 @@ interface AiSession {
   recommendations: AiRecommendation[];
   rejectedCandidates?: RejectedCandidate[];
   settings: AiSettings;
+  debug?: AiDebugInfo;
 }
 
 interface AiAdvisorProps {
@@ -110,6 +163,13 @@ const LOADING_STEPS = [
   "Öneriler hazırlanıyor",
 ];
 
+function generateId(prefix = "id"): string {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return `${prefix}-${crypto.randomUUID()}`;
+  }
+  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 9)}`;
+}
+
 function buildLocalFallbackRecs(prompt: string, mediaList: MediaItem[]): AiRecommendation[] {
   const lower = prompt.toLowerCase();
   const isContinue = /devam|bugün|kütüphan|chill/.test(lower);
@@ -136,7 +196,7 @@ function buildAssistantMessage(prompt: string, settings: AiSettings, count: numb
     settings.useProfile && "kütüphane profili",
     settings.useRecentActivity && "son aktiviteler",
     settings.usePersonalNotes && "kişisel notlar",
-    settings.useWebResearch && "web araştırması",
+    settings.useWebResearch && "AI bilgi sinyali",
     settings.deepResearch && "derin araştırma",
   ]
     .filter(Boolean)
@@ -145,6 +205,58 @@ function buildAssistantMessage(prompt: string, settings: AiSettings, count: numb
     return `İsteğini "${prompt.trim()}" olarak yorumladım. Doğrulanmış aday bulunamadı.`;
   }
   return `İsteğini "${prompt.trim()}" olarak yorumladım. ${used || "Yalnızca istek metni"} kullanılarak ${count} doğrulanmış öneri hazırlandı.`;
+}
+
+function formatList(values?: string[]) {
+  return values && values.length > 0 ? values.join(", ") : "Yok";
+}
+
+function summarizeDebug(debug: AiDebugInfo): string[] {
+  const r = debug.retrieval;
+  if (!r) {
+    return [
+      `Provider: ${debug.selectedProvider || debug.provider || "mock"}${debug.fellBackToMock ? " (fallback)" : ""} | Error: ${debug.providerError || "yok"} | Model: ${debug.usedModel || "bilinmiyor"} | Gemini calls: ${debug.geminiCallCount ?? 0}`,
+      `Attempts: ${formatList(debug.attemptedProviders)} | OpenRouter calls: ${debug.openrouterCallCount ?? 0} | Groq calls: ${debug.groqCallCount ?? 0}`,
+      `Rate limit: ${debug.rateLimitHit ? "Evet" : "Hayir"} | Fallback reason: ${debug.fallbackReason || "yok"} | Note: ${debug.note || "yok"}`,
+    ];
+  }
+
+  const querySummary = r.executedQueries && r.executedQueries.length > 0
+    ? r.executedQueries
+        .slice(0, 6)
+        .map((q) => `${q.source}/${q.mediaType}: "${q.query}" (${q.resultCount})`)
+        .join(" | ")
+    : "Çalıştırılan query yok";
+
+  const sourceCounts = r.sourceCandidateCounts
+    ? Object.entries(r.sourceCandidateCounts).map(([k, v]) => `${k}: ${v}`).join(", ")
+    : "Yok";
+
+  const filterReasons = r.filterSummary?.reasons
+    ? Object.entries(r.filterSummary.reasons).map(([k, v]) => `${k}: ${v}`).join(", ")
+    : "Yok";
+
+  return [
+    `Task: ${r.taskType || "bilinmiyor"} | Provider: ${debug.selectedProvider || debug.provider || "mock"}${debug.fellBackToMock || r.providerFallback ? " (fallback)" : ""} | Error: ${debug.providerError || "yok"} | Model: ${debug.usedModel || "bilinmiyor"}`,
+    `Attempts: ${formatList(debug.attemptedProviders)} | Gemini: ${debug.geminiCallCount ?? 0} | OpenRouter: ${debug.openrouterCallCount ?? 0} | Groq: ${debug.groqCallCount ?? 0}`,
+    `Rate limit: ${debug.rateLimitHit ? "Evet" : "Hayir"} | Fallback reason: ${debug.fallbackReason || "yok"} | Provider errors: ${
+      debug.providerErrors ? Object.entries(debug.providerErrors).map(([k, v]) => `${k}: ${v}`).join(", ") || "yok" : "yok"
+    }`,
+    `Target: ${formatList(r.targetMediaTypes)} | Source: ${formatList(r.sourceTypes)}${r.sourceContext ? ` | Context: ${r.sourceContext}` : ""}`,
+    `Signals: ${formatList(r.preferenceSignals)} | Avoid: ${formatList(r.avoidSignals)}`,
+    `Clarification: ${r.needsClarification ? r.clarificationQuestion || "İstendi" : "Hayır"}`,
+    `Plan: ${(r.searchPlans || []).map((p) => `${p.source}/${p.mediaType} [${p.queries.join(", ")}]`).join(" | ") || "Yok"}`,
+    `Ideas: ${r.candidateIdeasCount ?? 0} | Verified: ${r.verifiedCount ?? 0} | Unverified: ${r.rejectedUnverifiedCount ?? 0} | Fallback search: ${r.fallbackSearchUsed ? "Evet" : "Hayır"}`,
+    `Verification counts: ${
+      r.verificationSourceCounts
+        ? Object.entries(r.verificationSourceCounts).map(([k, v]) => `${k}: ${v}`).join(", ") || "Yok"
+        : "Yok"
+    }`,
+    `Queries: ${querySummary}`,
+    `Source counts: ${sourceCounts}`,
+    `Filtering: ${r.filterSummary?.before ?? 0} -> ${r.filterSummary?.after ?? 0} | Removed: ${r.filterSummary?.removed ?? 0} | Reasons: ${filterReasons}`,
+    `Final candidates: ${r.finalCandidateCount ?? 0} | Refined pass: ${r.refinedPassUsed ? "Evet" : "Hayır"} | Notes: ${formatList(r.notes)}`,
+  ];
 }
 
 export default function AiAdvisor({
@@ -162,7 +274,16 @@ export default function AiAdvisor({
   const [sessions, setSessions] = useState<AiSession[]>([]);
   const [viewingSessionId, setViewingSessionId] = useState<string | null>(null);
   const [addedIds, setAddedIds] = useState<Record<string, boolean>>({});
+  const [debugInfo, setDebugInfo] = useState<AiDebugInfo | null>(null);
+  const [showDebug, setShowDebug] = useState(false);
+  const [pendingClarification, setPendingClarification] = useState<{
+    originalPrompt: string;
+    question: string;
+  } | null>(null);
   const stepTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inFlightRequestId = useRef<string | null>(null);
+  const inFlightPromptKey = useRef<string | null>(null);
+  const lastPersistedSessionKey = useRef<string | null>(null);
 
   useEffect(() => {
     try {
@@ -192,7 +313,12 @@ export default function AiAdvisor({
     setInput("");
     setViewingSessionId(null);
     setAddedIds({});
+    setDebugInfo(null);
+    setShowDebug(false);
+    setPendingClarification(null);
     if (stepTimer.current) clearTimeout(stepTimer.current);
+    inFlightRequestId.current = null;
+    inFlightPromptKey.current = null;
     setLoadingStep(-1);
   }, [resetSignal]);
 
@@ -211,28 +337,58 @@ export default function AiAdvisor({
     prompt: string,
     recs: AiRecommendation[],
     assistantText: string,
-    rejectedList: RejectedCandidate[]
+    rejectedList: RejectedCandidate[],
+    debug?: AiDebugInfo,
+    requestId?: string
   ) {
+    if (requestId && inFlightRequestId.current !== requestId) return;
+    if (requestId) {
+      inFlightRequestId.current = null;
+      inFlightPromptKey.current = null;
+    }
     setRecommendations(recs);
     setRejected(rejectedList);
-    setMessages((prev) => [...prev, { role: "assistant", content: assistantText }]);
+    setDebugInfo(debug || null);
+    setShowDebug(false);
+    if (debug?.retrieval?.needsClarification) {
+      setPendingClarification({
+        originalPrompt: prompt,
+        question: debug.retrieval.clarificationQuestion || assistantText,
+      });
+    } else {
+      setPendingClarification(null);
+    }
+    setMessages((prev) => [...prev, { id: generateId("msg"), role: "assistant", content: assistantText }]);
     setLoadingStep(-1);
+    if (debug?.retrieval?.needsClarification) return;
+
+    const sessionKey = `${prompt.trim().toLowerCase()}|${recs.map((r) => r.externalSource + ":" + r.externalId).join(",")}|${assistantText}`;
+    if (lastPersistedSessionKey.current === sessionKey) {
+      return;
+    }
+    lastPersistedSessionKey.current = sessionKey;
+
     const session: AiSession = {
-      id: `ai-${Date.now()}`,
+      id: requestId || generateId("session"),
       createdAt: new Date().toISOString(),
       prompt,
       assistantMessage: assistantText,
       recommendations: recs,
       rejectedCandidates: rejectedList,
       settings,
+      debug,
     };
-    persistSessions([session, ...sessions].slice(0, MAX_SESSIONS));
+    persistSessions([
+      session,
+      ...sessions.filter((s) => `${s.prompt.trim().toLowerCase()}|${s.recommendations.map((r) => r.externalSource + ":" + r.externalId).join(",")}|${s.assistantMessage}` !== sessionKey),
+    ].slice(0, MAX_SESSIONS));
   }
 
   async function runApi(prompt: string): Promise<{
     recs: AiRecommendation[];
     text: string;
     rejected: RejectedCandidate[];
+    debug?: AiDebugInfo;
   } | null> {
     try {
       const res = await fetch("/api/ai/recommend", {
@@ -243,6 +399,7 @@ export default function AiAdvisor({
           mediaItems: mediaList,
           progressLogs,
           settings,
+          recentContext: messages.slice(-6).map((m) => ({ role: m.role, content: m.content })),
         }),
       });
       if (!res.ok) return null;
@@ -270,6 +427,7 @@ export default function AiAdvisor({
         recs,
         text: data.assistantMessage || buildAssistantMessage(prompt, settings, recs.length),
         rejected: Array.isArray(data.rejectedCandidates) ? data.rejectedCandidates : [],
+        debug: data.debug,
       };
     } catch {
       return null;
@@ -279,49 +437,118 @@ export default function AiAdvisor({
   function runStep(
     step: number,
     prompt: string,
+    requestId: string,
     apiPromise: Promise<{
       recs: AiRecommendation[];
       text: string;
       rejected: RejectedCandidate[];
+      debug?: AiDebugInfo;
     } | null>
   ) {
+    if (inFlightRequestId.current !== requestId) return;
     if (step >= LOADING_STEPS.length) {
       apiPromise.then((apiResult) => {
+        if (inFlightRequestId.current !== requestId) return;
         if (apiResult) {
-          finishWith(prompt, apiResult.recs, apiResult.text, apiResult.rejected);
+          finishWith(prompt, apiResult.recs, apiResult.text, apiResult.rejected, apiResult.debug, requestId);
         } else {
           // Sunucu erişilemezse local fallback (sadece library_based benzeri)
           const recs = buildLocalFallbackRecs(prompt, mediaList);
           const text = buildAssistantMessage(prompt, settings, recs.length);
-          finishWith(prompt, recs, text, []);
+          finishWith(prompt, recs, text, [], undefined, requestId);
         }
       });
       return;
     }
     setLoadingStep(step);
-    stepTimer.current = setTimeout(() => runStep(step + 1, prompt, apiPromise), 550);
+    stepTimer.current = setTimeout(() => runStep(step + 1, prompt, requestId, apiPromise), 550);
+  }
+
+  function dominantMediaType(): MediaType | null {
+    const counts = new Map<MediaType, number>();
+    for (const item of mediaList) {
+      counts.set(item.type, (counts.get(item.type) || 0) + 1);
+    }
+    const sorted = [...counts.entries()].sort((a, b) => b[1] - a[1]);
+    return sorted[0]?.[0] || null;
+  }
+
+  function parseShortTarget(answer: string): MediaType | "auto" | null {
+    const lower = answer.toLowerCase().trim();
+    if (/^(istediğin gibi|fark etmez|sen seç|sen bilirsin|herhangi biri)$/i.test(lower)) return "auto";
+    if (/\b(dizi|tv)\b/i.test(lower)) return "tv";
+    if (/\banime\b/i.test(lower)) return "anime";
+    if (/\b(kitap|book)\b/i.test(lower)) return "book";
+    if (/\b(manga)\b/i.test(lower)) return "manga";
+    if (/\b(manhwa)\b/i.test(lower)) return "manhwa";
+    if (/\b(manhua)\b/i.test(lower)) return "manhua";
+    if (/\b(film|movie)\b/i.test(lower)) return "movie";
+    return null;
+  }
+
+  function targetLabelForPrompt(type: MediaType): string {
+    switch (type) {
+      case "tv": return "dizi";
+      case "book": return "kitap";
+      case "movie": return "film";
+      default: return type;
+    }
+  }
+
+  function mergeClarificationPrompt(answer: string): string {
+    if (!pendingClarification) return answer;
+    const target = parseShortTarget(answer);
+    if (!target) return answer;
+
+    if (target === "auto") {
+      const dominant = dominantMediaType();
+      if (!dominant) {
+        return pendingClarification.originalPrompt;
+      }
+      return `${pendingClarification.originalPrompt}. Profil çoğunluğuna göre ${targetLabelForPrompt(dominant)} hedef türünü varsay.`;
+    }
+
+    const label = targetLabelForPrompt(target);
+    const original = pendingClarification.originalPrompt;
+    if (/bir şey/i.test(original)) {
+      return original.replace(/bir şey/gi, label);
+    }
+    return `${original}. Hedef medya türü: ${label}.`;
   }
 
   function handleSend(text?: string) {
-    const prompt = (text ?? input).trim();
-    if (!prompt || isLoading) return;
+    const rawPrompt = (text ?? input).trim();
+    const promptKey = rawPrompt.toLowerCase();
+    if (!rawPrompt || isLoading || inFlightRequestId.current) return;
+    if (inFlightPromptKey.current === promptKey) return;
+    const prompt = mergeClarificationPrompt(rawPrompt);
     setViewingSessionId(null);
-    setMessages((prev) => [...prev, { role: "user", content: prompt }]);
+    setMessages((prev) => [...prev, { id: generateId("msg"), role: "user", content: rawPrompt }]);
     setInput("");
     setRecommendations([]);
     setRejected([]);
+    setDebugInfo(null);
+    setShowDebug(false);
+    const requestId = generateId("req");
+    inFlightRequestId.current = requestId;
+    inFlightPromptKey.current = promptKey;
     const apiPromise = runApi(prompt);
-    runStep(0, prompt, apiPromise);
+    runStep(0, prompt, requestId, apiPromise);
   }
 
   function handleNewTopic() {
     if (stepTimer.current) clearTimeout(stepTimer.current);
+    inFlightRequestId.current = null;
+    inFlightPromptKey.current = null;
     setMessages([]);
     setRecommendations([]);
     setRejected([]);
     setInput("");
     setViewingSessionId(null);
     setAddedIds({});
+    setDebugInfo(null);
+    setShowDebug(false);
+    setPendingClarification(null);
     setLoadingStep(-1);
   }
 
@@ -332,6 +559,9 @@ export default function AiAdvisor({
     setMessages([]);
     setRecommendations(s.recommendations);
     setRejected(s.rejectedCandidates || []);
+    setDebugInfo(s.debug || null);
+    setShowDebug(false);
+    setPendingClarification(null);
     setInput("");
   }
 
@@ -356,7 +586,7 @@ export default function AiAdvisor({
     const parts = [
       settings.useProfile ? "kütüphane profil özeti" : null,
       settings.useRecentActivity ? "son aktivite özeti" : null,
-      `web araştırması ${settings.useWebResearch ? "açık" : "kapalı"}`,
+      `AI bilgi sinyali ${settings.useWebResearch ? "açık" : "kapalı"}`,
       `kişisel notlar ${settings.usePersonalNotes ? "dahil" : "değil"}`,
       settings.deepResearch ? "derin araştırma modu" : null,
     ].filter(Boolean);
@@ -432,9 +662,9 @@ export default function AiAdvisor({
 
         {messages.length > 0 && (
           <div className="space-y-3">
-            {messages.map((m, i) => (
+            {messages.map((m) => (
               <div
-                key={i}
+                key={m.id}
                 className={`p-3 rounded-xl text-sm leading-relaxed ${
                   m.role === "user"
                     ? "bg-violet-500/10 border border-violet-500/20 text-zinc-100 ml-auto max-w-[85%]"
@@ -467,6 +697,27 @@ export default function AiAdvisor({
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {debugInfo && !isLoading && (
+          <div className="rounded-xl bg-zinc-950/30 border border-zinc-800/60 overflow-hidden">
+            <button
+              onClick={() => setShowDebug((prev) => !prev)}
+              className="w-full flex items-center justify-between gap-3 px-3 py-2 text-xs text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50 transition-colors cursor-pointer"
+            >
+              <span>Teknik planı göster</span>
+              <ChevronRight className={`w-3.5 h-3.5 transition-transform ${showDebug ? "rotate-90" : ""}`} />
+            </button>
+            {showDebug && (
+              <div className="px-3 pb-3 space-y-1.5">
+                {summarizeDebug(debugInfo).map((line, i) => (
+                  <p key={`debug-${i}`} className="text-[11px] leading-relaxed text-zinc-500">
+                    {line}
+                  </p>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -545,7 +796,7 @@ export default function AiAdvisor({
             <p className="text-xs text-zinc-500 uppercase tracking-wide mb-2">Elenenler</p>
             <ul className="space-y-1.5">
               {rejected.slice(0, 3).map((r, i) => (
-                <li key={i} className="text-xs text-zinc-400">
+                <li key={`rejected-${i}-${r.title}`} className="text-xs text-zinc-400">
                   <span className="text-zinc-300">{r.title}</span> — {r.reason}
                 </li>
               ))}
@@ -590,7 +841,7 @@ export default function AiAdvisor({
                 ["useProfile", "Kütüphane profilimi kullan"],
                 ["useRecentActivity", "Son aktivitelerimi kullan"],
                 ["usePersonalNotes", "Kişisel notlarımı dahil et"],
-                ["useWebResearch", "Web araştırması kullan"],
+                ["useWebResearch", "AI bilgi sinyali kullan"],
                 ["deepResearch", "Derin araştırma modu"],
               ] as const
             ).map(([key, label]) => (
