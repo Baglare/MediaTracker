@@ -37,6 +37,7 @@ import {
 } from "@/lib/sync-manager";
 import QuickAddModal from "@/components/quick-add-modal";
 import EnhancedDashboard from "@/components/enhanced-dashboard";
+import AiAdvisor from "@/components/ai-advisor";
 import { ChevronDown, ChevronUp, Search, Plus } from "lucide-react";
 import { GlobalSearchResult } from "@/lib/global-search-types";
 import { mockMediaList } from "@/lib/mock-media";
@@ -72,6 +73,9 @@ export default function HomePage() {
 
   // Gelişmiş aramaları (eski panelleri) gösterme durumu
   const [showAdvancedSearches, setShowAdvancedSearches] = useState(false);
+
+  // AI Danışman sekmesi dışına çıkıldığında aktif sohbeti sıfırlamak için sinyal
+  const [aiResetSignal, setAiResetSignal] = useState(0);
 
   // Modal durumları
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -127,7 +131,12 @@ export default function HomePage() {
   // ---- EYLEMLER (Actions) ----
 
   const handleTabChange = useCallback((tab: TabType) => {
-    setActiveTab(tab);
+    setActiveTab((prev) => {
+      if (prev === "ai" && tab !== "ai") {
+        setAiResetSignal((s) => s + 1);
+      }
+      return tab;
+    });
     setDetailMediaId(null);
     setEditingItem(null);
     setIsModalOpen(false);
@@ -831,6 +840,16 @@ export default function HomePage() {
               )}
             </div>
           </div>
+        )}
+
+        {/* AI DANIŞMAN SEKMESI */}
+        {activeTab === "ai" && (
+          <AiAdvisor
+            mediaList={mediaList}
+            progressLogs={progressLogs}
+            resetSignal={aiResetSignal}
+            onAddToLibrary={handleAddFromGlobalSearch}
+          />
         )}
 
         {/* AKTİVİTE SEKMESI */}
