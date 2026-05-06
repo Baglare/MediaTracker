@@ -48,7 +48,7 @@ export interface LibraryProfile {
   notes?: { title: string; note: string }[];
 }
 
-export type RetrievalSource = "anilist" | "tvmaze" | "openlibrary" | "tmdb" | "library";
+export type RetrievalSource = "anilist" | "tvmaze" | "openlibrary" | "omdb" | "tmdb" | "library";
 
 export interface AiSearchPlan {
   source: RetrievalSource;
@@ -107,11 +107,14 @@ export interface AiRetrievalDebug {
   finalCandidateCount: number;
   refinedPassUsed: boolean;
   providerFallback: boolean;
+  parseRepairUsed?: boolean;
+  ideationFailedReason?: "provider_parse_error" | "all_providers_failed" | "empty_ideas" | "rate_limit" | "key_missing" | "api_error" | "skipped_library_based";
+  safeFallbackUsed?: boolean;
   notes?: string[];
 }
 
 export interface AiCandidate {
-  source: "tvmaze" | "anilist" | "openlibrary" | "library";
+  source: "tvmaze" | "anilist" | "openlibrary" | "omdb" | "library";
   externalId: string;
   type: MediaType;
   title: string;
@@ -139,7 +142,7 @@ export interface AiRecommendation {
   title: string;
   mediaType: MediaType;
   source: string;             // "AniList" | "TVmaze" | "Open Library" | "Kütüphanen"
-  externalSource?: "tvmaze" | "anilist" | "openlibrary" | "library";
+  externalSource?: "tvmaze" | "anilist" | "openlibrary" | "omdb" | "library";
   externalId?: string;
   coverUrl?: string;
   overview?: string;
@@ -162,12 +165,15 @@ export interface AiRecommendResponse {
     attemptedProviders?: string[];
     selectedProvider?: string;
     providerErrors?: Record<string, string>;
-    providerError?: "rate_limit" | "gemini_key_missing" | "openrouter_key_missing" | "groq_key_missing" | "parse_error" | "api_error" | "openrouter_skipped_paid_model";
+    providerError?: "rate_limit" | "gemini_key_missing" | "openrouter_key_missing" | "groq_key_missing" | "parse_error" | "api_error" | "openrouter_skipped_paid_model" | "timeout";
     geminiCallCount?: number;
     openrouterCallCount?: number;
     groqCallCount?: number;
+    providerCallCounts?: Record<string, number>;
     rateLimitHit?: boolean;
+    timeoutHit?: boolean;
     fallbackReason?: string;
+    safeFallbackUsed?: boolean;
     fellBackToMock?: boolean;
     note?: string;
     usedModel?: string;

@@ -61,19 +61,95 @@ interface ParsedRankJson {
   rejectedCandidates?: { title?: string; reason?: string }[];
 }
 
-function extractJson<T>(text: string): T | null {
-  const stripped = text.trim().replace(/^```(?:json)?/i, "").replace(/```$/i, "").trim();
+interface ExtractResult<T> {
+  data: T | null;
+  repairUsed: boolean;
+}
+
+/**
+ * JSON çıkarımı. Stratejiler:
+ *  1) Doğrudan parse.
+ *  2) ```json fence sıyır + parse.
+ *  3) İlk balanced { ... } bloğunu bul + parse.
+ *  4) En geniş balanced { ... } bloğunu bul + parse.
+ *  5) Trailing comma temizleme + parse.
+ * 2-5 arası başarı = repair kullanıldı.
+ */
+function extractJsonRich<T>(rawText: string): ExtractResult<T> {
+  if (!rawText) return { data: null, repairUsed: false };
+  const text = rawText.trim();
+
+  // 1) Direkt
   try {
-    return JSON.parse(stripped) as T;
+    return { data: JSON.parse(text) as T, repairUsed: false };
   } catch {
-    const m = stripped.match(/\{[\s\S]*\}/);
-    if (!m) return null;
+    // devam
+  }
+
+  // 2) Fence sıyır
+  const fenced = text
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/```\s*$/i, "")
+    .trim();
+  if (fenced !== text) {
     try {
-      return JSON.parse(m[0]) as T;
+      return { data: JSON.parse(fenced) as T, repairUsed: true };
     } catch {
-      return null;
+      // devam
     }
   }
+
+  const findBalancedBlocks = (s: string): string[] => {
+    const blocks: string[] = [];
+    let depth = 0;
+    let start = -1;
+    let inString = false;
+    let escape = false;
+    for (let i = 0; i < s.length; i++) {
+      const ch = s[i];
+      if (escape) { escape = false; continue; }
+      if (ch === "\\") { escape = true; continue; }
+      if (ch === '"') { inString = !inString; continue; }
+      if (inString) continue;
+      if (ch === "{") {
+        if (depth === 0) start = i;
+        depth++;
+      } else if (ch === "}") {
+        depth--;
+        if (depth === 0 && start !== -1) {
+          blocks.push(s.slice(start, i + 1));
+          start = -1;
+        }
+      }
+    }
+    return blocks;
+  };
+
+  const blocks = findBalancedBlocks(fenced);
+
+  // 3-4) Önce en uzun, sonra ilk
+  const ordered = [...blocks].sort((a, b) => b.length - a.length).concat(blocks);
+  for (const block of ordered) {
+    try {
+      return { data: JSON.parse(block) as T, repairUsed: true };
+    } catch {
+      // 5) trailing comma temizleme
+      const cleaned = block.replace(/,(\s*[}\]])/g, "$1");
+      if (cleaned !== block) {
+        try {
+          return { data: JSON.parse(cleaned) as T, repairUsed: true };
+        } catch {
+          // devam
+        }
+      }
+    }
+  }
+
+  return { data: null, repairUsed: false };
+}
+
+function extractJson<T>(text: string): T | null {
+  return extractJsonRich<T>(text).data;
 }
 
 function isRateLimit(status: number, text: string) {
@@ -169,7 +245,7 @@ function buildPlanningPrompt(args: {
     `Intent: ${JSON.stringify(args.intent)}`,
     `Library profile: ${profileBlock}`,
     refineBlock,
-    "Kurallar: hedef tür belirsizse clarification iste; anime/manga/manhwa/manhua için anilist, tv için tvmaze, book için openlibrary, movie için tmdb kullan.",
+    "Kurallar: hedef tür belirsizse clarification iste; anime/manga/manhwa/manhua için anilist, tv için tvmaze, book için openlibrary, movie/film için omdb kullan.",
     `Şema:
 {
   "taskType": string,
@@ -182,7 +258,7 @@ function buildPlanningPrompt(args: {
   "needsClarification": boolean,
   "clarificationQuestion": string|null,
   "searchPlans": [
-    { "source": "anilist"|"tvmaze"|"openlibrary"|"tmdb", "mediaType": "tv"|"anime"|"manga"|"manhwa"|"manhua"|"book"|"movie", "queries": string[], "reason": string }
+    { "source": "anilist"|"tvmaze"|"openlibrary"|"omdb", "mediaType": "tv"|"anime"|"manga"|"manhwa"|"manhua"|"book"|"movie", "queries": string[], "reason": string }
   ]
 }`,
   ].join("\n");
@@ -211,7 +287,7 @@ function normalizePlanShape(parsed: Partial<AiRetrievalPlan> | null, intent: AiI
         reason: String(p.reason || ""),
       }))
       .filter((p) =>
-        ["anilist", "tvmaze", "openlibrary", "tmdb", "library"].includes(p.source) &&
+        ["anilist", "tvmaze", "openlibrary", "omdb", "library"].includes(p.source) &&
         isMediaType(p.mediaType)
       )
       .slice(0, 6),
@@ -256,7 +332,7 @@ function buildRankingPrompt(args: {
   "assistantMessage": string,
   "recommendations": [
     {
-      "externalSource": "anilist"|"tvmaze"|"openlibrary"|"library",
+      "externalSource": "anilist"|"tvmaze"|"openlibrary"|"omdb"|"library",
       "externalId": string,
       "fitLabel": string,
       "reason": string,
@@ -274,6 +350,7 @@ function sourceLabel(s: AiCandidate["source"]): string {
     case "anilist": return "AniList";
     case "tvmaze": return "TVmaze";
     case "openlibrary": return "Open Library";
+    case "omdb": return "OMDb";
     case "library": return "Kütüphanen";
   }
 }
@@ -298,7 +375,7 @@ function createCompatibleProvider(config: CompatibleConfig): AiProvider {
     async generateRetrievalPlan(args) {
       const response = await fetchChatJson(config, buildPlanningPrompt(args), args.refinement ? 0.55 : 0.35);
       const text = response.choices?.[0]?.message?.content || "";
-      const parsed = extractJson<Partial<AiRetrievalPlan>>(text);
+      const { data: parsed } = extractJsonRich<Partial<AiRetrievalPlan>>(text);
       if (!parsed) {
         throw new CompatibleProviderError(config.name, "parse_error", `${config.name} planning returned invalid JSON`);
       }
@@ -311,7 +388,7 @@ function createCompatibleProvider(config: CompatibleConfig): AiProvider {
 
       const response = await fetchChatJson(config, buildRankingPrompt(args), 0.7);
       const text = response.choices?.[0]?.message?.content || "";
-      const parsed = extractJson<ParsedRankJson>(text);
+      const { data: parsed, repairUsed } = extractJsonRich<ParsedRankJson>(text);
       if (!parsed || !Array.isArray(parsed.recommendations)) {
         throw new CompatibleProviderError(config.name, "parse_error", `${config.name} ranking returned invalid JSON`);
       }
@@ -359,7 +436,11 @@ function createCompatibleProvider(config: CompatibleConfig): AiProvider {
           .slice(0, 3),
         transparencySummary: buildTransparency(args.settings),
         intent: args.intent,
-        debug: { provider: config.name, usedModel: process.env[config.modelEnv] || config.defaultModel },
+        debug: {
+          provider: config.name,
+          usedModel: process.env[config.modelEnv] || config.defaultModel,
+          ...(repairUsed ? { note: "json_parse_repair_used" } : {}),
+        },
       } satisfies AiRecommendResponse;
     },
   };

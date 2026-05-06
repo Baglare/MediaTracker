@@ -26,7 +26,7 @@ export interface AiSettings {
 }
 
 interface AiCandidate {
-  source: "tvmaze" | "anilist" | "openlibrary" | "library";
+  source: "tvmaze" | "anilist" | "openlibrary" | "omdb" | "library";
   externalId: string;
   type: MediaType;
   title: string;
@@ -71,6 +71,9 @@ interface AiRetrievalDebug {
   finalCandidateCount?: number;
   refinedPassUsed?: boolean;
   providerFallback?: boolean;
+  parseRepairUsed?: boolean;
+  ideationFailedReason?: string;
+  safeFallbackUsed?: boolean;
   notes?: string[];
 }
 
@@ -79,15 +82,18 @@ interface AiDebugInfo {
   attemptedProviders?: string[];
   selectedProvider?: string;
   providerErrors?: Record<string, string>;
-  providerError?: "rate_limit" | "gemini_key_missing" | "openrouter_key_missing" | "groq_key_missing" | "parse_error" | "api_error" | "openrouter_skipped_paid_model";
+  providerError?: "rate_limit" | "gemini_key_missing" | "openrouter_key_missing" | "groq_key_missing" | "parse_error" | "api_error" | "openrouter_skipped_paid_model" | "timeout";
   geminiCallCount?: number;
   openrouterCallCount?: number;
   groqCallCount?: number;
+  providerCallCounts?: Record<string, number>;
   rateLimitHit?: boolean;
+  timeoutHit?: boolean;
   fallbackReason?: string;
   fellBackToMock?: boolean;
   note?: string;
   usedModel?: string;
+  safeFallbackUsed?: boolean;
   retrieval?: AiRetrievalDebug;
 }
 
@@ -96,7 +102,7 @@ interface AiRecommendation {
   title: string;
   mediaType: MediaType;
   source: string;
-  externalSource?: "tvmaze" | "anilist" | "openlibrary" | "library";
+  externalSource?: "tvmaze" | "anilist" | "openlibrary" | "omdb" | "library";
   externalId?: string;
   coverUrl?: string;
   overview?: string;
@@ -162,6 +168,7 @@ const LOADING_STEPS = [
   "Adaylar aranıyor",
   "Öneriler hazırlanıyor",
 ];
+const AI_REQUEST_TIMEOUT_MS = 35000;
 
 function generateId(prefix = "id"): string {
   if (typeof crypto !== "undefined" && crypto.randomUUID) {
@@ -215,9 +222,11 @@ function summarizeDebug(debug: AiDebugInfo): string[] {
   const r = debug.retrieval;
   if (!r) {
     return [
-      `Provider: ${debug.selectedProvider || debug.provider || "mock"}${debug.fellBackToMock ? " (fallback)" : ""} | Error: ${debug.providerError || "yok"} | Model: ${debug.usedModel || "bilinmiyor"} | Gemini calls: ${debug.geminiCallCount ?? 0}`,
-      `Attempts: ${formatList(debug.attemptedProviders)} | OpenRouter calls: ${debug.openrouterCallCount ?? 0} | Groq calls: ${debug.groqCallCount ?? 0}`,
-      `Rate limit: ${debug.rateLimitHit ? "Evet" : "Hayir"} | Fallback reason: ${debug.fallbackReason || "yok"} | Note: ${debug.note || "yok"}`,
+      `Provider: ${debug.selectedProvider || debug.provider || "mock"}${debug.fellBackToMock ? " (fallback)" : ""} | Error: ${debug.providerError || "yok"} | Model: ${debug.usedModel || "bilinmiyor"}`,
+      `Attempts: ${formatList(debug.attemptedProviders)} | Calls: ${
+        debug.providerCallCounts ? Object.entries(debug.providerCallCounts).map(([k, v]) => `${k}: ${v}`).join(", ") : `gemini: ${debug.geminiCallCount ?? 0}, openrouter: ${debug.openrouterCallCount ?? 0}, groq: ${debug.groqCallCount ?? 0}`
+      }`,
+      `Rate limit: ${debug.rateLimitHit ? "Evet" : "Hayir"} | Timeout: ${debug.timeoutHit ? "Evet" : "Hayir"} | Safe fallback: ${debug.safeFallbackUsed ? "Evet" : "Hayir"} | Fallback reason: ${debug.fallbackReason || "yok"} | Note: ${debug.note || "yok"}`,
     ];
   }
 
@@ -238,8 +247,10 @@ function summarizeDebug(debug: AiDebugInfo): string[] {
 
   return [
     `Task: ${r.taskType || "bilinmiyor"} | Provider: ${debug.selectedProvider || debug.provider || "mock"}${debug.fellBackToMock || r.providerFallback ? " (fallback)" : ""} | Error: ${debug.providerError || "yok"} | Model: ${debug.usedModel || "bilinmiyor"}`,
-    `Attempts: ${formatList(debug.attemptedProviders)} | Gemini: ${debug.geminiCallCount ?? 0} | OpenRouter: ${debug.openrouterCallCount ?? 0} | Groq: ${debug.groqCallCount ?? 0}`,
-    `Rate limit: ${debug.rateLimitHit ? "Evet" : "Hayir"} | Fallback reason: ${debug.fallbackReason || "yok"} | Provider errors: ${
+    `Attempts: ${formatList(debug.attemptedProviders)} | Calls: ${
+      debug.providerCallCounts ? Object.entries(debug.providerCallCounts).map(([k, v]) => `${k}: ${v}`).join(", ") : `gemini: ${debug.geminiCallCount ?? 0}, openrouter: ${debug.openrouterCallCount ?? 0}, groq: ${debug.groqCallCount ?? 0}`
+    }`,
+    `Rate limit: ${debug.rateLimitHit ? "Evet" : "Hayir"} | Timeout: ${debug.timeoutHit ? "Evet" : "Hayir"} | Safe fallback: ${debug.safeFallbackUsed ? "Evet" : "Hayir"} | Fallback reason: ${debug.fallbackReason || "yok"} | Provider errors: ${
       debug.providerErrors ? Object.entries(debug.providerErrors).map(([k, v]) => `${k}: ${v}`).join(", ") || "yok" : "yok"
     }`,
     `Target: ${formatList(r.targetMediaTypes)} | Source: ${formatList(r.sourceTypes)}${r.sourceContext ? ` | Context: ${r.sourceContext}` : ""}`,
@@ -256,6 +267,7 @@ function summarizeDebug(debug: AiDebugInfo): string[] {
     `Source counts: ${sourceCounts}`,
     `Filtering: ${r.filterSummary?.before ?? 0} -> ${r.filterSummary?.after ?? 0} | Removed: ${r.filterSummary?.removed ?? 0} | Reasons: ${filterReasons}`,
     `Final candidates: ${r.finalCandidateCount ?? 0} | Refined pass: ${r.refinedPassUsed ? "Evet" : "Hayır"} | Notes: ${formatList(r.notes)}`,
+    `Parse repair: ${r.parseRepairUsed ? "Evet" : "Hayır"} | Safe fallback: ${r.safeFallbackUsed ? "Evet" : "Hayır"} | Ideation failed: ${r.ideationFailedReason || "yok"}`,
   ];
 }
 
@@ -390,10 +402,13 @@ export default function AiAdvisor({
     rejected: RejectedCandidate[];
     debug?: AiDebugInfo;
   } | null> {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), AI_REQUEST_TIMEOUT_MS);
     try {
       const res = await fetch("/api/ai/recommend", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
         body: JSON.stringify({
           message: prompt,
           mediaItems: mediaList,
@@ -431,6 +446,8 @@ export default function AiAdvisor({
       };
     } catch {
       return null;
+    } finally {
+      clearTimeout(timeoutId);
     }
   }
 
@@ -447,17 +464,29 @@ export default function AiAdvisor({
   ) {
     if (inFlightRequestId.current !== requestId) return;
     if (step >= LOADING_STEPS.length) {
-      apiPromise.then((apiResult) => {
-        if (inFlightRequestId.current !== requestId) return;
-        if (apiResult) {
-          finishWith(prompt, apiResult.recs, apiResult.text, apiResult.rejected, apiResult.debug, requestId);
-        } else {
-          // Sunucu erişilemezse local fallback (sadece library_based benzeri)
+      apiPromise
+        .then((apiResult) => {
+          if (inFlightRequestId.current !== requestId) return;
+          if (apiResult) {
+            finishWith(prompt, apiResult.recs, apiResult.text, apiResult.rejected, apiResult.debug, requestId);
+          } else {
+            const recs = buildLocalFallbackRecs(prompt, mediaList);
+            const text = buildAssistantMessage(prompt, settings, recs.length);
+            finishWith(prompt, recs, text, [], undefined, requestId);
+          }
+        })
+        .catch(() => {
+          if (inFlightRequestId.current !== requestId) return;
           const recs = buildLocalFallbackRecs(prompt, mediaList);
           const text = buildAssistantMessage(prompt, settings, recs.length);
           finishWith(prompt, recs, text, [], undefined, requestId);
-        }
-      });
+        })
+        .finally(() => {
+          if (inFlightRequestId.current !== requestId) return;
+          inFlightRequestId.current = null;
+          inFlightPromptKey.current = null;
+          setLoadingStep(-1);
+        });
       return;
     }
     setLoadingStep(step);

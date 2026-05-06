@@ -108,7 +108,7 @@ function buildRankingPrompt(args: {
   "assistantMessage": string,
   "recommendations": [
     {
-      "externalSource": "anilist"|"tvmaze"|"openlibrary"|"library",
+      "externalSource": "anilist"|"tvmaze"|"openlibrary"|"omdb"|"library",
       "externalId": string,
       "fitLabel": string,
       "reason": string,
@@ -224,8 +224,7 @@ function buildPlanningPrompt(args: {
     "Kurallar:",
     "- Aday başlığı uydurma; sadece arama planı yaz.",
     "- targetMediaTypes belirsizse ve kullanıcı genel olarak 'bir şey öner' diyorsa needsClarification true yap; rastgele TVmaze/OpenLibrary/AniList araması planlama.",
-    "- anime/manga/manhwa/manhua için source anilist, tv için tvmaze, book için openlibrary kullan.",
-    "- movie/film için source tmdb yazabilirsin ama TMDB pasif olduğu için arama sonucu gelmeyeceğini bil; mümkünse clarification iste.",
+    "- anime/manga/manhwa/manhua için source anilist, tv için tvmaze, book için openlibrary, movie/film için omdb kullan.",
     "- Zevk kararını keyword filtresine bırakma; arama sorgularını kullanıcı isteği, profil ve referanslardan üret.",
     "- searchPlans en fazla 6 plan, her plan en fazla 4 query içersin.",
     "",
@@ -241,7 +240,7 @@ function buildPlanningPrompt(args: {
   "needsClarification": boolean,
   "clarificationQuestion": string|null,
   "searchPlans": [
-    { "source": "anilist"|"tvmaze"|"openlibrary"|"tmdb", "mediaType": "tv"|"anime"|"manga"|"manhwa"|"manhua"|"book"|"movie", "queries": string[], "reason": string }
+    { "source": "anilist"|"tvmaze"|"openlibrary"|"omdb", "mediaType": "tv"|"anime"|"manga"|"manhwa"|"manhua"|"book"|"movie", "queries": string[], "reason": string }
   ]
 }`,
   ].join("\n");
@@ -327,7 +326,7 @@ function normalizePlanShape(parsed: Partial<AiRetrievalPlan> | null, intent: AiI
         reason: String(p.reason || ""),
       }))
       .filter((p) =>
-        ["anilist", "tvmaze", "openlibrary", "tmdb", "library"].includes(p.source) &&
+        ["anilist", "tvmaze", "openlibrary", "omdb", "library"].includes(p.source) &&
         isMediaType(p.mediaType)
       )
       .slice(0, 6),
@@ -435,6 +434,7 @@ function sourceLabel(s: AiCandidate["source"]): string {
     case "anilist": return "AniList";
     case "tvmaze": return "TVmaze";
     case "openlibrary": return "Open Library";
+    case "omdb": return "OMDb";
     case "library": return "Kütüphanen";
   }
 }
@@ -520,7 +520,7 @@ export const geminiProvider: AiProvider = {
         .slice(0, 3),
       transparencySummary: buildTransparency(settings),
       intent,
-      debug: { provider: "gemini" },
+      debug: { provider: "gemini", usedModel: MODEL },
     };
     return out;
   },

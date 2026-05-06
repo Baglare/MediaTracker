@@ -75,6 +75,8 @@ export default function MediaDetailModal({
       ? "AniList"
       : media.externalSource === "openlibrary"
       ? "Open Library"
+      : media.externalSource === "omdb"
+      ? "OMDb"
       : media.externalSource === "tmdb"
       ? "TMDB"
       : "Manuel";
@@ -83,6 +85,9 @@ export default function MediaDetailModal({
   let sourceLink = media.siteUrl;
   if (!sourceLink && media.externalSource === "openlibrary" && media.externalId) {
     sourceLink = `https://openlibrary.org${media.externalId}`;
+  }
+  if (!sourceLink && media.externalSource === "omdb" && media.externalId) {
+    sourceLink = `https://www.imdb.com/title/${media.externalId}/`;
   }
 
   // Durum rengi

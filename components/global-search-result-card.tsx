@@ -25,6 +25,8 @@ function getSourceBadge(source: string) {
       return { label: "AniList", cls: "bg-rose-500/15 text-rose-400 ring-rose-500/25" };
     case "openlibrary":
       return { label: "Open Library", cls: "bg-lime-500/15 text-lime-400 ring-lime-500/25" };
+    case "omdb":
+      return { label: "OMDb", cls: "bg-amber-500/15 text-amber-300 ring-amber-500/25" };
     default:
       return { label: source, cls: "bg-zinc-500/15 text-zinc-400 ring-zinc-500/25" };
   }

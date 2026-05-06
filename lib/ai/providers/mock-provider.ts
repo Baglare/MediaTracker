@@ -2,7 +2,7 @@
 // Mock AI Provider
 // ============================================
 // Anahtar yokken / fallback için kullanılan deterministik provider.
-// Sadece doğrulanmış adaylar üzerinden öneri üretir; hayalî başlık üretmez.
+// Sadece doğrulanmış adaylar üzerinden öneri üretir; hayali başlık üretmez.
 
 import {
   AiProvider,
@@ -22,8 +22,10 @@ function sourceLabel(c: AiCandidate): string {
     case "anilist": return "AniList";
     case "tvmaze": return "TVmaze";
     case "openlibrary": return "Open Library";
+    case "omdb": return "OMDb";
     case "library": return "Kütüphanen";
   }
+  return "Kaynak";
 }
 
 function libraryReason(c: AiCandidate): string {
@@ -69,7 +71,7 @@ function buildAssistantMessage(message: string, settings: AiSettings, count: num
     settings.useProfile && "kütüphane profili",
     settings.useRecentActivity && "son aktiviteler",
     settings.usePersonalNotes && "kişisel notlar",
-    settings.useWebResearch && "web araştırması",
+    settings.useWebResearch && "AI bilgi sinyali",
     settings.deepResearch && "derin araştırma",
   ]
     .filter(Boolean)
@@ -81,7 +83,7 @@ function buildTransparency(settings: AiSettings): string {
   const parts = [
     settings.useProfile ? "kütüphane profil özeti" : null,
     settings.useRecentActivity ? "son aktivite özeti" : null,
-    `web araştırması ${settings.useWebResearch ? "açık" : "kapalı"}`,
+    `AI bilgi sinyali ${settings.useWebResearch ? "açık" : "kapalı"}`,
     `kişisel notlar ${settings.usePersonalNotes ? "dahil" : "değil"}`,
     settings.deepResearch ? "derin araştırma modu" : null,
   ].filter(Boolean);

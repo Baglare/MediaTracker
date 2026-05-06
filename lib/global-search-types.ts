@@ -6,7 +6,7 @@ import { MediaType } from "./types";
 
 /** Global Search sonuçlarının ortak yapısı */
 export interface GlobalSearchResult {
-  source: "tvmaze" | "anilist" | "openlibrary";
+  source: "tvmaze" | "anilist" | "openlibrary" | "omdb";
   externalId: string;
   type: MediaType;
   title: string;

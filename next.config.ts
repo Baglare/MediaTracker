@@ -19,6 +19,16 @@ const nextConfig: NextConfig = {
         hostname: "s4.anilist.co",
         pathname: "/file/**",
       },
+      {
+        protocol: "https",
+        hostname: "m.media-amazon.com",
+        pathname: "/images/**",
+      },
+      {
+        protocol: "https",
+        hostname: "ia.media-imdb.com",
+        pathname: "/images/**",
+      },
     ],
   },
 };

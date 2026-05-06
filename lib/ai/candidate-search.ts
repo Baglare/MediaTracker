@@ -21,6 +21,7 @@ import {
 import { AniListNormalizedResult, AniListCategory } from "@/lib/anilist-types";
 import { TvmazeNormalizedResult } from "@/lib/tvmaze-types";
 import { OpenLibraryNormalizedResult } from "@/lib/openlibrary-types";
+import { OmdbNormalizedResult } from "@/lib/omdb-types";
 import { GlobalSearchResult } from "@/lib/global-search-types";
 
 const PER_SOURCE_LIMIT = 8;
@@ -313,7 +314,7 @@ async function searchForType(ctx: SearchContext, type: MediaType, q: string): Pr
     case "book":
       return searchOpenLibrary(ctx, q);
     case "movie":
-      return []; // TMDB pasif
+      return searchOmdb(ctx, q);
   }
 }
 
@@ -526,6 +527,8 @@ function sourceMatchesMediaType(plan: AiSearchPlan): boolean {
       return plan.mediaType === "tv";
     case "openlibrary":
       return plan.mediaType === "book";
+    case "omdb":
+      return plan.mediaType === "movie";
     case "tmdb":
       return plan.mediaType === "movie";
     case "library":
@@ -544,7 +547,7 @@ function normalizePlan(plan: AiRetrievalPlan, intent: AiIntent): AiRetrievalPlan
         .slice(0, MAX_PLAN_QUERIES),
       reason: String(p.reason || ""),
     }))
-    .filter((p) => p.queries.length > 0 || p.source === "tmdb")
+    .filter((p) => p.queries.length > 0)
     .slice(0, 8);
 
   const targetMediaTypes = (Array.isArray(plan.targetMediaTypes) ? plan.targetMediaTypes : [])
@@ -571,17 +574,12 @@ async function runRetrievalPlan(
   const tasks: Promise<AiCandidate[]>[] = [];
 
   for (const p of plan.searchPlans) {
-    if (p.source === "tmdb") {
-      for (const q of p.queries.slice(0, MAX_PLAN_QUERIES)) {
-        recordQuery(ctx.debug, "tmdb", "movie", q, 0);
-      }
-      continue; // TMDB pasif: film adayları uydurulmaz.
-    }
     if (p.source === "library") continue;
     for (const q of p.queries.slice(0, MAX_PLAN_QUERIES)) {
       if (p.source === "anilist") tasks.push(searchAniList(ctx, q, p.mediaType));
       else if (p.source === "tvmaze") tasks.push(searchTvmaze(ctx, q));
       else if (p.source === "openlibrary") tasks.push(searchOpenLibrary(ctx, q));
+      else if (p.source === "omdb" || p.source === "tmdb") tasks.push(searchOmdb(ctx, q));
     }
   }
 
@@ -607,8 +605,49 @@ async function searchForIdea(ctx: SearchContext, idea: AiCandidateIdea): Promise
     case "book":
       return searchOpenLibrary(ctx, query);
     case "movie":
-      recordQuery(ctx.debug, "tmdb", "movie", query, 0);
-      return [];
+      return searchOmdb(ctx, query);
+  }
+}
+
+async function searchOmdb(ctx: SearchContext, q: string): Promise<AiCandidate[]> {
+  if (!q.trim()) return [];
+  try {
+    const url = `${ctx.baseUrl}/api/omdb/search?q=${encodeURIComponent(q)}`;
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) return [];
+    const data = (await res.json()) as { results?: OmdbNormalizedResult[] };
+    const results = (data.results || []).slice(0, PER_SOURCE_LIMIT);
+    recordQuery(ctx.debug, "omdb", "movie", q, results.length);
+    return results.map<AiCandidate>((r) => {
+      const gs: GlobalSearchResult = {
+        source: "omdb",
+        externalId: r.externalId,
+        type: "movie",
+        title: r.title,
+        overview: r.overview,
+        releaseYear: r.releaseYear,
+        coverUrl: r.coverUrl,
+        genres: r.genres,
+        totalProgress: r.totalProgress,
+        raw: r,
+      };
+      return {
+        source: "omdb",
+        externalId: r.externalId,
+        type: "movie",
+        title: r.title,
+        overview: r.overview,
+        releaseYear: r.releaseYear,
+        coverUrl: r.coverUrl,
+        genres: r.genres,
+        totalProgress: r.totalProgress,
+        averageScore: r.imdbRating,
+        globalSearch: gs,
+      };
+    });
+  } catch {
+    recordQuery(ctx.debug, "omdb", "movie", q, 0);
+    return [];
   }
 }
 
@@ -786,3 +825,4 @@ export async function searchCandidatesWithDebug(args: {
 
   return finish(hygieneFilterCandidates(pool, targets, intent.references, debug).slice(0, MAX_TOTAL));
 }
+

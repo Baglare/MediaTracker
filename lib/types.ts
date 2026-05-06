@@ -15,7 +15,7 @@ export type MediaStatus =
   | "dropped";   // Bırakmış
 
 // Medyanın nereden eklendiğini belirten kaynak
-export type MediaSource = "manual" | "tmdb" | "tvmaze" | "openlibrary" | "anilist";
+export type MediaSource = "manual" | "tmdb" | "tvmaze" | "openlibrary" | "anilist" | "omdb";
 
 // Her bir medya kartının sahip olduğu veriler
 export interface MediaItem {

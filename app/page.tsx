@@ -48,6 +48,7 @@ import { calculateDashboardStats } from "@/lib/dashboard-stats";
 import { TvmazeNormalizedDetail } from "@/lib/tvmaze-types";
 import { OpenLibraryNormalizedResult } from "@/lib/openlibrary-types";
 import { AniListNormalizedResult } from "@/lib/anilist-types";
+import { OmdbNormalizedResult } from "@/lib/omdb-types";
 
 export default function HomePage() {
   // ---- AUTH (cloud aktarım için) ----
@@ -650,6 +651,33 @@ export default function HomePage() {
     [isInLibrary]
   );
 
+  const handleAddFromOmdb = useCallback(
+    (result: OmdbNormalizedResult) => {
+      if (isInLibrary("omdb", result.externalId)) return;
+
+      const newItem: MediaItem = {
+        id: `omdb-${result.externalId}`,
+        title: result.title,
+        type: "movie",
+        status: "planning",
+        coverImage: result.coverUrl || "/placeholders/movie.svg",
+        currentProgress: 0,
+        totalProgress: 1,
+        externalSource: "omdb",
+        externalId: result.externalId,
+        overview: result.overview,
+        releaseYear: result.releaseYear,
+        runtime: result.runtime,
+        genres: result.genres,
+        averageScore: result.imdbRating,
+        siteUrl: result.imdbUrl,
+      };
+
+      setPendingQuickAdd({ singleItem: newItem, seasonItems: null });
+    },
+    [isInLibrary]
+  );
+
   /**
    * Global Search'ten dönen sonucu doğru formata çevirip ekler.
    */
@@ -668,13 +696,18 @@ export default function HomePage() {
         } else if (item.source === "openlibrary") {
           // Open Library arama sonucu yeterli detaya sahip
           handleAddFromOpenLibrary(item.raw as OpenLibraryNormalizedResult);
+        } else if (item.source === "omdb") {
+          const res = await fetch(`/api/omdb/details?id=${item.externalId}`);
+          const detail = await res.json().catch(() => null);
+          if (!res.ok || !detail) throw new Error(detail?.error || "OMDb detay verisi alınamadı");
+          handleAddFromOmdb(detail as OmdbNormalizedResult);
         }
       } catch (err) {
         console.error("Global search ekleme hatası:", err);
         alert("Ekleme sırasında bir hata oluştu. Lütfen tekrar deneyin.");
       }
     },
-    [handleAddFromTvmaze, handleAddFromAniList, handleAddFromOpenLibrary]
+    [handleAddFromTvmaze, handleAddFromAniList, handleAddFromOpenLibrary, handleAddFromOmdb]
   );
 
   // ---- FİLTRELEME ----

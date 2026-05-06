@@ -27,6 +27,7 @@ import {
   AiIntent,
   AiRecommendRequest,
   AiRecommendResponse,
+  AiRecommendation,
   AiRetrievalPlan,
   AiSettings,
   LibraryProfile,
@@ -37,16 +38,17 @@ import { MediaType } from "@/lib/types";
 
 export const runtime = "nodejs";
 
-const GEMINI_RATE_LIMIT_MESSAGE =
-  "Gemini ücretsiz kota/rate limit sınırına takıldı. Bir süre sonra tekrar dene veya mock moda geç.";
-const GEMINI_ALT_PROVIDER_MESSAGE =
-  "Gemini kota sınırına takıldı, alternatif sağlayıcıyla devam edildi.";
+const PROVIDER_RATE_LIMIT_MESSAGE =
+  "AI sağlayıcılarından biri kota/rate limit sınırına takıldı, alternatif sağlayıcı denendi.";
 const ALL_PROVIDERS_MOCK_MESSAGE =
-  "AI sağlayıcıları şu an yanıt veremiyor, mock fallback kullanıldı.";
+  "AI sağlayıcıları şu an yanıt veremiyor. Daha sonra tekrar dene veya mock moda geç.";
+
+const PROVIDER_TIMEOUT_MS = 25000;
 
 type ProviderErrorCode =
   | GeminiProviderErrorCode
-  | CompatibleProviderErrorCode;
+  | CompatibleProviderErrorCode
+  | "timeout";
 
 interface ProviderRunState {
   attemptedProviders: string[];
@@ -58,6 +60,84 @@ interface ProviderRunState {
   geminiCallCount: number;
   openrouterCallCount: number;
   groqCallCount: number;
+  mockCallCount: number;
+  timeoutHit: boolean;
+  safeFallbackUsed: boolean;
+  usedModel?: string;
+}
+
+class ProviderTimeoutError extends Error {
+  provider: string;
+  constructor(provider: string) {
+    super(`${provider} provider timeout`);
+    this.name = "ProviderTimeoutError";
+    this.provider = provider;
+  }
+}
+
+function statusLabelTr(status?: string): string {
+  switch (status) {
+    case "watching": return "İzliyor";
+    case "reading": return "Okuyor";
+    case "planning": return "Planlandı";
+    case "paused": return "Duraklatıldı";
+    case "completed": return "Tamamlandı";
+    case "dropped": return "Bırakıldı";
+    default: return status || "—";
+  }
+}
+
+function deterministicLibraryReason(c: AiCandidate): string {
+  const parts: string[] = [];
+  if (c.status) parts.push(`${statusLabelTr(c.status)} durumunda`);
+  if (typeof c.currentProgress === "number" && typeof c.totalProgress === "number" && c.totalProgress > 0) {
+    const pct = Math.round((c.currentProgress / c.totalProgress) * 100);
+    parts.push(`${c.currentProgress}/${c.totalProgress} ilerlemişsin (%${pct})`);
+  }
+  if (typeof c.userRating === "number") parts.push(`puan ${c.userRating}/10`);
+  if (c.favorite) parts.push("favorilerinde");
+  if (c.lastActivityAt) {
+    const d = new Date(c.lastActivityAt);
+    if (!isNaN(d.getTime())) {
+      parts.push(`son aktiviten ${d.toLocaleDateString("tr-TR")}`);
+    }
+  }
+  return parts.length > 0
+    ? parts.join(", ").replace(/^./, (m) => m.toUpperCase()) + "."
+    : "Kütüphanende devam etmeye uygun, dropped/completed olmayan bir aday.";
+}
+
+function deterministicLibraryFitLabel(c: AiCandidate, idx: number): string {
+  if (c.status === "watching" || c.status === "reading") {
+    if (typeof c.currentProgress === "number" && typeof c.totalProgress === "number" && c.totalProgress > 0) {
+      const pct = c.currentProgress / c.totalProgress;
+      if (pct >= 0.5) return "Bitirmeye yakın";
+    }
+    return "Devam ediyor";
+  }
+  if (c.status === "paused") return "Duraklamış — kaldığın yerden";
+  if (c.status === "planning") return "Plandaki sıradan";
+  return idx === 0 ? "Bugün için ideal" : "Devam etmeye uygun";
+}
+
+function buildLibraryDeterministicRecs(candidates: AiCandidate[]): AiRecommendation[] {
+  return candidates
+    .filter((c) => c.source === "library" && c.status !== "completed" && c.status !== "dropped")
+    .slice(0, 5)
+    .map<AiRecommendation>((c, i) => ({
+      id: `lib-det-${c.externalId}-${i}`,
+      title: c.title,
+      mediaType: c.type,
+      source: "Kütüphanen",
+      externalSource: "library",
+      externalId: c.externalId,
+      coverUrl: c.coverUrl,
+      overview: c.overview,
+      fitLabel: deterministicLibraryFitLabel(c, i),
+      reason: deterministicLibraryReason(c),
+      inLibrary: true,
+      candidate: c,
+    }));
 }
 
 function buildTransparencySummary(s: AiSettings): string {
@@ -75,7 +155,8 @@ function sourceForType(type: MediaType): AiRetrievalPlan["searchPlans"][number][
   if (["anime", "manga", "manhwa", "manhua"].includes(type)) return "anilist";
   if (type === "tv") return "tvmaze";
   if (type === "book") return "openlibrary";
-  return "tmdb";
+  if (type === "movie") return "omdb";
+  return "library";
 }
 
 function fallbackQueries(message: string, intent: AiIntent): string[] {
@@ -114,7 +195,7 @@ function buildFallbackRetrievalPlan(message: string, intent: AiIntent): AiRetrie
   const queries = fallbackQueries(message, intent);
   return {
     taskType: intent.kind,
-    interpretation: "Gemini planning kullanılamadığı için yalnızca açık tür/referans sinyalleriyle güvenli fallback plan üretildi.",
+    interpretation: "AI provider planning kullanılamadığı için yalnızca açık tür/referans sinyalleriyle güvenli fallback plan üretildi.",
     targetMediaTypes: targets,
     sourceTypes: intent.sourceTypes,
     preferenceSignals: intent.mood,
@@ -197,8 +278,17 @@ function providerDebugFields(state: ProviderRunState): Omit<NonNullable<AiRecomm
     geminiCallCount: state.geminiCallCount,
     openrouterCallCount: state.openrouterCallCount,
     groqCallCount: state.groqCallCount,
+    providerCallCounts: {
+      gemini: state.geminiCallCount,
+      openrouter: state.openrouterCallCount,
+      groq: state.groqCallCount,
+      mock: state.mockCallCount,
+    },
     rateLimitHit: state.rateLimitHit,
+    timeoutHit: state.timeoutHit,
     fallbackReason: state.fallbackReason,
+    safeFallbackUsed: state.safeFallbackUsed,
+    usedModel: state.usedModel,
   };
 }
 
@@ -209,6 +299,7 @@ function recordProviderAttempt(state: ProviderRunState, providerName: string) {
   if (providerName === "gemini") state.geminiCallCount += 1;
   else if (providerName === "openrouter") state.openrouterCallCount += 1;
   else if (providerName === "groq") state.groqCallCount += 1;
+  else if (providerName === "mock") state.mockCallCount += 1;
 }
 
 function classifyProviderError(error: unknown): {
@@ -218,6 +309,15 @@ function classifyProviderError(error: unknown): {
   rateLimitHit: boolean;
   fallbackReason: string;
 } {
+  if (error instanceof ProviderTimeoutError) {
+    return {
+      provider: error.provider,
+      providerError: "timeout",
+      note: error.message,
+      rateLimitHit: false,
+      fallbackReason: "timeout",
+    };
+  }
   if (error instanceof GeminiProviderError) {
     return {
       provider: error.provider,
@@ -253,7 +353,18 @@ function applyProviderError(state: ProviderRunState, error: unknown, fallbackPro
   state.providerErrors[providerName] = classified.providerError;
   state.providerError = classified.providerError;
   state.rateLimitHit = state.rateLimitHit || classified.rateLimitHit;
+  state.timeoutHit = state.timeoutHit || classified.providerError === "timeout";
   state.fallbackReason = classified.fallbackReason;
+}
+
+function withProviderTimeout<T>(providerName: string, promise: Promise<T>): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const timeoutPromise = new Promise<T>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new ProviderTimeoutError(providerName)), PROVIDER_TIMEOUT_MS);
+  });
+  return Promise.race([promise, timeoutPromise]).finally(() => {
+    if (timeoutId) clearTimeout(timeoutId);
+  });
 }
 
 function providerCanRun(provider: AiProvider) {
@@ -276,12 +387,13 @@ async function runPlanningWithProviders(args: {
 
     try {
       recordProviderAttempt(args.state, provider.name);
-      const plan = await provider.generateRetrievalPlan({
-        message: args.message,
-        profile: args.profile,
-        intent: args.intent,
-        settings: args.settings,
-      });
+      const plan = await withProviderTimeout(provider.name, provider.generateRetrievalPlan({
+          message: args.message,
+          profile: args.profile,
+          intent: args.intent,
+          settings: args.settings,
+        })
+      );
       args.state.selectedProvider = provider.name;
       return plan;
     } catch (error) {
@@ -310,20 +422,22 @@ async function runRankingWithProviders(args: {
 
     try {
       recordProviderAttempt(args.state, provider.name);
-      const response = await provider.generate({
-        message: args.message,
-        profile: args.profile,
-        intent: args.intent,
-        settings: args.settings,
-        candidates: args.candidates,
-        retrievalPlan: args.retrievalPlan,
-        recentContext: args.recentContext,
-      });
+      const response = await withProviderTimeout(provider.name, provider.generate({
+          message: args.message,
+          profile: args.profile,
+          intent: args.intent,
+          settings: args.settings,
+          candidates: args.candidates,
+          retrievalPlan: args.retrievalPlan,
+          recentContext: args.recentContext,
+        })
+      );
       args.state.selectedProvider = provider.name;
+      args.state.usedModel = response.debug?.usedModel || args.state.usedModel;
       if (provider.name === "mock" && nonMockFailed) {
         response.assistantMessage = `${ALL_PROVIDERS_MOCK_MESSAGE} ${response.assistantMessage}`.trim();
-      } else if (args.state.rateLimitHit && provider.name !== "gemini" && provider.name !== "mock") {
-        response.assistantMessage = `${GEMINI_ALT_PROVIDER_MESSAGE} ${response.assistantMessage}`.trim();
+      } else if (args.state.rateLimitHit && provider.name !== "mock") {
+        response.assistantMessage = `${PROVIDER_RATE_LIMIT_MESSAGE} ${response.assistantMessage}`.trim();
       }
       return response;
     } catch (error) {
@@ -333,6 +447,8 @@ async function runRankingWithProviders(args: {
   }
 
   args.state.selectedProvider = "mock";
+  args.state.safeFallbackUsed = Object.keys(args.state.providerErrors).length > 0;
+  recordProviderAttempt(args.state, "mock");
   const fallback = await mockProvider.generate({
     message: args.message,
     profile: args.profile,
@@ -522,10 +638,58 @@ export async function POST(req: NextRequest) {
     geminiCallCount: 0,
     openrouterCallCount: 0,
     groqCallCount: 0,
+    mockCallCount: 0,
+    timeoutHit: false,
+    safeFallbackUsed: false,
   };
   let retrievalPlan: AiRetrievalPlan | null = null;
+  let ideationFailedReason: AiRetrievalDebug["ideationFailedReason"] | undefined;
+  let parseRepairUsed = false;
+  let providerPlanSucceeded = false;
 
-  if (intent.kind !== "library_based") {
+  // ---- Library-based: tamamen deterministik. LLM ranking yok. ----
+  if (intent.kind === "library_based") {
+    const libSearch = await getCandidates({
+      intent,
+      retrievalPlan: null,
+      profile,
+      message,
+      mediaItems,
+      progressLogs,
+    });
+    const libRecs = buildLibraryDeterministicRecs(libSearch.candidates);
+    const libDebug = buildRetrievalDebug({
+      intent,
+      plan: null,
+      searchDebug: { ...libSearch.debug, finalCandidateCount: libRecs.length },
+      refinedPassUsed: false,
+      providerFallback: false,
+      notes: ["library_deterministic"],
+    });
+    libDebug.ideationFailedReason = "skipped_library_based";
+    libDebug.safeFallbackUsed = false;
+    const assistantMessage = libRecs.length > 0
+      ? `Kütüphanenden devam etmeye uygun ${libRecs.length} öneri hazırladım. Sıralama yerel sinyallerden (durum, ilerleme, son aktivite, favori, puan) deterministik üretildi.`
+      : "Kütüphanende devam etmeye uygun (dropped/completed dışı) bir aday bulamadım.";
+    return NextResponse.json({
+      assistantMessage,
+      recommendations: libRecs,
+      transparencySummary: buildTransparencySummary(settings),
+      intent,
+      debug: {
+        provider: "library_local",
+        selectedProvider: "library_local",
+        attemptedProviders: [],
+        providerErrors: {},
+        rateLimitHit: false,
+        retrieval: libDebug,
+        note: "library_based_deterministic",
+      },
+    } satisfies AiRecommendResponse);
+  }
+
+  // library_based zaten yukarıda erken döndü; buraya yalnızca diğer intent'ler düşer.
+  {
     retrievalPlan = await runPlanningWithProviders({
       providers,
       state: providerState,
@@ -534,9 +698,44 @@ export async function POST(req: NextRequest) {
       intent,
       settings,
     });
+    providerPlanSucceeded = !!retrievalPlan;
+    if (!retrievalPlan) {
+      const codes = Object.values(providerState.providerErrors);
+      if (codes.length === 0) ideationFailedReason = "empty_ideas";
+      else if (codes.every((c) => c === "rate_limit")) ideationFailedReason = "rate_limit";
+      else if (codes.some((c) => c === "parse_error")) ideationFailedReason = "provider_parse_error";
+      else if (codes.every((c) => /key_missing/.test(c))) ideationFailedReason = "key_missing";
+      else ideationFailedReason = "all_providers_failed";
+    }
     retrievalPlan = retrievalPlan || buildFallbackRetrievalPlan(message, intent);
 
     retrievalPlan = applyIntentGuardrails(retrievalPlan, intent, message);
+
+
+    if (!providerPlanSucceeded && (intent.kind === "reference_based" || intent.kind === "cross_media_translation")) {
+      const debug = buildRetrievalDebug({
+        intent,
+        plan: retrievalPlan,
+        refinedPassUsed: false,
+        providerFallback: true,
+        notes: ["provider_plan_failed_no_external_fallback"],
+      });
+      debug.safeFallbackUsed = true;
+      debug.ideationFailedReason = ideationFailedReason || "all_providers_failed";
+      return NextResponse.json({
+        assistantMessage: ALL_PROVIDERS_MOCK_MESSAGE,
+        recommendations: [],
+        transparencySummary: buildTransparencySummary(settings),
+        intent,
+        debug: {
+          provider: "safe_fallback",
+          selectedProvider: "safe_fallback",
+          ...providerDebugFields(providerState),
+          fallbackReason: providerState.fallbackReason || "safe_fallback",
+          retrieval: debug,
+        },
+      } satisfies AiRecommendResponse);
+    }
 
     if (retrievalPlan.needsClarification) {
       const debug = buildRetrievalDebug({
@@ -615,7 +814,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const fallbackSearchUsed = intent.kind !== "library_based" && searchResult.candidates.length < 3;
+  const fallbackSearchUsed = searchResult.candidates.length < 3;
   const verificationResult: CandidateVerificationResult = emptyVerificationResult();
 
   if (isWeakTvMoodDiscovery(intent, retrievalPlan, searchResult)) {
@@ -662,22 +861,30 @@ export async function POST(req: NextRequest) {
     rejectedUnverifiedCount: verificationResult.rejectedUnverifiedCount,
     fallbackSearchUsed,
   });
+  retrievalDebug.ideationFailedReason = ideationFailedReason;
+  retrievalDebug.safeFallbackUsed = false;
+  retrievalDebug.parseRepairUsed = false;
 
   if (candidates.length === 0) {
+    let baseMsg = buildEmptyPoolMessage(retrievalPlan, intent, profile, retrievalDebug.notes || []);
+    if (ideationFailedReason && ideationFailedReason !== "skipped_library_based") {
+      baseMsg = `${baseMsg} (AI plan üretilemedi: ${ideationFailedReason}. Daha net bir tür/mood verirsen yeniden deneyebilirim.)`;
+    }
     const empty: AiRecommendResponse = {
-      assistantMessage: buildEmptyPoolMessage(retrievalPlan, intent, profile, retrievalDebug.notes || []),
+      assistantMessage: baseMsg,
       recommendations: [],
       transparencySummary: buildTransparencySummary(settings),
       intent,
       debug: {
-        provider: providerState.selectedProvider || "mock",
+        provider: providerState.selectedProvider || "safe_fallback",
+        selectedProvider: providerState.selectedProvider || "safe_fallback",
         ...providerDebugFields(providerState),
         note: "empty candidate pool",
         retrieval: retrievalDebug,
       },
     };
     if (providerState.rateLimitHit) {
-      empty.assistantMessage = GEMINI_RATE_LIMIT_MESSAGE;
+      empty.assistantMessage = PROVIDER_RATE_LIMIT_MESSAGE;
     }
     return NextResponse.json(empty);
   }
@@ -694,6 +901,26 @@ export async function POST(req: NextRequest) {
       retrievalPlan,
       recentContext: body.recentContext,
     });
+    parseRepairUsed = response.debug?.note === "json_parse_repair_used";
+    const usedMock = providerState.selectedProvider === "mock";
+    if (usedMock && Object.keys(providerState.providerErrors).length > 0) {
+      retrievalDebug.safeFallbackUsed = true;
+    }
+    if (parseRepairUsed) retrievalDebug.parseRepairUsed = true;
+
+    // Cross-media veya reference-based + zayıf havuz → düşük güven mesajı
+    if (fallbackSearchUsed) {
+      const lowConfNote =
+        intent.kind === "cross_media_translation"
+          ? " (Düşük güven: kaynak zevkini hedef türe çevirmek için yeterli sinyal yok. Sevdiğin 1-2 örnek başlık verirsen daha iyi öneri çıkartabilirim.)"
+          : intent.kind === "reference_based"
+          ? " (Düşük güven: referansa yakın aday havuzu zayıf — daha geniş eş anlamlı arama kullanıldı.)"
+          : "";
+      if (lowConfNote) {
+        response.assistantMessage = `${response.assistantMessage}${lowConfNote}`.trim();
+      }
+    }
+
     response.debug = {
       ...(response.debug || { provider: providerState.selectedProvider || "mock" }),
       provider: providerState.selectedProvider || response.debug?.provider || "mock",
@@ -719,15 +946,17 @@ export async function POST(req: NextRequest) {
       candidates,
       retrievalPlan,
     });
+    retrievalDebug.safeFallbackUsed = true;
     fallback.debug = {
       provider: "mock",
+      selectedProvider: "mock",
       ...providerDebugFields(providerState),
       fellBackToMock: true,
       note: err instanceof Error ? err.message : "unknown error",
       retrieval: { ...retrievalDebug, providerFallback: true },
     };
     if (providerState.rateLimitHit) {
-      fallback.assistantMessage = `${GEMINI_RATE_LIMIT_MESSAGE} ${fallback.assistantMessage}`.trim();
+      fallback.assistantMessage = `${PROVIDER_RATE_LIMIT_MESSAGE} ${fallback.assistantMessage}`.trim();
     }
     fallback.recommendations = fallback.recommendations.map((r) => ({
       ...r,
@@ -738,3 +967,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(fallback);
   }
 }
+
+
+
+
+
