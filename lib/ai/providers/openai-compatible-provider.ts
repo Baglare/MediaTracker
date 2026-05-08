@@ -11,9 +11,10 @@ import {
 import { summarizeProfile } from "../profile-builder";
 import { MediaType } from "@/lib/types";
 
-export type CompatibleProviderName = "openrouter" | "groq";
+export type CompatibleProviderName = "openai" | "openrouter" | "groq";
 export type CompatibleProviderErrorCode =
   | "rate_limit"
+  | "openai_key_missing"
   | "openrouter_key_missing"
   | "groq_key_missing"
   | "parse_error"
@@ -36,8 +37,8 @@ export class CompatibleProviderError extends Error {
 
 interface CompatibleConfig {
   name: CompatibleProviderName;
-  apiKeyEnv: "OPENROUTER_API_KEY" | "GROQ_API_KEY";
-  modelEnv: "OPENROUTER_MODEL" | "GROQ_MODEL";
+  apiKeyEnv: "OPENAI_API_KEY" | "OPENROUTER_API_KEY" | "GROQ_API_KEY";
+  modelEnv: "OPENAI_MODEL" | "OPENROUTER_MODEL" | "GROQ_MODEL";
   defaultModel: string;
   endpoint: string;
 }
@@ -158,6 +159,7 @@ function isRateLimit(status: number, text: string) {
 }
 
 function keyMissingCode(provider: CompatibleProviderName): CompatibleProviderErrorCode {
+  if (provider === "openai") return "openai_key_missing";
   return provider === "openrouter" ? "openrouter_key_missing" : "groq_key_missing";
 }
 
@@ -453,6 +455,14 @@ export const openrouterProvider = createCompatibleProvider({
   modelEnv: "OPENROUTER_MODEL",
   defaultModel: "openrouter/free",
   endpoint: "https://openrouter.ai/api/v1/chat/completions",
+});
+
+export const openaiProvider = createCompatibleProvider({
+  name: "openai",
+  apiKeyEnv: "OPENAI_API_KEY",
+  modelEnv: "OPENAI_MODEL",
+  defaultModel: "gpt-5.4-mini",
+  endpoint: "https://api.openai.com/v1/chat/completions",
 });
 
 export const groqProvider = createCompatibleProvider({

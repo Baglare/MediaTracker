@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -23,6 +23,7 @@ export interface AiSettings {
   usePersonalNotes: boolean;
   useWebResearch: boolean;
   deepResearch: boolean;
+  useOpenAIProvider: boolean;
 }
 
 interface AiCandidate {
@@ -77,6 +78,10 @@ interface AiRetrievalDebug {
   highRatedSourceCount?: number;
   deterministicTasteSignals?: string[];
   deterministicFallbackUsed?: boolean;
+  sourceTitles?: string[];
+  excludedSourceTitles?: string[];
+  tasteSignalQueries?: string[];
+  directTitleQueryUsed?: boolean;
   notes?: string[];
 }
 
@@ -86,7 +91,9 @@ interface AiDebugInfo {
   selectedProvider?: string;
   failedProviders?: { provider: string; stage: "planning" | "ranking"; error: string }[];
   providerErrors?: Record<string, string>;
-  providerError?: "rate_limit" | "gemini_key_missing" | "openrouter_key_missing" | "groq_key_missing" | "parse_error" | "api_error" | "openrouter_skipped_paid_model" | "timeout";
+  providerError?: "rate_limit" | "gemini_key_missing" | "openai_key_missing" | "openrouter_key_missing" | "groq_key_missing" | "parse_error" | "api_error" | "openrouter_skipped_paid_model" | "timeout";
+  useOpenAIProvider?: boolean;
+  openaiCallCount?: number;
   geminiCallCount?: number;
   openrouterCallCount?: number;
   groqCallCount?: number;
@@ -168,20 +175,21 @@ const DEFAULT_SETTINGS: AiSettings = {
   usePersonalNotes: false,
   useWebResearch: true,
   deepResearch: false,
+  useOpenAIProvider: false,
 };
 
 const SAMPLE_PROMPTS = [
-  "Solo Leveling gibi ama daha romantik anime öner.",
-  "7+ puan verdiğim dizilere göre kitap öner.",
-  "Bugün kütüphanemden neye devam etsem?",
-  "Chill ve kısa bir şey öner.",
+  "Solo Leveling gibi ama daha romantik anime Ã¶ner.",
+  "7+ puan verdiÄŸim dizilere gÃ¶re kitap Ã¶ner.",
+  "BugÃ¼n kÃ¼tÃ¼phanemden neye devam etsem?",
+  "Chill ve kÄ±sa bir ÅŸey Ã¶ner.",
 ];
 
 const LOADING_STEPS = [
-  "İstek analiz ediliyor",
-  "Kütüphane profili hazırlanıyor",
-  "Adaylar aranıyor",
-  "Öneriler hazırlanıyor",
+  "Ä°stek analiz ediliyor",
+  "KÃ¼tÃ¼phane profili hazÄ±rlanÄ±yor",
+  "Adaylar aranÄ±yor",
+  "Ã–neriler hazÄ±rlanÄ±yor",
 ];
 const AI_REQUEST_TIMEOUT_MS = 35000;
 
@@ -194,18 +202,18 @@ function generateId(prefix = "id"): string {
 
 function buildLocalFallbackRecs(prompt: string, mediaList: MediaItem[]): AiRecommendation[] {
   const lower = prompt.toLowerCase();
-  const isContinue = /devam|bugün|kütüphan|chill/.test(lower);
+  const isContinue = /devam|bugÃ¼n|kÃ¼tÃ¼phan|chill/.test(lower);
   if (isContinue && mediaList.length > 0) {
     return mediaList.slice(0, 3).map<AiRecommendation>((m, i) => ({
       id: `rec-${m.id}-${i}`,
       title: m.title,
       mediaType: m.type,
-      source: "Kütüphanen",
+      source: "KÃ¼tÃ¼phanen",
       externalSource: "library",
       externalId: m.id,
       coverUrl: m.coverImage,
       overview: m.overview,
-      fitLabel: i === 0 ? "Bugün için ideal" : "Devam etmeye uygun",
+      fitLabel: i === 0 ? "BugÃ¼n iÃ§in ideal" : "Devam etmeye uygun",
       reason: `${m.currentProgress}/${m.totalProgress} ilerleme.`,
       inLibrary: true,
     }));
@@ -215,18 +223,18 @@ function buildLocalFallbackRecs(prompt: string, mediaList: MediaItem[]): AiRecom
 
 function buildAssistantMessage(prompt: string, settings: AiSettings, count: number): string {
   const used = [
-    settings.useProfile && "kütüphane profili",
+    settings.useProfile && "kÃ¼tÃ¼phane profili",
     settings.useRecentActivity && "son aktiviteler",
-    settings.usePersonalNotes && "kişisel notlar",
+    settings.usePersonalNotes && "kiÅŸisel notlar",
     settings.useWebResearch && "AI bilgi sinyali",
-    settings.deepResearch && "derin araştırma",
+    settings.deepResearch && "derin araÅŸtÄ±rma",
   ]
     .filter(Boolean)
     .join(", ");
   if (count === 0) {
-    return `İsteğini "${prompt.trim()}" olarak yorumladım. Doğrulanmış aday bulunamadı.`;
+    return `Ä°steÄŸini "${prompt.trim()}" olarak yorumladÄ±m. DoÄŸrulanmÄ±ÅŸ aday bulunamadÄ±.`;
   }
-  return `İsteğini "${prompt.trim()}" olarak yorumladım. ${used || "Yalnızca istek metni"} kullanılarak ${count} doğrulanmış öneri hazırlandı.`;
+  return `Ä°steÄŸini "${prompt.trim()}" olarak yorumladÄ±m. ${used || "YalnÄ±zca istek metni"} kullanÄ±larak ${count} doÄŸrulanmÄ±ÅŸ Ã¶neri hazÄ±rlandÄ±.`;
 }
 
 function formatList(values?: string[]) {
@@ -242,9 +250,10 @@ function summarizeDebug(debug: AiDebugInfo): string[] {
     return [
       `Provider: ${debug.selectedProvider || debug.provider || "mock"}${debug.fellBackToMock ? " (fallback)" : ""} | Error: ${debug.providerError || "yok"} | Model: ${debug.usedModel || "bilinmiyor"}`,
       `Attempts: ${formatList(debug.attemptedProviders)} | Calls: ${
-        debug.providerCallCounts ? Object.entries(debug.providerCallCounts).map(([k, v]) => `${k}: ${v}`).join(", ") : `gemini: ${debug.geminiCallCount ?? 0}, openrouter: ${debug.openrouterCallCount ?? 0}, groq: ${debug.groqCallCount ?? 0}`
+        debug.providerCallCounts ? Object.entries(debug.providerCallCounts).map(([k, v]) => `${k}: ${v}`).join(", ") : `openai: ${debug.openaiCallCount ?? 0}, gemini: ${debug.geminiCallCount ?? 0}, openrouter: ${debug.openrouterCallCount ?? 0}, groq: ${debug.groqCallCount ?? 0}`
       }`,
-      `Rate limit: ${debug.rateLimitHit ? "Evet" : "Hayir"} | Timeout: ${debug.timeoutHit ? "Evet" : "Hayir"} | Safe fallback: ${debug.safeFallbackUsed ? "Evet" : "Hayir"} | Fallback reason: ${debug.fallbackReason || "yok"} | Note: ${debug.note || "yok"}`,
+      `OpenAI toggle: ${debug.useOpenAIProvider ? "AÃ§Ä±k" : "KapalÄ±"} | Rate limit: ${debug.rateLimitHit ? "Evet" : "Hayir"} | Timeout: ${debug.timeoutHit ? "Evet" : "Hayir"} | Safe fallback: ${debug.safeFallbackUsed ? "Evet" : "Hayir"}`,
+      `Fallback reason: ${debug.fallbackReason || "yok"} | Note: ${debug.note || "yok"}`,
       `Failed providers: ${failedProviders} | Follow-up merged: ${debug.followUpMerged ? "Evet" : "Hayir"} | Active context: ${debug.activeContextSummary || "yok"}`,
     ];
   }
@@ -254,7 +263,7 @@ function summarizeDebug(debug: AiDebugInfo): string[] {
         .slice(0, 6)
         .map((q) => `${q.source}/${q.mediaType}: "${q.query}" (${q.resultCount})`)
         .join(" | ")
-    : "Çalıştırılan query yok";
+    : "Ã‡alÄ±ÅŸtÄ±rÄ±lan query yok";
 
   const sourceCounts = r.sourceCandidateCounts
     ? Object.entries(r.sourceCandidateCounts).map(([k, v]) => `${k}: ${v}`).join(", ")
@@ -267,17 +276,18 @@ function summarizeDebug(debug: AiDebugInfo): string[] {
   return [
     `Task: ${r.taskType || "bilinmiyor"} | Provider: ${debug.selectedProvider || debug.provider || "mock"}${debug.fellBackToMock || r.providerFallback ? " (fallback)" : ""} | Error: ${debug.providerError || "yok"} | Model: ${debug.usedModel || "bilinmiyor"}`,
     `Attempts: ${formatList(debug.attemptedProviders)} | Calls: ${
-      debug.providerCallCounts ? Object.entries(debug.providerCallCounts).map(([k, v]) => `${k}: ${v}`).join(", ") : `gemini: ${debug.geminiCallCount ?? 0}, openrouter: ${debug.openrouterCallCount ?? 0}, groq: ${debug.groqCallCount ?? 0}`
+      debug.providerCallCounts ? Object.entries(debug.providerCallCounts).map(([k, v]) => `${k}: ${v}`).join(", ") : `openai: ${debug.openaiCallCount ?? 0}, gemini: ${debug.geminiCallCount ?? 0}, openrouter: ${debug.openrouterCallCount ?? 0}, groq: ${debug.groqCallCount ?? 0}`
     }`,
-    `Rate limit: ${debug.rateLimitHit ? "Evet" : "Hayir"} | Timeout: ${debug.timeoutHit ? "Evet" : "Hayir"} | Safe fallback: ${debug.safeFallbackUsed ? "Evet" : "Hayir"} | Fallback reason: ${debug.fallbackReason || "yok"} | Provider errors: ${
+    `OpenAI toggle: ${debug.useOpenAIProvider ? "AÃ§Ä±k" : "KapalÄ±"} | Rate limit: ${debug.rateLimitHit ? "Evet" : "Hayir"} | Timeout: ${debug.timeoutHit ? "Evet" : "Hayir"} | Safe fallback: ${debug.safeFallbackUsed ? "Evet" : "Hayir"}`,
+    `Fallback reason: ${debug.fallbackReason || "yok"} | Provider errors: ${
       debug.providerErrors ? Object.entries(debug.providerErrors).map(([k, v]) => `${k}: ${v}`).join(", ") || "yok" : "yok"
     }`,
     `Failed providers: ${failedProviders} | Follow-up merged: ${debug.followUpMerged ? "Evet" : "Hayir"} | Active context: ${debug.activeContextSummary || "yok"}`,
     `Target: ${formatList(r.targetMediaTypes)} | Source: ${formatList(r.sourceTypes)}${r.sourceContext ? ` | Context: ${r.sourceContext}` : ""}`,
     `Signals: ${formatList(r.preferenceSignals)} | Avoid: ${formatList(r.avoidSignals)}`,
-    `Clarification: ${r.needsClarification ? r.clarificationQuestion || "İstendi" : "Hayır"}`,
+    `Clarification: ${r.needsClarification ? r.clarificationQuestion || "Ä°stendi" : "HayÄ±r"}`,
     `Plan: ${(r.searchPlans || []).map((p) => `${p.source}/${p.mediaType} [${p.queries.join(", ")}]`).join(" | ") || "Yok"}`,
-    `Ideas: ${r.candidateIdeasCount ?? 0} | Verified: ${r.verifiedCount ?? 0} | Unverified: ${r.rejectedUnverifiedCount ?? 0} | Fallback search: ${r.fallbackSearchUsed ? "Evet" : "Hayır"}`,
+    `Ideas: ${r.candidateIdeasCount ?? 0} | Verified: ${r.verifiedCount ?? 0} | Unverified: ${r.rejectedUnverifiedCount ?? 0} | Fallback search: ${r.fallbackSearchUsed ? "Evet" : "HayÄ±r"}`,
     `Verification counts: ${
       r.verificationSourceCounts
         ? Object.entries(r.verificationSourceCounts).map(([k, v]) => `${k}: ${v}`).join(", ") || "Yok"
@@ -286,9 +296,11 @@ function summarizeDebug(debug: AiDebugInfo): string[] {
     `Queries: ${querySummary}`,
     `Source counts: ${sourceCounts}`,
     `Filtering: ${r.filterSummary?.before ?? 0} -> ${r.filterSummary?.after ?? 0} | Removed: ${r.filterSummary?.removed ?? 0} | Reasons: ${filterReasons}`,
-    `Final candidates: ${r.finalCandidateCount ?? 0} | Refined pass: ${r.refinedPassUsed ? "Evet" : "Hayır"} | Notes: ${formatList(r.notes)}`,
-    `High-rated source: ${r.highRatedSourceCount ?? 0} | Deterministic fallback: ${r.deterministicFallbackUsed ? "Evet" : "Hayır"} | Taste signals: ${formatList(r.deterministicTasteSignals)}`,
-    `Parse repair: ${r.parseRepairUsed ? "Evet" : "Hayır"} | Safe fallback: ${r.safeFallbackUsed ? "Evet" : "Hayır"} | Ideation failed: ${r.ideationFailedReason || "yok"}`,
+    `Final candidates: ${r.finalCandidateCount ?? 0} | Refined pass: ${r.refinedPassUsed ? "Evet" : "HayÄ±r"} | Notes: ${formatList(r.notes)}`,
+    `High-rated source: ${r.highRatedSourceCount ?? 0} | Deterministic fallback: ${r.deterministicFallbackUsed ? "Evet" : "HayÄ±r"} | Taste signals: ${formatList(r.deterministicTasteSignals)}`,
+    `Source titles: ${formatList(r.sourceTitles)} | Excluded source titles: ${formatList(r.excludedSourceTitles)}`,
+    `Taste queries: ${formatList(r.tasteSignalQueries)} | Direct title query used: ${r.directTitleQueryUsed ? "Evet" : "HayÄ±r"}`,
+    `Parse repair: ${r.parseRepairUsed ? "Evet" : "HayÄ±r"} | Safe fallback: ${r.safeFallbackUsed ? "Evet" : "HayÄ±r"} | Ideation failed: ${r.ideationFailedReason || "yok"}`,
   ];
 }
 
@@ -535,7 +547,7 @@ export default function AiAdvisor({
 
   function parseShortTarget(answer: string): MediaType | "auto" | null {
     const lower = answer.toLowerCase().trim();
-    if (/^(istediğin gibi|fark etmez|sen seç|sen bilirsin|herhangi biri)$/i.test(lower)) return "auto";
+    if (/^(istediÄŸin gibi|fark etmez|sen seÃ§|sen bilirsin|herhangi biri)$/i.test(lower)) return "auto";
     if (/\b(dizi|tv)\b/i.test(lower)) return "tv";
     if (/\banime\b/i.test(lower)) return "anime";
     if (/\b(kitap|book)\b/i.test(lower)) return "book";
@@ -565,15 +577,15 @@ export default function AiAdvisor({
       if (!dominant) {
         return pendingClarification.originalPrompt;
       }
-      return `${pendingClarification.originalPrompt}. Profil çoğunluğuna göre ${targetLabelForPrompt(dominant)} hedef türünü varsay.`;
+      return `${pendingClarification.originalPrompt}. Profil Ã§oÄŸunluÄŸuna gÃ¶re ${targetLabelForPrompt(dominant)} hedef tÃ¼rÃ¼nÃ¼ varsay.`;
     }
 
     const label = targetLabelForPrompt(target);
     const original = pendingClarification.originalPrompt;
-    if (/bir şey/i.test(original)) {
-      return original.replace(/bir şey/gi, label);
+    if (/bir ÅŸey/i.test(original)) {
+      return original.replace(/bir ÅŸey/gi, label);
     }
-    return `${original}. Hedef medya türü: ${label}.`;
+    return `${original}. Hedef medya tÃ¼rÃ¼: ${label}.`;
   }
 
   function isShortFollowUp(answer: string): boolean {
@@ -585,34 +597,34 @@ export default function AiAdvisor({
   }
 
   function isDependentFollowUp(lower: string): boolean {
-    return /^(yani\s+)?(sonu[cç]\s+olarak\s+)?(ne\s+öneriyorsun|ne\s+oneriyorsun|hangisini\s+se[cç]eyim|peki\s+hangisi|peki\s+ya\??|devam\s+et|devam|özetle|ozetle|kısaca|kisaca)$/i.test(lower);
+    return /^(yani\s+)?(sonu[cÃ§]\s+olarak\s+)?(ne\s+Ã¶neriyorsun|ne\s+oneriyorsun|hangisini\s+se[cÃ§]eyim|peki\s+hangisi|peki\s+ya\??|devam\s+et|devam|Ã¶zetle|ozetle|kÄ±saca|kisaca)$/i.test(lower);
   }
 
   function isExplicitNewTask(answer: string): boolean {
     const lower = answer.toLowerCase().trim();
     if (isDependentFollowUp(lower)) return false;
-    if (/7\+|puan\s+verdi[ğg]im|k[üu]t[üu]phaneme\s+g[öo]re|\bgibi\b|\bbenzeri\b|\btarz[ıi]\b/i.test(lower)) return true;
-    if (/\b(kitap|book|anime|dizi|tv|film|movie|manga|manhwa|manhua)\s+(öner|oner|tavsiye)\b/i.test(lower)) return true;
-    return /\b(öner|oner|tavsiye)\b/i.test(lower) && lower.split(/\s+/).length > 3;
+    if (/7\+|puan\s+verdi[ÄŸg]im|k[Ã¼u]t[Ã¼u]phaneme\s+g[Ã¶o]re|\bgibi\b|\bbenzeri\b|\btarz[Ä±i]\b/i.test(lower)) return true;
+    if (/\b(kitap|book|anime|dizi|tv|film|movie|manga|manhwa|manhua)\s+(Ã¶ner|oner|tavsiye)\b/i.test(lower)) return true;
+    return /\b(Ã¶ner|oner|tavsiye)\b/i.test(lower) && lower.split(/\s+/).length > 3;
   }
 
   function isShortTargetAnswer(answer: string): boolean {
     const lower = answer.toLowerCase().trim();
     if (!parseShortTarget(lower)) return false;
-    return /^(dizi|tv|anime|kitap|book|manga|manhwa|manhua|film|movie)(\s+(olsun|tabii ki|tabi ki))?$|^(istediğin gibi|istedigin gibi|fark etmez|sen seç|sen sec|sen bilirsin|herhangi biri)$/i.test(lower);
+    return /^(dizi|tv|anime|kitap|book|manga|manhwa|manhua|film|movie)(\s+(olsun|tabii ki|tabi ki))?$|^(istediÄŸin gibi|istedigin gibi|fark etmez|sen seÃ§|sen sec|sen bilirsin|herhangi biri)$/i.test(lower);
   }
 
   function mergeTargetIntoPrompt(original: string, answer: string): string {
     const target = parseShortTarget(answer);
     if (!target || target === "auto") return original;
     const label = targetLabelForPrompt(target);
+    if (/bir Ã…Å¸ey/i.test(original)) {
+      return original.replace(/bir Ã…Å¸ey/gi, label);
+    }
     if (/bir ÅŸey/i.test(original)) {
       return original.replace(/bir ÅŸey/gi, label);
     }
-    if (/bir şey/i.test(original)) {
-      return original.replace(/bir şey/gi, label);
-    }
-    return `${original}. Hedef medya türü: ${label}.`;
+    return `${original}. Hedef medya tÃ¼rÃ¼: ${label}.`;
   }
 
   function buildFollowUpRequest(rawPrompt: string): { prompt: string; activeContext: AiActiveContext | null } {
@@ -709,7 +721,7 @@ export default function AiAdvisor({
     try {
       await onAddToLibrary(gs);
     } catch {
-      // ekleme başarısız olursa state geri al
+      // ekleme baÅŸarÄ±sÄ±z olursa state geri al
       setAddedIds((prev) => {
         const next = { ...prev };
         delete next[rec.id];
@@ -720,17 +732,17 @@ export default function AiAdvisor({
 
   const transparencyText = useMemo(() => {
     const parts = [
-      settings.useProfile ? "kütüphane profil özeti" : null,
-      settings.useRecentActivity ? "son aktivite özeti" : null,
-      `AI bilgi sinyali ${settings.useWebResearch ? "açık" : "kapalı"}`,
-      `kişisel notlar ${settings.usePersonalNotes ? "dahil" : "değil"}`,
-      settings.deepResearch ? "derin araştırma modu" : null,
+      settings.useProfile ? "kÃ¼tÃ¼phane profil Ã¶zeti" : null,
+      settings.useRecentActivity ? "son aktivite Ã¶zeti" : null,
+      `AI bilgi sinyali ${settings.useWebResearch ? "aÃ§Ä±k" : "kapalÄ±"}`,
+      `kiÅŸisel notlar ${settings.usePersonalNotes ? "dahil" : "deÄŸil"}`,
+      settings.deepResearch ? "derin araÅŸtÄ±rma modu" : null,
     ].filter(Boolean);
-    return `Bu istekte kullanılacaklar: ${parts.join(", ")}.`;
+    return `Bu istekte kullanÄ±lacaklar: ${parts.join(", ")}.`;
   }, [settings]);
 
   const profileSummary = useMemo(() => {
-    return `${mediaList.length} medya · ${progressLogs.length} aktivite kaydı`;
+    return `${mediaList.length} medya Â· ${progressLogs.length} aktivite kaydÄ±`;
   }, [mediaList.length, progressLogs.length]);
 
   const viewingSession = viewingSessionId ? sessions.find((s) => s.id === viewingSessionId) : null;
@@ -738,14 +750,14 @@ export default function AiAdvisor({
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-6">
       <div className="space-y-5 min-w-0">
-        {/* Başlık */}
+        {/* BaÅŸlÄ±k */}
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center">
               <Sparkles className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-zinc-100">AI Danışman</h2>
+              <h2 className="text-lg font-semibold text-zinc-100">AI DanÄ±ÅŸman</h2>
               <p className="text-xs text-zinc-500">{profileSummary}</p>
             </div>
           </div>
@@ -760,16 +772,16 @@ export default function AiAdvisor({
           )}
         </div>
 
-        {/* Şeffaflık */}
+        {/* ÅeffaflÄ±k */}
         <div className="flex items-start gap-3 p-3 rounded-xl bg-zinc-900/40 border border-zinc-800/60">
           <ShieldCheck className="w-4 h-4 text-violet-400 mt-0.5 shrink-0" />
           <p className="text-xs text-zinc-400 leading-relaxed">{transparencyText}</p>
         </div>
 
-        {/* Boş durum */}
+        {/* BoÅŸ durum */}
         {messages.length === 0 && recommendations.length === 0 && !viewingSessionId && (
           <div className="space-y-3">
-            <p className="text-xs text-zinc-500 uppercase tracking-wide">Örnek istekler</p>
+            <p className="text-xs text-zinc-500 uppercase tracking-wide">Ã–rnek istekler</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {SAMPLE_PROMPTS.map((p) => (
                 <button
@@ -787,7 +799,7 @@ export default function AiAdvisor({
         {viewingSession && (
           <div className="flex items-center justify-between gap-3 p-3 rounded-xl bg-violet-500/5 border border-violet-500/20">
             <div className="min-w-0">
-              <p className="text-xs text-violet-300 uppercase tracking-wide">Geçmiş öneri oturumu</p>
+              <p className="text-xs text-violet-300 uppercase tracking-wide">GeÃ§miÅŸ Ã¶neri oturumu</p>
               <p className="text-sm text-zinc-200 truncate">{viewingSession.prompt}</p>
             </div>
             <span className="text-xs text-zinc-500 shrink-0">
@@ -842,7 +854,7 @@ export default function AiAdvisor({
               onClick={() => setShowDebug((prev) => !prev)}
               className="w-full flex items-center justify-between gap-3 px-3 py-2 text-xs text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50 transition-colors cursor-pointer"
             >
-              <span>Teknik planı göster</span>
+              <span>Teknik planÄ± gÃ¶ster</span>
               <ChevronRight className={`w-3.5 h-3.5 transition-transform ${showDebug ? "rotate-90" : ""}`} />
             </button>
             {showDebug && (
@@ -857,7 +869,7 @@ export default function AiAdvisor({
           </div>
         )}
 
-        {/* Öneri kartları */}
+        {/* Ã–neri kartlarÄ± */}
         {recommendations.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {recommendations.map((rec) => {
@@ -881,7 +893,7 @@ export default function AiAdvisor({
                     </div>
                   ) : (
                     <div className="w-14 h-20 shrink-0 rounded-md bg-zinc-800/60 flex items-center justify-center text-zinc-600 text-xl">
-                      {rec.mediaType === "book" ? "📖" : "🎬"}
+                      {rec.mediaType === "book" ? "ğŸ“–" : "ğŸ¬"}
                     </div>
                   )}
                   <div className="flex flex-col gap-1.5 min-w-0 flex-1">
@@ -889,7 +901,7 @@ export default function AiAdvisor({
                       <div className="min-w-0">
                         <h4 className="text-sm font-semibold text-zinc-100 truncate">{rec.title}</h4>
                         <p className="text-xs text-zinc-500 truncate">
-                          {rec.mediaType} · {rec.source}
+                          {rec.mediaType} Â· {rec.source}
                         </p>
                       </div>
                       <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-violet-500/15 text-violet-300 border border-violet-500/30 shrink-0">
@@ -900,14 +912,14 @@ export default function AiAdvisor({
                       <p className="text-xs text-zinc-500 line-clamp-2">{rec.overview}</p>
                     )}
                     <p className="text-xs text-zinc-300 leading-relaxed">{rec.reason}</p>
-                    {rec.risk && <p className="text-xs text-amber-300/80">⚠ {rec.risk}</p>}
+                    {rec.risk && <p className="text-xs text-amber-300/80">âš  {rec.risk}</p>}
                     {rec.communitySignal && (
                       <p className="text-xs text-zinc-500">{rec.communitySignal}</p>
                     )}
                     <button
                       disabled={!!added || !canAdd}
                       onClick={() => handleAddRec(rec)}
-                      title={!canAdd && !added ? "Bu öneri Quick Add'a uygun değil" : undefined}
+                      title={!canAdd && !added ? "Bu Ã¶neri Quick Add'a uygun deÄŸil" : undefined}
                       className={`mt-1 self-start flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                         added
                           ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 cursor-default"
@@ -933,7 +945,7 @@ export default function AiAdvisor({
             <ul className="space-y-1.5">
               {rejected.slice(0, 3).map((r, i) => (
                 <li key={`rejected-${i}-${r.title}`} className="text-xs text-zinc-400">
-                  <span className="text-zinc-300">{r.title}</span> — {r.reason}
+                  <span className="text-zinc-300">{r.title}</span> â€” {r.reason}
                 </li>
               ))}
             </ul>
@@ -953,7 +965,7 @@ export default function AiAdvisor({
                 }
               }}
               rows={1}
-              placeholder="AI Danışmana sor: ne izlemek/okumak istersin?"
+              placeholder="AI DanÄ±ÅŸmana sor: ne izlemek/okumak istersin?"
               className="flex-1 bg-transparent resize-none px-3 py-2 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none max-h-32"
             />
             <button
@@ -962,7 +974,7 @@ export default function AiAdvisor({
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium bg-violet-500/20 text-violet-300 border border-violet-500/40 hover:bg-violet-500/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
             >
               <Send className="w-4 h-4" />
-              <span className="hidden sm:inline">Gönder</span>
+              <span className="hidden sm:inline">GÃ¶nder</span>
             </button>
           </div>
         </div>
@@ -970,22 +982,23 @@ export default function AiAdvisor({
 
       <aside className="space-y-4">
         <div className="p-4 rounded-2xl bg-zinc-900/40 border border-zinc-800/60">
-          <h3 className="text-sm font-semibold text-zinc-200 mb-3">Gizlilik / Araştırma</h3>
+          <h3 className="text-sm font-semibold text-zinc-200 mb-3">Gizlilik / AraÅŸtÄ±rma</h3>
           <div className="space-y-2">
             {(
               [
-                ["useProfile", "Kütüphane profilimi kullan"],
+                ["useProfile", "KÃ¼tÃ¼phane profilimi kullan"],
                 ["useRecentActivity", "Son aktivitelerimi kullan"],
-                ["usePersonalNotes", "Kişisel notlarımı dahil et"],
+                ["usePersonalNotes", "KiÅŸisel notlarÄ±mÄ± dahil et"],
                 ["useWebResearch", "AI bilgi sinyali kullan"],
-                ["deepResearch", "Derin araştırma modu"],
+                ["deepResearch", "Derin araÅŸtÄ±rma modu"],
+                ["useOpenAIProvider", "OpenAI API kullan"],
               ] as const
             ).map(([key, label]) => (
               <label
                 key={key}
                 className="flex items-center justify-between gap-3 px-2 py-1.5 rounded-lg hover:bg-zinc-800/40 cursor-pointer"
               >
-                <span className="text-xs text-zinc-300">{label}</span>
+                <span className="text-xs text-zinc-300">{label}{key === "useOpenAIProvider" ? (<span className="block text-[10px] text-zinc-500 mt-0.5">Açıksa OpenAI API öncelikli kullanılır; ücretli olabilir.</span>) : null}</span>
                 <input
                   type="checkbox"
                   checked={settings[key]}
@@ -1005,7 +1018,7 @@ export default function AiAdvisor({
             Son Oturumlar
           </h3>
           {sessions.length === 0 ? (
-            <p className="text-xs text-zinc-500">Henüz oturum yok.</p>
+            <p className="text-xs text-zinc-500">HenÃ¼z oturum yok.</p>
           ) : (
             <div className="space-y-1">
               {sessions.map((s) => (
@@ -1021,8 +1034,8 @@ export default function AiAdvisor({
                   <div className="min-w-0">
                     <p className="text-xs text-zinc-200 truncate">{s.prompt}</p>
                     <p className="text-[10px] text-zinc-500">
-                      {new Date(s.createdAt).toLocaleDateString("tr-TR")} ·{" "}
-                      {s.recommendations.length} öneri
+                      {new Date(s.createdAt).toLocaleDateString("tr-TR")} Â·{" "}
+                      {s.recommendations.length} Ã¶neri
                     </p>
                   </div>
                   <ChevronRight className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
@@ -1035,3 +1048,5 @@ export default function AiAdvisor({
     </div>
   );
 }
+
+

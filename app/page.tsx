@@ -267,7 +267,10 @@ export default function HomePage() {
    */
   const handleComplete = useCallback((id: string) => {
     const item = mediaList.find((m) => m.id === id);
-    if (!item || item.currentProgress >= item.totalProgress) return;
+    if (!item) return;
+    // Zaten "completed" ise hiçbir şey yapma; ama 220/220 olup status hâlâ
+    // watching/reading/paused/planning ise sadece status'u güncelle.
+    if (item.status === "completed") return;
 
     const prevProgress = item.currentProgress;
     const newProgress = item.totalProgress;
@@ -275,6 +278,12 @@ export default function HomePage() {
 
     setMediaList((prev) => prev.map((m) => (m.id === id ? updated : m)));
     enqueueMediaUpsert(updated);
+
+    // Eğer ilerleme zaten tamsa log üretme (status-only değişiklik için kayıt
+    // gerekmiyor, completed bir kez logged'lanmış olabilir).
+    if (prevProgress >= item.totalProgress) {
+      return;
+    }
 
     addProgressLog(
       item.id,

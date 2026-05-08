@@ -19,7 +19,16 @@ interface MediaModalProps {
 }
 
 const mediaTypes: MediaType[] = ["movie", "tv", "anime", "manga", "manhwa", "manhua", "book"];
-const statusOptions: MediaStatus[] = ["planning", "watching", "reading", "completed", "paused", "dropped"];
+
+/**
+ * Türe göre uygun durum seçeneklerini döndürür.
+ * Okunan türler (kitap/manga/manhwa/manhua) "reading" gösterir, diğerleri "watching".
+ * "watching" ve "reading" aynı anda asla seçenek olarak çıkmaz.
+ */
+function getStatusOptionsForType(type: MediaType): MediaStatus[] {
+  const isReading = type === "book" || type === "manga" || type === "manhwa" || type === "manhua";
+  return ["planning", isReading ? "reading" : "watching", "completed", "paused", "dropped"];
+}
 
 function getDefaultCover(type: MediaType): string {
   return `/placeholders/${type}.svg`;
@@ -254,14 +263,26 @@ export default function MediaModal({ isOpen, editingItem, onSave, onClose }: Med
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={labelCls}>Medya Türü</label>
-              <select value={type} onChange={(e) => setType(e.target.value as MediaType)} className={`${inputCls} cursor-pointer`}>
+              <select
+                value={type}
+                onChange={(e) => {
+                  const nextType = e.target.value as MediaType;
+                  setType(nextType);
+                  // Tür değişince watching↔reading karışmasın diye uygun
+                  // aktif duruma otomatik geçiş yap.
+                  const isReading = nextType === "book" || nextType === "manga" || nextType === "manhwa" || nextType === "manhua";
+                  if (status === "watching" && isReading) setStatus("reading");
+                  else if (status === "reading" && !isReading) setStatus("watching");
+                }}
+                className={`${inputCls} cursor-pointer`}
+              >
                 {mediaTypes.map((t) => (<option key={t} value={t}>{getMediaTypeLabel(t)}</option>))}
               </select>
             </div>
             <div>
               <label className={labelCls}>Durum</label>
               <select value={status} onChange={(e) => setStatus(e.target.value as MediaStatus)} className={`${inputCls} cursor-pointer`}>
-                {statusOptions.map((s) => (<option key={s} value={s}>{getStatusLabel(s)}</option>))}
+                {getStatusOptionsForType(type).map((s) => (<option key={s} value={s}>{getStatusLabel(s)}</option>))}
               </select>
             </div>
           </div>

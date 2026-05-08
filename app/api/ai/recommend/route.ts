@@ -60,6 +60,8 @@ interface ProviderRunState {
   providerError?: ProviderErrorCode;
   rateLimitHit: boolean;
   fallbackReason?: string;
+  useOpenAIProvider: boolean;
+  openaiCallCount: number;
   geminiCallCount: number;
   openrouterCallCount: number;
   groqCallCount: number;
@@ -194,6 +196,8 @@ interface DeterministicTaste {
   highRatedSourceCount: number;
   signals: string[];
   queries: string[];
+  sourceTitles: string[];
+  excludedSourceTitles: string[];
 }
 
 function minRequestedRating(message: string): number {
@@ -205,6 +209,79 @@ function minRequestedRating(message: string): number {
 
 function addSignal(signals: Set<string>, signal: string) {
   if (signal) signals.add(signal.toLowerCase());
+}
+
+function dedupeText(values: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const value of values) {
+    const trimmed = value.trim();
+    const key = normalizeTitleForMatch(trimmed);
+    if (!trimmed || !key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(trimmed);
+  }
+  return out;
+}
+
+function normalizeTitleForMatch(value: string): string {
+  return value
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/&/g, " and ")
+    .replace(/\b(a|an|the)\b/g, " ")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function normalizedTokenCount(value: string): number {
+  return value.split(/\s+/).filter(Boolean).length;
+}
+
+function isCloseSourceTitleMatch(value: string, sourceTitle: string): boolean {
+  const normalizedValue = normalizeTitleForMatch(value);
+  const normalizedSource = normalizeTitleForMatch(sourceTitle);
+  if (!normalizedValue || !normalizedSource || normalizedValue.length < 3 || normalizedSource.length < 3) {
+    return false;
+  }
+  if (normalizedValue === normalizedSource) return true;
+  if (normalizedValue.includes(normalizedSource)) return true;
+  return (
+    normalizedSource.includes(normalizedValue) &&
+    normalizedTokenCount(normalizedValue) >= 2 &&
+    normalizedValue.length / normalizedSource.length >= 0.6
+  );
+}
+
+function buildExcludedSourceTitles(sourceTitles: string[]): string[] {
+  const expanded: string[] = [];
+  for (const title of sourceTitles) {
+    expanded.push(title);
+    const normalized = normalizeTitleForMatch(title);
+    if (normalized.includes("game of thrones") || normalized.includes("song of ice and fire")) {
+      expanded.push(
+        "Game of Thrones",
+        "A Game of Thrones",
+        "Song of Ice and Fire",
+        "A Song of Ice and Fire",
+        "A Clash of Kings",
+        "A Storm of Swords",
+        "A Feast for Crows",
+        "A Dance with Dragons",
+        "The Winds of Winter",
+        "A Dream of Spring",
+        "Fire & Blood",
+        "The World of Ice & Fire",
+        "A Knight of the Seven Kingdoms"
+      );
+    }
+    if (normalized.includes("solo leveling")) {
+      expanded.push("Solo Leveling");
+    }
+  }
+  return dedupeText(expanded);
 }
 
 function extractDeterministicTaste(
@@ -220,6 +297,11 @@ function extractDeterministicTaste(
   });
 
   const signals = new Set<string>();
+  const sourceTitles = dedupeText([
+    ...sourceItems.map((item) => item.title).filter(Boolean),
+    ...intent.references,
+  ]);
+
   for (const item of sourceItems) {
     const text = [
       item.title,
@@ -239,14 +321,41 @@ function extractDeterministicTaste(
     if (/struggle|war|battle|rival|conflict/i.test(text)) addSignal(signals, "power struggle");
     if (/dark|brutal|violent|blood|death|grim/i.test(text)) addSignal(signals, "dark");
     if (/intrigue|conspiracy|scheme|secret/i.test(text)) addSignal(signals, "intrigue");
+    if (/court|noble|king|queen|empire|throne|intrigue/i.test(text)) addSignal(signals, "court intrigue");
+    if (/morally gray|moral|antihero|betrayal|throne|power|war/i.test(text)) addSignal(signals, "morally gray");
     if (/thriller|crime|mystery|suspense/i.test(text)) addSignal(signals, "thriller");
   }
 
-  const signalList = [...signals].slice(0, 10);
+  const referenceText = `${sourceTitles.join(" ")} ${message}`.toLowerCase();
+  if (/game\s+of\s+thrones|song\s+of\s+ice\s+and\s+fire|\bthrone\b/i.test(referenceText)) {
+    addSignal(signals, "fantasy");
+    addSignal(signals, "drama");
+    addSignal(signals, "political");
+    addSignal(signals, "power struggle");
+    addSignal(signals, "dark");
+    addSignal(signals, "court intrigue");
+    addSignal(signals, "morally gray");
+  }
+  if (/solo\s+leveling|\bleveling\b|dungeon|gate|hunter|rank|system/i.test(referenceText)) {
+    addSignal(signals, "action");
+    addSignal(signals, "fantasy");
+    addSignal(signals, "adventure");
+    addSignal(signals, "power progression");
+    addSignal(signals, "dungeon");
+    addSignal(signals, "game system");
+  }
+  if (/romantik|romance|romantic/i.test(referenceText)) addSignal(signals, "romance");
+  if (/action|aksiyon/i.test(referenceText)) addSignal(signals, "action");
+  if (/fantasy|fantastik/i.test(referenceText)) addSignal(signals, "fantasy");
+  if (/dark|karanl/i.test(referenceText)) addSignal(signals, "dark");
+
+  const signalList = [...signals].slice(0, 14);
   return {
     highRatedSourceCount: sourceItems.length,
     signals: signalList,
     queries: buildDeterministicQueries(intent.targetTypes, signalList),
+    sourceTitles,
+    excludedSourceTitles: buildExcludedSourceTitles(sourceTitles),
   };
 }
 
@@ -254,43 +363,58 @@ function buildDeterministicQueries(targetTypes: MediaType[], signals: string[]):
   const has = (value: string) => signals.some((s) => s.includes(value));
   const target = targetTypes[0];
   const queries: string[] = [];
+  const push = (query: string) => {
+    if (!queries.includes(query)) queries.push(query);
+  };
 
   if (target === "book") {
-    if (has("fantasy")) queries.push("epic fantasy novel");
-    if (has("political") || has("power struggle") || has("intrigue")) queries.push("political fantasy novel");
-    if (has("dark")) queries.push("dark fantasy novel");
-    if (has("drama")) queries.push("fantasy drama novel");
+    if (has("fantasy")) push("epic fantasy novel");
+    if (has("political") || has("power struggle") || has("intrigue") || has("court intrigue")) {
+      push("political fantasy novel");
+    }
+    if (has("dark")) push("dark fantasy novel");
+    if (has("power struggle")) push("power struggle fantasy");
+    if (has("court intrigue") || has("intrigue")) push("court intrigue fantasy");
+    if (has("morally gray") || has("dark") || has("political")) push("morally gray fantasy novel");
+    if (has("drama")) push("fantasy drama novel");
   } else if (target === "anime") {
-    if (has("fantasy")) queries.push("epic fantasy anime");
-    if (has("political") || has("power struggle")) queries.push("political fantasy anime");
-    if (has("dark")) queries.push("dark fantasy anime");
+    if ((has("action") || has("fantasy")) && has("romance")) push("action fantasy romance");
+    if (has("fantasy") && has("romance")) push("fantasy romance adventure");
+    if (has("power progression")) push("power progression fantasy");
+    if (has("dungeon")) push("dungeon fantasy anime");
+    if (has("game system")) push("game system fantasy");
+    if (has("romance")) push("romantic anime");
+    if (has("fantasy")) push("epic fantasy anime");
+    if (has("political") || has("power struggle")) push("political fantasy anime");
+    if (has("dark")) push("dark fantasy anime");
   } else if (target === "tv") {
-    if (has("fantasy")) queries.push("epic fantasy");
-    if (has("political") || has("power struggle")) queries.push("political drama");
-    if (has("dark")) queries.push("dark drama");
+    if (has("fantasy")) push("epic fantasy");
+    if (has("political") || has("power struggle")) push("political drama");
+    if (has("dark")) push("dark drama");
   } else if (target === "movie") {
-    if (has("fantasy")) queries.push("epic fantasy");
-    if (has("political") || has("power struggle")) queries.push("political thriller");
-    if (has("dark")) queries.push("dark fantasy");
+    if (has("fantasy")) push("epic fantasy");
+    if (has("political") || has("power struggle")) push("political thriller");
+    if (has("dark")) push("dark fantasy");
   } else if (target) {
-    if (has("fantasy")) queries.push("fantasy");
-    if (has("dark")) queries.push("dark fantasy");
-    if (has("drama")) queries.push("drama");
+    if (has("fantasy")) push("fantasy");
+    if (has("dark")) push("dark fantasy");
+    if (has("drama")) push("drama");
   }
 
-  return [...new Set(queries)].slice(0, 4);
+  return [...new Set(queries)].slice(0, target === "book" || target === "anime" ? 6 : 4);
 }
 
 function buildDeterministicFallbackPlan(intent: AiIntent, taste: DeterministicTaste): AiRetrievalPlan | null {
-  if (taste.highRatedSourceCount <= 0 || taste.queries.length === 0 || intent.targetTypes.length === 0) {
+  if (taste.queries.length === 0 || intent.targetTypes.length === 0) {
     return null;
   }
+  const sourceContext = taste.highRatedSourceCount > 0 ? "high_rated_source_items" : "reference_taste_signals";
   return {
     taskType: intent.kind,
     interpretation: "Provider planning başarısız olduğu için yüksek puanlı kaynak kayıtlarından deterministik düşük güvenli plan üretildi.",
     targetMediaTypes: intent.targetTypes,
     sourceTypes: intent.sourceTypes,
-    sourceContext: "high_rated_source_items",
+    sourceContext,
     preferenceSignals: taste.signals,
     avoidSignals: intent.avoid,
     needsClarification: false,
@@ -348,7 +472,9 @@ function sourceForType(type: MediaType): AiRetrievalPlan["searchPlans"][number][
 
 function fallbackQueries(message: string, intent: AiIntent): string[] {
   const refs = intent.references.map((r) => r.trim()).filter(Boolean);
-  if (refs.length > 0) return refs.slice(0, 3);
+  const usesSourceAsTaste =
+    intent.kind === "reference_based" || intent.kind === "cross_media_translation";
+  if (refs.length > 0 && !usesSourceAsTaste) return refs.slice(0, 3);
 
   const cleaned = message
     .replace(/[^\p{L}\p{N}\s]/gu, " ")
@@ -358,6 +484,33 @@ function fallbackQueries(message: string, intent: AiIntent): string[] {
     .join(" ")
     .trim();
   return cleaned ? [cleaned] : [];
+}
+
+function isTasteSignalIntent(intent: AiIntent): boolean {
+  return intent.kind === "reference_based" || intent.kind === "cross_media_translation";
+}
+
+function isDirectSourceTitleQuery(query: string, sourceTitles: string[]): boolean {
+  return sourceTitles.some((title) => isCloseSourceTitleMatch(query, title));
+}
+
+function mergeQueries(primary: string[], secondary: string[]): string[] {
+  return dedupeText([...primary, ...secondary]).slice(0, 6);
+}
+
+function sanitizeTasteSignalQueries(
+  queries: string[],
+  intent: AiIntent,
+  taste?: DeterministicTaste
+): string[] {
+  if (!isTasteSignalIntent(intent)) return dedupeText(queries).slice(0, 6);
+  const sourceTitles = taste ? taste.excludedSourceTitles : intent.references;
+  return dedupeText(queries).filter((query) => !isDirectSourceTitleQuery(query, sourceTitles)).slice(0, 6);
+}
+
+function planHasDirectTitleQuery(plan: AiRetrievalPlan | null, sourceTitles: string[]): boolean {
+  if (!plan || sourceTitles.length === 0) return false;
+  return plan.searchPlans.some((p) => p.queries.some((query) => isDirectSourceTitleQuery(query, sourceTitles)));
 }
 
 function buildFallbackRetrievalPlan(message: string, intent: AiIntent): AiRetrievalPlan {
@@ -404,14 +557,28 @@ function isSourceCompatible(type: MediaType, source: AiRetrievalPlan["searchPlan
   return sourceForType(type) === source;
 }
 
-function applyIntentGuardrails(plan: AiRetrievalPlan, intent: AiIntent, message: string): AiRetrievalPlan {
+function applyIntentGuardrails(
+  plan: AiRetrievalPlan,
+  intent: AiIntent,
+  message: string,
+  taste?: DeterministicTaste
+): AiRetrievalPlan {
   if (intent.targetTypes.length === 0) return plan;
 
   const forcedTargets = intent.targetTypes;
-  const queries = fallbackQueries(message, intent);
+  const deterministicQueries = sanitizeTasteSignalQueries(taste?.queries || [], intent, taste);
+  const fallback = sanitizeTasteSignalQueries(fallbackQueries(message, intent), intent, taste);
+  const queries = deterministicQueries.length > 0 ? deterministicQueries : fallback;
   const guardedPlans = plan.searchPlans
     .filter((p) => forcedTargets.includes(p.mediaType) && isSourceCompatible(p.mediaType, p.source))
-    .map((p) => ({ ...p, queries: p.queries.length > 0 ? p.queries : queries }));
+    .map((p) => {
+      const sanitized = sanitizeTasteSignalQueries(p.queries, intent, taste);
+      const nextQueries = isTasteSignalIntent(intent)
+        ? mergeQueries(queries, sanitized)
+        : sanitized.length > 0 ? sanitized : queries;
+      return { ...p, queries: nextQueries };
+    })
+    .filter((p) => p.queries.length > 0);
 
   const missingPlans = forcedTargets
     .filter((type) => !guardedPlans.some((p) => p.mediaType === type))
@@ -463,10 +630,13 @@ function providerDebugFields(state: ProviderRunState): Omit<NonNullable<AiRecomm
     failedProviders: state.failedProviders,
     providerErrors: state.providerErrors,
     providerError: state.providerError,
+    useOpenAIProvider: state.useOpenAIProvider,
+    openaiCallCount: state.openaiCallCount,
     geminiCallCount: state.geminiCallCount,
     openrouterCallCount: state.openrouterCallCount,
     groqCallCount: state.groqCallCount,
     providerCallCounts: {
+      openai: state.openaiCallCount,
       gemini: state.geminiCallCount,
       openrouter: state.openrouterCallCount,
       groq: state.groqCallCount,
@@ -486,7 +656,8 @@ function recordProviderAttempt(state: ProviderRunState, providerName: string) {
   if (!state.attemptedProviders.includes(providerName)) {
     state.attemptedProviders.push(providerName);
   }
-  if (providerName === "gemini") state.geminiCallCount += 1;
+  if (providerName === "openai") state.openaiCallCount += 1;
+  else if (providerName === "gemini") state.geminiCallCount += 1;
   else if (providerName === "openrouter") state.openrouterCallCount += 1;
   else if (providerName === "groq") state.groqCallCount += 1;
   else if (providerName === "mock") state.mockCallCount += 1;
@@ -743,6 +914,10 @@ function buildRetrievalDebug(args: {
   highRatedSourceCount?: number;
   deterministicTasteSignals?: string[];
   deterministicFallbackUsed?: boolean;
+  sourceTitles?: string[];
+  excludedSourceTitles?: string[];
+  tasteSignalQueries?: string[];
+  directTitleQueryUsed?: boolean;
 }): AiRetrievalDebug {
   const {
     intent,
@@ -759,6 +934,10 @@ function buildRetrievalDebug(args: {
     highRatedSourceCount,
     deterministicTasteSignals,
     deterministicFallbackUsed,
+    sourceTitles,
+    excludedSourceTitles,
+    tasteSignalQueries,
+    directTitleQueryUsed,
   } = args;
   return {
     parsedIntent: intent,
@@ -785,6 +964,10 @@ function buildRetrievalDebug(args: {
     highRatedSourceCount: highRatedSourceCount || 0,
     deterministicTasteSignals: deterministicTasteSignals || [],
     deterministicFallbackUsed: Boolean(deterministicFallbackUsed),
+    sourceTitles: sourceTitles || [],
+    excludedSourceTitles: excludedSourceTitles || [],
+    tasteSignalQueries: tasteSignalQueries || [],
+    directTitleQueryUsed: Boolean(directTitleQueryUsed),
     notes: [...(searchDebug?.notes || []), ...(notes || [])],
   };
 }
@@ -814,6 +997,45 @@ function emptyVerificationResult(): CandidateVerificationResult {
   };
 }
 
+function isExcludedSourceCandidate(candidateTitle: string, excludedSourceTitles: string[]): boolean {
+  return excludedSourceTitles.some((title) => isCloseSourceTitleMatch(candidateTitle, title));
+}
+
+function applySourceTitleExclusion(
+  result: CandidateSearchResult,
+  excludedSourceTitles: string[],
+  notes: string[]
+): CandidateSearchResult {
+  if (excludedSourceTitles.length === 0 || result.candidates.length === 0) return result;
+  const before = result.candidates.length;
+  const candidates = result.candidates.filter((candidate) => (
+    !isExcludedSourceCandidate(candidate.title, excludedSourceTitles)
+  ));
+  const removed = before - candidates.length;
+  if (removed <= 0) return result;
+
+  notes.push("source_title_or_franchise_excluded");
+  const filterSummary = result.debug.filterSummary;
+  return {
+    ...result,
+    candidates,
+    debug: {
+      ...result.debug,
+      filterSummary: {
+        before: filterSummary.before,
+        after: Math.max(0, filterSummary.after - removed),
+        removed: filterSummary.removed + removed,
+        reasons: {
+          ...filterSummary.reasons,
+          source_title_or_franchise: (filterSummary.reasons.source_title_or_franchise || 0) + removed,
+        },
+      },
+      finalCandidateCount: candidates.length,
+      notes: [...result.debug.notes, "source_title_or_franchise_excluded"],
+    },
+  };
+}
+
 export async function POST(req: NextRequest) {
   let body: AiRecommendRequest;
   try {
@@ -838,12 +1060,14 @@ export async function POST(req: NextRequest) {
   const profile = settings?.useProfile
     ? buildLibraryProfile(mediaItems, progressLogs, settings)
     : null;
-  const providers = getProviderSequence();
+  const providers = getProviderSequence(settings);
   const providerState: ProviderRunState = {
     attemptedProviders: [],
     failedProviders: [],
     providerErrors: {},
     rateLimitHit: false,
+    useOpenAIProvider: Boolean(settings?.useOpenAIProvider),
+    openaiCallCount: 0,
     geminiCallCount: 0,
     openrouterCallCount: 0,
     groqCallCount: 0,
@@ -882,6 +1106,10 @@ export async function POST(req: NextRequest) {
       highRatedSourceCount: deterministicTaste.highRatedSourceCount,
       deterministicTasteSignals: deterministicTaste.signals,
       deterministicFallbackUsed,
+      sourceTitles: deterministicTaste.sourceTitles,
+      excludedSourceTitles: deterministicTaste.excludedSourceTitles,
+      tasteSignalQueries: deterministicTaste.queries,
+      directTitleQueryUsed: false,
     });
     libDebug.ideationFailedReason = "skipped_library_based";
     libDebug.safeFallbackUsed = false;
@@ -945,6 +1173,10 @@ export async function POST(req: NextRequest) {
           highRatedSourceCount: deterministicTaste.highRatedSourceCount,
           deterministicTasteSignals: deterministicTaste.signals,
           deterministicFallbackUsed: false,
+          sourceTitles: deterministicTaste.sourceTitles,
+          excludedSourceTitles: deterministicTaste.excludedSourceTitles,
+          tasteSignalQueries: deterministicTaste.queries,
+          directTitleQueryUsed: false,
         });
         debug.safeFallbackUsed = true;
         debug.ideationFailedReason = ideationFailedReason || "all_providers_failed";
@@ -964,10 +1196,13 @@ export async function POST(req: NextRequest) {
     }
 
     retrievalPlan = retrievalPlan || buildFallbackRetrievalPlan(message, intent);
-    retrievalPlan = applyIntentGuardrails(retrievalPlan, intent, message);
+    retrievalPlan = applyIntentGuardrails(retrievalPlan, intent, message, deterministicTaste);
 
     if (!providerPlanSucceeded && (intent.kind === "reference_based" || intent.kind === "cross_media_translation")) {
-      deterministicFallbackUsed = deterministicFallbackUsed || retrievalPlan.sourceContext === "high_rated_source_items";
+      deterministicFallbackUsed =
+        deterministicFallbackUsed ||
+        retrievalPlan.sourceContext === "high_rated_source_items" ||
+        retrievalPlan.sourceContext === "reference_taste_signals";
     }
 
     if (retrievalPlan.needsClarification) {
@@ -980,6 +1215,10 @@ export async function POST(req: NextRequest) {
         highRatedSourceCount: deterministicTaste.highRatedSourceCount,
         deterministicTasteSignals: deterministicTaste.signals,
         deterministicFallbackUsed,
+        sourceTitles: deterministicTaste.sourceTitles,
+        excludedSourceTitles: deterministicTaste.excludedSourceTitles,
+        tasteSignalQueries: deterministicTaste.queries,
+        directTitleQueryUsed: planHasDirectTitleQuery(retrievalPlan, deterministicTaste.excludedSourceTitles),
       });
       return NextResponse.json(
         buildClarificationResponse(settings, intent, retrievalPlan, providerState.selectedProvider || "safe_fallback", debug, {
@@ -990,6 +1229,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  const debugNotes: string[] = [];
   let searchResult: CandidateSearchResult = await getCandidates({
     intent,
     retrievalPlan,
@@ -998,9 +1238,9 @@ export async function POST(req: NextRequest) {
     mediaItems,
     progressLogs,
   });
-  const debugNotes: string[] = [];
+  searchResult = applySourceTitleExclusion(searchResult, deterministicTaste.excludedSourceTitles, debugNotes);
   if (deterministicFallbackUsed) {
-    debugNotes.push("deterministic_high_rated_source_fallback");
+    debugNotes.push("deterministic_taste_signal_fallback");
   }
 
   if (
@@ -1010,7 +1250,7 @@ export async function POST(req: NextRequest) {
   ) {
     const deterministicPlan = buildDeterministicFallbackPlan(intent, deterministicTaste);
     if (deterministicPlan) {
-      retrievalPlan = applyIntentGuardrails(deterministicPlan, intent, message);
+      retrievalPlan = applyIntentGuardrails(deterministicPlan, intent, message, deterministicTaste);
       searchResult = await getCandidates({
         intent,
         retrievalPlan,
@@ -1019,9 +1259,10 @@ export async function POST(req: NextRequest) {
         mediaItems,
         progressLogs,
       });
+      searchResult = applySourceTitleExclusion(searchResult, deterministicTaste.excludedSourceTitles, debugNotes);
       deterministicFallbackUsed = true;
       providerState.safeFallbackUsed = true;
-      debugNotes.push("deterministic_high_rated_source_fallback");
+      debugNotes.push("deterministic_taste_signal_fallback");
     }
   }
 
@@ -1058,8 +1299,8 @@ export async function POST(req: NextRequest) {
         settings,
       });
       if (refinedPlan && !refinedPlan.needsClarification) {
-        const guardedRefinedPlan = applyIntentGuardrails(refinedPlan, intent, message);
-        const refinedResult = await getCandidates({
+        const guardedRefinedPlan = applyIntentGuardrails(refinedPlan, intent, message, deterministicTaste);
+        const refinedResultRaw = await getCandidates({
           intent,
           retrievalPlan: guardedRefinedPlan,
           profile,
@@ -1067,6 +1308,11 @@ export async function POST(req: NextRequest) {
           mediaItems,
           progressLogs,
         });
+        const refinedResult = applySourceTitleExclusion(
+          refinedResultRaw,
+          deterministicTaste.excludedSourceTitles,
+          debugNotes
+        );
         if (refinedResult.candidates.length > searchResult.candidates.length || searchResult.candidates.length === 0) {
           retrievalPlan = guardedRefinedPlan;
           searchResult = refinedResult;
@@ -1127,6 +1373,10 @@ export async function POST(req: NextRequest) {
     highRatedSourceCount: deterministicTaste.highRatedSourceCount,
     deterministicTasteSignals: deterministicTaste.signals,
     deterministicFallbackUsed,
+    sourceTitles: deterministicTaste.sourceTitles,
+    excludedSourceTitles: deterministicTaste.excludedSourceTitles,
+    tasteSignalQueries: deterministicTaste.queries,
+    directTitleQueryUsed: planHasDirectTitleQuery(retrievalPlan, deterministicTaste.excludedSourceTitles),
   });
   retrievalDebug.ideationFailedReason = ideationFailedReason;
   retrievalDebug.safeFallbackUsed = false;
@@ -1139,8 +1389,8 @@ export async function POST(req: NextRequest) {
     let baseMsg = buildEmptyPoolMessage(retrievalPlan, intent, profile, retrievalDebug.notes || []);
     if (deterministicFallbackUsed) {
       baseMsg = providerPlanSucceeded
-        ? "İlk arama aday bulamadığı için kütüphane sinyallerinden düşük güvenli aday aradım ama doğrulanmış aday bulamadım."
-        : "AI sağlayıcıları sağlıklı plan üretemediği için kütüphane sinyallerinden düşük güvenli aday aradım ama doğrulanmış aday bulamadım.";
+        ? "İlk arama aday bulamadığı için zevk sinyallerinden düşük güvenli aday aradım ama doğrulanmış aday bulamadım."
+        : "AI sağlayıcıları sağlıklı plan üretemediği için zevk sinyallerinden düşük güvenli aday aradım ama doğrulanmış aday bulamadım.";
     } else if (deterministicTaste.highRatedSourceCount > 0 && /yeterli/i.test(baseMsg)) {
       const targets = (retrievalPlan?.targetMediaTypes || intent.targetTypes).map(targetLabel).join(", ") || "hedef tür";
       baseMsg = `${targets} tarafında yüksek puanlı kaynak kayıtlarından sinyal çıkardım ama doğrulanmış aday bulamadım.`;
@@ -1187,8 +1437,8 @@ export async function POST(req: NextRequest) {
 
     if (deterministicFallbackUsed) {
       const deterministicMsg = providerPlanSucceeded
-        ? "İlk arama aday bulamadığı için kütüphane sinyallerinden düşük güvenli öneriler hazırladım."
-        : "AI sağlayıcıları sağlıklı plan üretemediği için kütüphane sinyallerinden düşük güvenli öneriler hazırladım.";
+        ? "İlk arama aday bulamadığı için zevk sinyallerinden düşük güvenli öneriler hazırladım."
+        : "AI sağlayıcıları sağlıklı plan üretemediği için zevk sinyallerinden düşük güvenli öneriler hazırladım.";
       response.assistantMessage = `${deterministicMsg} ${response.assistantMessage}`.trim();
     }
 

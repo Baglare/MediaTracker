@@ -161,9 +161,29 @@ export default function MediaCard({
           <div>
             {/* Başlık satırı + Favori/Düzenle/Sil butonları */}
             <div className="flex items-start justify-between gap-2">
-              <h3 className="font-semibold text-zinc-100 truncate text-sm leading-tight">
-                {item.title}
-              </h3>
+              {/*
+                Tek bir h3: normalde truncate, hover'da kendi konumunda
+                büyüyüp tam metni vurgulu olarak gösterir (absolute layer
+                ana başlığın üstüne biner — kart içinde duplicate metin yok).
+              */}
+              <div className="relative min-w-0 flex-1 h-[1.15rem]">
+                <h3
+                  className="
+                    absolute left-0 top-0 z-20 max-w-full
+                    font-semibold text-zinc-100 text-sm leading-tight cursor-default
+                    whitespace-nowrap overflow-hidden text-ellipsis
+                    transition-[max-width,padding,background-color,box-shadow,border-color] duration-150
+                    hover:z-40 hover:max-w-[26rem] hover:whitespace-normal hover:break-words
+                    hover:bg-zinc-950/95 hover:backdrop-blur
+                    hover:rounded-lg hover:px-2 hover:py-1.5
+                    hover:border hover:border-violet-500/40
+                    hover:shadow-lg hover:shadow-black/40
+                    hover:text-base
+                  "
+                >
+                  {item.title}
+                </h3>
+              </div>
               <div className="flex items-center gap-1 flex-shrink-0">
                 {/* Favori kalp butonu */}
                 <button

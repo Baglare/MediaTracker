@@ -26,7 +26,7 @@ import { normalizeAniListMedia } from "@/lib/anilist";
 const SEARCH_QUERY = `
 query ($search: String!, $type: MediaType, $perPage: Int) {
   Page(page: 1, perPage: $perPage) {
-    media(search: $search, type: $type, sort: SEARCH_MATCH) {
+    media(search: $search, type: $type, sort: [SEARCH_MATCH, POPULARITY_DESC]) {
       id
       type
       format
@@ -159,8 +159,10 @@ export async function GET(request: NextRequest) {
       results = await queryAniList(query.trim(), "ANIME", 12);
     } else {
       // manga, manhwa, manhua → Hepsi AniList'te MANGA türü
-      // Daha fazla çekip server-side filtrele
-      results = await queryAniList(query.trim(), "MANGA", 25);
+      // Daha fazla çekip server-side filtrele (40, çünkü country filtresi sonrası
+      // ana eserin top 12'ye girebilmesi gerekiyor — Attack on Titan / Oshi no Ko gibi
+      // popüler başlıkların türetilmiş işleri tarafından bastırılmasını önler).
+      results = await queryAniList(query.trim(), "MANGA", 40);
       results = filterByCountry(results, category);
     }
 

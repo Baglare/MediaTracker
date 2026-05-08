@@ -54,7 +54,7 @@ export default function QuickAddModal({
   const [mode, setMode] = useState<AddMode>("single");
   const [selectedSeasonIds, setSelectedSeasonIds] = useState<Set<string>>(new Set());
   const [status, setStatus] = useState<MediaStatus>("planning");
-  const [currentProgress, setCurrentProgress] = useState(0);
+  const [currentProgressInput, setCurrentProgressInput] = useState("");
   const [userRating, setUserRating] = useState("");
   const [favorite, setFavorite] = useState(false);
 
@@ -66,10 +66,12 @@ export default function QuickAddModal({
     setMode(hasSeasons ? "seasons" : "single");
     setSelectedSeasonIds(new Set(payload?.seasonItems?.map((s) => s.id) ?? []));
     setStatus("planning");
-    setCurrentProgress(0);
+    setCurrentProgressInput("");
     setUserRating("");
     setFavorite(false);
   }
+
+  const currentProgress = currentProgressInput.trim() === "" ? 0 : Number(currentProgressInput);
 
   // Kaydedilecek aktif item dizisini moda göre hesapla
   const activeItems = useMemo<MediaItem[]>(() => {
@@ -174,7 +176,12 @@ export default function QuickAddModal({
               />
             </div>
             <div className="flex-1 min-w-0 flex flex-col justify-center">
-              <h3 className="text-lg font-bold text-white truncate">{titleForHeader}</h3>
+              <h3
+                title={titleForHeader}
+                className="text-lg font-bold text-white leading-tight break-words"
+              >
+                {titleForHeader}
+              </h3>
               <p className="text-sm text-zinc-400 capitalize mb-1">{primaryItem.type}</p>
               {primaryItem.releaseYear && (
                 <p className="text-xs text-zinc-500">{primaryItem.releaseYear}</p>
@@ -282,13 +289,23 @@ export default function QuickAddModal({
                 onChange={(e) => setStatus(e.target.value as MediaStatus)}
                 className="w-full px-3 py-2.5 bg-zinc-950 border border-zinc-800 rounded-lg text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
               >
-                <option value="planning">Planlanıyor</option>
-                <option value="watching">
-                  {primaryItem.type === "book" || primaryItem.type === "manga" ? "Okunuyor" : "İzleniyor"}
-                </option>
-                <option value="completed">Tamamlandı</option>
-                <option value="paused">Duraklatıldı</option>
-                <option value="dropped">Bırakıldı</option>
+                {(() => {
+                  const t = primaryItem.type;
+                  const isReadingType = t === "book" || t === "manga" || t === "manhwa" || t === "manhua";
+                  // Aktif durum (watching/reading) tek bir option olarak gösterilir;
+                  // value türe uygun ki form save'de doğru status'a otomatik düşsün.
+                  return (
+                    <>
+                      <option value="planning">Planlanıyor</option>
+                      <option value={isReadingType ? "reading" : "watching"}>
+                        {isReadingType ? "Okunuyor" : "İzleniyor"}
+                      </option>
+                      <option value="completed">Tamamlandı</option>
+                      <option value="paused">Duraklatıldı</option>
+                      <option value="dropped">Bırakıldı</option>
+                    </>
+                  );
+                })()}
               </select>
             </div>
 
@@ -301,10 +318,11 @@ export default function QuickAddModal({
                   type="number"
                   min="0"
                   max={totalProgress || undefined}
-                  value={currentProgress}
-                  onChange={(e) => setCurrentProgress(Number(e.target.value))}
+                  value={currentProgressInput}
+                  placeholder="0"
+                  onChange={(e) => setCurrentProgressInput(e.target.value)}
                   disabled={status === "completed" || noneSelected}
-                  className="w-full px-3 py-2.5 bg-zinc-950 border border-zinc-800 rounded-lg text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-violet-500/50 disabled:opacity-50"
+                  className="w-full px-3 py-2.5 bg-zinc-950 border border-zinc-800 rounded-lg text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-violet-500/50 disabled:opacity-50"
                 />
                 {isMultiSelected && (
                   <p className="mt-1 text-[11px] text-zinc-500">
@@ -330,16 +348,16 @@ export default function QuickAddModal({
                 <label className="block text-sm font-medium text-zinc-300 mb-1.5">
                   Puanınız (0-10)
                 </label>
-                <input
-                  type="number"
-                  min="0"
-                  max="10"
-                  step="1"
+                <select
                   value={userRating}
                   onChange={(e) => setUserRating(e.target.value)}
-                  placeholder="Opsiyonel"
-                  className="w-full px-3 py-2.5 bg-zinc-950 border border-zinc-800 rounded-lg text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
-                />
+                  className="w-full px-3 py-2.5 bg-zinc-950 border border-zinc-800 rounded-lg text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-violet-500/50 cursor-pointer"
+                >
+                  <option value="">Puan verilmedi</option>
+                  {Array.from({ length: 11 }, (_, i) => (
+                    <option key={i} value={String(i)}>{i}/10</option>
+                  ))}
+                </select>
               </div>
               <div className="flex items-end pb-1">
                 <button

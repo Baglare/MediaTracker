@@ -67,15 +67,14 @@ export function calculateDashboardStats(
     }
 
     // Dormant items check
+    // Hiç log yoksa "uzun süredir dokunulmamış" demek değildir — yeni eklenmiş
+    // veya import edilmiş olabilir; bu durumda dormant listesine alma.
     const itemLogs = sortedLogs.filter((l) => l.mediaId === item.id);
     if (itemLogs.length > 0) {
       const lastLogDate = new Date(itemLogs[0].createdAt);
       if (lastLogDate < twoWeeksAgo) {
         stats.dormantItems.push(item);
       }
-    } else {
-      // No logs at all and it's in progress
-      stats.dormantItems.push(item);
     }
   }
 

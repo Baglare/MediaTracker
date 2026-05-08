@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { ProgressLog } from "@/lib/types";
-import { History, Filter } from "lucide-react";
+import { History } from "lucide-react";
 
 interface ActivityLogPanelProps {
   progressLogs: ProgressLog[];
@@ -56,7 +56,6 @@ export default function ActivityLogPanel({ progressLogs }: ActivityLogPanelProps
         </h2>
 
         <div className="flex items-center gap-2 overflow-x-auto pb-2 sm:pb-0 scrollbar-hide">
-          <Filter className="w-4 h-4 text-zinc-500 mr-1" />
           <select
             value={filter}
             onChange={(e) => setFilter(e.target.value as "all" | "today" | "7days" | "30days")}

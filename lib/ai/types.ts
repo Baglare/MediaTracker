@@ -11,6 +11,7 @@ export interface AiSettings {
   usePersonalNotes: boolean;
   useWebResearch: boolean;
   deepResearch: boolean;
+  useOpenAIProvider: boolean;
 }
 
 export type IntentKind =
@@ -113,6 +114,10 @@ export interface AiRetrievalDebug {
   highRatedSourceCount?: number;
   deterministicTasteSignals?: string[];
   deterministicFallbackUsed?: boolean;
+  sourceTitles?: string[];
+  excludedSourceTitles?: string[];
+  tasteSignalQueries?: string[];
+  directTitleQueryUsed?: boolean;
   notes?: string[];
 }
 
@@ -169,7 +174,9 @@ export interface AiRecommendResponse {
     selectedProvider?: string;
     failedProviders?: { provider: string; stage: "planning" | "ranking"; error: string }[];
     providerErrors?: Record<string, string>;
-    providerError?: "rate_limit" | "gemini_key_missing" | "openrouter_key_missing" | "groq_key_missing" | "parse_error" | "api_error" | "openrouter_skipped_paid_model" | "timeout";
+    providerError?: "rate_limit" | "gemini_key_missing" | "openai_key_missing" | "openrouter_key_missing" | "groq_key_missing" | "parse_error" | "api_error" | "openrouter_skipped_paid_model" | "timeout";
+    useOpenAIProvider?: boolean;
+    openaiCallCount?: number;
     geminiCallCount?: number;
     openrouterCallCount?: number;
     groqCallCount?: number;
