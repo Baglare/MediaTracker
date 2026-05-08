@@ -43,6 +43,7 @@ interface CompatibleConfig {
 }
 
 interface ChatResponse {
+  model?: string;
   choices?: { message?: { content?: string } }[];
 }
 
@@ -438,7 +439,7 @@ function createCompatibleProvider(config: CompatibleConfig): AiProvider {
         intent: args.intent,
         debug: {
           provider: config.name,
-          usedModel: process.env[config.modelEnv] || config.defaultModel,
+          usedModel: response.model || process.env[config.modelEnv] || config.defaultModel,
           ...(repairUsed ? { note: "json_parse_repair_used" } : {}),
         },
       } satisfies AiRecommendResponse;

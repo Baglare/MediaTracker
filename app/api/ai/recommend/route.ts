@@ -43,6 +43,8 @@ const PROVIDER_RATE_LIMIT_MESSAGE =
 const ALL_PROVIDERS_MOCK_MESSAGE =
   "AI sağlayıcıları şu an yanıt veremiyor. Daha sonra tekrar dene veya mock moda geç.";
 
+const PROVIDER_PLAN_FAILED_MESSAGE =
+  "AI sağlayıcıları sağlıklı plan üretemediği için güvenilir öneri hazırlayamadım.";
 const PROVIDER_TIMEOUT_MS = 25000;
 
 type ProviderErrorCode =
@@ -53,6 +55,7 @@ type ProviderErrorCode =
 interface ProviderRunState {
   attemptedProviders: string[];
   selectedProvider?: string;
+  failedProviders: { provider: string; stage: "planning" | "ranking"; error: string }[];
   providerErrors: Record<string, string>;
   providerError?: ProviderErrorCode;
   rateLimitHit: boolean;
@@ -64,6 +67,8 @@ interface ProviderRunState {
   timeoutHit: boolean;
   safeFallbackUsed: boolean;
   usedModel?: string;
+  followUpMerged: boolean;
+  activeContextSummary?: string;
 }
 
 class ProviderTimeoutError extends Error {
@@ -90,7 +95,9 @@ function statusLabelTr(status?: string): string {
 function deterministicLibraryReason(c: AiCandidate): string {
   const parts: string[] = [];
   if (c.status) parts.push(`${statusLabelTr(c.status)} durumunda`);
-  if (typeof c.currentProgress === "number" && typeof c.totalProgress === "number" && c.totalProgress > 0) {
+  if (c.type === "movie" && (c.currentProgress || 0) === 0 && c.totalProgress === 1) {
+    parts.push("henüz başlamamışsın");
+  } else if (typeof c.currentProgress === "number" && typeof c.totalProgress === "number" && c.totalProgress > 0) {
     const pct = Math.round((c.currentProgress / c.totalProgress) * 100);
     parts.push(`${c.currentProgress}/${c.totalProgress} ilerlemişsin (%${pct})`);
   }
@@ -108,6 +115,9 @@ function deterministicLibraryReason(c: AiCandidate): string {
 }
 
 function deterministicLibraryFitLabel(c: AiCandidate, idx: number): string {
+  if (c.type === "movie" && (c.currentProgress || 0) === 0 && c.totalProgress === 1) {
+    return "Başlamak için uygun";
+  }
   if (c.status === "watching" || c.status === "reading") {
     if (typeof c.currentProgress === "number" && typeof c.totalProgress === "number" && c.totalProgress > 0) {
       const pct = c.currentProgress / c.totalProgress;
@@ -140,6 +150,159 @@ function buildLibraryDeterministicRecs(candidates: AiCandidate[]): AiRecommendat
     }));
 }
 
+function localOnlyCandidates(
+  mediaItems: AiRecommendRequest["mediaItems"],
+  progressLogs: AiRecommendRequest["progressLogs"]
+): AiCandidate[] {
+  const lastByMedia = new Map<string, string>();
+  for (const log of progressLogs) {
+    const prev = lastByMedia.get(log.mediaId);
+    if (!prev || new Date(log.createdAt).getTime() > new Date(prev).getTime()) {
+      lastByMedia.set(log.mediaId, log.createdAt);
+    }
+  }
+  return mediaItems
+    .filter((m) => m.status !== "completed" && m.status !== "dropped")
+    .map<AiCandidate>((m) => ({
+      source: "library",
+      externalId: m.id,
+      type: m.type,
+      title: m.title,
+      overview: m.overview,
+      releaseYear: m.releaseYear,
+      coverUrl: m.coverImage,
+      genres: m.genres,
+      totalProgress: m.totalProgress,
+      status: m.status,
+      currentProgress: m.currentProgress,
+      userRating: m.userRating ?? m.rating ?? null,
+      favorite: Boolean(m.favorite),
+      lastActivityAt: lastByMedia.get(m.id),
+      libraryItemId: m.id,
+    }))
+    .sort((a, b) => {
+      const score = (c: AiCandidate) =>
+        (c.favorite ? 30 : 0) +
+        (typeof c.userRating === "number" ? c.userRating * 3 : 0) +
+        (c.status === "watching" || c.status === "reading" ? 20 : 0) +
+        (c.lastActivityAt ? 10 : 0);
+      return score(b) - score(a);
+    });
+}
+
+interface DeterministicTaste {
+  highRatedSourceCount: number;
+  signals: string[];
+  queries: string[];
+}
+
+function minRequestedRating(message: string): number {
+  const match = message.match(/(\d+(?:[.,]\d+)?)\s*\+/);
+  if (!match) return 7;
+  const parsed = Number(match[1].replace(",", "."));
+  return Number.isFinite(parsed) ? parsed : 7;
+}
+
+function addSignal(signals: Set<string>, signal: string) {
+  if (signal) signals.add(signal.toLowerCase());
+}
+
+function extractDeterministicTaste(
+  mediaItems: AiRecommendRequest["mediaItems"],
+  intent: AiIntent,
+  message: string
+): DeterministicTaste {
+  const minRating = minRequestedRating(message);
+  const sourceTypes = intent.sourceTypes.length > 0 ? intent.sourceTypes : [];
+  const sourceItems = mediaItems.filter((m) => {
+    const rating = m.userRating ?? m.rating ?? null;
+    return typeof rating === "number" && rating >= minRating && sourceTypes.includes(m.type);
+  });
+
+  const signals = new Set<string>();
+  for (const item of sourceItems) {
+    const text = [
+      item.title,
+      item.overview,
+      ...(item.genres || []),
+      ...(item.tags || []),
+      ...(item.subjects || []),
+      item.personalNotes,
+    ].filter(Boolean).join(" ").toLowerCase();
+
+    for (const genre of [...(item.genres || []), ...(item.tags || []), ...(item.subjects || [])]) {
+      addSignal(signals, genre);
+    }
+    if (/fantasy|sci-fi|magic|dragon|throne|kingdom|realm|myth/i.test(text)) addSignal(signals, "fantasy");
+    if (/drama|family|betrayal|tragedy/i.test(text)) addSignal(signals, "drama");
+    if (/politic|political|power|control|court|noble|king|queen|empire|throne/i.test(text)) addSignal(signals, "political");
+    if (/struggle|war|battle|rival|conflict/i.test(text)) addSignal(signals, "power struggle");
+    if (/dark|brutal|violent|blood|death|grim/i.test(text)) addSignal(signals, "dark");
+    if (/intrigue|conspiracy|scheme|secret/i.test(text)) addSignal(signals, "intrigue");
+    if (/thriller|crime|mystery|suspense/i.test(text)) addSignal(signals, "thriller");
+  }
+
+  const signalList = [...signals].slice(0, 10);
+  return {
+    highRatedSourceCount: sourceItems.length,
+    signals: signalList,
+    queries: buildDeterministicQueries(intent.targetTypes, signalList),
+  };
+}
+
+function buildDeterministicQueries(targetTypes: MediaType[], signals: string[]): string[] {
+  const has = (value: string) => signals.some((s) => s.includes(value));
+  const target = targetTypes[0];
+  const queries: string[] = [];
+
+  if (target === "book") {
+    if (has("fantasy")) queries.push("epic fantasy novel");
+    if (has("political") || has("power struggle") || has("intrigue")) queries.push("political fantasy novel");
+    if (has("dark")) queries.push("dark fantasy novel");
+    if (has("drama")) queries.push("fantasy drama novel");
+  } else if (target === "anime") {
+    if (has("fantasy")) queries.push("epic fantasy anime");
+    if (has("political") || has("power struggle")) queries.push("political fantasy anime");
+    if (has("dark")) queries.push("dark fantasy anime");
+  } else if (target === "tv") {
+    if (has("fantasy")) queries.push("epic fantasy");
+    if (has("political") || has("power struggle")) queries.push("political drama");
+    if (has("dark")) queries.push("dark drama");
+  } else if (target === "movie") {
+    if (has("fantasy")) queries.push("epic fantasy");
+    if (has("political") || has("power struggle")) queries.push("political thriller");
+    if (has("dark")) queries.push("dark fantasy");
+  } else if (target) {
+    if (has("fantasy")) queries.push("fantasy");
+    if (has("dark")) queries.push("dark fantasy");
+    if (has("drama")) queries.push("drama");
+  }
+
+  return [...new Set(queries)].slice(0, 4);
+}
+
+function buildDeterministicFallbackPlan(intent: AiIntent, taste: DeterministicTaste): AiRetrievalPlan | null {
+  if (taste.highRatedSourceCount <= 0 || taste.queries.length === 0 || intent.targetTypes.length === 0) {
+    return null;
+  }
+  return {
+    taskType: intent.kind,
+    interpretation: "Provider planning başarısız olduğu için yüksek puanlı kaynak kayıtlarından deterministik düşük güvenli plan üretildi.",
+    targetMediaTypes: intent.targetTypes,
+    sourceTypes: intent.sourceTypes,
+    sourceContext: "high_rated_source_items",
+    preferenceSignals: taste.signals,
+    avoidSignals: intent.avoid,
+    needsClarification: false,
+    searchPlans: intent.targetTypes.map((type) => ({
+      source: sourceForType(type),
+      mediaType: type,
+      queries: taste.queries,
+      reason: "Yüksek puanlı kaynak kayıtlarının genre/tag/overview sinyallerinden üretildi.",
+    })),
+  };
+}
+
 function buildTransparencySummary(s: AiSettings): string {
   const parts = [
     s.useProfile ? "kütüphane profil özeti" : null,
@@ -149,6 +312,30 @@ function buildTransparencySummary(s: AiSettings): string {
     s.deepResearch ? "derin araştırma modu" : null,
   ].filter(Boolean);
   return `Bu istekte kullanılacaklar: ${parts.join(", ")}.`;
+}
+
+function summarizeActiveContext(ctx?: AiRecommendRequest["activeContext"]): string | undefined {
+  if (!ctx?.followUpMerged) return undefined;
+  const recs = ctx.lastRecommendations?.slice(0, 3).map((r) => r.title).filter(Boolean).join(", ");
+  return [
+    ctx.previousPrompt ? `previous: ${ctx.previousPrompt}` : null,
+    ctx.followUpMessage ? `follow-up: ${ctx.followUpMessage}` : null,
+    recs ? `last recommendations: ${recs}` : null,
+  ].filter(Boolean).join(" | ");
+}
+
+function buildProviderMessage(message: string, ctx?: AiRecommendRequest["activeContext"]): string {
+  if (!ctx?.followUpMerged || !ctx.previousPrompt) return message;
+  const recs = ctx.lastRecommendations?.slice(0, 5)
+    .map((r) => `${r.title}${r.mediaType ? ` (${r.mediaType})` : ""}`)
+    .join(", ");
+  return [
+    `Önceki kullanıcı isteği: ${ctx.previousPrompt}`,
+    ctx.lastAssistantMessage ? `Son AI cevabı: ${ctx.lastAssistantMessage}` : null,
+    recs ? `Son doğrulanmış öneriler: ${recs}` : null,
+    `Kullanıcının takip mesajı: ${ctx.followUpMessage || message}`,
+    "Bu mesajı yeni bağımsız istek gibi değil, önceki aktif AI konusunun devamı olarak yorumla.",
+  ].filter(Boolean).join("\n");
 }
 
 function sourceForType(type: MediaType): AiRetrievalPlan["searchPlans"][number]["source"] {
@@ -273,6 +460,7 @@ function providerDebugFields(state: ProviderRunState): Omit<NonNullable<AiRecomm
   return {
     attemptedProviders: state.attemptedProviders,
     selectedProvider: state.selectedProvider,
+    failedProviders: state.failedProviders,
     providerErrors: state.providerErrors,
     providerError: state.providerError,
     geminiCallCount: state.geminiCallCount,
@@ -289,6 +477,8 @@ function providerDebugFields(state: ProviderRunState): Omit<NonNullable<AiRecomm
     fallbackReason: state.fallbackReason,
     safeFallbackUsed: state.safeFallbackUsed,
     usedModel: state.usedModel,
+    followUpMerged: state.followUpMerged,
+    activeContextSummary: state.activeContextSummary,
   };
 }
 
@@ -347,10 +537,16 @@ function classifyProviderError(error: unknown): {
   };
 }
 
-function applyProviderError(state: ProviderRunState, error: unknown, fallbackProviderName?: string) {
+function applyProviderError(
+  state: ProviderRunState,
+  error: unknown,
+  fallbackProviderName?: string,
+  stage: "planning" | "ranking" = "ranking"
+) {
   const classified = classifyProviderError(error);
   const providerName = classified.provider === "unknown" ? fallbackProviderName || "unknown" : classified.provider;
   state.providerErrors[providerName] = classified.providerError;
+  state.failedProviders.push({ provider: providerName, stage, error: classified.providerError });
   state.providerError = classified.providerError;
   state.rateLimitHit = state.rateLimitHit || classified.rateLimitHit;
   state.timeoutHit = state.timeoutHit || classified.providerError === "timeout";
@@ -394,10 +590,9 @@ async function runPlanningWithProviders(args: {
           settings: args.settings,
         })
       );
-      args.state.selectedProvider = provider.name;
       return plan;
     } catch (error) {
-      applyProviderError(args.state, error, provider.name);
+      applyProviderError(args.state, error, provider.name, "planning");
     }
   }
   return null;
@@ -442,7 +637,7 @@ async function runRankingWithProviders(args: {
       return response;
     } catch (error) {
       if (provider.name !== "mock") nonMockFailed = true;
-      applyProviderError(args.state, error, provider.name);
+      applyProviderError(args.state, error, provider.name, "ranking");
     }
   }
 
@@ -545,6 +740,9 @@ function buildRetrievalDebug(args: {
   verificationSourceCounts?: Record<string, number>;
   rejectedUnverifiedCount?: number;
   fallbackSearchUsed?: boolean;
+  highRatedSourceCount?: number;
+  deterministicTasteSignals?: string[];
+  deterministicFallbackUsed?: boolean;
 }): AiRetrievalDebug {
   const {
     intent,
@@ -558,6 +756,9 @@ function buildRetrievalDebug(args: {
     verificationSourceCounts,
     rejectedUnverifiedCount,
     fallbackSearchUsed,
+    highRatedSourceCount,
+    deterministicTasteSignals,
+    deterministicFallbackUsed,
   } = args;
   return {
     parsedIntent: intent,
@@ -581,6 +782,9 @@ function buildRetrievalDebug(args: {
     finalCandidateCount: searchDebug?.finalCandidateCount || 0,
     refinedPassUsed,
     providerFallback,
+    highRatedSourceCount: highRatedSourceCount || 0,
+    deterministicTasteSignals: deterministicTasteSignals || [],
+    deterministicFallbackUsed: Boolean(deterministicFallbackUsed),
     notes: [...(searchDebug?.notes || []), ...(notes || [])],
   };
 }
@@ -622,6 +826,10 @@ export async function POST(req: NextRequest) {
   if (!message) {
     return NextResponse.json({ error: "message is required" }, { status: 400 });
   }
+  const activeContext = body.activeContext;
+  const followUpMerged = Boolean(activeContext?.followUpMerged);
+  const activeContextSummary = summarizeActiveContext(activeContext);
+  const providerMessage = buildProviderMessage(message, activeContext);
 
   const settings = body.settings;
   const mediaItems = Array.isArray(body.mediaItems) ? body.mediaItems : [];
@@ -633,6 +841,7 @@ export async function POST(req: NextRequest) {
   const providers = getProviderSequence();
   const providerState: ProviderRunState = {
     attemptedProviders: [],
+    failedProviders: [],
     providerErrors: {},
     rateLimitHit: false,
     geminiCallCount: 0,
@@ -641,7 +850,12 @@ export async function POST(req: NextRequest) {
     mockCallCount: 0,
     timeoutHit: false,
     safeFallbackUsed: false,
+    followUpMerged: false,
+    activeContextSummary,
   };
+  providerState.followUpMerged = followUpMerged;
+  const deterministicTaste = extractDeterministicTaste(mediaItems, intent, message);
+  let deterministicFallbackUsed = false;
   let retrievalPlan: AiRetrievalPlan | null = null;
   let ideationFailedReason: AiRetrievalDebug["ideationFailedReason"] | undefined;
   let parseRepairUsed = false;
@@ -665,6 +879,9 @@ export async function POST(req: NextRequest) {
       refinedPassUsed: false,
       providerFallback: false,
       notes: ["library_deterministic"],
+      highRatedSourceCount: deterministicTaste.highRatedSourceCount,
+      deterministicTasteSignals: deterministicTaste.signals,
+      deterministicFallbackUsed,
     });
     libDebug.ideationFailedReason = "skipped_library_based";
     libDebug.safeFallbackUsed = false;
@@ -682,6 +899,9 @@ export async function POST(req: NextRequest) {
         attemptedProviders: [],
         providerErrors: {},
         rateLimitHit: false,
+        failedProviders: [],
+        followUpMerged,
+        activeContextSummary,
         retrieval: libDebug,
         note: "library_based_deterministic",
       },
@@ -693,7 +913,7 @@ export async function POST(req: NextRequest) {
     retrievalPlan = await runPlanningWithProviders({
       providers,
       state: providerState,
-      message,
+      message: providerMessage,
       profile,
       intent,
       settings,
@@ -707,46 +927,63 @@ export async function POST(req: NextRequest) {
       else if (codes.every((c) => /key_missing/.test(c))) ideationFailedReason = "key_missing";
       else ideationFailedReason = "all_providers_failed";
     }
-    retrievalPlan = retrievalPlan || buildFallbackRetrievalPlan(message, intent);
+    if (!retrievalPlan && (intent.kind === "reference_based" || intent.kind === "cross_media_translation")) {
+      const deterministicPlan = buildDeterministicFallbackPlan(intent, deterministicTaste);
+      if (deterministicPlan) {
+        retrievalPlan = deterministicPlan;
+        deterministicFallbackUsed = true;
+        providerState.safeFallbackUsed = true;
+      } else {
+        providerState.selectedProvider = "safe_fallback";
+        providerState.safeFallbackUsed = true;
+        const debug = buildRetrievalDebug({
+          intent,
+          plan: null,
+          refinedPassUsed: false,
+          providerFallback: true,
+          notes: ["provider_plan_failed_no_external_fallback", "deterministic_taste_signal_missing"],
+          highRatedSourceCount: deterministicTaste.highRatedSourceCount,
+          deterministicTasteSignals: deterministicTaste.signals,
+          deterministicFallbackUsed: false,
+        });
+        debug.safeFallbackUsed = true;
+        debug.ideationFailedReason = ideationFailedReason || "all_providers_failed";
+        return NextResponse.json({
+          assistantMessage: "Yeterli kütüphane sinyali bulamadım. 1-2 örnek başlık verirsen daha iyi öneririm.",
+          recommendations: [],
+          transparencySummary: buildTransparencySummary(settings),
+          intent,
+          debug: {
+            provider: "safe_fallback",
+            ...providerDebugFields(providerState),
+            fallbackReason: providerState.fallbackReason || "safe_fallback",
+            retrieval: debug,
+          },
+        } satisfies AiRecommendResponse);
+      }
+    }
 
+    retrievalPlan = retrievalPlan || buildFallbackRetrievalPlan(message, intent);
     retrievalPlan = applyIntentGuardrails(retrievalPlan, intent, message);
 
-
     if (!providerPlanSucceeded && (intent.kind === "reference_based" || intent.kind === "cross_media_translation")) {
-      const debug = buildRetrievalDebug({
-        intent,
-        plan: retrievalPlan,
-        refinedPassUsed: false,
-        providerFallback: true,
-        notes: ["provider_plan_failed_no_external_fallback"],
-      });
-      debug.safeFallbackUsed = true;
-      debug.ideationFailedReason = ideationFailedReason || "all_providers_failed";
-      return NextResponse.json({
-        assistantMessage: ALL_PROVIDERS_MOCK_MESSAGE,
-        recommendations: [],
-        transparencySummary: buildTransparencySummary(settings),
-        intent,
-        debug: {
-          provider: "safe_fallback",
-          selectedProvider: "safe_fallback",
-          ...providerDebugFields(providerState),
-          fallbackReason: providerState.fallbackReason || "safe_fallback",
-          retrieval: debug,
-        },
-      } satisfies AiRecommendResponse);
+      deterministicFallbackUsed = deterministicFallbackUsed || retrievalPlan.sourceContext === "high_rated_source_items";
     }
 
     if (retrievalPlan.needsClarification) {
+      providerState.selectedProvider = "safe_fallback";
       const debug = buildRetrievalDebug({
         intent,
         plan: retrievalPlan,
         refinedPassUsed: false,
         providerFallback: false,
+        highRatedSourceCount: deterministicTaste.highRatedSourceCount,
+        deterministicTasteSignals: deterministicTaste.signals,
+        deterministicFallbackUsed,
       });
       return NextResponse.json(
-        buildClarificationResponse(settings, intent, retrievalPlan, providerState.selectedProvider || "mock", debug, {
-          provider: providerState.selectedProvider || "mock",
+        buildClarificationResponse(settings, intent, retrievalPlan, providerState.selectedProvider || "safe_fallback", debug, {
+          provider: providerState.selectedProvider || "safe_fallback",
           ...providerDebugFields(providerState),
         })
       );
@@ -762,6 +999,31 @@ export async function POST(req: NextRequest) {
     progressLogs,
   });
   const debugNotes: string[] = [];
+  if (deterministicFallbackUsed) {
+    debugNotes.push("deterministic_high_rated_source_fallback");
+  }
+
+  if (
+    !deterministicFallbackUsed &&
+    searchResult.candidates.length === 0 &&
+    (intent.kind === "reference_based" || intent.kind === "cross_media_translation")
+  ) {
+    const deterministicPlan = buildDeterministicFallbackPlan(intent, deterministicTaste);
+    if (deterministicPlan) {
+      retrievalPlan = applyIntentGuardrails(deterministicPlan, intent, message);
+      searchResult = await getCandidates({
+        intent,
+        retrievalPlan,
+        profile,
+        message,
+        mediaItems,
+        progressLogs,
+      });
+      deterministicFallbackUsed = true;
+      providerState.safeFallbackUsed = true;
+      debugNotes.push("deterministic_high_rated_source_fallback");
+    }
+  }
 
   if (isWeakTvMoodDiscovery(intent, retrievalPlan, searchResult)) {
     debugNotes.push("tv_mood_discovery_weak");
@@ -778,6 +1040,8 @@ export async function POST(req: NextRequest) {
 
   const shouldRefine =
     settings.deepResearch &&
+    providerPlanSucceeded &&
+    !deterministicFallbackUsed &&
     !providerState.rateLimitHit &&
     !!retrievalPlan &&
     searchResult.candidates.length === 0;
@@ -788,7 +1052,7 @@ export async function POST(req: NextRequest) {
       const refinedPlan = await runPlanningWithProviders({
         providers,
         state: providerState,
-        message,
+        message: providerMessage,
         profile,
         intent,
         settings,
@@ -810,7 +1074,7 @@ export async function POST(req: NextRequest) {
         }
       }
     } catch (error) {
-      applyProviderError(providerState, error);
+      applyProviderError(providerState, error, undefined, "planning");
     }
   }
 
@@ -860,13 +1124,27 @@ export async function POST(req: NextRequest) {
     verificationSourceCounts: verificationResult.verificationSourceCounts,
     rejectedUnverifiedCount: verificationResult.rejectedUnverifiedCount,
     fallbackSearchUsed,
+    highRatedSourceCount: deterministicTaste.highRatedSourceCount,
+    deterministicTasteSignals: deterministicTaste.signals,
+    deterministicFallbackUsed,
   });
   retrievalDebug.ideationFailedReason = ideationFailedReason;
   retrievalDebug.safeFallbackUsed = false;
   retrievalDebug.parseRepairUsed = false;
 
   if (candidates.length === 0) {
+    providerState.selectedProvider = "safe_fallback";
+    providerState.safeFallbackUsed = true;
+    retrievalDebug.safeFallbackUsed = true;
     let baseMsg = buildEmptyPoolMessage(retrievalPlan, intent, profile, retrievalDebug.notes || []);
+    if (deterministicFallbackUsed) {
+      baseMsg = providerPlanSucceeded
+        ? "İlk arama aday bulamadığı için kütüphane sinyallerinden düşük güvenli aday aradım ama doğrulanmış aday bulamadım."
+        : "AI sağlayıcıları sağlıklı plan üretemediği için kütüphane sinyallerinden düşük güvenli aday aradım ama doğrulanmış aday bulamadım.";
+    } else if (deterministicTaste.highRatedSourceCount > 0 && /yeterli/i.test(baseMsg)) {
+      const targets = (retrievalPlan?.targetMediaTypes || intent.targetTypes).map(targetLabel).join(", ") || "hedef tür";
+      baseMsg = `${targets} tarafında yüksek puanlı kaynak kayıtlarından sinyal çıkardım ama doğrulanmış aday bulamadım.`;
+    }
     if (ideationFailedReason && ideationFailedReason !== "skipped_library_based") {
       baseMsg = `${baseMsg} (AI plan üretilemedi: ${ideationFailedReason}. Daha net bir tür/mood verirsen yeniden deneyebilirim.)`;
     }
@@ -877,14 +1155,13 @@ export async function POST(req: NextRequest) {
       intent,
       debug: {
         provider: providerState.selectedProvider || "safe_fallback",
-        selectedProvider: providerState.selectedProvider || "safe_fallback",
         ...providerDebugFields(providerState),
         note: "empty candidate pool",
         retrieval: retrievalDebug,
       },
     };
     if (providerState.rateLimitHit) {
-      empty.assistantMessage = PROVIDER_RATE_LIMIT_MESSAGE;
+      empty.assistantMessage = `${empty.assistantMessage} ${PROVIDER_RATE_LIMIT_MESSAGE}`.trim();
     }
     return NextResponse.json(empty);
   }
@@ -893,7 +1170,7 @@ export async function POST(req: NextRequest) {
     const response = await runRankingWithProviders({
       providers,
       state: providerState,
-      message,
+      message: providerMessage,
       profile,
       intent,
       settings,
@@ -908,8 +1185,15 @@ export async function POST(req: NextRequest) {
     }
     if (parseRepairUsed) retrievalDebug.parseRepairUsed = true;
 
+    if (deterministicFallbackUsed) {
+      const deterministicMsg = providerPlanSucceeded
+        ? "İlk arama aday bulamadığı için kütüphane sinyallerinden düşük güvenli öneriler hazırladım."
+        : "AI sağlayıcıları sağlıklı plan üretemediği için kütüphane sinyallerinden düşük güvenli öneriler hazırladım.";
+      response.assistantMessage = `${deterministicMsg} ${response.assistantMessage}`.trim();
+    }
+
     // Cross-media veya reference-based + zayıf havuz → düşük güven mesajı
-    if (fallbackSearchUsed) {
+    if (fallbackSearchUsed && !deterministicFallbackUsed) {
       const lowConfNote =
         intent.kind === "cross_media_translation"
           ? " (Düşük güven: kaynak zevkini hedef türe çevirmek için yeterli sinyal yok. Sevdiğin 1-2 örnek başlık verirsen daha iyi öneri çıkartabilirim.)"
@@ -936,10 +1220,12 @@ export async function POST(req: NextRequest) {
     }));
     return NextResponse.json(response satisfies AiRecommendResponse);
   } catch (err) {
-    applyProviderError(providerState, err);
+    applyProviderError(providerState, err, undefined, "ranking");
+    providerState.selectedProvider = "mock";
+    providerState.safeFallbackUsed = true;
 
     const fallback = await mockProvider.generate({
-      message,
+      message: providerMessage,
       profile,
       intent,
       settings,
@@ -949,7 +1235,6 @@ export async function POST(req: NextRequest) {
     retrievalDebug.safeFallbackUsed = true;
     fallback.debug = {
       provider: "mock",
-      selectedProvider: "mock",
       ...providerDebugFields(providerState),
       fellBackToMock: true,
       note: err instanceof Error ? err.message : "unknown error",

@@ -110,6 +110,9 @@ export interface AiRetrievalDebug {
   parseRepairUsed?: boolean;
   ideationFailedReason?: "provider_parse_error" | "all_providers_failed" | "empty_ideas" | "rate_limit" | "key_missing" | "api_error" | "skipped_library_based";
   safeFallbackUsed?: boolean;
+  highRatedSourceCount?: number;
+  deterministicTasteSignals?: string[];
+  deterministicFallbackUsed?: boolean;
   notes?: string[];
 }
 
@@ -164,6 +167,7 @@ export interface AiRecommendResponse {
     provider: string;
     attemptedProviders?: string[];
     selectedProvider?: string;
+    failedProviders?: { provider: string; stage: "planning" | "ranking"; error: string }[];
     providerErrors?: Record<string, string>;
     providerError?: "rate_limit" | "gemini_key_missing" | "openrouter_key_missing" | "groq_key_missing" | "parse_error" | "api_error" | "openrouter_skipped_paid_model" | "timeout";
     geminiCallCount?: number;
@@ -177,8 +181,19 @@ export interface AiRecommendResponse {
     fellBackToMock?: boolean;
     note?: string;
     usedModel?: string;
+    followUpMerged?: boolean;
+    activeContextSummary?: string;
     retrieval?: AiRetrievalDebug;
   };
+}
+
+export interface AiActiveContext {
+  previousPrompt: string;
+  lastAssistantMessage?: string;
+  lastRecommendations?: { title: string; mediaType: MediaType; source?: string }[];
+  followUpMessage?: string;
+  summary?: string;
+  followUpMerged?: boolean;
 }
 
 export interface AiRecommendRequest {
@@ -187,6 +202,7 @@ export interface AiRecommendRequest {
   progressLogs: ProgressLog[];
   settings: AiSettings;
   recentContext?: { role: "user" | "assistant"; content: string }[];
+  activeContext?: AiActiveContext;
 }
 
 export interface AiProvider {
