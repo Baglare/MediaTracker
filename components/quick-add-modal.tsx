@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { MediaItem, MediaStatus } from "@/lib/types";
+import { MediaItem, MediaStatus, withMediaClassification } from "@/lib/types";
 import { X, Heart, Save } from "lucide-react";
 import Image from "next/image";
 
@@ -128,13 +128,13 @@ export default function QuickAddModal({
         finalStatus = getActiveStatusForType(item.type);
       }
 
-      return {
+      return withMediaClassification({
         ...item,
         status: finalStatus,
         currentProgress: seasonProgress,
         userRating: ratingNum,
         favorite,
-      };
+      });
     });
 
     onSave(savedItems);

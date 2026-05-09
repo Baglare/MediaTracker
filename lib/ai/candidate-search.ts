@@ -312,6 +312,9 @@ async function searchForType(ctx: SearchContext, type: MediaType, q: string): Pr
     case "tv":
       return searchTvmaze(ctx, q);
     case "book":
+    case "light_novel":
+    case "web_novel":
+    case "visual_novel":
       return searchOpenLibrary(ctx, q);
     case "movie":
       return searchOmdb(ctx, q);
@@ -603,6 +606,9 @@ async function searchForIdea(ctx: SearchContext, idea: AiCandidateIdea): Promise
     case "tv":
       return searchTvmaze(ctx, query);
     case "book":
+    case "light_novel":
+    case "web_novel":
+    case "visual_novel":
       return searchOpenLibrary(ctx, query);
     case "movie":
       return searchOmdb(ctx, query);

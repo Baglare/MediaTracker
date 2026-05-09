@@ -832,6 +832,9 @@ async function runRankingWithProviders(args: {
 function targetLabel(type: MediaType): string {
   switch (type) {
     case "book": return "Kitap";
+    case "light_novel": return "Light Novel";
+    case "web_novel": return "Web Novel";
+    case "visual_novel": return "Visual Novel";
     case "tv": return "Dizi";
     case "anime": return "Anime";
     case "manga": return "Manga";

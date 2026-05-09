@@ -13,7 +13,9 @@ import {
   ProgressLog,
   ProgressLogAction,
   ProgressLogUnit,
+  withMediaClassification,
 } from "../types";
+import { withInferredSeriesGroup } from "../series-group";
 import type { Database, Json } from "./types";
 
 type MediaItemRow = Database["public"]["Tables"]["media_items"]["Row"];
@@ -25,10 +27,18 @@ type ProgressLogInsert = Database["public"]["Tables"]["progress_logs"]["Insert"]
 // Bilinmeyen/runtime'da gelen alanlar metadata'ya sızmaz.
 const METADATA_KEYS = [
   "rating",
+  "theme",
+  "mediaType",
+  "subType",
   "runtime",
   "numberOfSeasons",
   "numberOfEpisodes",
   "seasonBreakdown",
+  "seriesGroupId",
+  "seriesGroupTitle",
+  "seriesRelationType",
+  "seasonNumber",
+  "orderIndex",
   "tvmazeStatus",
   "tmdbStatus",
   "lastAirDate",
@@ -57,32 +67,34 @@ const METADATA_KEYS = [
 
 // ---- MediaItem → media_items row ----
 export function toMediaRow(userId: string, item: MediaItem): MediaItemInsert {
+  const classifiedItem = withMediaClassification(withInferredSeriesGroup(item));
+
   // Sadece whitelist'teki alanları metadata'ya kopyala
   const metadata: Record<string, unknown> = {};
   for (const key of METADATA_KEYS) {
-    const value = item[key];
+    const value = classifiedItem[key];
     if (value === undefined) continue;
     metadata[key] = value;
   }
 
   return {
-    id: item.id,
+    id: classifiedItem.id,
     user_id: userId,
-    title: item.title,
-    type: item.type,
-    status: item.status,
-    current_progress: item.currentProgress,
-    total_progress: item.totalProgress,
-    external_source: item.externalSource ?? null,
-    external_id: item.externalId ?? null,
-    cover_url: item.coverImage || null,
-    backdrop_url: item.backdropUrl ?? null,
-    overview: item.overview ?? null,
-    release_year: item.releaseYear ?? null,
-    favorite: !!item.favorite,
-    user_rating: item.userRating ?? null,
-    tags: item.tags ?? [],
-    personal_notes: item.personalNotes ?? null,
+    title: classifiedItem.title,
+    type: classifiedItem.type,
+    status: classifiedItem.status,
+    current_progress: classifiedItem.currentProgress,
+    total_progress: classifiedItem.totalProgress,
+    external_source: classifiedItem.externalSource ?? null,
+    external_id: classifiedItem.externalId ?? null,
+    cover_url: classifiedItem.coverImage || null,
+    backdrop_url: classifiedItem.backdropUrl ?? null,
+    overview: classifiedItem.overview ?? null,
+    release_year: classifiedItem.releaseYear ?? null,
+    favorite: !!classifiedItem.favorite,
+    user_rating: classifiedItem.userRating ?? null,
+    tags: classifiedItem.tags ?? [],
+    personal_notes: classifiedItem.personalNotes ?? null,
     metadata: metadata as Json,
   };
 }
@@ -109,7 +121,7 @@ export function fromMediaRow(row: MediaItemRow): MediaItem {
       ? row.cover_url
       : `/placeholders/${row.type}.svg`;
 
-  return {
+  return withMediaClassification(withInferredSeriesGroup({
     id: row.id,
     title: row.title,
     type: row.type as MediaType,
@@ -127,7 +139,7 @@ export function fromMediaRow(row: MediaItemRow): MediaItem {
     overview: row.overview ?? undefined,
     releaseYear: row.release_year ?? undefined,
     ...meta,
-  };
+  }));
 }
 
 // ---- ProgressLog → progress_logs row ----

@@ -5,7 +5,7 @@
 // UI tarafı confirm/banner/busy state'i kendi yönetir;
 // burada sadece veri akışı + hesaplama var.
 
-import type { MediaItem, ProgressLog } from "../types";
+import { MediaItem, ProgressLog, withMediaClassification } from "../types";
 import {
   fetchCloudMediaItems,
   fetchCloudProgressLogs,
@@ -44,7 +44,7 @@ export async function performCloudUpload(
   mediaItems: MediaItem[],
   progressLogs: ProgressLog[]
 ): Promise<CloudActionResult> {
-  const m = await uploadMediaItems(userId, mediaItems);
+  const m = await uploadMediaItems(userId, mediaItems.map((item) => withMediaClassification(item)));
   if (!m.ok) return { ok: false, message: m.error };
   const p = await uploadProgressLogs(userId, progressLogs);
   if (!p.ok) return { ok: false, message: p.error };
@@ -62,7 +62,7 @@ export async function performCloudDownload(userId: string): Promise<CloudDownloa
   if (!p.ok) return { ok: false, message: p.error };
   return {
     ok: true,
-    mediaItems: m.data,
+    mediaItems: m.data.map((item) => withMediaClassification(item)),
     progressLogs: p.data,
     message: `Aktarım tamamlandı. ${m.data.length} içerik ve ${p.data.length} aktivite kaydı yerele alındı.`,
   };
@@ -80,12 +80,14 @@ export async function performCloudMerge(
   if (!p.ok) return { ok: false, message: p.error };
 
   // ---- Media merge: yerel öncelikli, cloud-only olanları ekle ----
-  const localKeys = new Set(localMedia.map(dedupKey));
-  const localIds = new Set(localMedia.map((it) => it.id));
+  const normalizedLocalMedia = localMedia.map((item) => withMediaClassification(item));
+  const normalizedCloudMedia = m.data.map((item) => withMediaClassification(item));
+  const localKeys = new Set(normalizedLocalMedia.map(dedupKey));
+  const localIds = new Set(normalizedLocalMedia.map((it) => it.id));
   let mediaAdded = 0;
   let mediaSkipped = 0;
-  const mergedMedia = [...localMedia];
-  for (const cloudItem of m.data) {
+  const mergedMedia = [...normalizedLocalMedia];
+  for (const cloudItem of normalizedCloudMedia) {
     const key = dedupKey(cloudItem);
     if (localKeys.has(key) || localIds.has(cloudItem.id)) {
       mediaSkipped++;

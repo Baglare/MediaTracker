@@ -4,9 +4,9 @@
 // Gerçek bir API veya veritabanı yerine bu verileri kullanıyoruz.
 // İleride Supabase, TMDB, AniList gibi servislerle değiştirilecek.
 
-import { MediaItem } from "./types";
+import { MediaItem, withMediaClassification } from "./types";
 
-export const mockMediaList: MediaItem[] = [
+const baseMockMediaList: MediaItem[] = [
   // --- FİLMLER ---
   {
     id: "1",
@@ -154,3 +154,7 @@ export const mockMediaList: MediaItem[] = [
     totalProgress: 464,
   },
 ];
+
+export const mockMediaList: MediaItem[] = baseMockMediaList.map((item) =>
+  withMediaClassification(item)
+);

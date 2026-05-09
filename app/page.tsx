@@ -43,7 +43,8 @@ import { GlobalSearchResult } from "@/lib/global-search-types";
 import { mockMediaList } from "@/lib/mock-media";
 import { loadMediaList, saveMediaList, clearMediaList, loadProgressLogs, saveProgressLogs } from "@/lib/storage";
 import { getIncrementAmount, getProgressLabel, getProgressUnit, getStatusLabel } from "@/lib/progress";
-import { MediaItem, MediaType, MediaStatus, ProgressLog } from "@/lib/types";
+import { MediaItem, MediaType, MediaStatus, ProgressLog, withMediaClassification } from "@/lib/types";
+import { withInferredSeriesGroup } from "@/lib/series-group";
 import { calculateDashboardStats } from "@/lib/dashboard-stats";
 import { TvmazeNormalizedDetail } from "@/lib/tvmaze-types";
 import { OpenLibraryNormalizedResult } from "@/lib/openlibrary-types";
@@ -323,6 +324,7 @@ export default function HomePage() {
    * Modal'dan gelen veriyi kaydet (ekleme veya güncelleme)
    */
   function handleSaveMedia(item: MediaItem) {
+    const classifiedItem = withMediaClassification(withInferredSeriesGroup(item));
     type LogPayload = {
       id: string;
       title: string;
@@ -333,35 +335,35 @@ export default function HomePage() {
       newProgress: number;
       detail?: string;
     };
-    const exists = mediaList.find((m) => m.id === item.id);
+    const exists = mediaList.find((m) => m.id === classifiedItem.id);
     let logPayload: LogPayload | null = null;
-    let mergedItem: MediaItem = item;
+    let mergedItem: MediaItem = classifiedItem;
     if (exists) {
-      mergedItem = { ...exists, ...item };
-      if (exists.currentProgress !== item.currentProgress) {
+      mergedItem = withMediaClassification({ ...exists, ...classifiedItem });
+      if (exists.currentProgress !== classifiedItem.currentProgress) {
         logPayload = {
-          id: item.id,
-          title: item.title,
-          type: item.type,
+          id: classifiedItem.id,
+          title: classifiedItem.title,
+          type: classifiedItem.type,
           action: "manual_adjust",
-          amount: Math.abs(item.currentProgress - exists.currentProgress),
+          amount: Math.abs(classifiedItem.currentProgress - exists.currentProgress),
           prevProgress: exists.currentProgress,
-          newProgress: item.currentProgress,
+          newProgress: classifiedItem.currentProgress,
         };
       }
-      setMediaList((prev) => prev.map((m) => (m.id === item.id ? mergedItem : m)));
+      setMediaList((prev) => prev.map((m) => (m.id === classifiedItem.id ? mergedItem : m)));
     } else {
       logPayload = {
-        id: item.id,
-        title: item.title,
-        type: item.type,
+        id: classifiedItem.id,
+        title: classifiedItem.title,
+        type: classifiedItem.type,
         action: "added",
-        amount: item.currentProgress,
+        amount: classifiedItem.currentProgress,
         prevProgress: 0,
-        newProgress: item.currentProgress,
-        detail: buildAddedLogDetail(item),
+        newProgress: classifiedItem.currentProgress,
+        detail: buildAddedLogDetail(classifiedItem),
       };
-      setMediaList((prev) => [...prev, item]);
+      setMediaList((prev) => [...prev, classifiedItem]);
     }
     enqueueMediaUpsert(mergedItem);
 
@@ -451,7 +453,7 @@ export default function HomePage() {
    * Import sonrası medya listesini günceller.
    */
   function handleImport(items: MediaItem[], logs: ProgressLog[]) {
-    setMediaList(items);
+    setMediaList(items.map((item) => withMediaClassification(item)));
     if (logs) {
       setProgressLogs(logs);
     }

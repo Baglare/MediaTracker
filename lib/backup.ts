@@ -4,7 +4,8 @@
 // Medya listesini JSON olarak dışa aktarma (export)
 // ve içe aktarma (import) işlemlerini yönetir.
 
-import { MediaItem, ProgressLog } from "./types";
+import { MediaItem, ProgressLog, withMediaClassification } from "./types";
+import { withInferredSeriesGroup } from "./series-group";
 
 // ---- Export Yapısı ----
 
@@ -30,7 +31,7 @@ export function createBackupPayload(mediaItems: MediaItem[], progressLogs: Progr
     schemaVersion: 2,
     exportedAt: new Date().toISOString(),
     data: {
-      mediaItems,
+      mediaItems: mediaItems.map((item) => withMediaClassification(withInferredSeriesGroup(item))),
       progressLogs,
     },
   };
@@ -140,10 +141,13 @@ export function normalizeImportedMediaItem(item: Partial<MediaItem>): MediaItem 
   const totalProgress = Math.max(1, Number(item.totalProgress) || 1);
   const currentProgress = Math.max(0, Math.min(Number(item.currentProgress) || 0, totalProgress));
 
-  return {
+  return withMediaClassification({
     id: item.id || generateId(),
     title: String(item.title || "İsimsiz"),
     type: item.type || "movie",
+    theme: item.theme,
+    mediaType: item.mediaType,
+    subType: item.subType,
     status: item.status || "planning",
     coverImage: item.coverImage || `/placeholders/${item.type || "movie"}.svg`,
     currentProgress,
@@ -189,7 +193,12 @@ export function normalizeImportedMediaItem(item: Partial<MediaItem>): MediaItem 
     popularity: item.popularity,
     siteUrl: item.siteUrl,
     nextAiringEpisode: item.nextAiringEpisode,
-  };
+    seriesGroupId: item.seriesGroupId,
+    seriesGroupTitle: item.seriesGroupTitle,
+    seriesRelationType: item.seriesRelationType,
+    seasonNumber: item.seasonNumber,
+    orderIndex: item.orderIndex,
+  });
 }
 
 /**
@@ -202,10 +211,17 @@ export function mergeImportedMediaItems(
   currentLogs: ProgressLog[] = [],
   importedLogs: ProgressLog[] = []
 ): ImportResult {
+  const normalizedCurrentItems = currentItems.map((item) =>
+    withMediaClassification(withInferredSeriesGroup(item))
+  );
+  const normalizedImportedItems = importedItems.map((item) =>
+    withMediaClassification(withInferredSeriesGroup(item))
+  );
+
   // Mevcut ID ve externalId'leri topla
-  const existingIds = new Set(currentItems.map((m) => m.id));
+  const existingIds = new Set(normalizedCurrentItems.map((m) => m.id));
   const existingExternalKeys = new Set(
-    currentItems
+    normalizedCurrentItems
       .filter((m) => m.externalSource && m.externalId)
       .map((m) => `${m.externalSource}:${m.externalId}`)
   );
@@ -213,7 +229,7 @@ export function mergeImportedMediaItems(
   const toAdd: MediaItem[] = [];
   let skippedCount = 0;
 
-  for (const item of importedItems) {
+  for (const item of normalizedImportedItems) {
     // externalSource+externalId ile duplicate kontrolü
     if (item.externalSource && item.externalId) {
       const key = `${item.externalSource}:${item.externalId}`;
@@ -236,7 +252,7 @@ export function mergeImportedMediaItems(
     }
   }
 
-  const merged = [...currentItems, ...toAdd];
+  const merged = [...normalizedCurrentItems, ...toAdd];
 
   // Merge logs
   const existingLogIds = new Set(currentLogs.map((l) => l.id));

@@ -4,7 +4,8 @@
 // Medya listesini tarayıcının yerel deposuna (localStorage) kaydeder
 // ve oradan okur. Böylece sayfa yenilenince veriler kaybolmaz.
 
-import { MediaItem, ProgressLog } from "./types";
+import { MediaItem, ProgressLog, withMediaClassification } from "./types";
+import { withInferredSeriesGroup } from "./series-group";
 
 // localStorage'da kullanılan anahtar ismi
 const STORAGE_KEY = "media-tracker-list";
@@ -26,7 +27,7 @@ export function loadMediaList(): MediaItem[] | null {
     const parsed = JSON.parse(saved) as MediaItem[];
     // Geçerli bir dizi mi kontrol et
     if (!Array.isArray(parsed)) return null;
-    return parsed;
+    return parsed.map((item) => withMediaClassification(withInferredSeriesGroup(item)));
   } catch {
     // Veri bozuksa veya parse hatası olursa null dön
     return null;
@@ -39,7 +40,10 @@ export function loadMediaList(): MediaItem[] | null {
 export function saveMediaList(list: MediaItem[]): void {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify(list.map((item) => withMediaClassification(withInferredSeriesGroup(item))))
+    );
   } catch {
     // localStorage dolu veya erişilemezse sessizce geç
     console.warn("localStorage'a kaydedilemedi.");
@@ -88,4 +92,3 @@ export function saveProgressLogs(logs: ProgressLog[]): void {
     console.warn("localStorage'a loglar kaydedilemedi.");
   }
 }
-
