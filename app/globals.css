@@ -43,3 +43,67 @@ body {
   background-color: rgba(139, 92, 246, 0.3);
   color: #fafafa;
 }
+
+/* ============================================ */
+/* V5A.4 — Doğu sub-pill mikro animasyonları    */
+/* ============================================ */
+/* Hepsi tek seferlik: aktif pill içindeki ikon her seçim/değişim
+   anında React tarafından `key` ile remount edilir, böylece keyframe
+   sıfırdan oynar ve loop olmaz. Süreler 300–700ms arasında. */
+
+/* Anime — slash reveal: path stroke-draw + kısa glow */
+.v5a-slash-anim path {
+  stroke-dasharray: 32;
+  stroke-dashoffset: 32;
+  animation: v5a-slash-draw 500ms cubic-bezier(0.22, 0.9, 0.34, 1) forwards;
+}
+.v5a-slash-anim {
+  filter: drop-shadow(0 0 0 rgba(245, 158, 11, 0));
+  animation: v5a-slash-glow 600ms ease-out forwards;
+}
+@keyframes v5a-slash-draw {
+  to { stroke-dashoffset: 0; }
+}
+@keyframes v5a-slash-glow {
+  0%   { filter: drop-shadow(0 0 0 rgba(245, 158, 11, 0)); }
+  40%  { filter: drop-shadow(0 0 6px rgba(245, 158, 11, 0.55)); }
+  100% { filter: drop-shadow(0 0 0 rgba(245, 158, 11, 0)); }
+}
+
+/* Manga — yin-yang spin + settle (overshoot eased) */
+.v5a-yin-anim {
+  transform-origin: center;
+  animation: v5a-yin-spin 600ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+@keyframes v5a-yin-spin {
+  from { transform: rotate(-140deg); opacity: 0.55; }
+  to   { transform: rotate(0deg);    opacity: 1; }
+}
+
+/* Novel — parşömen + fırça izi mürekkep reveal */
+.v5a-ink-anim path {
+  stroke-dasharray: 48;
+  stroke-dashoffset: 48;
+  animation: v5a-ink-draw 700ms ease-out forwards;
+}
+.v5a-ink-anim path:nth-child(2) { animation-delay: 90ms; }
+.v5a-ink-anim path:nth-child(3) { animation-delay: 180ms; }
+@keyframes v5a-ink-draw {
+  to { stroke-dashoffset: 0; }
+}
+
+/* prefers-reduced-motion: animasyonları sadeleştir / kapat */
+@media (prefers-reduced-motion: reduce) {
+  .v5a-slash-anim,
+  .v5a-slash-anim path,
+  .v5a-yin-anim,
+  .v5a-ink-anim,
+  .v5a-ink-anim path {
+    animation: none !important;
+    stroke-dasharray: none !important;
+    stroke-dashoffset: 0 !important;
+    filter: none !important;
+    transform: none !important;
+    opacity: 1 !important;
+  }
+}

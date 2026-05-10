@@ -75,14 +75,18 @@ function ScrollBrushIcon({ className }: { className?: string }) {
   );
 }
 
+// V5A.4: Her ikona, aktif olduğunda ek bir animasyon class'ı veriyoruz.
+// CSS keyframes globals.css'te; React tarafında `key` değişimiyle remount
+// tetikleyip animasyon her seçimde bir kez (loopsuz) oynatılır.
 const SUB_PILLS: {
   value: Exclude<EastSubFilter, "all">;
   label: string;
   Icon: (props: { className?: string }) => React.ReactElement;
+  activeAnimClass: string;
 }[] = [
-  { value: "anime", label: "Anime", Icon: KatanaIcon },
-  { value: "manga", label: "Manga", Icon: YinYangIcon },
-  { value: "novel", label: "Novel", Icon: ScrollBrushIcon },
+  { value: "anime", label: "Anime", Icon: KatanaIcon, activeAnimClass: "v5a-slash-anim" },
+  { value: "manga", label: "Manga", Icon: YinYangIcon, activeAnimClass: "v5a-yin-anim" },
+  { value: "novel", label: "Novel", Icon: ScrollBrushIcon, activeAnimClass: "v5a-ink-anim" },
 ];
 
 interface EastThemeHeaderProps {
@@ -130,7 +134,7 @@ export default function EastThemeHeader({
           >
             Tümü
           </button>
-          {SUB_PILLS.map(({ value, label, Icon }) => {
+          {SUB_PILLS.map(({ value, label, Icon, activeAnimClass }) => {
             const isActive = activeSub === value;
             return (
               <button
@@ -147,7 +151,15 @@ export default function EastThemeHeader({
                   }
                 `}
               >
-                <Icon className="w-3.5 h-3.5" />
+                {/*
+                  V5A.4: Aktiften pasife (ya da pasiften aktife) geçişte React'ın
+                  `key` değişimi ikonu remount eder; CSS animasyonu yeniden
+                  tetiklenip bir kez oynar (sürekli loop yok).
+                */}
+                <Icon
+                  key={isActive ? "active" : "idle"}
+                  className={`w-3.5 h-3.5 ${isActive ? activeAnimClass : ""}`}
+                />
                 <span>{label}</span>
               </button>
             );

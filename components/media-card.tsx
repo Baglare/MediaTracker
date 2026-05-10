@@ -29,6 +29,11 @@ import {
   getIncrementLabel,
   isMovieLike,
 } from "@/lib/progress";
+import {
+  resolveThemeAccent,
+  topAccentGradient,
+  ThemeSubBadge,
+} from "@/components/theme-accent";
 
 interface MediaCardProps {
   item: MediaItem;
@@ -137,12 +142,15 @@ export default function MediaCard({
   const hasTags = item.tags && item.tags.length > 0;
   const hasNotes = item.personalNotes && item.personalNotes.trim().length > 0;
 
+  // V5A.3: Doğu ailesinde (anime/manga/novel) accent rengini themeden türet;
+  // diğer kartlarda eski type-bazlı gradient olduğu gibi kalır.
+  const themeAccent = resolveThemeAccent(item);
+  const accentGradient = topAccentGradient(themeAccent, getProgressGradient(item.type));
+
   return (
     <div className="group relative flex flex-col bg-zinc-900/50 rounded-2xl border border-zinc-800/50 overflow-hidden hover:border-zinc-700/50 transition-all duration-300">
       <div
-        className={`absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r ${getProgressGradient(
-          item.type
-        )} opacity-50 group-hover:opacity-100 transition-opacity`}
+        className={`absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r ${accentGradient} opacity-50 group-hover:opacity-100 transition-opacity`}
       />
 
       <div className="flex gap-4 p-4 flex-1">
@@ -226,6 +234,10 @@ export default function MediaCard({
               <span className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-zinc-800/80 text-zinc-400 ring-1 ring-zinc-700/50">
                 {getMediaTypeLabel(item.type)}
               </span>
+
+              {/* V5A.3: Doğu içerikleri için subType rozeti (manga/manhwa/manhua,
+                  Light Novel/Web Novel/Visual Novel, Anime · TV/Film/OVA…) */}
+              <ThemeSubBadge item={item} />
 
               <span
                 className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md ring-1 ${getStatusColor(

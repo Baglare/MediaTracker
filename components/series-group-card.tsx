@@ -17,6 +17,7 @@ import { MediaItem } from "@/lib/types";
 import { MediaItemGroup } from "@/lib/series-group";
 import { getMediaTypeLabel, getProgressLabel } from "@/lib/progress";
 import MediaCard from "@/components/media-card";
+import { resolveThemeAccent } from "@/components/theme-accent";
 
 interface SeriesGroupCardProps {
   group: MediaItemGroup;
@@ -173,6 +174,19 @@ export default function SeriesGroupCard({
   const ongoingLabel = ongoing ? describeOngoingLabel(ongoing) : null;
   const ongoingProgressLabel = ongoing ? getProgressLabel(ongoing.type) : "";
 
+  // V5A.3: Grup tek bir Doğu ailesinden mi (hepsi anime / hepsi manga / hepsi novel)?
+  // Öyleyse sol kenar accent + küçük rozet themeden tonlanır. Karışıksa fallback violet.
+  const accents = items.map(resolveThemeAccent);
+  const firstFamily = accents[0]?.family ?? null;
+  const sameEastFamily =
+    firstFamily !== null && accents.every((a) => a.family === firstFamily);
+  const groupAccent = sameEastFamily ? accents[0]?.accent ?? null : null;
+  const familyLabel: Record<"anime" | "manga" | "novel", string> = {
+    anime: "Anime",
+    manga: "Manga",
+    novel: "Novel",
+  };
+
   // Grup seviyesinde "Sezon/Parça Ekle" — temsilci olarak ilk item kullanılır
   // (TVmaze season grupları için hepsi aynı showId'yi paylaşır).
   const representative = items[0];
@@ -190,8 +204,13 @@ export default function SeriesGroupCard({
           : "border-zinc-800/60 ring-transparent hover:border-violet-500/30"
       }`}
     >
-      {/* Sol kenar accent — grup olduğunu güçlü şekilde belli eder */}
-      <div className="absolute left-0 top-3 bottom-3 w-0.5 rounded-full bg-gradient-to-b from-violet-500/60 to-fuchsia-500/40" />
+      {/* Sol kenar accent — grup olduğunu güçlü şekilde belli eder.
+          V5A.3: Tüm parçalar aynı Doğu ailesindense theme tonu kullanılır. */}
+      <div
+        className={`absolute left-0 top-3 bottom-3 w-0.5 rounded-full bg-gradient-to-b ${
+          groupAccent ? groupAccent.groupSideGradient : "from-violet-500/60 to-fuchsia-500/40"
+        }`}
+      />
 
       <button
         type="button"
@@ -228,6 +247,16 @@ export default function SeriesGroupCard({
             {sameType && (
               <span className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-zinc-800/80 text-zinc-400 ring-1 ring-zinc-700/50">
                 {getMediaTypeLabel(firstType!)}
+              </span>
+            )}
+            {/* V5A.3: Tüm parçalar aynı Doğu ailesindense küçük theme rozeti */}
+            {groupAccent && firstFamily && (
+              <span
+                className={`inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-md ring-1 ${groupAccent.badge}`}
+                title={`Doğu · ${familyLabel[firstFamily]}`}
+              >
+                <groupAccent.Icon className="w-3 h-3" />
+                {familyLabel[firstFamily]}
               </span>
             )}
           </div>
