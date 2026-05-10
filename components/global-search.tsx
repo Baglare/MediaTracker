@@ -333,7 +333,7 @@ export default function GlobalSearch({ getLibraryStatus, onAddToLibrary }: Globa
         ) : isSearching ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="w-6 h-6 text-violet-500 animate-spin" />
-            <span className="ml-3 text-sm text-zinc-400">Araniyor...</span>
+            <span className="ml-3 text-sm text-zinc-400">Aranıyor...</span>
           </div>
         ) : hasSearched ? (
           results.length > 0 ? (

@@ -126,14 +126,14 @@ export default function MediaCard({
   const hasNotes = item.personalNotes && item.personalNotes.trim().length > 0;
 
   return (
-    <div className="group relative bg-zinc-900/50 rounded-2xl border border-zinc-800/50 overflow-hidden hover:border-zinc-700/50 transition-all duration-300">
+    <div className="group relative flex flex-col bg-zinc-900/50 rounded-2xl border border-zinc-800/50 overflow-hidden hover:border-zinc-700/50 transition-all duration-300">
       <div
         className={`absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r ${getProgressGradient(
           item.type
         )} opacity-50 group-hover:opacity-100 transition-opacity`}
       />
 
-      <div className="flex gap-4 p-4">
+      <div className="flex gap-4 p-4 flex-1">
         <div className="relative w-20 h-28 rounded-xl overflow-hidden flex-shrink-0 ring-1 ring-zinc-800">
           <Image
             src={item.coverImage}
@@ -365,7 +365,7 @@ export default function MediaCard({
         </div>
       </div>
 
-      <div className="flex border-t border-zinc-800/50">
+      <div className="mt-auto flex border-t border-zinc-800/50">
         {isMovie ? (
           <button
             onClick={() => onComplete(item.id)}

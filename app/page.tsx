@@ -16,6 +16,7 @@ import { TabType } from "@/components/app-tabs";
 import ActivityLogPanel from "@/components/activity-log-panel";
 import MediaFilters from "@/components/media-filters";
 import MediaCard from "@/components/media-card";
+import SeriesGroupCard from "@/components/series-group-card";
 import MediaModal from "@/components/media-modal";
 import MediaDetailModal from "@/components/media-detail-modal";
 import ConfirmDialog from "@/components/confirm-dialog";
@@ -47,7 +48,10 @@ import { MediaItem, MediaType, MediaStatus, ProgressLog, withMediaClassification
 import {
   getTvmazeExistingSeasonNumbers,
   getTvmazeSeasonExternalId,
+  getTvmazeSeasonNumber,
   getTvmazeShowExternalId,
+  groupMediaItems,
+  resolveAniListSeriesGroup,
   withInferredSeriesGroup,
 } from "@/lib/series-group";
 import { calculateDashboardStats } from "@/lib/dashboard-stats";
@@ -626,22 +630,49 @@ export default function HomePage() {
       return true;
     }
 
-    const lockedSeasonIds = getTvmazeItemsForShow(detail.externalId)
-      .map((item) => item.externalId)
-      .filter((value): value is string => typeof value === "string");
+    // Mevcut kütüphaneden, bu shown'a ait sezon NUMARALARINI çıkar (güvenli season-key).
+    // - externalSource === "tvmaze" + getTvmazeShowExternalId === detail.externalId
+    // - seasonNumber (varsa) ya da externalId'den parse edilen seasonNumber
+    const existingSeasonNumbers = new Set<number>();
+    let hasMainShowEntry = false;
+    for (const existing of getTvmazeItemsForShow(detail.externalId)) {
+      const seasonNumber = getTvmazeSeasonNumber(existing);
+      if (typeof seasonNumber === "number") {
+        existingSeasonNumbers.add(seasonNumber);
+      } else if (existing.seriesRelationType !== "season") {
+        // "Tek Kayıt" olarak eklenmiş ana show — sezon eşlemesini bloklamaz,
+        // ama duplicate handler aşağıda yine korur.
+        hasMainShowEntry = true;
+      }
+    }
+
+    // Modal'a season.id formatında lock listesi geçiyoruz. seasonItems[i].id = `tvmaze-{showId}-season-{N}`
+    // ve seasonItems[i].seasonNumber = N. Bu eşleşmeyle locked kart UI'da checked + disabled görünür.
+    const lockedSeasonIds = seasonItems
+      .filter((item) =>
+        typeof item.seasonNumber === "number" &&
+        existingSeasonNumbers.has(item.seasonNumber)
+      )
+      .map((item) => item.id);
 
     const missingItems = seasonItems.filter(
-      (item) => !lockedSeasonIds.includes(item.externalId ?? "")
+      (item) =>
+        typeof item.seasonNumber === "number" &&
+        !existingSeasonNumbers.has(item.seasonNumber)
     );
 
     if (relatedOnly && missingItems.length === 0) {
       return false;
     }
 
+    void hasMainShowEntry; // bilinçli; gelecekte ipucu olarak kullanılabilir
+
     setPendingQuickAdd({
       singleItem,
       seasonItems,
-      lockedSeasonIds: relatedOnly ? lockedSeasonIds : undefined,
+      // V2.2: relatedOnly olmasa da ekli sezonlar her zaman lock edilir;
+      // tekrar override edilmeleri engellenir.
+      lockedSeasonIds: lockedSeasonIds.length > 0 ? lockedSeasonIds : undefined,
       preferredMode: "seasons",
       forceSeasonSelection: relatedOnly,
     });
@@ -813,11 +844,70 @@ export default function HomePage() {
         popularity: result.popularity,
         siteUrl: result.siteUrl,
         nextAiringEpisode: result.nextAiringEpisode,
+        // V3: persisted relations — sadece details endpoint'inden gelir
+        anilistRelations: result.relations,
       };
+
+      // V3: Güvenilir relation eşleşmesi varsa seriesGroup üret + mevcut item'lara
+      // SADECE seri metadata patch'i uygula (progress/status/rating asla değişmez).
+      const resolution = resolveAniListSeriesGroup(newItem, mediaList);
+
+      if (resolution.newItemSeriesPatch.seriesGroupId) {
+        const patch = resolution.newItemSeriesPatch;
+        if (patch.seriesGroupId) newItem.seriesGroupId = patch.seriesGroupId;
+        if (patch.seriesGroupTitle) newItem.seriesGroupTitle = patch.seriesGroupTitle;
+        if (patch.seriesRelationType) newItem.seriesRelationType = patch.seriesRelationType;
+        if (typeof patch.orderIndex === "number") newItem.orderIndex = patch.orderIndex;
+      }
+
+      if (resolution.existingPatches.length > 0) {
+        const patchMap = new Map(
+          resolution.existingPatches.map((p) => [p.itemId, p.fields])
+        );
+
+        // Önce yeni listeyi ve patch'lenen item'ları SAF olarak (yan etki yok) hesapla.
+        // setMediaList'in functional updater'ı render fazında da çağrılabilir; içine
+        // enqueueMediaUpsert gibi dış-store update'i koymak React'in render-phase
+        // update kuralını ihlal eder ("Cannot update a component while rendering...").
+        const patchedItems: MediaItem[] = [];
+        const nextList = mediaList.map((item) => {
+          const fields = patchMap.get(item.id);
+          if (!fields) return item;
+          // Defansif birleştirme: SADECE undefined olan series alanlarını doldur.
+          // Hiçbir koşulda progress/status/userRating/favorite/tags/personalNotes vb.
+          // alanlara dokunmaz.
+          const merged: MediaItem = { ...item };
+          if (fields.seriesGroupId && !merged.seriesGroupId) {
+            merged.seriesGroupId = fields.seriesGroupId;
+          }
+          if (fields.seriesGroupTitle && !merged.seriesGroupTitle) {
+            merged.seriesGroupTitle = fields.seriesGroupTitle;
+          }
+          if (fields.seriesRelationType && !merged.seriesRelationType) {
+            merged.seriesRelationType = fields.seriesRelationType;
+          }
+          if (
+            typeof fields.orderIndex === "number" &&
+            typeof merged.orderIndex !== "number"
+          ) {
+            merged.orderIndex = fields.orderIndex;
+          }
+          patchedItems.push(merged);
+          return merged;
+        });
+
+        // Önce state'i güncelle (saf değer geç, updater fn kullanma).
+        setMediaList(nextList);
+
+        // Sonra dış store yan etkilerini event handler bağlamında, render dışında çalıştır.
+        for (const merged of patchedItems) {
+          enqueueMediaUpsert(merged);
+        }
+      }
 
       setPendingQuickAdd({ singleItem: newItem, seasonItems: null });
     },
-    [isInLibrary]
+    [isInLibrary, mediaList]
   );
 
   const handleAddFromOmdb = useCallback(
@@ -860,8 +950,20 @@ export default function HomePage() {
           const detail = await res.json();
           handleAddFromTvmaze(detail, options);
         } else if (item.source === "anilist") {
-          // AniList arama sonucu yeterli detaya sahip
-          handleAddFromAniList(item.raw as AniListNormalizedResult);
+          // V3: relations alanı yalnızca details endpoint'inden geldiği için
+          // global search'te de details çağrısı yapıyoruz. Hata olursa search
+          // raw'ına geri düş — gruplama yapılamaz ama ekleme çalışır.
+          let detailResult: AniListNormalizedResult | null = null;
+          try {
+            const res = await fetch(`/api/anilist/details?id=${item.externalId}`);
+            if (res.ok) {
+              const data = await res.json();
+              if (data?.result) detailResult = data.result as AniListNormalizedResult;
+            }
+          } catch {
+            // sessizce raw'a düş
+          }
+          handleAddFromAniList(detailResult ?? (item.raw as AniListNormalizedResult));
         } else if (item.source === "openlibrary") {
           // Open Library arama sonucu yeterli detaya sahip
           handleAddFromOpenLibrary(item.raw as OpenLibraryNormalizedResult);
@@ -1012,14 +1114,14 @@ export default function HomePage() {
             </div>
 
             {filteredMedia.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                {filteredMedia.map((item) => (
-                  (() => {
-                    const relatedAction = getLibraryRelatedAction(item);
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
+                {groupMediaItems(filteredMedia).map((group) => {
+                  // V1: 2+ parça varsa grup kartı; aksi halde tek MediaCard.
+                  if (group.isGroup && group.items.length >= 2) {
                     return (
-                      <MediaCard
-                        key={item.id}
-                        item={item}
+                      <SeriesGroupCard
+                        key={group.key}
+                        group={group}
                         onIncrement={handleIncrement}
                         onComplete={handleComplete}
                         onEdit={handleOpenEditModal}
@@ -1027,12 +1129,28 @@ export default function HomePage() {
                         onToggleFavorite={handleToggleFavorite}
                         onOpenDetail={handleOpenDetailModal}
                         onAddRelatedParts={handleAddMissingTvmazeParts}
-                        relatedPartsLabel={relatedAction.label}
-                        canAddRelatedParts={relatedAction.canAdd}
+                        resolveRelatedAction={getLibraryRelatedAction}
                       />
                     );
-                  })()
-                ))}
+                  }
+                  const item = group.items[0];
+                  const relatedAction = getLibraryRelatedAction(item);
+                  return (
+                    <MediaCard
+                      key={item.id}
+                      item={item}
+                      onIncrement={handleIncrement}
+                      onComplete={handleComplete}
+                      onEdit={handleOpenEditModal}
+                      onDelete={handleDeleteRequest}
+                      onToggleFavorite={handleToggleFavorite}
+                      onOpenDetail={handleOpenDetailModal}
+                      onAddRelatedParts={handleAddMissingTvmazeParts}
+                      relatedPartsLabel={relatedAction.label}
+                      canAddRelatedParts={relatedAction.canAdd}
+                    />
+                  );
+                })}
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center py-20 bg-zinc-900/20 rounded-2xl border border-zinc-800/50">
@@ -1196,7 +1314,12 @@ export default function HomePage() {
         isOpen={!!pendingQuickAdd}
         payload={pendingQuickAdd}
         onSave={(items) => {
-          items.forEach((item) => handleSaveMedia(item));
+          // V2.2 defense-in-depth: zaten library'de olan id'leri kesinlikle override etme.
+          // Modal locked listesi düzgün çalışsa bile, herhangi bir yoldan locked item submit'e
+          // sızarsa burada skip edilir.
+          const existingIds = new Set(mediaList.map((m) => m.id));
+          const safeItems = items.filter((item) => !existingIds.has(item.id));
+          safeItems.forEach((item) => handleSaveMedia(item));
           setPendingQuickAdd(null);
         }}
         onClose={() => setPendingQuickAdd(null)}

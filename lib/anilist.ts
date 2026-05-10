@@ -6,9 +6,39 @@
 
 import {
   AniListRawMedia,
+  AniListRawRelationEdge,
   AniListRawTitle,
   AniListNormalizedResult,
+  AniListRelationLite,
 } from "./anilist-types";
+
+/**
+ * AniList relation edge'lerini minimal `AniListRelationLite` listesine çevirir.
+ * Tek görevi: persistence için küçük + güvenli bir alt küme tutmak.
+ */
+export function normalizeAniListRelations(
+  edges?: AniListRawRelationEdge[]
+): AniListRelationLite[] | undefined {
+  if (!edges || edges.length === 0) return undefined;
+  const out: AniListRelationLite[] = [];
+  for (const edge of edges) {
+    const node = edge?.node;
+    if (!node || typeof node.id !== "number") continue;
+    const title = node.title
+      ? node.title.english || node.title.romaji || node.title.native || undefined
+      : undefined;
+    out.push({
+      anilistId: node.id,
+      relationType: edge.relationType || undefined,
+      rawType: node.type,
+      format: node.format || undefined,
+      title,
+      episodes: typeof node.episodes === "number" ? node.episodes : undefined,
+      releaseYear: node.startDate?.year || undefined,
+    });
+  }
+  return out.length > 0 ? out : undefined;
+}
 
 /** AniList medya tipleri (sadece AniList'ten gelebilecek türler) */
 type AniListMediaType = "anime" | "manga" | "manhwa" | "manhua";
@@ -125,5 +155,6 @@ export function normalizeAniListMedia(
           airingAt: media.nextAiringEpisode.airingAt,
         }
       : undefined,
+    relations: normalizeAniListRelations(media.relations?.edges),
   };
 }

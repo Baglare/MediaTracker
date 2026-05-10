@@ -63,6 +63,7 @@ const METADATA_KEYS = [
   "popularity",
   "siteUrl",
   "nextAiringEpisode",
+  "anilistRelations",
 ] as const satisfies readonly (keyof MediaItem)[];
 
 // ---- MediaItem → media_items row ----

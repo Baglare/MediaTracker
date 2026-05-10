@@ -45,6 +45,25 @@ query ($id: Int!) {
       episode
       airingAt
     }
+    relations {
+      edges {
+        relationType
+        node {
+          id
+          type
+          format
+          episodes
+          title {
+            romaji
+            english
+            native
+          }
+          startDate {
+            year
+          }
+        }
+      }
+    }
   }
 }
 `;

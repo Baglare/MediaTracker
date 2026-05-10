@@ -30,6 +30,30 @@ export interface AniListRawNextAiring {
   airingAt?: number;
 }
 
+/**
+ * AniList relation node (ham): relations.edges[].node alanı.
+ * Sadece güvenli ve anlamlı alanları çekiyoruz.
+ */
+export interface AniListRawRelationNode {
+  id: number;
+  type?: "ANIME" | "MANGA";
+  format?: string;
+  title?: AniListRawTitle;
+  episodes?: number;
+  startDate?: AniListRawDate;
+}
+
+/** AniList relations.edges[] */
+export interface AniListRawRelationEdge {
+  relationType?: string; // PREQUEL, SEQUEL, PARENT, SIDE_STORY, ADAPTATION, ...
+  node: AniListRawRelationNode;
+}
+
+/** AniList relations alanı */
+export interface AniListRawRelations {
+  edges?: AniListRawRelationEdge[];
+}
+
 /** AniList media (GraphQL sorgudan dönen tek bir medya) */
 export interface AniListRawMedia {
   id: number;
@@ -50,6 +74,7 @@ export interface AniListRawMedia {
   popularity?: number;
   siteUrl?: string;
   nextAiringEpisode?: AniListRawNextAiring;
+  relations?: AniListRawRelations;
 }
 
 /** AniList Page yapısı */
@@ -100,6 +125,32 @@ export interface AniListNormalizedResult {
     episode?: number;
     airingAt?: number;
   };
+  /**
+   * AniList relations alanı — sadece details endpoint'inden gelir.
+   * Güvenilir seriesGroupId üretimi için minimal liste.
+   */
+  relations?: AniListRelationLite[];
+}
+
+/**
+ * Minimal/persisted AniList relation girdisi.
+ * Aramayı yavaşlatmamak için arama sonuçlarında dolmaz; details/add akışında dolar.
+ */
+export interface AniListRelationLite {
+  /** AniList'teki ilgili medyanın id'si (Number) */
+  anilistId: number;
+  /** PREQUEL, SEQUEL, PARENT, SIDE_STORY, ADAPTATION, vb. (raw AniList relationType) */
+  relationType?: string;
+  /** ANIME veya MANGA */
+  rawType?: "ANIME" | "MANGA";
+  /** TV, MOVIE, OVA, ONA, SPECIAL, MANGA, ONE_SHOT, NOVEL, ... */
+  format?: string;
+  /** Romaji/english başlık (kısa) */
+  title?: string;
+  /** Bölüm sayısı (anime için) */
+  episodes?: number;
+  /** Çıkış yılı */
+  releaseYear?: number;
 }
 
 // ---- Kategori tipi ----

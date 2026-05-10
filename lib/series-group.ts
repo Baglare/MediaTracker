@@ -1,5 +1,221 @@
 import { MediaItem, SeriesRelationType } from "./types";
 
+const ANILIST_GROUP_PREFIX = "anilist-series:";
+
+/**
+ * Aynı seri olarak değerlendirilmesi güvenli olan AniList relationType'ları.
+ * Bu tur kasıtlı olarak küçük tutulmuştur:
+ * - PREQUEL/SEQUEL: aynı seri kuvvetle muhtemel
+ * - PARENT: side story → ana eser bağlantısı
+ * - SIDE_STORY: ana eserin yan hikayesi
+ *
+ * ADAPTATION (manga↔anime), ALTERNATIVE, SPIN_OFF, CHARACTER, SUMMARY, COMPILATION,
+ * SOURCE, OTHER, CONTAINS DIŞARDA. Bunlar yanlış pozitif riski yüksek.
+ */
+const SAFE_ANILIST_RELATION_TYPES = new Set([
+  "PREQUEL",
+  "SEQUEL",
+  "PARENT",
+  "SIDE_STORY",
+]);
+
+const ANILIST_FORMAT_RELATION_FOR_GROUP: Record<string, SeriesRelationType> = {
+  TV: "season",
+  TV_SHORT: "season",
+  MOVIE: "movie",
+  OVA: "ova",
+  ONA: "ona",
+  SPECIAL: "special",
+};
+
+/** AniList anilistId → MediaItem.id (uygulama içinde) */
+function anilistItemId(anilistId: number | string): string {
+  return `anilist-${anilistId}`;
+}
+
+/** MediaItem.id → AniList anilistId (yalnızca anilist kaynaklı item'larda) */
+function getAniListIdFromMediaItem(item: MediaItem): number | undefined {
+  if (item.externalSource !== "anilist") return undefined;
+  if (typeof item.externalId !== "string") return undefined;
+  const n = Number.parseInt(item.externalId, 10);
+  return Number.isFinite(n) && n > 0 ? n : undefined;
+}
+
+/**
+ * AniList kaynaklı bir item'ın `format`'ından grup-içi rol türetir.
+ * Belirsizse undefined döner — agresif eşleştirme yapılmaz.
+ */
+export function getAniListSeriesRelationType(
+  format: string | undefined
+): SeriesRelationType | undefined {
+  if (!format) return undefined;
+  return ANILIST_FORMAT_RELATION_FOR_GROUP[format.toUpperCase()];
+}
+
+export interface AniListGroupResolution {
+  /** Yeni eklenecek item için series alanları (tümü opsiyonel) */
+  newItemSeriesPatch: {
+    seriesGroupId?: string;
+    seriesGroupTitle?: string;
+    seriesRelationType?: SeriesRelationType;
+    orderIndex?: number;
+  };
+  /**
+   * Mevcut kütüphanedeki item'lara uygulanacak güvenli metadata patch'leri.
+   * SADECE series* / orderIndex alanlarını içerir; progress/status/rating gibi
+   * kullanıcı verisine asla dokunmaz.
+   */
+  existingPatches: Array<{
+    itemId: string;
+    fields: {
+      seriesGroupId?: string;
+      seriesGroupTitle?: string;
+      seriesRelationType?: SeriesRelationType;
+      orderIndex?: number;
+    };
+  }>;
+}
+
+/**
+ * Yeni eklenen AniList item'ı, kütüphanede güvenilir relation eşleşmesi olan
+ * AniList item'larıyla aynı seriesGroup altında toplar.
+ *
+ * Güvenlik kuralları:
+ * - SADECE persist edilmiş AniList relation id eşleşmesi kullanılır.
+ * - Title benzerliği KESİNLİKLE kullanılmaz.
+ * - SADECE SAFE_ANILIST_RELATION_TYPES kabul edilir.
+ * - Aynı tip (anime↔anime, manga↔manga) zorunluluğu vardır.
+ * - Mevcut item'ın seriesGroupId'si varsa o kullanılır; yoksa stabil bir id üretilir
+ *   (`anilist-series:{minId}`) ve eksik series alanları YALNIZCA undefined ise doldurulur.
+ */
+export function resolveAniListSeriesGroup(
+  newItem: Pick<
+    MediaItem,
+    | "type"
+    | "externalSource"
+    | "externalId"
+    | "title"
+    | "format"
+    | "seriesGroupId"
+    | "seriesGroupTitle"
+    | "anilistRelations"
+    | "releaseYear"
+  >,
+  library: MediaItem[]
+): AniListGroupResolution {
+  const empty: AniListGroupResolution = { newItemSeriesPatch: {}, existingPatches: [] };
+
+  if (newItem.externalSource !== "anilist") return empty;
+  const newAnilistId = (() => {
+    if (typeof newItem.externalId !== "string") return undefined;
+    const n = Number.parseInt(newItem.externalId, 10);
+    return Number.isFinite(n) && n > 0 ? n : undefined;
+  })();
+  if (newAnilistId === undefined) return empty;
+
+  const relations = newItem.anilistRelations;
+  if (!relations || relations.length === 0) return empty;
+
+  // Eşleşme adayları: relations içindeki güvenli tipler + kütüphanedeki AniList item'lar
+  // ile id eşleşmesi.
+  const safeRelationIds = new Set<number>();
+  for (const rel of relations) {
+    if (!rel || typeof rel.anilistId !== "number") continue;
+    if (!rel.relationType || !SAFE_ANILIST_RELATION_TYPES.has(rel.relationType)) continue;
+    // Sadece aynı medya tipi (anime↔anime / manga↔manga). ADAPTATION zaten dışarıda
+    // ama ekstra güvenlik için type kontrolü:
+    if (rel.rawType) {
+      const isNewAnime = newItem.type === "anime";
+      if (isNewAnime && rel.rawType !== "ANIME") continue;
+      if (!isNewAnime && rel.rawType !== "MANGA") continue;
+    }
+    safeRelationIds.add(rel.anilistId);
+  }
+  if (safeRelationIds.size === 0) return empty;
+
+  // Bu relation id'leriyle kesişen kütüphane item'ları
+  const matchedLibraryItems: MediaItem[] = [];
+  for (const item of library) {
+    if (item.externalSource !== "anilist") continue;
+    if (item.type !== newItem.type) continue;
+    const id = getAniListIdFromMediaItem(item);
+    if (id === undefined) continue;
+    if (safeRelationIds.has(id)) {
+      matchedLibraryItems.push(item);
+    }
+  }
+  if (matchedLibraryItems.length === 0) return empty;
+
+  // Mevcut bir grup id'si varsa onu tercih et; yoksa stabil bir id üret.
+  let groupId: string | undefined;
+  let groupTitle: string | undefined;
+  for (const m of matchedLibraryItems) {
+    if (m.seriesGroupId) {
+      groupId = m.seriesGroupId;
+      groupTitle = m.seriesGroupTitle ?? groupTitle;
+      break;
+    }
+  }
+
+  if (!groupId) {
+    // Kümeye dahil tüm AniList id'leri arasında en küçüğünü kullanan stabil id üret.
+    const idPool = new Set<number>([newAnilistId]);
+    for (const m of matchedLibraryItems) {
+      const mid = getAniListIdFromMediaItem(m);
+      if (mid !== undefined) idPool.add(mid);
+    }
+    const minId = Math.min(...idPool);
+    groupId = `${ANILIST_GROUP_PREFIX}${minId}`;
+  }
+
+  // Grup başlığı için ipucu: ilk eşleşen item'ın seriesGroupTitle'ı, yoksa kendi title'ı.
+  if (!groupTitle) {
+    groupTitle =
+      matchedLibraryItems.find((m) => m.seriesGroupTitle)?.seriesGroupTitle ??
+      matchedLibraryItems[0]?.title ??
+      newItem.title;
+  }
+
+  const newRelationType =
+    getAniListSeriesRelationType(newItem.format) ?? "other";
+
+  // orderIndex: releaseYear varsa onu kullan (güvenli, monoton). Yoksa boş bırak.
+  const newOrderIndex =
+    typeof newItem.releaseYear === "number" && newItem.releaseYear > 0
+      ? newItem.releaseYear
+      : undefined;
+
+  // Mevcut item'lara güvenli patch'ler — sadece undefined/missing alanları doldur.
+  const existingPatches: AniListGroupResolution["existingPatches"] = [];
+  for (const m of matchedLibraryItems) {
+    const fields: AniListGroupResolution["existingPatches"][number]["fields"] = {};
+    if (!m.seriesGroupId) fields.seriesGroupId = groupId;
+    if (!m.seriesGroupTitle && groupTitle) fields.seriesGroupTitle = groupTitle;
+    if (!m.seriesRelationType) {
+      const inferred = getAniListSeriesRelationType(m.format);
+      if (inferred) fields.seriesRelationType = inferred;
+    }
+    if (typeof m.orderIndex !== "number" && typeof m.releaseYear === "number" && m.releaseYear > 0) {
+      fields.orderIndex = m.releaseYear;
+    }
+    if (Object.keys(fields).length > 0) {
+      existingPatches.push({ itemId: m.id, fields });
+    }
+  }
+
+  return {
+    newItemSeriesPatch: {
+      seriesGroupId: groupId,
+      seriesGroupTitle: groupTitle,
+      seriesRelationType: newRelationType,
+      orderIndex: newOrderIndex,
+    },
+    existingPatches,
+  };
+}
+
+void anilistItemId; // şimdilik kullanılmıyor; ileride manuel grup yönetimi için ipucu
+
 export interface MediaItemGroup {
   key: string;
   seriesGroupId?: string;

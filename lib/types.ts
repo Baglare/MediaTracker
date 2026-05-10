@@ -2,6 +2,8 @@
 // Medya Takip Uygulaması - Tip Tanımları
 // ============================================
 
+import type { AniListRelationLite } from "./anilist-types";
+
 // Desteklenen medya türleri
 export type MediaType =
   | "movie"
@@ -142,7 +144,17 @@ export interface MediaItem {
     episode?: number;
     airingAt?: number;
   };
+
+  /**
+   * AniList relations alanı (V3): item details fetch sırasında doldurulur.
+   * Sadece güvenli ve minimal bilgiyi tutar; group inference için kullanılır.
+   * Eski item'larda undefined olabilir.
+   */
+  anilistRelations?: AniListRelationLite[];
 }
+
+// AniList relation tipini buradan da kullanılabilir kılmak için re-export.
+export type { AniListRelationLite } from "./anilist-types";
 
 type ClassifiableMediaItem = Partial<MediaItem> & {
   metadata?: Record<string, unknown> | null;

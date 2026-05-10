@@ -74,13 +74,11 @@ export default function QuickAddModal({
         ? "seasons"
         : payload?.preferredMode ?? (hasSeasons ? "seasons" : "single")
     );
-    setSelectedSeasonIds(
-      new Set(
-        (payload?.seasonItems ?? [])
-          .filter((season) => !lockedSeasonIds.has(season.id))
-          .map((season) => season.id)
-      )
-    );
+    // V2.1: Eksik sezonlar başlangıçta seçili gelmesin; kullanıcı bilinçli seçsin.
+    // Zaten kütüphanede olanlar (locked) UI'da checked + disabled görünür ama
+    // selectedSeasonIds set'inde tutulmaz — submit yalnızca kullanıcının seçtiği
+    // yeni eksik sezonları ekler.
+    setSelectedSeasonIds(new Set());
     setStatus("planning");
     setCurrentProgressInput("");
     setUserRating("");
