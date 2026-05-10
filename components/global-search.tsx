@@ -4,9 +4,13 @@
 
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Search, Loader2 } from "lucide-react";
-import { GlobalSearchResult, GlobalSearchCategory } from "@/lib/global-search-types";
+import {
+  GlobalSearchResult,
+  GlobalSearchCategory,
+  GlobalSearchLibraryStatus,
+} from "@/lib/global-search-types";
 import GlobalSearchResultCard from "./global-search-result-card";
 import { TvmazeNormalizedResult } from "@/lib/tvmaze-types";
 import { AniListNormalizedResult } from "@/lib/anilist-types";
@@ -14,8 +18,8 @@ import { OpenLibraryNormalizedResult } from "@/lib/openlibrary-types";
 import { OmdbNormalizedResult } from "@/lib/omdb-types";
 
 interface GlobalSearchProps {
-  isInLibrary: (source: string, externalId: string) => boolean;
-  onAddToLibrary: (item: GlobalSearchResult) => void;
+  getLibraryStatus: (item: GlobalSearchResult) => Promise<GlobalSearchLibraryStatus> | GlobalSearchLibraryStatus;
+  onAddToLibrary: (item: GlobalSearchResult, options?: { relatedOnly?: boolean }) => void | Promise<void>;
 }
 
 const CATEGORIES: { value: GlobalSearchCategory; label: string }[] = [
@@ -29,7 +33,12 @@ const CATEGORIES: { value: GlobalSearchCategory; label: string }[] = [
   { value: "movie", label: "Film" },
 ];
 
-export default function GlobalSearch({ isInLibrary, onAddToLibrary }: GlobalSearchProps) {
+const DEFAULT_LIBRARY_STATUS: GlobalSearchLibraryStatus = {
+  isInLibrary: false,
+  hasAddableParts: false,
+};
+
+export default function GlobalSearch({ getLibraryStatus, onAddToLibrary }: GlobalSearchProps) {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<GlobalSearchCategory>("all");
   const [isSearching, setIsSearching] = useState(false);
@@ -37,6 +46,7 @@ export default function GlobalSearch({ isInLibrary, onAddToLibrary }: GlobalSear
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
   const [addingIds, setAddingIds] = useState<Set<string>>(new Set());
+  const [libraryStatuses, setLibraryStatuses] = useState<Record<string, GlobalSearchLibraryStatus>>({});
 
   async function handleSearch(e?: React.FormEvent) {
     if (e) e.preventDefault();
@@ -46,6 +56,7 @@ export default function GlobalSearch({ isInLibrary, onAddToLibrary }: GlobalSear
     setError(null);
     setHasSearched(true);
     setResults([]);
+    setLibraryStatuses({});
 
     try {
       const fetchPromises: Promise<GlobalSearchResult[]>[] = [];
@@ -181,12 +192,45 @@ export default function GlobalSearch({ isInLibrary, onAddToLibrary }: GlobalSear
     }
   }
 
-  async function handleAdd(result: GlobalSearchResult) {
+  useEffect(() => {
+    let cancelled = false;
+
+    async function resolveStatuses() {
+      const entries = await Promise.all(
+        results.map(async (result) => {
+          const key = `${result.source}-${result.externalId}`;
+          try {
+            const status = await Promise.resolve(getLibraryStatus(result));
+            return [key, status] as const;
+          } catch {
+            return [key, DEFAULT_LIBRARY_STATUS] as const;
+          }
+        })
+      );
+
+      if (cancelled) return;
+      setLibraryStatuses(Object.fromEntries(entries));
+    }
+
+    if (results.length > 0) {
+      void resolveStatuses();
+    } else {
+      setLibraryStatuses({});
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [getLibraryStatus, results]);
+
+  async function handleAdd(result: GlobalSearchResult, options?: { relatedOnly?: boolean }) {
     const key = `${result.source}-${result.externalId}`;
     setAddingIds((prev) => new Set(prev).add(key));
 
     try {
-      await onAddToLibrary(result);
+      await onAddToLibrary(result, options);
+      const nextStatus = await Promise.resolve(getLibraryStatus(result));
+      setLibraryStatuses((prev) => ({ ...prev, [key]: nextStatus }));
     } finally {
       setAddingIds((prev) => {
         const next = new Set(prev);
@@ -212,15 +256,18 @@ export default function GlobalSearch({ isInLibrary, onAddToLibrary }: GlobalSear
       <div className="mb-6">
         <h3 className="text-sm font-semibold text-zinc-300 mb-3 uppercase tracking-wider">{title}</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-          {items.map((res) => (
-            <GlobalSearchResultCard
-              key={`${res.source}-${res.externalId}`}
-              result={res}
-              isInLibrary={isInLibrary(res.source, res.externalId)}
-              isAdding={addingIds.has(`${res.source}-${res.externalId}`)}
-              onAdd={handleAdd}
-            />
-          ))}
+          {items.map((res) => {
+            const key = `${res.source}-${res.externalId}`;
+            return (
+              <GlobalSearchResultCard
+                key={key}
+                result={res}
+                libraryStatus={libraryStatuses[key] ?? DEFAULT_LIBRARY_STATUS}
+                isAdding={addingIds.has(key)}
+                onAdd={handleAdd}
+              />
+            );
+          })}
         </div>
       </div>
     );
@@ -302,15 +349,18 @@ export default function GlobalSearch({ isInLibrary, onAddToLibrary }: GlobalSear
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-                {results.map((res) => (
-                  <GlobalSearchResultCard
-                    key={`${res.source}-${res.externalId}`}
-                    result={res}
-                    isInLibrary={isInLibrary(res.source, res.externalId)}
-                    isAdding={addingIds.has(`${res.source}-${res.externalId}`)}
-                    onAdd={handleAdd}
-                  />
-                ))}
+                {results.map((res) => {
+                  const key = `${res.source}-${res.externalId}`;
+                  return (
+                    <GlobalSearchResultCard
+                      key={key}
+                      result={res}
+                      libraryStatus={libraryStatuses[key] ?? DEFAULT_LIBRARY_STATUS}
+                      isAdding={addingIds.has(key)}
+                      onAdd={handleAdd}
+                    />
+                  );
+                })}
               </div>
             )
           ) : (

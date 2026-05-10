@@ -6,14 +6,14 @@
 
 import Image from "next/image";
 import { Plus, Check, Loader2 } from "lucide-react";
-import { GlobalSearchResult } from "@/lib/global-search-types";
+import { GlobalSearchLibraryStatus, GlobalSearchResult } from "@/lib/global-search-types";
 import { getMediaTypeLabel } from "@/lib/progress";
 
 interface Props {
   result: GlobalSearchResult;
-  isInLibrary: boolean;
+  libraryStatus: GlobalSearchLibraryStatus;
   isAdding: boolean;
-  onAdd: (result: GlobalSearchResult) => void;
+  onAdd: (result: GlobalSearchResult, options?: { relatedOnly?: boolean }) => void;
 }
 
 /** Kaynağa göre badge rengi */
@@ -34,7 +34,7 @@ function getSourceBadge(source: string) {
 
 export default function GlobalSearchResultCard({
   result,
-  isInLibrary,
+  libraryStatus,
   isAdding,
   onAdd,
 }: Props) {
@@ -104,10 +104,25 @@ export default function GlobalSearchResultCard({
 
       {/* Ekle butonu */}
       <div className="flex items-center flex-shrink-0">
-        {isInLibrary ? (
-          <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-emerald-500/10 text-emerald-500/60 ring-1 ring-emerald-500/20">
-            <Check className="w-3 h-3" /> Listede
-          </span>
+        {libraryStatus.isInLibrary ? (
+          <div className="flex flex-col items-end gap-1.5">
+            <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-emerald-500/10 text-emerald-500/60 ring-1 ring-emerald-500/20">
+              <Check className="w-3 h-3" /> Listede
+            </span>
+            {libraryStatus.hasAddableParts && (
+              <button
+                onClick={() => onAdd(result, { relatedOnly: true })}
+                disabled={isAdding}
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-violet-500/15 text-violet-300 ring-1 ring-violet-500/30 hover:bg-violet-500/25 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isAdding ? (
+                  <><Loader2 className="w-3 h-3 animate-spin" /> Açılıyor</>
+                ) : (
+                  <><Plus className="w-3 h-3" /> {libraryStatus.actionLabel ?? "Parça Ekle"}</>
+                )}
+              </button>
+            )}
+          </div>
         ) : (
           <button
             onClick={() => onAdd(result)}

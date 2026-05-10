@@ -1,13 +1,18 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useMemo, useState } from "react";
 import { MediaItem, MediaStatus, withMediaClassification } from "@/lib/types";
 import { X, Heart, Save } from "lucide-react";
 import Image from "next/image";
 
+type AddMode = "single" | "seasons";
+
 interface QuickAddPayload {
   singleItem: MediaItem;
   seasonItems: MediaItem[] | null;
+  lockedSeasonIds?: string[];
+  preferredMode?: AddMode;
+  forceSeasonSelection?: boolean;
 }
 
 interface QuickAddModalProps {
@@ -16,8 +21,6 @@ interface QuickAddModalProps {
   onSave: (items: MediaItem[]) => void;
   onClose: () => void;
 }
-
-type AddMode = "single" | "seasons";
 
 function getProgressLabel(type: string) {
   switch (type) {
@@ -50,6 +53,10 @@ export default function QuickAddModal({
   onClose,
 }: QuickAddModalProps) {
   const hasSeasons = !!(payload?.seasonItems && payload.seasonItems.length > 1);
+  const lockedSeasonIds = useMemo(
+    () => new Set(payload?.lockedSeasonIds ?? []),
+    [payload?.lockedSeasonIds]
+  );
 
   const [mode, setMode] = useState<AddMode>("single");
   const [selectedSeasonIds, setSelectedSeasonIds] = useState<Set<string>>(new Set());
@@ -58,13 +65,22 @@ export default function QuickAddModal({
   const [userRating, setUserRating] = useState("");
   const [favorite, setFavorite] = useState(false);
 
-  // Modal her açıldığında veya farklı bir payload geldiğinde formu sıfırla.
   const payloadKey = isOpen && payload ? payload.singleItem.id : null;
   const [resetKey, setResetKey] = useState<string | null>(null);
   if (resetKey !== payloadKey) {
     setResetKey(payloadKey);
-    setMode(hasSeasons ? "seasons" : "single");
-    setSelectedSeasonIds(new Set(payload?.seasonItems?.map((s) => s.id) ?? []));
+    setMode(
+      payload?.forceSeasonSelection
+        ? "seasons"
+        : payload?.preferredMode ?? (hasSeasons ? "seasons" : "single")
+    );
+    setSelectedSeasonIds(
+      new Set(
+        (payload?.seasonItems ?? [])
+          .filter((season) => !lockedSeasonIds.has(season.id))
+          .map((season) => season.id)
+      )
+    );
     setStatus("planning");
     setCurrentProgressInput("");
     setUserRating("");
@@ -73,12 +89,13 @@ export default function QuickAddModal({
 
   const currentProgress = currentProgressInput.trim() === "" ? 0 : Number(currentProgressInput);
 
-  // Kaydedilecek aktif item dizisini moda göre hesapla
   const activeItems = useMemo<MediaItem[]>(() => {
     if (!payload) return [];
     if (mode === "single" || !payload.seasonItems) return [payload.singleItem];
-    return payload.seasonItems.filter((s) => selectedSeasonIds.has(s.id));
-  }, [payload, mode, selectedSeasonIds]);
+    return payload.seasonItems.filter(
+      (item) => selectedSeasonIds.has(item.id) && !lockedSeasonIds.has(item.id)
+    );
+  }, [payload, mode, selectedSeasonIds, lockedSeasonIds]);
 
   const totalProgress = useMemo(
     () => activeItems.reduce((sum, item) => sum + item.totalProgress, 0),
@@ -89,9 +106,12 @@ export default function QuickAddModal({
 
   const primaryItem = payload.singleItem;
   const allSeasons = payload.seasonItems ?? [];
+  const availableSeasons = allSeasons.filter((season) => !lockedSeasonIds.has(season.id));
   const isMultiSelected = mode === "seasons" && activeItems.length > 1;
 
   const toggleSeason = (id: string) => {
+    if (lockedSeasonIds.has(id)) return;
+
     setSelectedSeasonIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -102,8 +122,10 @@ export default function QuickAddModal({
 
   const toggleAllSeasons = () => {
     setSelectedSeasonIds((prev) => {
-      if (prev.size === allSeasons.length) return new Set();
-      return new Set(allSeasons.map((s) => s.id));
+      if (availableSeasons.length === 0) return new Set();
+      const selectedAvailableCount = availableSeasons.filter((season) => prev.has(season.id)).length;
+      if (selectedAvailableCount === availableSeasons.length) return new Set();
+      return new Set(availableSeasons.map((season) => season.id));
     });
   };
 
@@ -144,7 +166,9 @@ export default function QuickAddModal({
     ? primaryItem.title.replace(/ - Sezon \d+$/, "")
     : primaryItem.title;
 
-  const allSelected = selectedSeasonIds.size === allSeasons.length && allSeasons.length > 0;
+  const allSelected =
+    availableSeasons.length > 0 &&
+    availableSeasons.every((season) => selectedSeasonIds.has(season.id));
   const noneSelected = activeItems.length === 0;
 
   return (
@@ -194,8 +218,7 @@ export default function QuickAddModal({
             </div>
           </div>
 
-          {/* Mod Seçimi */}
-          {hasSeasons && (
+          {hasSeasons && !payload.forceSeasonSelection && (
             <div className="mb-5">
               <div className="grid grid-cols-2 gap-2 p-1 bg-zinc-950 rounded-xl border border-zinc-800">
                 <button
@@ -229,17 +252,17 @@ export default function QuickAddModal({
             </div>
           )}
 
-          {/* Sezon Seçim Listesi */}
           {hasSeasons && mode === "seasons" && (
             <div className="mb-5 rounded-xl border border-zinc-800 bg-zinc-950/40 p-3">
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs text-zinc-400">
-                  Eklenecek sezonlar ({activeItems.length}/{allSeasons.length})
+                  Eklenecek sezonlar ({activeItems.length}/{availableSeasons.length || allSeasons.length})
                 </p>
                 <button
                   type="button"
                   onClick={toggleAllSeasons}
-                  className="text-[11px] text-violet-400 hover:text-violet-300 transition-colors"
+                  disabled={availableSeasons.length === 0}
+                  className="text-[11px] text-violet-400 hover:text-violet-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   {allSelected ? "Tümünü Bırak" : "Tümünü Seç"}
                 </button>
@@ -247,11 +270,15 @@ export default function QuickAddModal({
               <div className="space-y-1.5">
                 {allSeasons.map((item) => {
                   const checked = selectedSeasonIds.has(item.id);
+                  const isLocked = lockedSeasonIds.has(item.id);
+
                   return (
                     <label
                       key={item.id}
                       className={`flex items-center justify-between gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors ${
-                        checked
+                        isLocked
+                          ? "bg-emerald-500/5 ring-1 ring-emerald-500/20 cursor-not-allowed"
+                          : checked
                           ? "bg-violet-500/10 ring-1 ring-violet-500/30"
                           : "bg-zinc-900/40 hover:bg-zinc-900/70"
                       }`}
@@ -259,15 +286,23 @@ export default function QuickAddModal({
                       <div className="flex items-center gap-2.5 min-w-0">
                         <input
                           type="checkbox"
-                          checked={checked}
+                          checked={isLocked || checked}
                           onChange={() => toggleSeason(item.id)}
-                          className="w-4 h-4 accent-violet-500 cursor-pointer"
+                          disabled={isLocked}
+                          className="w-4 h-4 accent-violet-500 cursor-pointer disabled:cursor-not-allowed"
                         />
                         <span className="text-xs text-zinc-200 truncate">{item.title}</span>
                       </div>
-                      <span className="text-[11px] text-zinc-500 whitespace-nowrap">
-                        {item.totalProgress} bölüm
-                      </span>
+                      <div className="flex items-center gap-2 whitespace-nowrap">
+                        <span className="text-[11px] text-zinc-500">
+                          {item.totalProgress} bölüm
+                        </span>
+                        {isLocked && (
+                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-500/20">
+                            Listede
+                          </span>
+                        )}
+                      </div>
                     </label>
                   );
                 })}
@@ -292,8 +327,6 @@ export default function QuickAddModal({
                 {(() => {
                   const t = primaryItem.type;
                   const isReadingType = t === "book" || t === "manga" || t === "manhwa" || t === "manhua";
-                  // Aktif durum (watching/reading) tek bir option olarak gösterilir;
-                  // value türe uygun ki form save'de doğru status'a otomatik düşsün.
                   return (
                     <>
                       <option value="planning">Planlanıyor</option>

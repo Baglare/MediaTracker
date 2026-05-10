@@ -13,6 +13,8 @@ type SeriesGroupFields = Pick<
   "seriesGroupId" | "seriesGroupTitle" | "seriesRelationType" | "seasonNumber" | "orderIndex"
 >;
 
+const TVMAZE_GROUP_PREFIX = "tvmaze:";
+
 const ANILIST_FORMAT_RELATION_MAP: Record<string, SeriesRelationType> = {
   TV: "main",
   MOVIE: "movie",
@@ -31,22 +33,21 @@ function readPositiveNumber(value: unknown): number | undefined {
 }
 
 function parseTvSeason(item: MediaItem): Partial<SeriesGroupFields> {
-  const externalId = readNonEmptyString(item.externalId);
+  const externalId = getTvmazeShowExternalId(item);
   const title = readNonEmptyString(item.title);
   if (!externalId || !title) return {};
 
-  const externalMatch = externalId.match(/^(.*)-season-(\d+)$/i);
   const titleMatch = title.match(/^(.*)\s+-\s+Sezon\s+(\d+)$/i);
-  if (!externalMatch || !titleMatch) return {};
+  if (!titleMatch) return {};
 
-  const seasonNumber = Number.parseInt(externalMatch[2], 10);
+  const seasonNumber = getTvmazeSeasonNumber(item);
   const baseTitle = titleMatch[1]?.trim();
-  if (!Number.isFinite(seasonNumber) || seasonNumber <= 0 || !baseTitle) {
+  if (seasonNumber === undefined || !baseTitle) {
     return {};
   }
 
   return {
-    seriesGroupId: `tvmaze:${externalMatch[1]}`,
+    seriesGroupId: `${TVMAZE_GROUP_PREFIX}${externalId}`,
     seriesGroupTitle: baseTitle,
     seriesRelationType: "season",
     seasonNumber,
@@ -101,6 +102,57 @@ export function withInferredSeriesGroup<T extends MediaItem>(item: T): T {
     seasonNumber: item.seasonNumber ?? inferred.seasonNumber,
     orderIndex: item.orderIndex ?? inferred.orderIndex,
   };
+}
+
+export function getTvmazeSeasonExternalId(showExternalId: string, seasonNumber: number): string {
+  return `${showExternalId}-season-${seasonNumber}`;
+}
+
+export function getTvmazeShowExternalId(item: Pick<MediaItem, "externalSource" | "externalId" | "seriesGroupId">): string | undefined {
+  if (item.externalSource !== "tvmaze") return undefined;
+
+  const seriesGroupId = readNonEmptyString(item.seriesGroupId);
+  if (seriesGroupId?.startsWith(TVMAZE_GROUP_PREFIX)) {
+    return seriesGroupId.slice(TVMAZE_GROUP_PREFIX.length);
+  }
+
+  const externalId = readNonEmptyString(item.externalId);
+  if (!externalId) return undefined;
+
+  const externalMatch = externalId.match(/^(.*)-season-(\d+)$/i);
+  return externalMatch ? externalMatch[1] : externalId;
+}
+
+export function getTvmazeSeasonNumber(item: Pick<MediaItem, "externalSource" | "externalId" | "seasonNumber">): number | undefined {
+  if (item.externalSource !== "tvmaze") return undefined;
+  if (typeof item.seasonNumber === "number" && Number.isFinite(item.seasonNumber) && item.seasonNumber > 0) {
+    return item.seasonNumber;
+  }
+
+  const externalId = readNonEmptyString(item.externalId);
+  if (!externalId) return undefined;
+
+  const externalMatch = externalId.match(/-season-(\d+)$/i);
+  if (!externalMatch) return undefined;
+
+  const seasonNumber = Number.parseInt(externalMatch[1], 10);
+  return Number.isFinite(seasonNumber) && seasonNumber > 0 ? seasonNumber : undefined;
+}
+
+export function getTvmazeExistingSeasonNumbers(items: MediaItem[], showExternalId: string): number[] {
+  const existing = new Set<number>();
+
+  for (const item of items) {
+    const currentShowId = getTvmazeShowExternalId(item);
+    if (currentShowId !== showExternalId) continue;
+
+    const seasonNumber = getTvmazeSeasonNumber(item);
+    if (seasonNumber !== undefined) {
+      existing.add(seasonNumber);
+    }
+  }
+
+  return Array.from(existing).sort((a, b) => a - b);
 }
 
 export function groupMediaItems(items: MediaItem[]): MediaItemGroup[] {

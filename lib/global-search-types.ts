@@ -22,6 +22,13 @@ export interface GlobalSearchResult {
   raw?: unknown;
 }
 
+export interface GlobalSearchLibraryStatus {
+  isInLibrary: boolean;
+  hasAddableParts: boolean;
+  actionLabel?: string;
+  missingCount?: number;
+}
+
 /** Global Search kategori filtreleri */
 export type GlobalSearchCategory =
   | "all"

@@ -39,12 +39,17 @@ import QuickAddModal from "@/components/quick-add-modal";
 import EnhancedDashboard from "@/components/enhanced-dashboard";
 import AiAdvisor from "@/components/ai-advisor";
 import { ChevronDown, ChevronUp, Search, Plus } from "lucide-react";
-import { GlobalSearchResult } from "@/lib/global-search-types";
+import { GlobalSearchLibraryStatus, GlobalSearchResult } from "@/lib/global-search-types";
 import { mockMediaList } from "@/lib/mock-media";
 import { loadMediaList, saveMediaList, clearMediaList, loadProgressLogs, saveProgressLogs } from "@/lib/storage";
 import { getIncrementAmount, getProgressLabel, getProgressUnit, getStatusLabel } from "@/lib/progress";
 import { MediaItem, MediaType, MediaStatus, ProgressLog, withMediaClassification } from "@/lib/types";
-import { withInferredSeriesGroup } from "@/lib/series-group";
+import {
+  getTvmazeExistingSeasonNumbers,
+  getTvmazeSeasonExternalId,
+  getTvmazeShowExternalId,
+  withInferredSeriesGroup,
+} from "@/lib/series-group";
 import { calculateDashboardStats } from "@/lib/dashboard-stats";
 import { TvmazeNormalizedDetail } from "@/lib/tvmaze-types";
 import { OpenLibraryNormalizedResult } from "@/lib/openlibrary-types";
@@ -86,7 +91,11 @@ export default function HomePage() {
   const [pendingQuickAdd, setPendingQuickAdd] = useState<{
     singleItem: MediaItem;
     seasonItems: MediaItem[] | null;
+    lockedSeasonIds?: string[];
+    preferredMode?: "single" | "seasons";
+    forceSeasonSelection?: boolean;
   } | null>(null);
+  const [tvmazeDetailsCache, setTvmazeDetailsCache] = useState<Record<string, TvmazeNormalizedDetail>>({});
 
   // Detay modalı için seçili medya öğesi (listeden her zaman güncel halini alır)
   const detailMedia = useMemo(
@@ -143,6 +152,43 @@ export default function HomePage() {
     setEditingItem(null);
     setIsModalOpen(false);
   }, []);
+
+  async function handleAddMissingTvmazeParts(showIdOrItem: string | MediaItem) {
+    const showId =
+      typeof showIdOrItem === "string"
+        ? showIdOrItem
+        : getTvmazeShowExternalId(showIdOrItem);
+
+    if (!showId) return false;
+
+    const detail = await ensureTvmazeDetail(showId);
+    return openTvmazeSeasonPicker(detail, true);
+  }
+
+  async function getGlobalSearchLibraryStatus(item: GlobalSearchResult): Promise<GlobalSearchLibraryStatus> {
+    const inLibrary = isInLibrary(item.source, item.externalId);
+
+    if (item.source !== "tvmaze") {
+      return { isInLibrary: inLibrary, hasAddableParts: false };
+    }
+
+    if (!inLibrary) {
+      return { isInLibrary: false, hasAddableParts: false };
+    }
+
+    try {
+      const detail = await ensureTvmazeDetail(item.externalId);
+      const missingItems = getMissingTvmazeSeasonItems(detail);
+      return {
+        isInLibrary: true,
+        hasAddableParts: missingItems.length > 0,
+        actionLabel: "Sezon Ekle",
+        missingCount: missingItems.length,
+      };
+    } catch {
+      return { isInLibrary: true, hasAddableParts: false };
+    }
+  }
 
   /**
    * Yeni log ekleme yardımcı fonksiyonu
@@ -467,15 +513,12 @@ export default function HomePage() {
    */
   const isInLibrary = useCallback(
     (externalSource: string, externalId: string) => {
+      if (externalSource === "tvmaze") {
+        return mediaList.some((item) => getTvmazeShowExternalId(item) === externalId);
+      }
+
       return mediaList.some(
-        (m) =>
-          m.externalSource === externalSource &&
-          (
-            m.externalId === externalId ||
-            (externalSource === "tvmaze" &&
-              typeof m.externalId === "string" &&
-              m.externalId.startsWith(`${externalId}-season-`))
-          )
+        (item) => item.externalSource === externalSource && item.externalId === externalId
       );
     },
     [mediaList]
@@ -484,6 +527,7 @@ export default function HomePage() {
   const buildTvmazeLibraryItems = useCallback((detail: TvmazeNormalizedDetail): MediaItem[] => {
     const coverImage = detail.coverUrl || "/placeholders/tv.svg";
     const seasonEntries = (detail.seasonBreakdown || []).filter((entry) => entry.episodes > 0);
+    const seriesGroupId = `tvmaze:${detail.externalId}`;
 
     if (seasonEntries.length <= 1) {
       return [
@@ -507,6 +551,10 @@ export default function HomePage() {
           genres: detail.genres,
           language: detail.language,
           seasonBreakdown: detail.seasonBreakdown,
+          seriesGroupId,
+          seriesGroupTitle: detail.title,
+          seriesRelationType: "main",
+          orderIndex: 1,
         },
       ];
     }
@@ -520,28 +568,138 @@ export default function HomePage() {
       currentProgress: 0,
       totalProgress: seasonEntry.episodes,
       externalSource: "tvmaze",
-      externalId: `${detail.externalId}-season-${seasonEntry.season}`,
+      externalId: getTvmazeSeasonExternalId(detail.externalId, seasonEntry.season),
       overview: detail.overview,
       releaseYear: detail.releaseYear,
-      numberOfSeasons: 1,
+      numberOfSeasons: detail.numberOfSeasons,
       numberOfEpisodes: seasonEntry.episodes,
       tvmazeStatus: detail.tvmazeStatus,
       lastAirDate: detail.lastAirDate,
       nextAirDate: detail.nextAirDate,
       genres: detail.genres,
       language: detail.language,
-      seasonBreakdown: [seasonEntry],
+      seasonBreakdown: detail.seasonBreakdown,
+      seriesGroupId,
+      seriesGroupTitle: detail.title,
+      seriesRelationType: "season",
+      seasonNumber: seasonEntry.season,
+      orderIndex: seasonEntry.season,
     }));
   }, []);
+
+  const openTvmazeSeasonPicker = useCallback((detail: TvmazeNormalizedDetail, relatedOnly = false) => {
+    const seasonItems = buildTvmazeLibraryItems(detail);
+    const isMultiSeason = seasonItems.length > 1;
+
+    const singleItem: MediaItem = {
+      id: `tvmaze-${detail.externalId}`,
+      title: detail.title,
+      type: "tv",
+      status: "planning",
+      coverImage: detail.coverUrl || "/placeholders/tv.svg",
+      currentProgress: 0,
+      totalProgress: detail.totalProgress,
+      externalSource: "tvmaze",
+      externalId: detail.externalId,
+      overview: detail.overview,
+      releaseYear: detail.releaseYear,
+      numberOfSeasons: detail.numberOfSeasons,
+      numberOfEpisodes: detail.numberOfEpisodes,
+      tvmazeStatus: detail.tvmazeStatus,
+      lastAirDate: detail.lastAirDate,
+      nextAirDate: detail.nextAirDate,
+      genres: detail.genres,
+      language: detail.language,
+      seasonBreakdown: detail.seasonBreakdown,
+      seriesGroupId: `tvmaze:${detail.externalId}`,
+      seriesGroupTitle: detail.title,
+      seriesRelationType: "main",
+      orderIndex: 1,
+    };
+
+    if (!isMultiSeason) {
+      if (relatedOnly || isInLibrary("tvmaze", detail.externalId)) {
+        return false;
+      }
+
+      setPendingQuickAdd({ singleItem, seasonItems: null });
+      return true;
+    }
+
+    const lockedSeasonIds = getTvmazeItemsForShow(detail.externalId)
+      .map((item) => item.externalId)
+      .filter((value): value is string => typeof value === "string");
+
+    const missingItems = seasonItems.filter(
+      (item) => !lockedSeasonIds.includes(item.externalId ?? "")
+    );
+
+    if (relatedOnly && missingItems.length === 0) {
+      return false;
+    }
+
+    setPendingQuickAdd({
+      singleItem,
+      seasonItems,
+      lockedSeasonIds: relatedOnly ? lockedSeasonIds : undefined,
+      preferredMode: "seasons",
+      forceSeasonSelection: relatedOnly,
+    });
+    return true;
+  }, [buildTvmazeLibraryItems, getTvmazeItemsForShow, isInLibrary]);
+
+  const ensureTvmazeDetail = useCallback(async (showId: string) => {
+    const cached = tvmazeDetailsCache[showId];
+    if (cached) return cached;
+
+    const response = await fetch(`/api/tvmaze/details?id=${showId}`);
+    const detail = await response.json().catch(() => null);
+    if (!response.ok || !detail) {
+      throw new Error("TVmaze detay verisi alınamadı");
+    }
+
+    setTvmazeDetailsCache((prev) => {
+      if (prev[showId]) return prev;
+      return { ...prev, [showId]: detail as TvmazeNormalizedDetail };
+    });
+
+    return detail as TvmazeNormalizedDetail;
+  }, [tvmazeDetailsCache]);
+
+  function getTvmazeItemsForShow(showId: string) {
+    return mediaList.filter((item) => getTvmazeShowExternalId(item) === showId);
+  }
+
+  function getMissingTvmazeSeasonItems(detail: TvmazeNormalizedDetail) {
+    const allSeasonItems = buildTvmazeLibraryItems(detail);
+    if (allSeasonItems.length <= 1) {
+      return [];
+    }
+
+    const existingExternalIds = new Set(
+      getTvmazeItemsForShow(detail.externalId)
+        .map((item) => item.externalId)
+        .filter((value): value is string => typeof value === "string")
+    );
+
+    return allSeasonItems.filter((item) => !existingExternalIds.has(item.externalId ?? ""));
+  }
 
   /**
    * TVmaze detay sonucunu kullanıcının medya listesine ekler.
    * TvmazeNormalizedDetail → MediaItem dönüşümü burada yapılır.
    */
   const handleAddFromTvmaze = useCallback(
-    (detail: TvmazeNormalizedDetail) => {
+    (detail: TvmazeNormalizedDetail, options?: { relatedOnly?: boolean }) => {
       // Zaten eklenmişse tekrar ekleme
+      if (options?.relatedOnly) {
+        openTvmazeSeasonPicker(detail, true);
+        return;
+      }
+
       if (isInLibrary("tvmaze", detail.externalId)) return;
+      openTvmazeSeasonPicker(detail, false);
+      return;
 
       const coverImage =
         detail.coverUrl || "/placeholders/tv.svg";
@@ -570,13 +728,13 @@ export default function HomePage() {
         seasonBreakdown: detail.seasonBreakdown,
       };
 
-      const isMultiSeason = !!(detail.seasonBreakdown && detail.seasonBreakdown.length > 1);
+      const isMultiSeason = (detail.seasonBreakdown?.length ?? 0) > 1;
       setPendingQuickAdd({
         singleItem: newItem,
         seasonItems: isMultiSeason ? buildTvmazeLibraryItems(detail) : null,
       });
     },
-    [buildTvmazeLibraryItems, isInLibrary]
+    [buildTvmazeLibraryItems, isInLibrary, openTvmazeSeasonPicker]
   );
 
   /**
@@ -693,14 +851,14 @@ export default function HomePage() {
    * Global Search'ten dönen sonucu doğru formata çevirip ekler.
    */
   const handleAddFromGlobalSearch = useCallback(
-    async (item: GlobalSearchResult) => {
+    async (item: GlobalSearchResult, options?: { relatedOnly?: boolean }) => {
       try {
         if (item.source === "tvmaze") {
           // TVmaze araması sadece yüzeysel veri döner, bölüm sayısı için detaya inmemiz gerekir
           const res = await fetch(`/api/tvmaze/details?id=${item.externalId}`);
           if (!res.ok) throw new Error("TVmaze detay verisi alınamadı");
           const detail = await res.json();
-          handleAddFromTvmaze(detail);
+          handleAddFromTvmaze(detail, options);
         } else if (item.source === "anilist") {
           // AniList arama sonucu yeterli detaya sahip
           handleAddFromAniList(item.raw as AniListNormalizedResult);
@@ -722,6 +880,39 @@ export default function HomePage() {
   );
 
   // ---- FİLTRELEME ----
+  useEffect(() => {
+    const showIds = Array.from(
+      new Set(
+        mediaList
+          .map((item) => getTvmazeShowExternalId(item))
+          .filter((value): value is string => typeof value === "string")
+      )
+    );
+
+    showIds.forEach((showId) => {
+      if (tvmazeDetailsCache[showId]) return;
+      void ensureTvmazeDetail(showId).catch(() => {});
+    });
+  }, [ensureTvmazeDetail, mediaList, tvmazeDetailsCache]);
+
+  const getLibraryRelatedAction = useCallback((item: MediaItem) => {
+    const showId = getTvmazeShowExternalId(item);
+    if (!showId) {
+      return { canAdd: false, label: "Parça Ekle" };
+    }
+
+    const detail = tvmazeDetailsCache[showId];
+    if (!detail) {
+      return { canAdd: false, label: "Sezon Ekle" };
+    }
+
+    const missingItems = getMissingTvmazeSeasonItems(detail);
+    return {
+      canAdd: missingItems.length > 0,
+      label: "Sezon Ekle",
+    };
+  }, [getMissingTvmazeSeasonItems, tvmazeDetailsCache]);
+
   const filteredMedia = useMemo(() => {
     return mediaList.filter((item) => {
       const matchesSearch = item.title
@@ -823,16 +1014,24 @@ export default function HomePage() {
             {filteredMedia.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                 {filteredMedia.map((item) => (
-                  <MediaCard
-                    key={item.id}
-                    item={item}
-                    onIncrement={handleIncrement}
-                    onComplete={handleComplete}
-                    onEdit={handleOpenEditModal}
-                    onDelete={handleDeleteRequest}
-                    onToggleFavorite={handleToggleFavorite}
-                    onOpenDetail={handleOpenDetailModal}
-                  />
+                  (() => {
+                    const relatedAction = getLibraryRelatedAction(item);
+                    return (
+                      <MediaCard
+                        key={item.id}
+                        item={item}
+                        onIncrement={handleIncrement}
+                        onComplete={handleComplete}
+                        onEdit={handleOpenEditModal}
+                        onDelete={handleDeleteRequest}
+                        onToggleFavorite={handleToggleFavorite}
+                        onOpenDetail={handleOpenDetailModal}
+                        onAddRelatedParts={handleAddMissingTvmazeParts}
+                        relatedPartsLabel={relatedAction.label}
+                        canAddRelatedParts={relatedAction.canAdd}
+                      />
+                    );
+                  })()
                 ))}
               </div>
             ) : (
@@ -853,7 +1052,7 @@ export default function HomePage() {
         {activeTab === "discover" && (
           <div className="space-y-8">
             <GlobalSearch
-              isInLibrary={isInLibrary}
+              getLibraryStatus={getGlobalSearchLibraryStatus}
               onAddToLibrary={handleAddFromGlobalSearch}
             />
             <div>
