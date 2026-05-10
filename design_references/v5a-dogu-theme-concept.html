@@ -1,0 +1,865 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>V5A · Doğu — Kütüphanem</title>
+<meta name="viewport" content="width=1280">
+<link rel="stylesheet" href="colors_and_type.css">
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background:
+      radial-gradient(120% 70% at 80% -10%, rgba(180,90,50,0.10) 0%, transparent 60%),
+      radial-gradient(80% 80% at 10% 110%, rgba(40,20,30,0.55) 0%, transparent 55%),
+      linear-gradient(180deg, oklch(0.10 0.02 20) 0%, oklch(0.07 0.01 20) 100%);
+    color: #ecd9a8;
+    font-family: var(--font-sans);
+    min-height: 100vh;
+  }
+
+  .doc { max-width: 1280px; margin: 0 auto; }
+
+  /* ================= STAGE: app screen ================= */
+  .stage {
+    padding: 32px 40px 56px;
+    border-bottom: 1px solid rgba(212,168,87,0.12);
+  }
+  .stage-tag {
+    font-family: var(--font-mono); font-size: 11px;
+    color: #b88a3a; letter-spacing: 0.18em; text-transform: uppercase;
+    margin-bottom: 18px;
+  }
+
+  /* Header (preserved structure: same row as base, theme tabs replace nav) */
+  .hdr {
+    background: rgba(15, 10, 8, 0.85);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(212,168,87,0.20);
+    border-radius: 14px;
+    padding: 18px 24px;
+    margin-bottom: 18px;
+  }
+  .hdr-row { display: flex; align-items: center; gap: 16px; }
+  .logo {
+    width: 40px; height: 40px; border-radius: 10px;
+    background: linear-gradient(135deg, #2a1810, #4a2a1c);
+    border: 1px solid rgba(212,168,87,0.40);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-cjk); font-weight: 700;
+    color: #d4a857; font-size: 18px;
+    line-height: 1;
+    box-shadow: 0 0 20px rgba(212,168,87,0.18);
+  }
+  .brand h1 {
+    margin: 0; font-family: var(--font-display); font-weight: 600;
+    font-size: 18px; letter-spacing: 0.04em;
+    color: #ecd9a8;
+  }
+  .brand p { margin: 0; font-size: 12px; color: rgba(232,216,179,0.55); font-style: italic; }
+
+  .hdr-actions { margin-left: auto; display: flex; gap: 8px; }
+  .icon-btn {
+    width: 36px; height: 36px; border-radius: 8px;
+    background: rgba(40,28,22,0.5); color: rgba(232,216,179,0.65);
+    border: 1px solid rgba(212,168,87,0.18);
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .icon-btn svg { width: 16px; height: 16px; }
+
+  /* Tabs row 1 — Tümü / Doğu / Ekran / Kütüphane */
+  .tabs { margin-top: 16px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .tab {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 9px 18px; border-radius: 8px;
+    font-family: var(--font-display); font-weight: 500;
+    font-size: 13.5px; letter-spacing: 0.02em;
+    background: rgba(40, 30, 25, 0.45);
+    color: rgba(232,216,179,0.55);
+    border: 1px solid rgba(212,168,87,0.10);
+    cursor: pointer;
+  }
+  .tab.active {
+    background: linear-gradient(180deg, rgba(56,38,28,0.85), rgba(40,28,22,0.85));
+    color: #ecd9a8;
+    border-color: rgba(212,168,87,0.45);
+    box-shadow: 0 0 0 1px rgba(212,168,87,0.15), 0 8px 24px -10px rgba(212,168,87,0.35);
+  }
+  .tab .kanji-mini { font-family: var(--font-cjk); font-weight: 700; font-size: 13px; line-height: 1; color: #d4a857; }
+
+  /* Sub-pills row 2 */
+  .sub-row { margin-top: 14px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .sub-rule { flex: 0 0 32px; height: 1px; background: linear-gradient(90deg, transparent, rgba(212,168,87,0.6), transparent); }
+  .sub {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 7px 14px; border-radius: 999px;
+    font-family: var(--font-display); font-size: 12.5px; font-weight: 500;
+    background: rgba(40, 30, 25, 0.6);
+    color: rgba(232,216,179,0.65);
+    border: 1px solid rgba(212,168,87,0.15);
+  }
+  .sub.active {
+    color: #ecd9a8;
+    background: linear-gradient(90deg, rgba(80,50,28,0.6), rgba(56,38,28,0.4));
+    border-color: rgba(212,168,87,0.50);
+    box-shadow: inset 0 0 0 1px rgba(212,168,87,0.12), 0 0 18px -4px rgba(212,168,87,0.25);
+  }
+  .sub svg { width: 14px; height: 14px; color: #d4a857; }
+
+  /* Hero strip (compact) */
+  .hero {
+    position: relative; height: 180px;
+    border-radius: 14px;
+    background:
+      radial-gradient(120% 90% at 80% 20%, rgba(180,90,50,0.30) 0%, transparent 60%),
+      radial-gradient(80% 70% at 15% 80%, rgba(40,20,30,0.7) 0%, transparent 55%),
+      linear-gradient(110deg, #0f0a08 0%, #1a0f0c 45%, #2b150f 100%);
+    overflow: hidden;
+    border: 1px solid rgba(212,168,87,0.30);
+    margin-bottom: 24px;
+  }
+  .hero::before, .hero::after {
+    content: ""; position: absolute; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(212,168,87,0.6), transparent);
+  }
+  .hero::before { top: 0; }
+  .hero::after  { bottom: 0; }
+  .hero .kanji-bg {
+    position: absolute; top: -24px; right: 24px;
+    font-family: var(--font-cjk); font-weight: 900; font-size: 200px; line-height: 1;
+    color: #d4a857; opacity: 0.10;
+    pointer-events: none; user-select: none;
+  }
+  .hero .thread { position: absolute; left: 40px; top: 22px; bottom: 22px; width: 1px;
+    background: linear-gradient(180deg, transparent, rgba(212,168,87,0.55) 30%, rgba(212,168,87,0.55) 70%, transparent); }
+  .hero .thread::before, .hero .thread::after {
+    content: ""; position: absolute; left: 50%; transform: translateX(-50%);
+    width: 5px; height: 5px; border-radius: 50%; background: #d4a857;
+  }
+  .hero .thread::before { top: -2px; } .hero .thread::after { bottom: -2px; }
+
+  .hero-content { position: relative; height: 100%; padding: 24px 32px 24px 70px;
+    display: flex; flex-direction: column; justify-content: center; gap: 4px; }
+  .eyebrow {
+    font-family: var(--font-display);
+    font-size: 11px; letter-spacing: 0.36em; text-transform: uppercase; color: #b88a3a;
+  }
+  .hero-title {
+    font-family: var(--font-display); font-weight: 600;
+    font-size: 36px; line-height: 1.05; color: #ecd9a8;
+    margin: 4px 0 6px;
+  }
+  .hero-title em { font-style: italic; color: #d4a857; font-weight: 500; }
+  .hero-sub { font-family: var(--font-display); font-style: italic; font-size: 14px; color: rgba(232,216,179,0.65); }
+  .hero-stats { margin-top: 12px; display: flex; gap: 26px; align-items: baseline; }
+  .hero-stats .n { font-family: var(--font-cjk); font-weight: 700; font-size: 22px; color: #d4a857; }
+  .hero-stats .l { font-family: var(--font-display); font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: rgba(232,216,179,0.50); }
+
+  /* Quick search result */
+  .qsearch {
+    display: flex; align-items: center; gap: 12px;
+    background: rgba(40,28,22,0.45);
+    border: 1px solid rgba(212,168,87,0.20);
+    border-radius: 10px;
+    padding: 10px 14px;
+    margin-bottom: 24px;
+  }
+  .qsearch svg { width: 14px; height: 14px; color: #d4a857; }
+  .qsearch input {
+    flex: 1; background: transparent; border: none; outline: none;
+    color: #ecd9a8; font: inherit; font-size: 14px; font-family: var(--font-display);
+  }
+  .qsearch input::placeholder { color: rgba(232,216,179,0.40); }
+  .qsearch .kbd {
+    font-family: var(--font-mono); font-size: 10px; color: rgba(232,216,179,0.55);
+    padding: 2px 6px; border-radius: 4px;
+    background: rgba(15,10,8,0.6); border: 1px solid rgba(212,168,87,0.20);
+  }
+  .qresult {
+    display: flex; align-items: center; gap: 12px;
+    background: linear-gradient(180deg, rgba(56,38,28,0.55), rgba(28,18,14,0.55));
+    border: 1px solid rgba(212,168,87,0.40);
+    box-shadow: 0 0 0 1px rgba(212,168,87,0.08), 0 8px 24px -8px rgba(0,0,0,0.6);
+    border-radius: 10px;
+    padding: 10px 14px 10px 12px;
+    margin-top: -8px;
+    margin-bottom: 28px;
+    position: relative;
+  }
+  .qresult::before {
+    content: ""; position: absolute; left: 0; right: 0; top: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(212,168,87,0.7), transparent);
+  }
+  .qresult .thumb {
+    width: 38px; height: 54px; border-radius: 3px;
+    background: linear-gradient(135deg, #1e1b4b, #312e81 60%, #d4a857);
+    box-shadow: 0 0 0 1px rgba(212,168,87,0.35);
+  }
+  .qresult .info { flex: 1; }
+  .qresult h4 { margin: 0; font-family: var(--font-display); font-weight: 600; font-size: 15px; color: #ecd9a8; }
+  .qresult .romaji { font-family: var(--font-cjk); font-size: 11px; color: #d4a857; }
+  .qresult .meta { font-family: var(--font-display); font-style: italic; font-size: 12px; color: rgba(232,216,179,0.55); margin-top: 2px; }
+
+  .badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-family: var(--font-display); font-weight: 500; letter-spacing: 0.04em;
+    font-size: 11px;
+    padding: 3px 10px; border-radius: 999px;
+    background: rgba(80,50,28,0.55); color: #ecd9a8;
+    border: 1px solid rgba(212,168,87,0.45);
+  }
+  .badge svg { width: 11px; height: 11px; color: #d4a857; }
+  .badge.gold {
+    background: linear-gradient(90deg, rgba(180,138,58,0.25), rgba(212,168,87,0.15));
+    color: #d4a857;
+  }
+
+  /* Section heading */
+  .section-head {
+    display: flex; align-items: center; gap: 14px;
+    margin-bottom: 16px; padding-bottom: 10px;
+    border-bottom: 1px solid rgba(212,168,87,0.15);
+  }
+  .section-head .kanji-mini {
+    font-family: var(--font-cjk); font-weight: 700; font-size: 16px; line-height: 1;
+    color: #d4a857; opacity: 0.75;
+  }
+  .section-head h2 { margin: 0; font-family: var(--font-display); font-weight: 600; font-size: 22px; letter-spacing: 0.02em; color: #ecd9a8; }
+  .section-head .count { font-family: var(--font-display); font-style: italic; font-size: 13px; color: rgba(232,216,179,0.50); }
+  .section-head .right { margin-left: auto; display: flex; gap: 6px; }
+  .seg {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-family: var(--font-display); font-size: 12px;
+    padding: 5px 11px; border-radius: 6px;
+    background: rgba(40,28,22,0.45); color: rgba(232,216,179,0.55);
+    border: 1px solid rgba(212,168,87,0.15);
+  }
+  .seg.active { color: #d4a857; border-color: rgba(212,168,87,0.45); background: rgba(56,38,28,0.6); }
+  .seg svg { width: 11px; height: 11px; }
+
+  /* MediaCard grid */
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 28px; }
+
+  .mc {
+    position: relative;
+    background: linear-gradient(180deg, rgba(40,28,22,0.55), rgba(28,18,14,0.55));
+    border: 1px solid rgba(212,168,87,0.22);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .mc::before {
+    content: ""; position: absolute; left: 0; right: 0; top: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(212,168,87,0.7), transparent);
+  }
+  .corner-tl, .corner-br { position: absolute; width: 12px; height: 12px; pointer-events: none; }
+  .corner-tl { top: 8px; left: 8px; border-top: 1px solid rgba(212,168,87,0.7); border-left: 1px solid rgba(212,168,87,0.7); }
+  .corner-br { bottom: 8px; right: 8px; border-bottom: 1px solid rgba(212,168,87,0.7); border-right: 1px solid rgba(212,168,87,0.7); }
+
+  .mc-body { display: flex; gap: 14px; padding: 16px; }
+  .cover {
+    width: 70px; height: 100px; border-radius: 4px;
+    background-size: cover; background-position: center;
+    box-shadow: 0 0 0 1px rgba(212,168,87,0.30), 0 8px 24px -8px rgba(0,0,0,0.6);
+    position: relative; flex: 0 0 auto;
+  }
+  .seal {
+    position: absolute; top: -6px; right: -6px;
+    width: 22px; height: 22px;
+    background: #b91c1c;
+    color: #fef3c7;
+    font-family: var(--font-cjk); font-weight: 700; font-size: 11px;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 0 0 1px rgba(212,168,87,0.5), 0 2px 8px rgba(0,0,0,0.4);
+    border-radius: 2px;
+  }
+  .mc-right { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+  .mc-right .romaji { font-family: var(--font-cjk); font-weight: 700; font-size: 11px; color: #d4a857; letter-spacing: 0.04em; }
+  .mc-right h3 { margin: 0; font-family: var(--font-display); font-weight: 600; font-size: 17px; line-height: 1.1; color: #ecd9a8; }
+  .badges-row { display: flex; gap: 6px; flex-wrap: wrap; }
+  .meta { font-family: var(--font-display); font-style: italic; font-size: 12px; color: rgba(232,216,179,0.55); }
+
+  .mc-progress { padding: 0 16px 12px; display: flex; flex-direction: column; gap: 6px; }
+  .mc-progress .row { display: flex; justify-content: space-between; font-family: var(--font-display); font-size: 12px; color: rgba(232,216,179,0.55); font-variant-numeric: tabular-nums; }
+  .mc-progress .row b { color: #d4a857; font-weight: 600; }
+  .bar { height: 3px; background: rgba(212,168,87,0.10); border-radius: 999px; overflow: hidden; }
+  .bar > i { display: block; height: 100%; background: linear-gradient(90deg, #b88a3a, #d4a857, #ecd9a8); border-radius: 999px; box-shadow: 0 0 6px rgba(212,168,87,0.45); }
+
+  .mc-foot { display: flex; border-top: 1px solid rgba(212,168,87,0.15); }
+  .mc-foot .btn {
+    flex: 1; padding: 10px; text-align: center;
+    color: rgba(232,216,179,0.65); font-family: var(--font-display); font-size: 12px; font-weight: 500; letter-spacing: 0.04em;
+  }
+  .mc-foot .btn + .btn { border-left: 1px solid rgba(212,168,87,0.15); }
+
+  /* Series group expanded */
+  .sg {
+    position: relative;
+    background: linear-gradient(180deg, rgba(60,40,28,0.45), rgba(28,18,14,0.55));
+    border: 1px solid rgba(212,168,87,0.35);
+    border-radius: 12px;
+    margin-bottom: 28px;
+  }
+  .sg::before, .sg::after {
+    content: ""; position: absolute; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(212,168,87,0.5), transparent);
+  }
+  .sg::before { top: 0; } .sg::after { bottom: 0; }
+  .sg-head { display: flex; gap: 16px; padding: 18px 20px 18px 32px; position: relative; }
+  .sg-head::before {
+    content: ""; position: absolute; left: 14px; top: 18px; bottom: 18px; width: 1px;
+    background: linear-gradient(180deg, transparent, rgba(212,168,87,0.7) 25%, rgba(212,168,87,0.7) 75%, transparent);
+  }
+  .sg-head .cover { width: 76px; height: 108px; }
+  .sg-body { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+  .sg-tag {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-family: var(--font-display); font-weight: 600;
+    font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.18em;
+    color: #d4a857;
+    padding: 2px 10px; border-radius: 4px;
+    background: rgba(80,50,28,0.55);
+    border: 1px solid rgba(212,168,87,0.45);
+    width: max-content;
+  }
+  .sg-body h3 { margin: 4px 0; font-family: var(--font-display); font-weight: 600; font-size: 22px; color: #ecd9a8; }
+  .sg-meta { font-family: var(--font-display); font-style: italic; font-size: 12.5px; color: rgba(232,216,179,0.60); display: flex; gap: 8px; flex-wrap: wrap; }
+  .sg-meta .ok { color: #d4a857; font-style: normal; font-weight: 600; }
+  .sg-meta .dot { color: rgba(212,168,87,0.30); }
+  .sg-progress { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
+  .sg-progress .bar { flex: 1; }
+  .sg-progress .pct { font-family: var(--font-display); font-size: 12px; color: #d4a857; font-variant-numeric: tabular-nums; }
+  .sg-chev { color: #d4a857; align-self: flex-start; padding-top: 6px; }
+
+  .sg-seasons { padding: 4px 20px 16px 32px; }
+  .sg-seasons-head {
+    font-family: var(--font-display); font-style: italic; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: rgba(232,216,179,0.45); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .sg-seasons-head::before, .sg-seasons-head::after {
+    content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, transparent, rgba(212,168,87,0.3), transparent);
+  }
+  .sg-seasons-list { display: flex; flex-direction: column; gap: 8px; }
+  .sg-season {
+    display: grid; grid-template-columns: 24px 1fr auto auto; gap: 12px; align-items: center;
+    padding: 10px 14px;
+    background: rgba(28,18,14,0.55);
+    border: 1px solid rgba(212,168,87,0.18);
+    border-radius: 8px;
+  }
+  .sg-season.active { border-color: rgba(212,168,87,0.50); background: rgba(56,38,28,0.55); }
+  .sg-season .num { font-family: var(--font-cjk); font-weight: 700; font-size: 13px; color: #d4a857; text-align: center; }
+  .sg-season .name { font-family: var(--font-display); font-size: 13px; color: #ecd9a8; }
+  .sg-season .name .sub { font-style: italic; color: rgba(232,216,179,0.50); margin-left: 6px; font-size: 11.5px; }
+  .sg-season .progress {
+    width: 140px; height: 3px; background: rgba(212,168,87,0.10); border-radius: 999px; overflow: hidden;
+  }
+  .sg-season .progress > i { display: block; height: 100%; background: linear-gradient(90deg, #b88a3a, #d4a857); border-radius: 999px; }
+  .sg-season .pct { font-family: var(--font-display); font-size: 11.5px; color: rgba(212,168,87,0.85); font-variant-numeric: tabular-nums; min-width: 32px; text-align: right; }
+
+  /* ================= DEV HANDOFF ================= */
+  .handoff { padding: 56px 40px 80px; }
+  .handoff h1 {
+    font-family: var(--font-display); font-weight: 600; font-size: 32px; color: #ecd9a8;
+    margin: 0 0 6px; letter-spacing: 0.02em;
+  }
+  .handoff .sub {
+    font-family: var(--font-display); font-style: italic; font-size: 14px;
+    color: rgba(232,216,179,0.55); margin-bottom: 32px;
+  }
+  .h-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  .h-card {
+    background: rgba(15,10,8,0.55);
+    border: 1px solid rgba(212,168,87,0.18);
+    border-radius: 12px;
+    padding: 22px 24px;
+  }
+  .h-card.full { grid-column: 1 / -1; }
+  .h-card h3 {
+    margin: 0 0 14px;
+    font-family: var(--font-display); font-weight: 600; font-size: 16px;
+    color: #d4a857; letter-spacing: 0.06em; text-transform: uppercase;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .h-card h3::after {
+    content: ""; flex: 1; height: 1px;
+    background: linear-gradient(90deg, rgba(212,168,87,0.3), transparent);
+  }
+  .h-card p, .h-card li { font-family: var(--font-sans); color: rgba(232,216,179,0.80); font-size: 13.5px; line-height: 1.55; }
+  .h-card ul { margin: 0; padding-left: 18px; }
+  .h-card li { margin-bottom: 8px; }
+  .h-card code {
+    font-family: var(--font-mono); font-size: 12px;
+    background: rgba(40,28,22,0.6);
+    color: #d4a857;
+    padding: 1px 6px; border-radius: 4px;
+    border: 1px solid rgba(212,168,87,0.18);
+  }
+  .h-card .row { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-top: 1px solid rgba(212,168,87,0.10); }
+  .h-card .row:first-of-type { border-top: none; }
+  .h-card .swatch { width: 28px; height: 28px; border-radius: 6px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.05); flex: 0 0 auto; }
+  .h-card .swatch-name { font-family: var(--font-mono); font-size: 12px; color: #ecd9a8; min-width: 130px; }
+  .h-card .swatch-val { font-family: var(--font-mono); font-size: 11px; color: rgba(232,216,179,0.55); flex: 1; }
+  .h-card .swatch-role { font-family: var(--font-display); font-style: italic; font-size: 12px; color: rgba(232,216,179,0.50); }
+
+  .pill-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+  .pill-row .p {
+    font-family: var(--font-mono); font-size: 11px;
+    padding: 3px 8px; border-radius: 4px;
+    background: rgba(40,28,22,0.55); color: #ecd9a8;
+    border: 1px solid rgba(212,168,87,0.18);
+  }
+
+  /* Phase columns */
+  .phase {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 6px;
+  }
+  .phase-col {
+    border: 1px solid rgba(212,168,87,0.20);
+    border-radius: 10px; padding: 14px 16px;
+    background: rgba(28,18,14,0.45);
+  }
+  .phase-col h4 {
+    margin: 0 0 8px; font-family: var(--font-display); font-weight: 600;
+    font-size: 14px; color: #d4a857; letter-spacing: 0.04em;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .phase-col h4 .badge-mini {
+    font-family: var(--font-mono); font-size: 9.5px;
+    padding: 2px 7px; border-radius: 999px;
+    background: linear-gradient(90deg, rgba(180,138,58,0.30), rgba(212,168,87,0.10));
+    color: #d4a857; letter-spacing: 0.18em;
+  }
+  .phase-col ul { margin: 0; padding-left: 16px; }
+  .phase-col li { font-size: 13px; color: rgba(232,216,179,0.85); margin-bottom: 6px; }
+
+  /* Anim card */
+  .anim-table {
+    display: grid; grid-template-columns: 200px 1fr 180px; gap: 10px 16px;
+    align-items: baseline;
+    font-size: 13px;
+    margin-top: 4px;
+  }
+  .anim-table .h {
+    font-family: var(--font-mono); font-size: 10px; color: rgba(212,168,87,0.65);
+    text-transform: uppercase; letter-spacing: 0.10em;
+    padding-bottom: 4px; border-bottom: 1px solid rgba(212,168,87,0.18);
+  }
+  .anim-table .name {
+    font-family: var(--font-display); font-weight: 600; font-size: 13.5px; color: #ecd9a8;
+  }
+  .anim-table .desc { color: rgba(232,216,179,0.75); line-height: 1.5; }
+  .anim-table .spec { font-family: var(--font-mono); font-size: 11.5px; color: #d4a857; }
+
+  /* Footer note */
+  .footer-note {
+    margin-top: 36px; padding: 16px 18px;
+    border-radius: 10px;
+    background: rgba(40,28,22,0.35);
+    border: 1px solid rgba(212,168,87,0.20);
+    font-family: var(--font-display); font-style: italic; font-size: 13px;
+    color: rgba(232,216,179,0.70); line-height: 1.55;
+  }
+</style>
+</head>
+<body>
+<div class="doc">
+
+  <!-- =================================================
+       STAGE — Doğu Kütüphanem screen
+       ================================================= -->
+  <section class="stage">
+    <div class="stage-tag">V5A · DOĞU · KÜTÜPHANEM</div>
+
+    <!-- Header preserved: same row, theme tabs replace nav -->
+    <div class="hdr">
+      <div class="hdr-row">
+        <div class="logo">東</div>
+        <div class="brand">
+          <h1>MediaTracker · 東方</h1>
+          <p>Yol uzundur, kılıç keskindir.</p>
+        </div>
+        <div class="hdr-actions">
+          <span class="icon-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 1112 0c0 7 3 8 3 8H3s3-1 3-8zM10 21a2 2 0 004 0"/></svg></span>
+          <span class="icon-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 00-.1-1.2l2-1.5-2-3.5-2.4.9a7 7 0 00-2-1.2L14 3h-4l-.5 2.5a7 7 0 00-2 1.2L5.1 5.8l-2 3.5 2 1.5A7 7 0 005 12c0 .4 0 .8.1 1.2l-2 1.5 2 3.5 2.4-.9c.6.5 1.3.9 2 1.2L10 21h4l.5-2.5c.7-.3 1.4-.7 2-1.2l2.4.9 2-3.5-2-1.5c.1-.4.1-.8.1-1.2z"/></svg></span>
+        </div>
+      </div>
+      <!-- Main theme tabs -->
+      <div class="tabs">
+        <span class="tab">Tümü</span>
+        <span class="tab active"><span class="kanji-mini">東</span> Doğu</span>
+        <span class="tab">Ekran</span>
+        <span class="tab">Kütüphane</span>
+      </div>
+      <!-- Doğu sub-pills -->
+      <div class="sub-row">
+        <span class="sub-rule"></span>
+        <span class="sub active">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 21L19 5"/><path d="M19 5l2 2-2 2"/><path d="M5 19l-1 1" stroke-width="2.6"/><path d="M9 15l1.5 1.5" opacity="0.5"/></svg>
+          Anime
+        </span>
+        <span class="sub">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 3a4.5 4.5 0 010 9 4.5 4.5 0 000 9" fill="currentColor" stroke="none"/><circle cx="12" cy="7.5" r="1" fill="#1a120c" stroke="none"/><circle cx="12" cy="16.5" r="1" fill="currentColor" stroke="none"/></svg>
+          Manga
+        </span>
+        <span class="sub">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19c2-3 6-4 9-2 2 1 3 0 5-3"/><path d="M14 5l4 4-2 2-4-4z"/><path d="M12 7l-7 7v3h3l7-7"/></svg>
+          Novel
+        </span>
+        <span class="sub-rule"></span>
+      </div>
+    </div>
+
+    <!-- Hero strip (compact) -->
+    <div class="hero">
+      <span class="kanji-bg">剣</span>
+      <span class="thread"></span>
+      <div class="hero-content">
+        <div class="eyebrow">DOĞU · アニメ · KÜTÜPHANEM</div>
+        <div class="hero-title">Kılıcın izinde, <em>kareleyin.</em></div>
+        <div class="hero-sub">Bir bıçak vuruşu kadar net. Anime koleksiyonun, kareler hâlinde.</div>
+        <div class="hero-stats">
+          <div><span class="n">42</span> <span class="l">ANİME</span></div>
+          <div><span class="n">14</span> <span class="l">DEVAM</span></div>
+          <div><span class="n">26</span> <span class="l">TAMAMLANAN</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick search + result -->
+    <div class="qsearch">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+      <input value="frieren" />
+      <span class="kbd">⌘K</span>
+    </div>
+    <div class="qresult">
+      <div class="thumb"></div>
+      <div class="info">
+        <div class="romaji">フリーレン</div>
+        <h4>Frieren: Beyond Journey's End</h4>
+        <div class="meta">2023 · 28 bölüm · TV · 2. Sezon</div>
+      </div>
+      <span class="badge gold">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 21L19 5"/><path d="M19 5l2 2-2 2"/></svg>
+        Doğu · Anime
+      </span>
+      <span class="badge"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.9 6.3 6.9.7-5.2 4.7 1.6 6.8L12 17l-6.2 3.5 1.6-6.8L2.2 9l6.9-.7z"/></svg> 9.4</span>
+    </div>
+
+    <!-- Section: Devam Ettiklerim -->
+    <div class="section-head">
+      <span class="kanji-mini">剣</span>
+      <h2>Devam Ettiklerim</h2>
+      <span class="count">— 4 eser</span>
+      <span class="right">
+        <span class="seg active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg> Izgara</span>
+        <span class="seg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg> Liste</span>
+      </span>
+    </div>
+
+    <!-- MediaCard grid -->
+    <div class="grid">
+      <!-- Card 1: Frieren -->
+      <div class="mc">
+        <span class="corner-tl"></span><span class="corner-br"></span>
+        <div class="mc-body">
+          <div class="cover" style="background:linear-gradient(135deg,#1e1b4b,#312e81 60%,#d4a857);">
+            <span class="seal">東</span>
+          </div>
+          <div class="mc-right">
+            <div class="romaji">フリーレン</div>
+            <h3>Frieren: Yolculuğun Sonu</h3>
+            <div class="badges-row">
+              <span class="badge gold">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 21L19 5"/><path d="M19 5l2 2-2 2"/></svg>
+                Doğu · Anime
+              </span>
+              <span class="badge"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.9 6.3 6.9.7-5.2 4.7 1.6 6.8L12 17l-6.2 3.5 1.6-6.8L2.2 9l6.9-.7z"/></svg> 9.4</span>
+            </div>
+            <div class="meta">2. Sezon · Drama · Fantasy</div>
+          </div>
+        </div>
+        <div class="mc-progress">
+          <div class="row"><span><b>14</b> / 28 bölüm</span><span>50%</span></div>
+          <div class="bar"><i style="width:50%"></i></div>
+        </div>
+        <div class="mc-foot"><span class="btn">+ İlerle</span><span class="btn">✓ Tamamla</span></div>
+      </div>
+
+      <!-- Card 2: Vinland Saga -->
+      <div class="mc">
+        <span class="corner-tl"></span><span class="corner-br"></span>
+        <div class="mc-body">
+          <div class="cover" style="background:linear-gradient(135deg,#422006,#7c2d12 60%,#d4a857);">
+            <span class="seal">航</span>
+          </div>
+          <div class="mc-right">
+            <div class="romaji">ヴィンランド・サガ</div>
+            <h3>Vinland Saga</h3>
+            <div class="badges-row">
+              <span class="badge gold">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 21L19 5"/><path d="M19 5l2 2-2 2"/></svg>
+                Doğu · Anime
+              </span>
+              <span class="badge">2. Sezon</span>
+            </div>
+            <div class="meta">Devam ediyor · Historical · Drama</div>
+          </div>
+        </div>
+        <div class="mc-progress">
+          <div class="row"><span><b>17</b> / 24 bölüm</span><span>71%</span></div>
+          <div class="bar"><i style="width:71%"></i></div>
+        </div>
+        <div class="mc-foot"><span class="btn">+ İlerle</span><span class="btn">✓ Tamamla</span></div>
+      </div>
+
+      <!-- Card 3: HxH -->
+      <div class="mc">
+        <span class="corner-tl"></span><span class="corner-br"></span>
+        <div class="mc-body">
+          <div class="cover" style="background:linear-gradient(135deg,#052e16,#166534 60%,#fde68a);">
+            <span class="seal">狩</span>
+          </div>
+          <div class="mc-right">
+            <div class="romaji">ハンターハンター</div>
+            <h3>Hunter × Hunter</h3>
+            <div class="badges-row">
+              <span class="badge gold">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 21L19 5"/><path d="M19 5l2 2-2 2"/></svg>
+                Doğu · Anime
+              </span>
+              <span class="badge"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.9 6.3 6.9.7-5.2 4.7 1.6 6.8L12 17l-6.2 3.5 1.6-6.8L2.2 9l6.9-.7z"/></svg> 9.0</span>
+            </div>
+            <div class="meta">Tamamlandı · Adventure</div>
+          </div>
+        </div>
+        <div class="mc-progress">
+          <div class="row"><span><b>148</b> / 148 bölüm</span><span>100%</span></div>
+          <div class="bar"><i style="width:100%"></i></div>
+        </div>
+        <div class="mc-foot"><span class="btn">↻ Yeniden İzle</span><span class="btn">★ Favorile</span></div>
+      </div>
+    </div>
+
+    <!-- Series group expanded -->
+    <div class="section-head">
+      <span class="kanji-mini">巻</span>
+      <h2>Seri Koleksiyonlarım</h2>
+      <span class="count">— 1 seri açık</span>
+    </div>
+    <div class="sg">
+      <div class="sg-head">
+        <div class="cover" style="background:linear-gradient(135deg,#292524,#57534e 50%,#b45309);">
+          <span class="seal">進</span>
+        </div>
+        <div class="sg-body">
+          <div class="sg-tag">SERİ · 4 SEZON</div>
+          <h3>Attack on Titan · 進撃の巨人</h3>
+          <div class="sg-meta">
+            <span><span class="ok">3</span> tamamlandı</span><span class="dot">·</span>
+            <span>Devam: <span class="ok">Final Sezon</span> Bölüm 24/28</span><span class="dot">·</span>
+            <span>87 bölüm toplam</span>
+          </div>
+          <div class="sg-progress">
+            <div class="bar"><i style="width:88%"></i></div>
+            <span class="pct">88%</span>
+          </div>
+        </div>
+        <div class="sg-chev">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 15l6-6 6 6"/></svg>
+        </div>
+      </div>
+      <div class="sg-seasons">
+        <div class="sg-seasons-head">SEZONLAR · 季節</div>
+        <div class="sg-seasons-list">
+          <div class="sg-season">
+            <span class="num">一</span>
+            <span class="name">Sezon 1 <span class="sub">Yeni Başlayanlar / 25 bölüm</span></span>
+            <span class="progress"><i style="width:100%"></i></span>
+            <span class="pct">100%</span>
+          </div>
+          <div class="sg-season">
+            <span class="num">二</span>
+            <span class="name">Sezon 2 <span class="sub">12 bölüm</span></span>
+            <span class="progress"><i style="width:100%"></i></span>
+            <span class="pct">100%</span>
+          </div>
+          <div class="sg-season">
+            <span class="num">三</span>
+            <span class="name">Sezon 3 <span class="sub">22 bölüm</span></span>
+            <span class="progress"><i style="width:100%"></i></span>
+            <span class="pct">100%</span>
+          </div>
+          <div class="sg-season active">
+            <span class="num">四</span>
+            <span class="name">Final Sezon <span class="sub">28 bölüm · devam ediyor</span></span>
+            <span class="progress"><i style="width:86%"></i></span>
+            <span class="pct">86%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- =================================================
+       DEV HANDOFF
+       ================================================= -->
+  <section class="handoff">
+    <h1>V5A — Developer handoff</h1>
+    <div class="sub">Doğu / Eastern theme. Component logic preserved; visual layer themed via tokens + a `[data-theme="dogu"]` scope.</div>
+
+    <div class="h-grid">
+
+      <!-- Components -->
+      <div class="h-card">
+        <h3>Components touched</h3>
+        <ul>
+          <li><code>&lt;ThemeTabs /&gt;</code> — new. Tümü / Doğu / Ekran / Kütüphane. Renders inside the existing `&lt;Header /&gt;` row, replacing the section nav for theme-mode views.</li>
+          <li><code>&lt;DoguSubTabs /&gt;</code> — new. Anime · Manga · Novel sub-pills. Conditionally rendered when active theme is <code>dogu</code>.</li>
+          <li><code>&lt;DoguHero /&gt;</code> — new. Compact (180px) cinematic strip. Props: <code>activeSub</code>, <code>counts</code>.</li>
+          <li><code>&lt;MediaCard /&gt;</code> — variant only. Same props/state. New visual via <code>[data-theme="dogu"] .media-card</code>.</li>
+          <li><code>&lt;SeriesGroupCard /&gt;</code> — variant only. Adds <code>&lt;SeasonRow /&gt;</code> children for the expanded state.</li>
+          <li><code>&lt;Badge /&gt;</code> — adds <code>variant="dogu-gold"</code> and <code>variant="dogu-neutral"</code>.</li>
+          <li><code>&lt;QuickSearchResult /&gt;</code> — new. Used by the existing Quick Search dropdown when a Doğu match is selected.</li>
+          <li><code>&lt;ThemeProvider /&gt;</code> — sets <code>document.documentElement.dataset.theme</code>. Persists in <code>localStorage</code>.</li>
+        </ul>
+      </div>
+
+      <!-- Colors -->
+      <div class="h-card">
+        <h3>Colors · Doğu palette</h3>
+        <div class="row"><span class="swatch" style="background:#0a0606"></span><span class="swatch-name">--dogu-ink</span><span class="swatch-val">#0a0606</span><span class="swatch-role">deepest dark</span></div>
+        <div class="row"><span class="swatch" style="background:oklch(0.13 0.03 20)"></span><span class="swatch-name">--dogu-bg-2</span><span class="swatch-val">oklch(0.13 0.03 20)</span><span class="swatch-role">page bg shadow</span></div>
+        <div class="row"><span class="swatch" style="background:oklch(0.18 0.04 25)"></span><span class="swatch-name">--dogu-bg-1</span><span class="swatch-val">oklch(0.18 0.04 25)</span><span class="swatch-role">page bg warm</span></div>
+        <div class="row"><span class="swatch" style="background:#d4a857"></span><span class="swatch-name">--dogu-gold</span><span class="swatch-val">#d4a857</span><span class="swatch-role">accent · type</span></div>
+        <div class="row"><span class="swatch" style="background:#b88a3a"></span><span class="swatch-name">--dogu-gold-soft</span><span class="swatch-val">#b88a3a</span><span class="swatch-role">eyebrow · resting</span></div>
+        <div class="row"><span class="swatch" style="background:#e8d8b3"></span><span class="swatch-name">--dogu-parchment</span><span class="swatch-val">#e8d8b3</span><span class="swatch-role">primary fg</span></div>
+        <div class="row"><span class="swatch" style="background:#a8202d"></span><span class="swatch-name">--dogu-crimson</span><span class="swatch-val">#a8202d</span><span class="swatch-role">seal only</span></div>
+        <div class="row"><span class="swatch" style="background:#f4a8b8"></span><span class="swatch-name">--dogu-sakura</span><span class="swatch-val">#f4a8b8</span><span class="swatch-role">decorative · rare</span></div>
+      </div>
+
+      <!-- Spacing & radii -->
+      <div class="h-card">
+        <h3>Spacing &amp; radii</h3>
+        <p style="margin-top:0;">Tailwind 4-px grid preserved. Doğu cards use the smaller radius scale to feel more "printed":</p>
+        <div class="pill-row">
+          <span class="p">card · 10px (vs 16px base)</span>
+          <span class="p">cover · 4px (vs 12px base)</span>
+          <span class="p">seal · 2px</span>
+          <span class="p">badge · 999px</span>
+        </div>
+        <p style="margin-top:14px;"><b style="color:#d4a857;">Section rhythm:</b></p>
+        <div class="pill-row">
+          <span class="p">hero ↔ qsearch · 24px</span>
+          <span class="p">qsearch ↔ result · 8px (overlap)</span>
+          <span class="p">section gap · 28px</span>
+          <span class="p">card grid gap · 16px</span>
+        </div>
+      </div>
+
+      <!-- Tailwind classes -->
+      <div class="h-card">
+        <h3>Tailwind suggestions</h3>
+        <p style="margin-top:0;">Add to <code>tailwind.config.ts</code> under <code>theme.extend</code>:</p>
+        <div class="pill-row">
+          <span class="p">colors.dogu.gold = "#d4a857"</span>
+          <span class="p">colors.dogu.parchment = "#e8d8b3"</span>
+          <span class="p">colors.dogu.crimson = "#a8202d"</span>
+          <span class="p">fontFamily.serif = "Cormorant Garamond"</span>
+          <span class="p">fontFamily.cjk = "Noto Serif JP"</span>
+        </div>
+        <p style="margin-top:14px;"><b style="color:#d4a857;">Recipe — Doğu MediaCard:</b></p>
+        <div class="pill-row" style="font-family:var(--font-mono); font-size:11px;">
+          <span class="p">relative rounded-[10px] border border-dogu-gold/20 bg-gradient-to-b from-amber-950/40 to-stone-950/55</span>
+        </div>
+        <p style="margin-top:10px;"><b style="color:#d4a857;">Gold rule (top hairline):</b></p>
+        <div class="pill-row" style="font-family:var(--font-mono); font-size:11px;">
+          <span class="p">before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-dogu-gold/70 before:to-transparent</span>
+        </div>
+        <p style="margin-top:10px;"><b style="color:#d4a857;">Theme scope:</b> all rules live under <code>[data-theme="dogu"] …</code> so the base shell ships untouched.</p>
+      </div>
+
+      <!-- Micro-animations -->
+      <div class="h-card full">
+        <h3>Micro-animations</h3>
+        <div class="anim-table">
+          <span class="h">Animation</span><span class="h">What happens</span><span class="h">Duration / easing</span>
+
+          <span class="name">Katana glint</span>
+          <span class="desc">On theme-tab → Doğu activate, a 1px gold sheen sweeps left→right across the active tab. Triggered once per session.</span>
+          <span class="spec">380ms · cubic-bezier(.2,.8,.2,1)</span>
+
+          <span class="name">Sub-tab ink draw</span>
+          <span class="desc">When switching Anime ↔ Manga ↔ Novel, the bottom hairline of the active pill animates from the previous pill's center to the new one's center.</span>
+          <span class="spec">300ms · ease-in-out</span>
+
+          <span class="name">Hero kanji breathe</span>
+          <span class="desc">Background kanji opacity oscillates 0.08 ↔ 0.12 on a long loop. Pause on <code>prefers-reduced-motion</code>.</span>
+          <span class="spec">6s loop · ease-in-out</span>
+
+          <span class="name">Card corner reveal</span>
+          <span class="desc">Hover: TL / BR gold corner brackets fade from 0.4 → 1.0 and grow from 8px → 12px. Border lifts to gold/50.</span>
+          <span class="spec">240ms · ease-out</span>
+
+          <span class="name">Progress fill</span>
+          <span class="desc">3-stop gold gradient slides in left→right when value changes; 4px outer glow ramps up briefly then settles.</span>
+          <span class="spec">600ms width · 320ms glow</span>
+
+          <span class="name">Seal stamp</span>
+          <span class="desc">When a card flips to "Tamamlandı", the crimson 印 seal scales from 0.6 → 1 with a 2° rotation, settling once.</span>
+          <span class="spec">280ms · cubic-bezier(.34,1.56,.64,1)</span>
+
+          <span class="name">Series row expand</span>
+          <span class="desc">Chev rotates 0 → 180°, season list slides + fades down with a 30ms stagger per row.</span>
+          <span class="spec">220ms chev · 280ms list</span>
+
+          <span class="name">Quick search match</span>
+          <span class="desc">Result card top hairline draws left→right (clip-path inset) as it appears, like ink hitting parchment.</span>
+          <span class="spec">320ms · cubic-bezier(.2,.8,.2,1)</span>
+        </div>
+      </div>
+
+      <!-- Phase split -->
+      <div class="h-card full">
+        <h3>V5A vs V5B — what ships when</h3>
+        <div class="phase">
+          <div class="phase-col">
+            <h4>V5A — visual + foundations <span class="badge-mini">SHIP NOW</span></h4>
+            <ul>
+              <li>Token layer: <code>--dogu-*</code> vars, <code>[data-theme="dogu"]</code> scope, ThemeProvider + persistence.</li>
+              <li>Header theme tabs (Tümü / Doğu / Ekran / Kütüphane).</li>
+              <li>Doğu sub-pills (Anime / Manga / Novel) with motif glyphs.</li>
+              <li>Compact DoguHero strip (single layout, kanji per sub).</li>
+              <li>MediaCard Doğu skin (corner brackets, gold rule, 印 seal, 3-stop progress).</li>
+              <li>Quick Search result Doğu badge.</li>
+              <li>Static micro-animations: corner reveal, progress fill, seal stamp.</li>
+              <li>Cormorant Garamond + Noto Serif JP loaded as Google Fonts (substitute, flagged).</li>
+            </ul>
+          </div>
+          <div class="phase-col">
+            <h4>V5B — motion + depth <span class="badge-mini">NEXT</span></h4>
+            <ul>
+              <li>SeriesGroup expanded view animations (chev rotate, season stagger).</li>
+              <li>Katana glint sweep on theme activation.</li>
+              <li>Sub-tab ink-draw transition.</li>
+              <li>Hero kanji breathe loop.</li>
+              <li>Quick Search ink-draw appearance.</li>
+              <li>Brand-supplied display + CJK fonts replace Google Fonts.</li>
+              <li>Two further themes scaffolded on the same token contract: <i>Batı</i> and <i>Sayfa</i> (placeholder names).</li>
+              <li>Doğu treatments for Stats grid, AI Danışman cards, Activity timeline.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="footer-note">
+          <b>Out of scope for both V5A and V5B:</b> redesigning the app shell, replacing the routing model, changing the offline-first data layer, or touching the existing component <i>logic</i>. Doğu is purely a token + variant skin over the components you already ship.
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+</div>
+</body>
+</html>

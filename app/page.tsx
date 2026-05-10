@@ -14,7 +14,8 @@ import { useState, useMemo, useEffect, useCallback } from "react";
 import AppHeader from "@/components/app-header";
 import { TabType } from "@/components/app-tabs";
 import ActivityLogPanel from "@/components/activity-log-panel";
-import MediaFilters from "@/components/media-filters";
+import MediaFilters, { type ThemeFilter, type EastSubFilter } from "@/components/media-filters";
+import EastThemeHeader from "@/components/east-theme-header";
 import MediaCard from "@/components/media-card";
 import SeriesGroupCard from "@/components/series-group-card";
 import MediaModal from "@/components/media-modal";
@@ -85,6 +86,35 @@ export default function HomePage() {
   const [typeFilter, setTypeFilter] = useState<MediaType | "all">("all");
   // Seçili durum filtresi
   const [statusFilter, setStatusFilter] = useState<MediaStatus | "active" | "all">("all");
+  // V5A.1: Üst seviye theme mode filtresi (Tümü / Doğu / Ekran / Kütüphane)
+  const [themeFilter, setThemeFilter] = useState<ThemeFilter>("all");
+  // V5A.1: Doğu seçiliyken aktif alt filtre (Tümü / Anime / Manga / Novel)
+  const [eastSubFilter, setEastSubFilter] = useState<EastSubFilter>("all");
+
+  // V5A.1/V5A.2: Theme mode değişince bağımlı filtreleri tutarlı tut.
+  // - Doğu dışına çıkılırsa eastSubFilter "all"a düşer (anlamı kalmaz).
+  // - typeFilter, yeni theme altında MediaFilters'da görünmeyecek bir değere
+  //   sabitlenmiş olabilir (örn. theme=screen, typeFilter="anime"). Bu durumda
+  //   "all"a sıfırlanır; aksi halde kullanıcı artık değiştiremediği bir filtreyle
+  //   boş listeye bakar.
+  const handleThemeFilterChange = (next: ThemeFilter) => {
+    setThemeFilter(next);
+    if (next !== "east") {
+      setEastSubFilter("all");
+    }
+    if (next === "east") {
+      // Doğu aktifken Medya Türü bloğu zaten gizli; tutarlılık için reset.
+      setTypeFilter("all");
+    } else if (next === "screen") {
+      if (typeFilter !== "all" && typeFilter !== "movie" && typeFilter !== "tv") {
+        setTypeFilter("all");
+      }
+    } else if (next === "library") {
+      if (typeFilter !== "all" && typeFilter !== "book") {
+        setTypeFilter("all");
+      }
+    }
+  };
 
   // Gelişmiş aramaları (eski panelleri) gösterme durumu
   const [showAdvancedSearches, setShowAdvancedSearches] = useState(false);
@@ -1159,9 +1189,35 @@ export default function HomePage() {
         matchesStatus = item.status === statusFilter;
       }
 
-      return matchesSearch && matchesType && matchesStatus;
+      // V5A.1: Theme mode + Doğu alt filtresi.
+      // Eski item'larda theme/mediaType eksik olabilir; classification akışını
+      // bozmamak için withMediaClassification ile fallback değerleri okuyoruz.
+      let matchesTheme = true;
+      if (themeFilter !== "all") {
+        const cls = withMediaClassification(item);
+        if (themeFilter === "east") {
+          // Doğu kapsamı: anime + manga + novel mediaType'ları.
+          // (serialized_novel/light_novel/visual_novel/web_novel hepsi mediaType="novel".)
+          const isEast =
+            cls.mediaType === "anime" ||
+            cls.mediaType === "manga" ||
+            cls.mediaType === "novel";
+          if (!isEast) {
+            matchesTheme = false;
+          } else if (eastSubFilter !== "all") {
+            matchesTheme = cls.mediaType === eastSubFilter;
+          }
+        } else if (themeFilter === "screen") {
+          matchesTheme = cls.mediaType === "tv" || cls.mediaType === "movie";
+        } else if (themeFilter === "library") {
+          // Kütüphane sadece kitap ailesi; novel'lar Doğu altına düştüğü için burada yok.
+          matchesTheme = cls.mediaType === "book";
+        }
+      }
+
+      return matchesSearch && matchesType && matchesStatus && matchesTheme;
     });
-  }, [mediaList, searchQuery, typeFilter, statusFilter]);
+  }, [mediaList, searchQuery, typeFilter, statusFilter, themeFilter, eastSubFilter]);
 
   // ---- İSTATİSTİKLER ----
   const dashboardStats = useMemo(() => {
@@ -1223,10 +1279,20 @@ export default function HomePage() {
               </button>
             </div>
 
+            {/* V5A.2: Doğu seçiliyken kompakt theme header — alt filtre burada */}
+            {themeFilter === "east" && (
+              <EastThemeHeader
+                activeSub={eastSubFilter}
+                onChangeSub={setEastSubFilter}
+              />
+            )}
+
             {/* Filtreler */}
             <MediaFilters
+              activeTheme={themeFilter}
               activeType={typeFilter}
               activeStatus={statusFilter}
+              onThemeChange={handleThemeFilterChange}
               onTypeChange={setTypeFilter}
               onStatusChange={setStatusFilter}
             />
