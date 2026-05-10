@@ -88,11 +88,14 @@ export function getAniListMediaType(media: AniListRawMedia): AniListMediaType {
  * Anime için:
  *   - episodes varsa → episodes
  *   - episodes yoksa ama nextAiringEpisode varsa → episode - 1 (şimdiye kadar yayınlanan)
- *   - hiçbiri yoksa → 1 (fallback)
+ *   - hiçbiri yoksa → 0 (BİLİNMİYOR — UI bunu "??" olarak gösterir)
  *
  * Manga/Manhwa/Manhua için:
  *   - chapters varsa → chapters
- *   - yoksa → 1 (fallback)
+ *   - yoksa → 0 (BİLİNMİYOR)
+ *
+ * NOT: Sahte 1 fallback kaldırıldı. UI ve handleIncrement total === 0 durumunu
+ * "bilinmeyen toplam" olarak ele alır; kullanıcı yine +1 ile takip edebilir.
  */
 export function getAniListTotalProgress(media: AniListRawMedia): number {
   if (media.type === "ANIME") {
@@ -100,12 +103,12 @@ export function getAniListTotalProgress(media: AniListRawMedia): number {
     if (media.nextAiringEpisode?.episode && media.nextAiringEpisode.episode > 1) {
       return media.nextAiringEpisode.episode - 1;
     }
-    return 1;
+    return 0;
   }
 
   // MANGA, MANHWA, MANHUA
   if (media.chapters && media.chapters > 0) return media.chapters;
-  return 1;
+  return 0;
 }
 
 /**

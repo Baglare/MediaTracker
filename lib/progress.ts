@@ -2,7 +2,30 @@
 // İlerleme (Progress) Yardımcı Fonksiyonları
 // ============================================
 
-import { MediaType } from "./types";
+import { MediaItem, MediaType } from "./types";
+
+/**
+ * "Film gibi" davranan içerikler:
+ * - Saf film (type="movie")
+ * - AniList üzerinden "MOVIE" formatlı animeler (type="anime", format="MOVIE")
+ *
+ * UI bu içerikleri için bölüm/dakika progress göstermez; ana aksiyon
+ * "İzlendi Olarak İşaretle" olur.
+ */
+export function isMovieLike(
+  item: Pick<MediaItem, "type" | "format" | "externalSource">
+): boolean {
+  if (item.type === "movie") return true;
+  if (
+    item.type === "anime" &&
+    item.externalSource === "anilist" &&
+    typeof item.format === "string" &&
+    item.format.toUpperCase() === "MOVIE"
+  ) {
+    return true;
+  }
+  return false;
+}
 
 /**
  * Medya türüne göre ilerleme biriminin etiketini döndürür.
@@ -17,11 +40,11 @@ export function getProgressLabel(type: MediaType): string {
     case "anime":
       return "bölüm";      // Anime için bölüm
     case "manga":
-      return "chapter";    // Manga için chapter
+      return "bölüm";      // Manga için bölüm
     case "manhwa":
-      return "chapter";    // Manhwa için chapter
+      return "bölüm";      // Manhwa için bölüm
     case "manhua":
-      return "chapter";    // Manhua için chapter
+      return "bölüm";      // Manhua için bölüm
     case "book":
       return "sayfa";      // Kitap için sayfa
     default:
@@ -80,11 +103,11 @@ export function getIncrementLabel(type: MediaType): string {
     case "anime":
       return "+1 bölüm";
     case "manga":
-      return "+1 chapter";
+      return "+1 bölüm";
     case "manhwa":
-      return "+1 chapter";
+      return "+1 bölüm";
     case "manhua":
-      return "+1 chapter";
+      return "+1 bölüm";
     case "book":
       return "+10 sayfa";
     default:

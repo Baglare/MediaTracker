@@ -132,7 +132,7 @@ export default function AniListResultCard({
           )}
           {result.type !== "anime" && result.chapters && (
             <span className="text-[10px] text-zinc-500">
-              {result.chapters} chapter
+              {result.chapters} bölüm
             </span>
           )}
           {result.type !== "anime" && result.volumes && (

@@ -26,11 +26,10 @@ function getProgressLabel(type: string) {
   switch (type) {
     case "tv":
     case "anime":
-      return "Bölüm";
     case "manga":
     case "manhwa":
     case "manhua":
-      return "Bölüm (Ch)";
+      return "Bölüm";
     case "book":
       return "Sayfa";
     case "movie":

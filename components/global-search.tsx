@@ -240,14 +240,17 @@ export default function GlobalSearch({ getLibraryStatus, onAddToLibrary }: Globa
     }
   }
 
+  // Kategori başına gösterilen maksimum sonuç sayısı.
+  // Backend tarafları: AniList 12, OpenLibrary 12, TVmaze/OMDb default — 9 hepsiyle uyumlu.
+  const PER_CATEGORY_LIMIT = 9;
   const groupedResults = {
-    movie: results.filter((r) => r.type === "movie").slice(0, 6),
-    tv: results.filter((r) => r.type === "tv").slice(0, 6),
-    anime: results.filter((r) => r.type === "anime").slice(0, 6),
-    manga: results.filter((r) => r.type === "manga").slice(0, 6),
-    manhwa: results.filter((r) => r.type === "manhwa").slice(0, 6),
-    manhua: results.filter((r) => r.type === "manhua").slice(0, 6),
-    book: results.filter((r) => r.type === "book").slice(0, 6),
+    movie: results.filter((r) => r.type === "movie").slice(0, PER_CATEGORY_LIMIT),
+    tv: results.filter((r) => r.type === "tv").slice(0, PER_CATEGORY_LIMIT),
+    anime: results.filter((r) => r.type === "anime").slice(0, PER_CATEGORY_LIMIT),
+    manga: results.filter((r) => r.type === "manga").slice(0, PER_CATEGORY_LIMIT),
+    manhwa: results.filter((r) => r.type === "manhwa").slice(0, PER_CATEGORY_LIMIT),
+    manhua: results.filter((r) => r.type === "manhua").slice(0, PER_CATEGORY_LIMIT),
+    book: results.filter((r) => r.type === "book").slice(0, PER_CATEGORY_LIMIT),
   };
 
   const renderGroup = (title: string, items: GlobalSearchResult[]) => {

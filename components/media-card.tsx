@@ -26,6 +26,7 @@ import {
   getMediaTypeLabel,
   getStatusLabel,
   getIncrementLabel,
+  isMovieLike,
 } from "@/lib/progress";
 
 interface MediaCardProps {
@@ -110,11 +111,19 @@ export default function MediaCard({
   relatedPartsLabel = "Parca Ekle",
   canAddRelatedParts = false,
 }: MediaCardProps) {
-  const percent = getProgressPercent(item.currentProgress, item.totalProgress);
+  const hasKnownTotal = item.totalProgress > 0;
+  const percent = hasKnownTotal
+    ? getProgressPercent(item.currentProgress, item.totalProgress)
+    : 0;
   const progressLabel = getProgressLabel(item.type);
-  const isFinished = item.currentProgress >= item.totalProgress;
+  // Bilinmeyen toplam (totalProgress = 0): hiçbir zaman "finished" sayma —
+  // kullanıcı serbestçe artırabilmeli.
+  const isFinished = hasKnownTotal && item.currentProgress >= item.totalProgress;
   const isCompleted = item.status === "completed";
-  const isMovie = item.type === "movie";
+  // "Film gibi" davranan: saf film + AniList anime MOVIE format. İkisi de bölüm/dakika
+  // progress göstermez; ana aksiyon "İzlendi Olarak İşaretle".
+  const isMovie = isMovieLike(item);
+  const showProgressBlock = !isMovie;
   const incrementLabel = getIncrementLabel(item.type);
   const hasSeasonInfo = item.numberOfSeasons || item.numberOfEpisodes || item.seasonNumber;
   const isBook = item.type === "book";
@@ -296,7 +305,7 @@ export default function MediaCard({
                   <span className="text-[10px] text-zinc-500">{item.episodes} bölüm</span>
                 )}
                 {item.type !== "anime" && item.chapters && (
-                  <span className="text-[10px] text-zinc-500">{item.chapters} chapter</span>
+                  <span className="text-[10px] text-zinc-500">{item.chapters} bölüm</span>
                 )}
                 {item.volumes && (
                   <>
@@ -343,25 +352,47 @@ export default function MediaCard({
             )}
           </div>
 
-          <div className="mt-3">
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-xs text-zinc-500">
-                <span className="text-zinc-300 font-medium">{item.currentProgress}</span>
-                {" / "}
-                {item.totalProgress} {progressLabel}
-              </span>
-              <span className="text-xs text-zinc-500 font-medium">{Math.round(percent)}%</span>
-            </div>
+          {showProgressBlock && (
+            <div className="mt-3">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xs text-zinc-500">
+                  <span className="text-zinc-300 font-medium">{item.currentProgress}</span>
+                  {" / "}
+                  {hasKnownTotal ? item.totalProgress : "??"} {progressLabel}
+                </span>
+                {hasKnownTotal ? (
+                  <span className="text-xs text-zinc-500 font-medium">{Math.round(percent)}%</span>
+                ) : (
+                  <span
+                    title="Toplam bilinmiyor"
+                    className="text-xs text-zinc-600 font-medium"
+                  >
+                    —
+                  </span>
+                )}
+              </div>
 
-            <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-              <div
-                className={`h-full rounded-full bg-gradient-to-r ${getProgressGradient(
-                  item.type
-                )} transition-all duration-500 ease-out`}
-                style={{ width: `${percent}%` }}
-              />
+              <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                {hasKnownTotal ? (
+                  <div
+                    className={`h-full rounded-full bg-gradient-to-r ${getProgressGradient(
+                      item.type
+                    )} transition-all duration-500 ease-out`}
+                    style={{ width: `${percent}%` }}
+                  />
+                ) : (
+                  // Bilinmeyen toplam: yalnızca görsel placeholder. Grup yüzdesi
+                  // hesabına KATILMAZ (computeGroupProgress totalProgress<=0 olanları
+                  // birim toplamına eklemiyor).
+                  <div
+                    aria-hidden
+                    className="h-full rounded-full bg-zinc-700/60"
+                    style={{ width: "50%" }}
+                  />
+                )}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
 

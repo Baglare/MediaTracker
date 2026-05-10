@@ -22,6 +22,7 @@ import {
   getMediaTypeLabel,
   getStatusLabel,
   getIncrementLabel,
+  isMovieLike,
 } from "@/lib/progress";
 
 interface MediaDetailModalProps {
@@ -61,11 +62,15 @@ export default function MediaDetailModal({
 
   const isFavorite = media.favorite || false;
   const isCompleted = media.status === "completed";
-  const isFinished = media.currentProgress >= media.totalProgress;
-  const percent = getProgressPercent(media.currentProgress, media.totalProgress);
+  const hasKnownTotal = media.totalProgress > 0;
+  const isFinished = hasKnownTotal && media.currentProgress >= media.totalProgress;
+  const percent = hasKnownTotal
+    ? getProgressPercent(media.currentProgress, media.totalProgress)
+    : 0;
   const progressLabel = getProgressLabel(media.type);
   const incrementLabel = getIncrementLabel(media.type);
-  const isMovie = media.type === "movie";
+  // AniList anime MOVIE de "film gibi" davranır.
+  const isMovie = isMovieLike(media);
 
   // Kaynak badge string'i
   const sourceLabel =
@@ -249,23 +254,40 @@ export default function MediaDetailModal({
 
         {/* İçerik */}
         <div className="p-6 max-h-[60vh] overflow-y-auto custom-scrollbar">
-          {/* Progress Alanı */}
+          {/* Progress Alanı (filmlerde sadece "Tamamla" aksiyonu kalır) */}
           <div className="bg-zinc-800/30 rounded-xl p-4 border border-zinc-800 mb-6">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-zinc-300">İlerleme Durumu</span>
-              <span className="text-sm text-zinc-400">
-                <strong className="text-white">{media.currentProgress}</strong> /{" "}
-                {media.totalProgress} {progressLabel} (
-                <span className="text-violet-400">{Math.round(percent)}%</span>)
-              </span>
-            </div>
-            {/* Progress Bar */}
-            <div className="w-full h-2 bg-zinc-900 rounded-full overflow-hidden mb-4">
-              <div
-                className="h-full bg-violet-500 transition-all duration-300"
-                style={{ width: `${percent}%` }}
-              />
-            </div>
+            {!isMovie && (
+              <>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-zinc-300">İlerleme Durumu</span>
+                  <span className="text-sm text-zinc-400">
+                    <strong className="text-white">{media.currentProgress}</strong> /{" "}
+                    {hasKnownTotal ? media.totalProgress : "??"} {progressLabel}
+                    {hasKnownTotal && (
+                      <>
+                        {" "}(
+                        <span className="text-violet-400">{Math.round(percent)}%</span>)
+                      </>
+                    )}
+                  </span>
+                </div>
+                {/* Progress Bar */}
+                <div className="w-full h-2 bg-zinc-900 rounded-full overflow-hidden mb-4">
+                  {hasKnownTotal ? (
+                    <div
+                      className="h-full bg-violet-500 transition-all duration-300"
+                      style={{ width: `${percent}%` }}
+                    />
+                  ) : (
+                    <div
+                      aria-hidden
+                      className="h-full bg-zinc-700/60"
+                      style={{ width: "50%" }}
+                    />
+                  )}
+                </div>
+              </>
+            )}
             {/* Progress Action Buttons */}
             <div className="flex gap-2">
               {!isMovie && (

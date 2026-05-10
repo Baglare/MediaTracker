@@ -43,7 +43,7 @@ import { ChevronDown, ChevronUp, Search, Plus } from "lucide-react";
 import { GlobalSearchLibraryStatus, GlobalSearchResult } from "@/lib/global-search-types";
 import { mockMediaList } from "@/lib/mock-media";
 import { loadMediaList, saveMediaList, clearMediaList, loadProgressLogs, saveProgressLogs } from "@/lib/storage";
-import { getIncrementAmount, getProgressLabel, getProgressUnit, getStatusLabel } from "@/lib/progress";
+import { getIncrementAmount, getProgressLabel, getProgressUnit, getStatusLabel, isMovieLike } from "@/lib/progress";
 import { MediaItem, MediaType, MediaStatus, ProgressLog, withMediaClassification } from "@/lib/types";
 import {
   getTvmazeExistingSeasonNumbers,
@@ -289,14 +289,25 @@ export default function HomePage() {
    */
   const handleIncrement = useCallback((id: string) => {
     const item = mediaList.find((m) => m.id === id);
-    if (!item || item.currentProgress >= item.totalProgress) return;
+    if (!item) return;
 
+    // Movie-like (film + AniList anime MOVIE) için +1 mantıklı değil; sadece "Tamamla" var.
+    if (isMovieLike(item)) return;
     const amount = getIncrementAmount(item.type);
     if (amount === 0) return;
 
+    // Bilinmeyen toplam (totalProgress <= 0) durumunda clamp yapma; serbest artır.
+    const hasKnownTotal = item.totalProgress > 0;
+    if (hasKnownTotal && item.currentProgress >= item.totalProgress) return;
+
     const prevProgress = item.currentProgress;
-    const newProgress = Math.min(item.currentProgress + amount, item.totalProgress);
-    const newStatus = newProgress >= item.totalProgress ? "completed" : item.status;
+    const newProgress = hasKnownTotal
+      ? Math.min(item.currentProgress + amount, item.totalProgress)
+      : item.currentProgress + amount;
+    const newStatus =
+      hasKnownTotal && newProgress >= item.totalProgress
+        ? "completed"
+        : item.status;
     const updated: MediaItem = { ...item, currentProgress: newProgress, status: newStatus };
 
     setMediaList((prev) => prev.map((m) => (m.id === id ? updated : m)));
@@ -324,7 +335,12 @@ export default function HomePage() {
     if (item.status === "completed") return;
 
     const prevProgress = item.currentProgress;
-    const newProgress = item.totalProgress;
+    // Bilinmeyen toplam: progress'i mevcut değerinde tut, sadece status'u completed yap.
+    // Bilinen toplam: progress'i totale çek.
+    const newProgress =
+      item.totalProgress > 0
+        ? item.totalProgress
+        : Math.max(item.currentProgress, 0);
     const updated: MediaItem = { ...item, currentProgress: newProgress, status: "completed" };
 
     setMediaList((prev) => prev.map((m) => (m.id === id ? updated : m)));

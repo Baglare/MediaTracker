@@ -160,11 +160,12 @@ export default function MediaModal({ isOpen, editingItem, onSave, onClose }: Med
 
     const finalCover = coverImage.trim() || getDefaultCover(type);
 
-    // totalProgress: film=1, diğerleri en az 1
-    let tp = isMovie ? 1 : Math.max(1, Number(totalProgress) || 1);
+    // totalProgress: film=1; diğerlerinde 0 ("bilinmiyor") da geçerli.
+    let tp = isMovie ? 1 : Math.max(0, Number(totalProgress) || 0);
     let cp = Math.max(0, Number(currentProgress) || 0);
     if (isMovie) { cp = status === "completed" ? 1 : cp > 0 ? 1 : 0; tp = 1; }
-    if (cp > tp) tp = cp;
+    // Bilinen total varsa cp > tp olamaz; bilinmiyorsa (tp=0) cp serbest kalır.
+    if (tp > 0 && cp > tp) tp = cp;
 
     // userRating doğrulama
     let rating: number | null = null;
@@ -227,8 +228,8 @@ export default function MediaModal({ isOpen, editingItem, onSave, onClose }: Med
   }
 
   // Türe göre ilerleme label'ları
-  const progressCurrentLabel = isBook ? "Mevcut Sayfa" : isManga ? "Mevcut Chapter" : "Mevcut Bölüm";
-  const progressTotalLabel = isBook ? "Toplam Sayfa" : isManga ? "Toplam Chapter" : "Toplam Bölüm";
+  const progressCurrentLabel = isBook ? "Mevcut Sayfa" : "Mevcut Bölüm";
+  const progressTotalLabel = isBook ? "Toplam Sayfa" : "Toplam Bölüm";
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
@@ -330,11 +331,28 @@ export default function MediaModal({ isOpen, editingItem, onSave, onClose }: Med
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className={labelCls}>{progressCurrentLabel}</label>
-                  <input type="number" min={0} value={currentProgress} onChange={(e) => setCurrentProgress(Number(e.target.value))} className={inputCls} />
+                  <input
+                    type="number"
+                    min={0}
+                    value={currentProgress === 0 ? "" : currentProgress}
+                    placeholder="0"
+                    onChange={(e) => setCurrentProgress(Number(e.target.value) || 0)}
+                    className={inputCls}
+                  />
                 </div>
                 <div>
-                  <label className={labelCls}>{progressTotalLabel}</label>
-                  <input type="number" min={1} value={totalProgress} onChange={(e) => setTotalProgress(Number(e.target.value))} className={inputCls} />
+                  <label className={labelCls}>
+                    {progressTotalLabel}{" "}
+                    <span className="text-zinc-600 font-normal">(bilinmiyorsa 0 yazılmalıdır)</span>
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={totalProgress === 0 ? "" : totalProgress}
+                    placeholder="0"
+                    onChange={(e) => setTotalProgress(Number(e.target.value) || 0)}
+                    className={inputCls}
+                  />
                 </div>
               </div>
               {isManga && (
