@@ -12,7 +12,7 @@
 
 import Image from "next/image";
 import { useState } from "react";
-import { ChevronDown, ChevronUp, Layers, Plus } from "lucide-react";
+import { ChevronDown, ChevronUp, Layers, Plus, Pencil } from "lucide-react";
 import { MediaItem } from "@/lib/types";
 import { MediaItemGroup } from "@/lib/series-group";
 import { getMediaTypeLabel, getProgressLabel } from "@/lib/progress";
@@ -28,6 +28,7 @@ interface SeriesGroupCardProps {
   onOpenDetail: (item: MediaItem) => void;
   onAddRelatedParts?: (item: MediaItem) => void;
   resolveRelatedAction?: (item: MediaItem) => { canAdd: boolean; label: string };
+  onOpenGroupEdit?: (item: MediaItem) => void;
 }
 
 function isItemCompleted(item: MediaItem): boolean {
@@ -146,6 +147,7 @@ export default function SeriesGroupCard({
   onOpenDetail,
   onAddRelatedParts,
   resolveRelatedAction,
+  onOpenGroupEdit,
 }: SeriesGroupCardProps) {
   const [open, setOpen] = useState(false);
 
@@ -277,21 +279,37 @@ export default function SeriesGroupCard({
       </button>
 
       {/* Grup seviyesi aksiyonlar */}
-      {canAddAtGroupLevel && (
-        <div className="px-4 pb-3 -mt-1 flex items-center gap-2">
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              if (representative && onAddRelatedParts) {
-                onAddRelatedParts(representative);
-              }
-            }}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-violet-500/15 text-violet-200 ring-1 ring-violet-500/30 hover:bg-violet-500/25 transition-colors cursor-pointer"
-          >
-            <Plus className="w-3 h-3" />
-            {groupRelated?.label ?? "Sezon Ekle"}
-          </button>
+      {(canAddAtGroupLevel || (onOpenGroupEdit && representative)) && (
+        <div className="px-4 pb-3 -mt-1 flex items-center gap-2 flex-wrap">
+          {canAddAtGroupLevel && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (representative && onAddRelatedParts) {
+                  onAddRelatedParts(representative);
+                }
+              }}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-violet-500/15 text-violet-200 ring-1 ring-violet-500/30 hover:bg-violet-500/25 transition-colors cursor-pointer"
+            >
+              <Plus className="w-3 h-3" />
+              {groupRelated?.label ?? "Sezon Ekle"}
+            </button>
+          )}
+          {onOpenGroupEdit && representative && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenGroupEdit(representative);
+              }}
+              title="Grup başlığını düzenle"
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-fuchsia-500/10 text-fuchsia-300 ring-1 ring-fuchsia-500/25 hover:bg-fuchsia-500/20 transition-colors cursor-pointer"
+            >
+              <Pencil className="w-3 h-3" />
+              Grubu Düzenle
+            </button>
+          )}
         </div>
       )}
 
@@ -315,6 +333,7 @@ export default function SeriesGroupCard({
                     onAddRelatedParts={onAddRelatedParts}
                     relatedPartsLabel={related?.label}
                     canAddRelatedParts={related?.canAdd ?? false}
+                    onOpenGroupEdit={onOpenGroupEdit}
                   />
                 </div>
               );

@@ -37,6 +37,10 @@ import {
   setUserId as setSyncUserId,
 } from "@/lib/sync-manager";
 import QuickAddModal from "@/components/quick-add-modal";
+import ManualGroupModal, {
+  type ManualGroupAction,
+  generateManualGroupId,
+} from "@/components/manual-group-modal";
 import EnhancedDashboard from "@/components/enhanced-dashboard";
 import AiAdvisor from "@/components/ai-advisor";
 import { ChevronDown, ChevronUp, Search, Plus } from "lucide-react";
@@ -92,6 +96,8 @@ export default function HomePage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<MediaItem | null>(null);
   const [detailMediaId, setDetailMediaId] = useState<string | null>(null);
+  // V4: Manuel grup yönetimi modalı
+  const [groupEditingItemId, setGroupEditingItemId] = useState<string | null>(null);
   const [pendingQuickAdd, setPendingQuickAdd] = useState<{
     singleItem: MediaItem;
     seasonItems: MediaItem[] | null;
@@ -469,6 +475,111 @@ export default function HomePage() {
       },
     });
   }
+
+  /**
+   * V4: Manuel grup düzenleme modalını aç (item seviyesi)
+   */
+  const handleOpenGroupEdit = useCallback((item: MediaItem) => {
+    setGroupEditingItemId(item.id);
+  }, []);
+
+  /**
+   * V4: Manuel grup yönetimi commit'i. Yan etki kuralları:
+   * - Tüm patch'ler önce SAF olarak hesaplanır.
+   * - setMediaList değer (functional updater değil) ile çağrılır.
+   * - enqueueMediaUpsert state commit'inden sonra, render dışında çağrılır.
+   * - SADECE seriesGroupId / seriesGroupTitle / seriesRelationType /
+   *   seasonNumber / orderIndex alanları değişir.
+   */
+  const handleCommitGroupAction = useCallback(
+    (action: ManualGroupAction) => {
+      const SERIES_KEYS = [
+        "seriesGroupId",
+        "seriesGroupTitle",
+        "seriesRelationType",
+        "seasonNumber",
+        "orderIndex",
+      ] as const;
+
+      // Yardımcı: bir item'a yalnızca series* alanlarını uygulayan kopya üretir.
+      // Diğer tüm alanlara dokunulmaz (currentProgress, status, userRating, vb.).
+      function applyPatch(
+        target: MediaItem,
+        patch: Partial<Pick<MediaItem, (typeof SERIES_KEYS)[number]>>
+      ): MediaItem {
+        const next: MediaItem = { ...target };
+        const mutable = next as unknown as Record<string, unknown>;
+        for (const k of SERIES_KEYS) {
+          if (k in patch) {
+            // patch[k] explicit undefined ise alanı sil; değer ise yaz.
+            const v = patch[k];
+            if (v === undefined) {
+              delete mutable[k];
+            } else {
+              mutable[k] = v;
+            }
+          }
+        }
+        return next;
+      }
+
+      const touched: MediaItem[] = [];
+      let nextList: MediaItem[] = mediaList;
+
+      if (action.kind === "create" || action.kind === "join") {
+        const groupId =
+          action.kind === "create" ? generateManualGroupId() : action.groupId;
+        const groupTitle = action.groupTitle;
+        const patch: Partial<Pick<MediaItem, (typeof SERIES_KEYS)[number]>> = {
+          seriesGroupId: groupId,
+          seriesGroupTitle: groupTitle,
+          seriesRelationType: action.relationType,
+          seasonNumber: action.seasonNumber,
+          orderIndex: action.orderIndex,
+        };
+
+        nextList = mediaList.map((it) => {
+          if (it.id !== action.itemId) return it;
+          const merged = applyPatch(it, patch);
+          touched.push(merged);
+          return merged;
+        });
+      } else if (action.kind === "leave") {
+        nextList = mediaList.map((it) => {
+          if (it.id !== action.itemId) return it;
+          const merged = applyPatch(it, {
+            seriesGroupId: undefined,
+            seriesGroupTitle: undefined,
+            seriesRelationType: undefined,
+            seasonNumber: undefined,
+            orderIndex: undefined,
+          });
+          touched.push(merged);
+          return merged;
+        });
+      } else if (action.kind === "rename") {
+        nextList = mediaList.map((it) => {
+          if (it.seriesGroupId !== action.groupId) return it;
+          if (it.seriesGroupTitle === action.newTitle) return it;
+          const merged = applyPatch(it, { seriesGroupTitle: action.newTitle });
+          touched.push(merged);
+          return merged;
+        });
+      }
+
+      // 1) Saf state commit
+      setMediaList(nextList);
+
+      // 2) Render dışı yan etki: cloud sync queue
+      for (const m of touched) {
+        enqueueMediaUpsert(m);
+      }
+
+      // 3) Modal'ı kapat
+      setGroupEditingItemId(null);
+    },
+    [mediaList]
+  );
 
   /**
    * Mock verilere sıfırlamak için onay penceresi aç
@@ -1146,6 +1257,7 @@ export default function HomePage() {
                         onOpenDetail={handleOpenDetailModal}
                         onAddRelatedParts={handleAddMissingTvmazeParts}
                         resolveRelatedAction={getLibraryRelatedAction}
+                        onOpenGroupEdit={handleOpenGroupEdit}
                       />
                     );
                   }
@@ -1164,6 +1276,7 @@ export default function HomePage() {
                       onAddRelatedParts={handleAddMissingTvmazeParts}
                       relatedPartsLabel={relatedAction.label}
                       canAddRelatedParts={relatedAction.canAdd}
+                      onOpenGroupEdit={handleOpenGroupEdit}
                     />
                   );
                 })}
@@ -1339,6 +1452,18 @@ export default function HomePage() {
           setPendingQuickAdd(null);
         }}
         onClose={() => setPendingQuickAdd(null)}
+      />
+      {/* V4: Manuel Grup Yönetimi Modalı */}
+      <ManualGroupModal
+        isOpen={groupEditingItemId !== null}
+        item={
+          groupEditingItemId
+            ? mediaList.find((m) => m.id === groupEditingItemId) ?? null
+            : null
+        }
+        mediaList={mediaList}
+        onSave={handleCommitGroupAction}
+        onClose={() => setGroupEditingItemId(null)}
       />
     </div>
   );

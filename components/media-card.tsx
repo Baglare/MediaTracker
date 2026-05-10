@@ -18,6 +18,7 @@ import {
   Star,
   StickyNote,
   Info,
+  Layers,
 } from "lucide-react";
 import { MediaItem } from "@/lib/types";
 import {
@@ -40,6 +41,7 @@ interface MediaCardProps {
   onAddRelatedParts?: (item: MediaItem) => void;
   relatedPartsLabel?: string;
   canAddRelatedParts?: boolean;
+  onOpenGroupEdit?: (item: MediaItem) => void;
 }
 
 function getStatusIcon(status: string) {
@@ -110,6 +112,7 @@ export default function MediaCard({
   onAddRelatedParts,
   relatedPartsLabel = "Parca Ekle",
   canAddRelatedParts = false,
+  onOpenGroupEdit,
 }: MediaCardProps) {
   const hasKnownTotal = item.totalProgress > 0;
   const percent = hasKnownTotal
@@ -200,6 +203,15 @@ export default function MediaCard({
                 >
                   <Pencil className="w-3 h-3" />
                 </button>
+                {onOpenGroupEdit && (
+                  <button
+                    onClick={() => onOpenGroupEdit(item)}
+                    title="Grup Düzenle"
+                    className="w-6 h-6 rounded-md flex items-center justify-center text-zinc-500 hover:text-fuchsia-400 hover:bg-fuchsia-500/10 transition-colors cursor-pointer opacity-0 group-hover:opacity-100"
+                  >
+                    <Layers className="w-3 h-3" />
+                  </button>
+                )}
                 <button
                   onClick={() => onDelete(item.id)}
                   title="Sil"
