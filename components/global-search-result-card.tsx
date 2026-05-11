@@ -8,6 +8,7 @@ import Image from "next/image";
 import { Plus, Check, Loader2 } from "lucide-react";
 import { GlobalSearchLibraryStatus, GlobalSearchResult } from "@/lib/global-search-types";
 import { getMediaTypeLabel } from "@/lib/progress";
+import { ThemeSubBadge } from "@/components/theme-accent";
 
 interface Props {
   result: GlobalSearchResult;
@@ -40,6 +41,21 @@ export default function GlobalSearchResultCard({
 }: Props) {
   const sourceBadge = getSourceBadge(result.source);
   const tags = result.genres || result.subjects || [];
+
+  // V5A.5: AniList sonuçlarında raw normalize edilmiş veride `format` taşınır
+  // (TV / MOVIE / OVA / ONA / SPECIAL / MANGA / NOVEL …). Bu format
+  // withMediaClassification akışındaki AniList format eşleştirmesini
+  // beslediği için Anime · Film, OVA, ONA gibi alt türler doğru rozet alır.
+  // Diğer kaynaklarda format yoksa inferMediaClassification type'a göre düşer.
+  const rawFormat =
+    result.raw && typeof result.raw === "object" && "format" in result.raw
+      ? (result.raw as { format?: unknown }).format
+      : undefined;
+  const classifiableLite = {
+    type: result.type,
+    externalSource: result.source,
+    format: typeof rawFormat === "string" ? rawFormat : undefined,
+  };
 
   return (
     <div className="flex gap-3 p-3 bg-zinc-900/40 rounded-xl border border-zinc-800/40 hover:border-zinc-700/40 transition-colors">
@@ -76,6 +92,9 @@ export default function GlobalSearchResultCard({
             <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-zinc-800/80 text-zinc-400 ring-1 ring-zinc-700/50">
               {getMediaTypeLabel(result.type)}
             </span>
+            {/* V5A.5: Doğu sonuçlarında subType rozeti (Anime · Film, OVA, Manhwa,
+                Light Novel vb.). Doğu dışı sonuçlarda hiç render edilmez. */}
+            <ThemeSubBadge item={classifiableLite} compact />
             <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ring-1 ${sourceBadge.cls}`}>
               {sourceBadge.label}
             </span>

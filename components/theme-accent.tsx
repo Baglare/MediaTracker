@@ -12,6 +12,13 @@ import type { ReactElement } from "react";
 import type { MediaItem, MediaSubType, MediaTheme } from "@/lib/types";
 import { withMediaClassification } from "@/lib/types";
 
+// V5A.5: resolveThemeAccent / ThemeSubBadge artık Quick Search sonuçları gibi
+// MediaItem olmayan ham nesnelerle de çalışıyor. withMediaClassification zaten
+// Partial<MediaItem> kabul ediyor; burada da aynı geniş tipi kullanıyoruz.
+type ClassifiableInput = Partial<MediaItem> & {
+  metadata?: Record<string, unknown> | null;
+};
+
 // ------ Inline SVG ikonlar (east-theme-header ile aynı dil) ------
 
 function KatanaIcon({ className }: { className?: string }) {
@@ -146,7 +153,7 @@ export interface ResolvedThemeAccent {
  * alanları withMediaClassification ile sadece OKUMA yönünde tamamlanır;
  * çağıran tarafta veri mutasyonu olmaz.
  */
-export function resolveThemeAccent(item: MediaItem): ResolvedThemeAccent {
+export function resolveThemeAccent(item: ClassifiableInput): ResolvedThemeAccent {
   const cls = withMediaClassification(item);
   let family: EastFamily | null = null;
   if (cls.theme === "east") {
@@ -182,13 +189,23 @@ export function topAccentGradient(
  * Doğu ailesinden bir item için ufak inline rozet (icon + subType label).
  * Doğu dışı item'larda null döner — kartı rozet çöplüğüne çevirmiyoruz.
  */
-export function ThemeSubBadge({ item }: { item: MediaItem }) {
+export function ThemeSubBadge({
+  item,
+  compact = false,
+}: {
+  item: ClassifiableInput;
+  // V5A.5: Quick Search gibi yoğun listelerde 10px varyant. Default 11px.
+  compact?: boolean;
+}) {
   const resolved = resolveThemeAccent(item);
   if (!resolved.accent || !resolved.subTypeLabel) return null;
   const Icon = resolved.accent.Icon;
+  const sizeClass = compact
+    ? "text-[10px] px-1.5 py-0.5 rounded"
+    : "text-[11px] px-2 py-0.5 rounded-md";
   return (
     <span
-      className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md ring-1 ${resolved.accent.badge}`}
+      className={`inline-flex items-center gap-1 font-medium ring-1 ${sizeClass} ${resolved.accent.badge}`}
       title={`Doğu · ${resolved.subTypeLabel}`}
     >
       <Icon className="w-3 h-3" />

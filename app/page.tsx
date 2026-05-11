@@ -205,6 +205,9 @@ export default function HomePage() {
     return openTvmazeSeasonPicker(detail, true);
   }
 
+  // NOT: Bu fonksiyon yalnızca arama sonucunu görsel olarak işaretlemek için
+  // (Listede / Sezon Ekle) çağrılır — sonuçları KESİNLİKLE filtrelemez. Listede
+  // olan item'lar GlobalSearch içinde aynen render edilir.
   async function getGlobalSearchLibraryStatus(item: GlobalSearchResult): Promise<GlobalSearchLibraryStatus> {
     const inLibrary = isInLibrary(item.source, item.externalId);
 

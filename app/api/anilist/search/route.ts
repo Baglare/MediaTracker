@@ -86,6 +86,9 @@ async function queryAniList(
     headers: {
       "Content-Type": "application/json",
       Accept: "application/json",
+      // Bazı backend'ler default Node fetch UA'sını reddediyor.
+      // AniList için zorunlu değil ama defansif olarak set ediyoruz.
+      "User-Agent": "MediaTracker/1.0 (+https://github.com/local)",
     },
     body: JSON.stringify({ query: SEARCH_QUERY, variables }),
   });
@@ -94,8 +97,15 @@ async function queryAniList(
     throw new Error(`AniList API hatası: ${response.status}`);
   }
 
-  const json = (await response.json()) as AniListSearchResponse;
-  return json.data.Page.media || [];
+  // GraphQL "200 OK + errors[]" durumunu da yakala — eskiden sessizce yutuluyordu.
+  const json = (await response.json()) as AniListSearchResponse & {
+    errors?: { message: string }[];
+  };
+  if (json.errors && json.errors.length > 0) {
+    const msg = json.errors.map((e) => e.message).join("; ");
+    throw new Error(`AniList GraphQL hatası: ${msg}`);
+  }
+  return json.data?.Page?.media || [];
 }
 
 /**
@@ -171,11 +181,32 @@ export async function GET(request: NextRequest) {
       .slice(0, 12)
       .map(normalizeAniListMedia);
 
-    return NextResponse.json({ results: normalized });
+    // Sessiz "0 sonuç" durumu — yukarı katmana görünür kalsın diye dev console'a yaz.
+    // Üst-akım AniList outage'larında veya search index degradasyonunda burada
+    // q="frieren" gibi sorgular için bile 0 dönebiliyor (deneylerle gözlendi).
+    if (normalized.length === 0) {
+      console.warn(
+        `[anilist:search] 0 sonuç: q="${query.trim()}" category="${category}" — AniList search alanı bu sorgu için boş döndü.`,
+      );
+    }
+
+    return NextResponse.json({
+      results: normalized,
+      // Client tarafında görünür empty/error state için meta. Mevcut tüketiciler
+      // (sadece `results` okuyan) etkilenmez — ekstra alan göz ardı edilir.
+      meta: { source: "anilist", count: normalized.length, query: query.trim(), category },
+    });
   } catch (err) {
     console.error("AniList arama hatası:", err);
     return NextResponse.json(
-      { error: "AniList'e bağlanırken bir hata oluştu." },
+      {
+        error: "AniList'e bağlanırken bir hata oluştu.",
+        meta: {
+          source: "anilist",
+          failed: true,
+          reason: err instanceof Error ? err.message : String(err),
+        },
+      },
       { status: 502 }
     );
   }

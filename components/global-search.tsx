@@ -38,6 +38,15 @@ const DEFAULT_LIBRARY_STATUS: GlobalSearchLibraryStatus = {
   hasAddableParts: false,
 };
 
+// Source-spesifik diagnostic — AniList gibi alt sistem 0 sonuç ya da
+// hata dönerse UI'da küçük bir not gösterebilmek için kullanılır.
+interface SourceDiag {
+  called: boolean;
+  count: number;
+  failed?: boolean;
+  reason?: string;
+}
+
 export default function GlobalSearch({ getLibraryStatus, onAddToLibrary }: GlobalSearchProps) {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<GlobalSearchCategory>("all");
@@ -47,27 +56,41 @@ export default function GlobalSearch({ getLibraryStatus, onAddToLibrary }: Globa
   const [hasSearched, setHasSearched] = useState(false);
   const [addingIds, setAddingIds] = useState<Set<string>>(new Set());
   const [libraryStatuses, setLibraryStatuses] = useState<Record<string, GlobalSearchLibraryStatus>>({});
+  // V5A.x bug fix: AniList kaynağının sessiz "0 sonuç" durumu — section
+  // hiç render edilmediği için kullanıcı kaynak çağrılmamış sandı. Artık
+  // diag tutup empty/error notunu kullanıcıya gösteriyoruz.
+  const [anilistDiag, setAnilistDiag] = useState<SourceDiag | null>(null);
 
-  async function handleSearch(e?: React.FormEvent) {
+  async function handleSearch(
+    e?: React.FormEvent | null,
+    overrideCategory?: GlobalSearchCategory,
+  ) {
     if (e) e.preventDefault();
     if (!query.trim()) return;
+
+    // BUG FIX: Kategori değişiminde re-search, setCategory henüz commit
+    // olmadan çağrıldığı için closure'daki `category` eski kalıyordu — sonuçlar
+    // önceki kategoriye göre çekiliyor, kullanıcıya alakasız bir liste düşüyordu.
+    // Çağıran taraf yeni değeri `overrideCategory` ile geçebilir.
+    const activeCategory = overrideCategory ?? category;
 
     setIsSearching(true);
     setError(null);
     setHasSearched(true);
     setResults([]);
     setLibraryStatuses({});
+    setAnilistDiag(null);
 
     try {
       const fetchPromises: Promise<GlobalSearchResult[]>[] = [];
 
-      if (category === "all" || category === "movie") {
+      if (activeCategory === "all" || activeCategory === "movie") {
         fetchPromises.push(
           fetch(`/api/omdb/search?q=${encodeURIComponent(query)}`)
             .then(async (res) => {
               const data = await res.json().catch(() => ({ results: [] }));
               if (!res.ok) {
-                if (category === "movie") {
+                if (activeCategory === "movie") {
                   throw new Error(data?.error || "OMDb araması başarısız.");
                 }
                 return { results: [] };
@@ -91,13 +114,13 @@ export default function GlobalSearch({ getLibraryStatus, onAddToLibrary }: Globa
               }));
             })
             .catch((err) => {
-              if (category === "movie") throw err;
+              if (activeCategory === "movie") throw err;
               return [];
             })
         );
       }
 
-      if (category === "all" || category === "tv") {
+      if (activeCategory === "all" || activeCategory === "tv") {
         fetchPromises.push(
           fetch(`/api/tvmaze/search?q=${encodeURIComponent(query)}`)
             .then((res) => (res.ok ? res.json() : { results: [] }))
@@ -120,12 +143,36 @@ export default function GlobalSearch({ getLibraryStatus, onAddToLibrary }: Globa
         );
       }
 
-      if (["all", "anime", "manga", "manhwa", "manhua"].includes(category)) {
+      if (["all", "anime", "manga", "manhwa", "manhua"].includes(activeCategory)) {
         fetchPromises.push(
-          fetch(`/api/anilist/search?q=${encodeURIComponent(query)}&category=${category}`)
-            .then((res) => (res.ok ? res.json() : { results: [] }))
-            .then((data: { results: AniListNormalizedResult[] }) => {
-              const resArray = data.results || [];
+          fetch(`/api/anilist/search?q=${encodeURIComponent(query)}&category=${activeCategory}`)
+            .then(async (res) => {
+              const data = (await res.json().catch(() => ({}))) as {
+                results?: AniListNormalizedResult[];
+                error?: string;
+                meta?: { failed?: boolean; reason?: string; count?: number };
+              };
+              if (!res.ok) {
+                // Diag'i kullanıcıya görünür kıl; pipeline'ı kırma.
+                setAnilistDiag({
+                  called: true,
+                  count: 0,
+                  failed: true,
+                  reason: data?.meta?.reason || data?.error || `HTTP ${res.status}`,
+                });
+                console.warn("[anilist] route hata döndü:", data?.error || res.status);
+                return { results: [] as AniListNormalizedResult[] };
+              }
+              return { results: data.results || [] };
+            })
+            .then(({ results }) => {
+              const resArray = results || [];
+              setAnilistDiag({ called: true, count: resArray.length });
+              if (resArray.length === 0) {
+                console.warn(
+                  `[anilist] 0 sonuç döndü (q="${query}", category="${activeCategory}") — search index geçici sorun yaşıyor olabilir.`,
+                );
+              }
               return resArray.map((item): GlobalSearchResult => ({
                 source: "anilist",
                 externalId: item.externalId,
@@ -140,11 +187,20 @@ export default function GlobalSearch({ getLibraryStatus, onAddToLibrary }: Globa
                 raw: item,
               }));
             })
-            .catch(() => [])
+            .catch((err) => {
+              setAnilistDiag({
+                called: true,
+                count: 0,
+                failed: true,
+                reason: err instanceof Error ? err.message : String(err),
+              });
+              console.warn("[anilist] fetch exception:", err);
+              return [];
+            })
         );
       }
 
-      if (category === "all" || category === "book") {
+      if (activeCategory === "all" || activeCategory === "book") {
         fetchPromises.push(
           fetch(`/api/openlibrary/search?q=${encodeURIComponent(query)}`)
             .then((res) => (res.ok ? res.json() : { results: [] }))
@@ -170,7 +226,7 @@ export default function GlobalSearch({ getLibraryStatus, onAddToLibrary }: Globa
       }
 
       const resultsArrays = await Promise.allSettled(fetchPromises);
-      if (category === "movie") {
+      if (activeCategory === "movie") {
         const rejected = resultsArrays.find((result) => result.status === "rejected");
         if (rejected && rejected.reason instanceof Error) {
           throw rejected.reason;
@@ -183,6 +239,9 @@ export default function GlobalSearch({ getLibraryStatus, onAddToLibrary }: Globa
           combined = [...combined, ...result.value];
         }
       });
+      // NOT: Listede zaten olan item'ları sonuçlardan ÇIKARMIYORUZ. Kütüphane
+      // durumu ayrıca getLibraryStatus üzerinden çözülüp karta "Listede" rozeti
+      // veya "Sezon/Parça Ekle" aksiyonu olarak yansıtılıyor — sonuç görünür kalmalı.
       setResults(combined);
     } catch (err) {
       console.error(err);
@@ -316,7 +375,10 @@ export default function GlobalSearch({ getLibraryStatus, onAddToLibrary }: Globa
             onClick={() => {
               setCategory(cat.value);
               if (query.trim() && hasSearched) {
-                setTimeout(() => handleSearch(), 0);
+                // Yeni kategoriyi handleSearch'e EXPLICIT geçiyoruz; aksi halde
+                // closure içindeki `category` state daha commit olmadığı için
+                // eski kategoriyle search yapılır ve kullanıcıya alakasız sonuç döner.
+                setTimeout(() => handleSearch(null, cat.value), 0);
               }
             }}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
@@ -331,6 +393,43 @@ export default function GlobalSearch({ getLibraryStatus, onAddToLibrary }: Globa
       </div>
 
       <div className="mt-4">
+        {/* AniList kaynağına özel diag notu — sadece AniList çağrıldı ve 0 sonuç
+            ya da hata döndüyse görünür. Diğer kaynakların sonuçlarını gizlemez. */}
+        {hasSearched && !isSearching && anilistDiag?.called && anilistDiag.count === 0 && (
+          <div className="mb-4 px-3 py-2.5 rounded-lg text-xs bg-rose-500/5 ring-1 ring-rose-500/20 text-rose-300/90 flex items-start justify-between gap-3 flex-wrap">
+            <div className="flex-1 min-w-0">
+              {anilistDiag.failed ? (
+                <>
+                  <span className="font-medium text-rose-200">
+                    AniList kaynağına ulaşılamadı
+                  </span>
+                  {anilistDiag.reason ? (
+                    <span className="text-rose-200/60"> · {anilistDiag.reason}</span>
+                  ) : null}
+                  . Anime / Manga sonuçları bu sorgu için listelenemiyor.
+                </>
+              ) : (
+                <>
+                  <span className="font-medium text-rose-200">
+                    AniList anime/manga sonucu döndürmedi
+                  </span>{" "}
+                  (server <span className="font-medium">0 sonuç</span> raporladı).
+                  {" Bu MediaTracker tarafında bir hata değil — AniList GraphQL’in `search` alanı şu sıralar global olarak yanıt vermiyor (doğrulandı: id ile arama çalışıyor, metin araması her sorgu için 0 dönüyor)."}
+                  {" Diğer kaynaklar etkilenmedi; birkaç dakika sonra tekrar deneyin."}
+                </>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => handleSearch(null, category)}
+              disabled={isSearching}
+              className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/30 hover:bg-rose-500/20 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Tekrar Dene
+            </button>
+          </div>
+        )}
+
         {error ? (
           <div className="text-center py-8 text-red-400 text-sm">{error}</div>
         ) : isSearching ? (
