@@ -29,10 +29,10 @@ interface AppTopbarProps {
 export default function AppTopbar({ activeTab, onChangeTab }: AppTopbarProps) {
   return (
     <header
-      className="sticky top-0 z-40 border-b border-zinc-800/60 bg-zinc-950/80 backdrop-blur-md"
+      className="sticky top-0 z-40 border-b border-zinc-800/60 bg-zinc-950/70 backdrop-blur-md"
       role="banner"
     >
-      <div className="flex items-center gap-4 px-4 sm:px-6 lg:px-8 h-14">
+      <div className="flex items-center gap-4 px-4 sm:px-6 lg:px-6 h-14">
         {/* Mobil marka (sidebar gizliyken yerine geçer) */}
         <div className="flex items-center gap-2 lg:hidden">
           <div className="w-7 h-7 rounded-md bg-gradient-to-br from-amber-400 to-amber-600 grid place-items-center text-zinc-950 font-bold text-xs">
@@ -42,15 +42,15 @@ export default function AppTopbar({ activeTab, onChangeTab }: AppTopbarProps) {
         </div>
 
         {/* Breadcrumb — lg+ sidebar var, marka tekrar etmeyelim */}
-        <div className="hidden lg:flex items-center gap-1.5 text-sm text-zinc-500 min-w-0">
+        <div className="hidden lg:flex items-center gap-1.5 text-[13px] text-zinc-500 min-w-0">
           <span>MediaTracker</span>
-          <ChevronRight className="w-3 h-3 opacity-50" aria-hidden="true" />
+          <ChevronRight className="w-3 h-3 opacity-50 shrink-0" aria-hidden="true" />
           <strong className="text-zinc-100 font-semibold truncate">
             {TAB_LABELS[activeTab]}
           </strong>
         </div>
 
-        <div className="ml-auto flex items-center gap-3">
+        <div className="ml-auto flex items-center gap-2">
           <CloudModeBadge />
         </div>
       </div>

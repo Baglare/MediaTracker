@@ -255,10 +255,10 @@ export default function SeriesGroupCard({
       }`}
     >
       {/* Üst accent şeridi — "featured collection" hissi.
-          Hem tema ailesi (Doğu) hem de fallback için aynı yapı. */}
+          R6: opacity hafifletildi ki grid içinde diğer kartları bastırmasın. */}
       <div
         aria-hidden="true"
-        className={`absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r ${palette.topStrip} opacity-80`}
+        className={`absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r ${palette.topStrip} opacity-60`}
       />
 
       {/* HEADER — toggle alanı + sağda kompakt progress paneli */}

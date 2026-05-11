@@ -1260,8 +1260,11 @@ export default function HomePage() {
       <div className="flex-1 min-w-0 flex flex-col">
         <AppTopbar activeTab={activeTab} onChangeTab={handleTabChange} />
 
-        {/* Ana içerik alanı */}
-        <main className="relative mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-8 flex-1">
+        {/* Ana içerik alanı.
+            R6: Shell zaten sidebar+rail ile column genişliğini kontrol ettiği
+            için max-w-7xl + mx-auto kalktı; içerik sütununu boğmuyor.
+            xl'de horizontal padding biraz daraltıldı (rail ile nefes alsın). */}
+        <main className="relative w-full px-4 sm:px-6 lg:px-8 xl:px-6 py-6 lg:py-8 flex-1 min-w-0">
         
         {/* DASHBOARD SEKMESI */}
         {activeTab === "dashboard" && (
@@ -1411,13 +1414,15 @@ export default function HomePage() {
                   // (Kütüphanem için sort + view toggle).
                   actions?: React.ReactNode;
                 }) => (
-                  <div className="flex items-end justify-between gap-3 mb-3">
+                  <div className="flex items-end justify-between gap-3 mb-3 pb-2 border-b border-zinc-800/50">
                     <div className="flex items-center gap-2 min-w-0">
                       <Icon className="w-4 h-4 text-amber-400/80 shrink-0" />
-                      <h2 className="text-base font-semibold text-zinc-100 tracking-tight truncate">
+                      <h2 className="text-[15px] font-semibold text-zinc-100 tracking-tight truncate">
                         {title}
                       </h2>
-                      <span className="text-xs font-mono text-zinc-500">{count}</span>
+                      <span className="text-[11px] font-mono tabular-nums text-zinc-500 px-1.5 py-0.5 rounded-md bg-zinc-900/60 border border-zinc-800/60">
+                        {count}
+                      </span>
                     </div>
                     <div className="flex items-center gap-3">
                       {hint && <span className="text-[11px] text-zinc-500">{hint}</span>}
@@ -1427,7 +1432,7 @@ export default function HomePage() {
                 );
 
                 return (
-                  <div className="space-y-10">
+                  <div className="space-y-8">
                     {/* 1) Devam Ettiklerim — in-progress slice (max 6) */}
                     {continueItems.length > 0 && (
                       <section aria-label="Devam Ettiklerim">

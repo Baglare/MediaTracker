@@ -93,12 +93,12 @@ function NavRow({
   // Active item: subtle zinc panel + gold left bar.
   // Ghost: faded text, no hover state, cursor disabled.
   const base =
-    "group relative w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-left";
+    "group relative w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-[13px] font-medium transition-colors text-left";
   const stateClass = ghost
     ? "text-zinc-600 cursor-not-allowed"
     : isActive
-    ? "bg-zinc-800/60 text-zinc-50 ring-1 ring-zinc-700/60 cursor-pointer"
-    : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/40 cursor-pointer";
+    ? "bg-zinc-800/60 text-zinc-50 cursor-pointer"
+    : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/30 cursor-pointer";
 
   let badgeClass = "ml-auto text-[10px] font-mono px-1.5 py-0.5 rounded-full ";
   if (item.badgeTone === "soon") {
@@ -122,7 +122,7 @@ function NavRow({
       {isActive && !ghost && (
         <span
           aria-hidden="true"
-          className="absolute -left-3 top-2 bottom-2 w-[2px] rounded-r bg-amber-400/80"
+          className="absolute -left-2.5 top-1.5 bottom-1.5 w-[2px] rounded-r bg-amber-400/70"
         />
       )}
       <Icon className={`w-4 h-4 shrink-0 ${ghost ? "opacity-60" : ""}`} />
@@ -139,25 +139,29 @@ export default function AppSidebar({ activeTab, onChange }: AppSidebarProps) {
 
   return (
     <aside
-      className="hidden lg:flex sticky top-0 h-screen w-64 shrink-0 flex-col gap-4 border-r border-zinc-800/60 bg-zinc-950/60 px-4 py-5"
+      className="hidden lg:flex sticky top-0 h-screen w-64 shrink-0 flex-col gap-4 border-r border-zinc-800/60 bg-zinc-950/40 px-4 py-5"
       aria-label="Birincil navigasyon"
     >
       {/* Brand */}
-      <div className="flex items-center gap-3 px-2 pb-3 border-b border-zinc-800/60">
-        <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-amber-400 to-amber-600 grid place-items-center text-zinc-950 font-bold text-base shadow-md shadow-amber-900/30">
+      <div className="flex items-center gap-2.5 px-1.5 pb-4 border-b border-zinc-800/60">
+        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-400 to-amber-600 grid place-items-center text-zinc-950 font-bold text-sm shadow-sm shadow-amber-900/30">
           M
         </div>
         <div className="min-w-0">
-          <div className="text-sm font-semibold text-zinc-50 tracking-tight">MediaTracker</div>
-          <div className="text-[11px] text-zinc-500">izle · oku · takip et</div>
+          <div className="text-[13px] font-semibold text-zinc-50 tracking-tight leading-tight">
+            MediaTracker
+          </div>
+          <div className="text-[10.5px] text-zinc-500 leading-tight mt-0.5">
+            izle · oku · takip et
+          </div>
         </div>
       </div>
 
       {/* Sections */}
-      <nav className="flex-1 min-h-0 overflow-y-auto -mx-1 px-1 flex flex-col gap-4">
+      <nav className="flex-1 min-h-0 overflow-y-auto -mx-1 px-1 flex flex-col gap-3">
         {SECTIONS.map((section) => (
-          <div key={section.label} className="flex flex-col gap-0.5">
-            <div className="px-2.5 pt-2 pb-1 text-[10px] font-semibold tracking-[0.14em] text-zinc-500 uppercase">
+          <div key={section.label} className="flex flex-col gap-px">
+            <div className="px-2.5 pt-1.5 pb-1 text-[10px] font-semibold tracking-[0.16em] text-zinc-600 uppercase">
               {section.label}
             </div>
             {section.items.map((item) => (
@@ -173,7 +177,7 @@ export default function AppSidebar({ activeTab, onChange }: AppSidebarProps) {
       </nav>
 
       {/* Foot — Settings */}
-      <div className="flex flex-col gap-0.5 pt-2 border-t border-zinc-800/60">
+      <div className="flex flex-col gap-px pt-3 border-t border-zinc-800/60">
         {FOOT.map((item) => (
           <NavRow
             key={item.id}

@@ -67,7 +67,7 @@ export default function LibraryControlBar({
   resultCount,
 }: LibraryControlBarProps) {
   return (
-    <div className="rounded-2xl border border-zinc-800/60 bg-zinc-900/40 ring-1 ring-zinc-800/40 shadow-lg shadow-black/10">
+    <div className="rounded-2xl border border-zinc-800/60 bg-zinc-900/30">
       {/* Üst satır: search · medya ekle */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 sm:p-4 border-b border-zinc-800/60">
         {/* Search */}

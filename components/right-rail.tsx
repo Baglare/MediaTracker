@@ -100,14 +100,14 @@ function Widget({
         ? "text-emerald-300"
         : "text-amber-400/90";
   return (
-    <div className="rounded-xl border border-zinc-800/60 bg-zinc-900/40 p-4">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-1.5 text-xs font-semibold text-zinc-200 tracking-tight">
+    <div className="rounded-xl border border-zinc-800/60 bg-zinc-900/30 p-3.5">
+      <div className="flex items-center justify-between mb-2.5">
+        <div className="flex items-center gap-1.5 text-[11.5px] font-semibold text-zinc-200 tracking-tight">
           <Icon className={`w-3.5 h-3.5 ${iconClass}`} />
           {title}
         </div>
         {eyebrow && (
-          <span className="text-[10px] font-mono tracking-widest text-zinc-500 uppercase">
+          <span className="text-[9.5px] font-mono tracking-[0.14em] text-zinc-600 uppercase">
             {eyebrow}
           </span>
         )}
@@ -497,10 +497,10 @@ export default function RightRail({
 
   return (
     <aside
-      className="hidden xl:flex sticky top-0 h-screen w-80 shrink-0 flex-col gap-3 border-l border-zinc-800/60 bg-zinc-950/40 px-4 py-5 overflow-y-auto"
+      className="hidden xl:flex sticky top-0 h-screen w-[18rem] shrink-0 flex-col gap-3 border-l border-zinc-800/60 bg-zinc-950/40 px-4 py-5 overflow-y-auto"
       aria-label="Sağ panel"
     >
-      <div className="text-[10px] font-semibold tracking-[0.14em] text-zinc-500 uppercase px-1">
+      <div className="text-[10px] font-semibold tracking-[0.16em] text-zinc-600 uppercase px-1">
         Bakış
       </div>
 
