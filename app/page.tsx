@@ -16,7 +16,9 @@ import AppTopbar from "@/components/app-topbar";
 import RightRail from "@/components/right-rail";
 import { TabType } from "@/components/app-tabs";
 import ActivityLogPanel from "@/components/activity-log-panel";
-import MediaFilters, { type ThemeFilter, type EastSubFilter } from "@/components/media-filters";
+// MediaFilters artık LibraryControlBar tarafından sarmalanıyor; burada
+// yalnızca type re-export'lar gerekli.
+import { type ThemeFilter, type EastSubFilter } from "@/components/media-filters";
 import EastThemeHeader from "@/components/east-theme-header";
 import MediaCard from "@/components/media-card";
 import SeriesGroupCard from "@/components/series-group-card";
@@ -46,7 +48,12 @@ import ManualGroupModal, {
 } from "@/components/manual-group-modal";
 import EnhancedDashboard from "@/components/enhanced-dashboard";
 import AiAdvisor from "@/components/ai-advisor";
-import { ChevronDown, ChevronUp, Search, Plus, PlayCircle, Layers, Library as LibraryIcon } from "lucide-react";
+import { ChevronDown, ChevronUp, PlayCircle, Layers, Library as LibraryIcon } from "lucide-react";
+import LibraryControlBar, {
+  LibrarySectionControls,
+  type LibrarySort,
+  type LibraryView,
+} from "@/components/library-control-bar";
 import { GlobalSearchLibraryStatus, GlobalSearchResult } from "@/lib/global-search-types";
 import { mockMediaList } from "@/lib/mock-media";
 import { loadMediaList, saveMediaList, clearMediaList, loadProgressLogs, saveProgressLogs } from "@/lib/storage";
@@ -92,6 +99,11 @@ export default function HomePage() {
   const [themeFilter, setThemeFilter] = useState<ThemeFilter>("all");
   // V5A.1: Doğu seçiliyken aktif alt filtre (Tümü / Anime / Manga / Novel)
   const [eastSubFilter, setEastSubFilter] = useState<EastSubFilter>("all");
+  // R5: Kütüphanem singleton bölümü için sıralama + görünüm tercihi.
+  // Sadece üçüncü bölümü (tekil item'lar) etkiler; "Devam Ettiklerim" ve
+  // "Seri Koleksiyonlarım" kendi sıralamasını korur.
+  const [librarySort, setLibrarySort] = useState<LibrarySort>("recent");
+  const [libraryView, setLibraryView] = useState<LibraryView>("grid");
 
   // V5A.1/V5A.2: Theme mode değişince bağımlı filtreleri tutarlı tut.
   // - Doğu dışına çıkılırsa eastSubFilter "all"a düşer (anlamı kalmaz).
@@ -1267,53 +1279,32 @@ export default function HomePage() {
         {/* KÜTÜPHANEM SEKMESI */}
         {activeTab === "library" && (
           <div className="space-y-6">
-            {/* Arama ve Ekleme Alanı */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div className="relative flex-1 w-full sm:max-w-md">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
-                <input
-                  type="text"
-                  placeholder="Kütüphanende ara..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 bg-zinc-900/50 border border-zinc-800 rounded-xl text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50 transition-all"
-                />
-              </div>
-              <button
-                onClick={handleOpenAddModal}
-                className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium bg-violet-500/20 text-violet-300 ring-1 ring-violet-500/40 hover:bg-violet-500/30 transition-colors w-full sm:w-auto cursor-pointer"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Medya Ekle</span>
-              </button>
-            </div>
+            {/* R5: Birleşik dashboard control bar
+                — search, sort, view, "Medya Ekle" + altta MediaFilters reuse */}
+            {/* R5.1: Sort + view kontrolleri buradan çıkarıldı; aşağıda
+                Kütüphanem section header'ının sağına taşındı. */}
+            <LibraryControlBar
+              searchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
+              themeFilter={themeFilter}
+              typeFilter={typeFilter}
+              statusFilter={statusFilter}
+              onThemeChange={handleThemeFilterChange}
+              onTypeChange={setTypeFilter}
+              onStatusChange={setStatusFilter}
+              onAddMedia={handleOpenAddModal}
+              resultCount={filteredMedia.length}
+              eastSubFilter={eastSubFilter}
+            />
 
-            {/* V5A.2: Doğu seçiliyken kompakt theme header — alt filtre burada */}
+            {/* V5A.2: Doğu seçiliyken kompakt theme header — alt filtre burada.
+                Control bar'la çakışmasın diye altına yerleşiyor. */}
             {themeFilter === "east" && (
               <EastThemeHeader
                 activeSub={eastSubFilter}
                 onChangeSub={setEastSubFilter}
               />
             )}
-
-            {/* Filtreler */}
-            <MediaFilters
-              activeTheme={themeFilter}
-              activeType={typeFilter}
-              activeStatus={statusFilter}
-              onThemeChange={handleThemeFilterChange}
-              onTypeChange={setTypeFilter}
-              onStatusChange={setStatusFilter}
-            />
-
-            <div className="mb-4">
-              <p className="text-sm text-zinc-500">
-                <span className="text-zinc-300 font-medium">
-                  {filteredMedia.length}
-                </span>{" "}
-                medya gösteriliyor
-              </p>
-            </div>
 
             {filteredMedia.length > 0 ? (
               (() => {
@@ -1330,9 +1321,16 @@ export default function HomePage() {
                 const seriesGroupCards = groupedAll.filter(
                   (g) => g.isGroup && g.items.length >= 2,
                 );
-                const singletonItems = groupedAll
+                const singletonItemsRaw = groupedAll
                   .filter((g) => !(g.isGroup && g.items.length >= 2))
                   .map((g) => g.items[0]);
+
+                // R5: Kütüphanem (tekil) bölümü için sıralama. Veri mutate
+                // edilmez — slice'lanmış kopya üzerinden sort. Devam Ettiklerim
+                // ve Seri Koleksiyonlarım kendi sıralamasını korur.
+                // mediaList içindeki orijinal index'i "ekleme sırası" proxy'si
+                // olarak kullanıyoruz; "recent" tersine çevirir → en son eklenen
+                // önce. lastLogAt aşağıda hesaplanıyor, burada referans veriyoruz.
 
                 // "Devam Ettiklerim" kuralı:
                 //   - status "watching" veya "reading"; veya
@@ -1361,16 +1359,57 @@ export default function HomePage() {
                   .sort((a, b) => (lastLogAt.get(b.id) ?? 0) - (lastLogAt.get(a.id) ?? 0))
                   .slice(0, 6);
 
+                // R5: Singleton bölümünün sıralaması. Veri mutate edilmez.
+                const indexOfInList = new Map<string, number>();
+                mediaList.forEach((m, i) => indexOfInList.set(m.id, i));
+                const progressRatio = (it: MediaItem) =>
+                  it.totalProgress > 0 ? it.currentProgress / it.totalProgress : -1;
+                const singletonItems = singletonItemsRaw.slice().sort((a, b) => {
+                  switch (librarySort) {
+                    case "title":
+                      return a.title.localeCompare(b.title, "tr");
+                    case "lastActivity":
+                      return (lastLogAt.get(b.id) ?? 0) - (lastLogAt.get(a.id) ?? 0);
+                    case "progress":
+                      return progressRatio(b) - progressRatio(a);
+                    case "rating": {
+                      // userRating null → en sona
+                      const ra = a.userRating ?? -1;
+                      const rb = b.userRating ?? -1;
+                      return rb - ra;
+                    }
+                    case "recent":
+                    default: {
+                      // mediaList index "ekleme sırası" proxy'si; sona eklenen
+                      // genellikle yenidir → reverse sort.
+                      const ia = indexOfInList.get(a.id) ?? 0;
+                      const ib = indexOfInList.get(b.id) ?? 0;
+                      return ib - ia;
+                    }
+                  }
+                });
+
+                // R5: View mode sadece bu bölümün grid sınıfını etkiler.
+                // "list" → tek sütun (yine MediaCard); "grid" → mevcut 3-col responsive.
+                const singletonGridClass =
+                  libraryView === "list"
+                    ? "grid grid-cols-1 gap-3 items-start"
+                    : "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start";
+
                 const SectionHead = ({
                   icon: Icon,
                   title,
                   count,
                   hint,
+                  actions,
                 }: {
                   icon: typeof PlayCircle;
                   title: string;
                   count: number;
                   hint?: string;
+                  // R5.1: Section başlığının sağ tarafına opsiyonel aksiyon slotu
+                  // (Kütüphanem için sort + view toggle).
+                  actions?: React.ReactNode;
                 }) => (
                   <div className="flex items-end justify-between gap-3 mb-3">
                     <div className="flex items-center gap-2 min-w-0">
@@ -1380,7 +1419,10 @@ export default function HomePage() {
                       </h2>
                       <span className="text-xs font-mono text-zinc-500">{count}</span>
                     </div>
-                    {hint && <span className="text-[11px] text-zinc-500">{hint}</span>}
+                    <div className="flex items-center gap-3">
+                      {hint && <span className="text-[11px] text-zinc-500">{hint}</span>}
+                      {actions}
+                    </div>
                   </div>
                 );
 
@@ -1447,15 +1489,23 @@ export default function HomePage() {
                       </section>
                     )}
 
-                    {/* 3) Kütüphanem — kalan tekil item'lar */}
+                    {/* 3) Kütüphanem — kalan tekil item'lar (R5: sort + view) */}
                     {singletonItems.length > 0 && (
                       <section aria-label="Kütüphanem">
                         <SectionHead
                           icon={LibraryIcon}
                           title="Kütüphanem"
                           count={singletonItems.length}
+                          actions={
+                            <LibrarySectionControls
+                              sortBy={librarySort}
+                              onSortChange={setLibrarySort}
+                              viewMode={libraryView}
+                              onViewChange={setLibraryView}
+                            />
+                          }
                         />
-                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
+                        <div className={singletonGridClass}>
                           {singletonItems.map((item) => {
                             const relatedAction = getLibraryRelatedAction(item);
                             return (
