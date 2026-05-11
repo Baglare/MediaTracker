@@ -176,8 +176,11 @@ export default function AppSidebar({ activeTab, onChange }: AppSidebarProps) {
         ))}
       </nav>
 
-      {/* Foot — Settings */}
-      <div className="flex flex-col gap-px pt-3 border-t border-zinc-800/60">
+      {/* Foot — Settings.
+          R7.1: Foot bölümüne hafif breathing room ve eyebrow benzeri ayrım
+          eklendi; nav listesiyle aynı density'de ama görsel olarak
+          ayrıştırılmış görünüyor. */}
+      <div className="mt-1 pt-3 border-t border-zinc-800/60">
         {FOOT.map((item) => (
           <NavRow
             key={item.id}

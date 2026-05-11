@@ -14,6 +14,7 @@ import { useState, useMemo, useEffect, useCallback } from "react";
 import AppSidebar from "@/components/app-sidebar";
 import AppTopbar from "@/components/app-topbar";
 import RightRail from "@/components/right-rail";
+import PageHeader from "@/components/page-header";
 import { TabType } from "@/components/app-tabs";
 import ActivityLogPanel from "@/components/activity-log-panel";
 // MediaFilters artık LibraryControlBar tarafından sarmalanıyor; burada
@@ -48,7 +49,18 @@ import ManualGroupModal, {
 } from "@/components/manual-group-modal";
 import EnhancedDashboard from "@/components/enhanced-dashboard";
 import AiAdvisor from "@/components/ai-advisor";
-import { ChevronDown, ChevronUp, PlayCircle, Layers, Library as LibraryIcon } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronUp,
+  PlayCircle,
+  Layers,
+  Library as LibraryIcon,
+  LayoutDashboard,
+  Compass,
+  Sparkles,
+  Activity as ActivityIcon,
+  Settings as SettingsIcon,
+} from "lucide-react";
 import LibraryControlBar, {
   LibrarySectionControls,
   type LibrarySort,
@@ -1268,15 +1280,22 @@ export default function HomePage() {
         
         {/* DASHBOARD SEKMESI */}
         {activeTab === "dashboard" && (
-          <EnhancedDashboard 
-            stats={dashboardStats} 
-            onSelectMedia={handleOpenDetailModal}
-            onIncrement={handleIncrement}
-            onComplete={handleComplete}
-            onEdit={handleOpenEditModal}
-            onToggleFavorite={handleToggleFavorite}
-            onDeleteMedia={handleDeleteRequest}
-          />
+          <div>
+            <PageHeader
+              icon={LayoutDashboard}
+              title="Dashboard"
+              subtitle="Genel istatistikler ve son aktiviteler"
+            />
+            <EnhancedDashboard
+              stats={dashboardStats}
+              onSelectMedia={handleOpenDetailModal}
+              onIncrement={handleIncrement}
+              onComplete={handleComplete}
+              onEdit={handleOpenEditModal}
+              onToggleFavorite={handleToggleFavorite}
+              onDeleteMedia={handleDeleteRequest}
+            />
+          </div>
         )}
 
         {/* KÜTÜPHANEM SEKMESI */}
@@ -1552,108 +1571,142 @@ export default function HomePage() {
 
         {/* KEŞFET SEKMESI */}
         {activeTab === "discover" && (
-          <div className="space-y-8">
-            <GlobalSearch
-              getLibraryStatus={getGlobalSearchLibraryStatus}
-              onAddToLibrary={handleAddFromGlobalSearch}
+          <div>
+            <PageHeader
+              icon={Compass}
+              title="Keşfet"
+              subtitle="TVMaze, AniList, Open Library ve OMDb üzerinden global arama"
             />
-            <div>
-              <button
-                onClick={() => setShowAdvancedSearches(!showAdvancedSearches)}
-                className="w-full flex items-center justify-between px-4 py-3 bg-zinc-900/50 border border-zinc-800/50 rounded-xl text-sm font-medium text-zinc-300 hover:bg-zinc-800/50 transition-colors cursor-pointer"
-              >
-                Gelişmiş Kaynak Aramaları (Eski Paneller)
-                {showAdvancedSearches ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-              </button>
-              
-              {showAdvancedSearches && (
-                <div className="mt-4 space-y-4">
-                  <TvmazeSearch
-                    isInLibrary={isInLibrary}
-                    onAddToLibrary={handleAddFromTvmaze}
-                  />
-                  <AniListSearch
-                    isInLibrary={isInLibrary}
-                    onAddToLibrary={handleAddFromAniList}
-                  />
-                  <OpenLibrarySearch
-                    isInLibrary={isInLibrary}
-                    onAddToLibrary={handleAddFromOpenLibrary}
-                  />
-                  <OnlineSearch />
-                </div>
-              )}
+            <div className="space-y-6">
+              <GlobalSearch
+                getLibraryStatus={getGlobalSearchLibraryStatus}
+                onAddToLibrary={handleAddFromGlobalSearch}
+              />
+              <div>
+                <button
+                  onClick={() => setShowAdvancedSearches(!showAdvancedSearches)}
+                  className="w-full flex items-center justify-between px-4 py-3 bg-zinc-900/30 border border-zinc-800/60 rounded-xl text-sm font-medium text-zinc-300 hover:bg-zinc-900/50 transition-colors cursor-pointer"
+                >
+                  Gelişmiş Kaynak Aramaları (Eski Paneller)
+                  {showAdvancedSearches ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                </button>
+
+                {showAdvancedSearches && (
+                  <div className="mt-4 space-y-4">
+                    <TvmazeSearch
+                      isInLibrary={isInLibrary}
+                      onAddToLibrary={handleAddFromTvmaze}
+                    />
+                    <AniListSearch
+                      isInLibrary={isInLibrary}
+                      onAddToLibrary={handleAddFromAniList}
+                    />
+                    <OpenLibrarySearch
+                      isInLibrary={isInLibrary}
+                      onAddToLibrary={handleAddFromOpenLibrary}
+                    />
+                    <OnlineSearch />
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}
 
         {/* AI DANIŞMAN SEKMESI */}
         {activeTab === "ai" && (
-          <AiAdvisor
-            mediaList={mediaList}
-            progressLogs={progressLogs}
-            resetSignal={aiResetSignal}
-            onAddToLibrary={handleAddFromGlobalSearch}
-          />
+          <div>
+            <PageHeader
+              icon={Sparkles}
+              title="AI Danışman"
+              subtitle="Kütüphanenden yola çıkarak öneriler ve analizler"
+            />
+            <AiAdvisor
+              mediaList={mediaList}
+              progressLogs={progressLogs}
+              resetSignal={aiResetSignal}
+              onAddToLibrary={handleAddFromGlobalSearch}
+            />
+          </div>
         )}
 
         {/* AKTİVİTE SEKMESI */}
         {activeTab === "activity" && (
-          <ActivityLogPanel progressLogs={progressLogs} />
+          <div>
+            <PageHeader
+              icon={ActivityIcon}
+              title="Aktivite"
+              subtitle="İlerleme ve durum kayıtlarının zaman çizelgesi"
+            />
+            <ActivityLogPanel progressLogs={progressLogs} />
+          </div>
         )}
 
         {/* AYARLAR SEKMESI */}
         {activeTab === "settings" && (
-          <div className="space-y-8 max-w-3xl mx-auto">
-            {/* Cloud Sync Hazırlık Durumu */}
-            <CloudSyncStatusCard />
-
-            {/* Hesap (Auth) */}
-            <AuthPanel />
-
-            {/* Cloud Veri Durumu (sayım + akıllı öneri + aktarım) */}
-            <CloudDataStatusCard
-              user={authUser}
-              configured={authConfigured}
-              mediaItems={mediaList}
-              progressLogs={progressLogs}
-              setMediaItems={setMediaList}
-              setProgressLogs={setProgressLogs}
-              onConfirm={openConfirmDialog}
+          // R7.1: RightRail bu sekmede gizli; main column tüm genişliği alır.
+          // 2 kolonlu grid lg+'da; küçük "durum" tipindeki paneller solda,
+          // veri/aksiyon panelleri sağda. "Uygulama Bilgisi" bütün satırı kaplar.
+          <div>
+            <PageHeader
+              icon={SettingsIcon}
+              title="Ayarlar"
+              subtitle="Hesap, cloud sync, veri yönetimi ve uygulama bilgisi"
             />
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-5 items-start">
+              {/* Sol kolon: hesap + cloud sync durumu */}
+              <div className="space-y-4 lg:space-y-5">
+                <AuthPanel />
+                <CloudSyncStatusCard />
+              </div>
 
-            <DataManagementPanel
-              mediaList={mediaList}
-              progressLogs={progressLogs}
-              onImport={handleImport}
-              onReset={handleResetRequest}
-              onConfirm={openConfirmDialog}
-            />
+              {/* Sağ kolon: cloud veri + veri yönetimi */}
+              <div className="space-y-4 lg:space-y-5">
+                <CloudDataStatusCard
+                  user={authUser}
+                  configured={authConfigured}
+                  mediaItems={mediaList}
+                  progressLogs={progressLogs}
+                  setMediaItems={setMediaList}
+                  setProgressLogs={setProgressLogs}
+                  onConfirm={openConfirmDialog}
+                />
+                <DataManagementPanel
+                  mediaList={mediaList}
+                  progressLogs={progressLogs}
+                  onImport={handleImport}
+                  onReset={handleResetRequest}
+                  onConfirm={openConfirmDialog}
+                />
+              </div>
 
-            {/* Uygulama Bilgisi & Credits */}
-            <div className="bg-zinc-900/50 rounded-2xl border border-zinc-800/50 p-6 mb-8">
-              <h3 className="text-lg font-semibold text-zinc-100 mb-4">Uygulama Bilgisi</h3>
-              <div className="space-y-4 text-sm text-zinc-400">
-                <p>
-                  <strong>MediaTracker</strong> tüm verileri tarayıcınızın yerel depolama alanında (localStorage) tutar. Verileriniz hiçbir dış sunucuya gönderilmez veya bir veritabanına kaydedilmez.
-                </p>
-                <div className="h-px bg-zinc-800/50 my-4" />
-                <h4 className="font-medium text-zinc-300">Veri Kaynakları (APIs)</h4>
-                <ul className="list-disc pl-5 space-y-2">
-                  <li>
-                    TV show data powered by <a href="https://www.tvmaze.com/" target="_blank" rel="noopener noreferrer" className="text-zinc-300 hover:text-violet-400 underline underline-offset-2">TVmaze</a>.
-                  </li>
-                  <li>
-                    Anime and manga data from <a href="https://anilist.co/" target="_blank" rel="noopener noreferrer" className="text-zinc-300 hover:text-violet-400 underline underline-offset-2">AniList</a>.
-                  </li>
-                  <li>
-                    Book data from <a href="https://openlibrary.org/" target="_blank" rel="noopener noreferrer" className="text-zinc-300 hover:text-violet-400 underline underline-offset-2">Open Library</a>.
-                  </li>
-                  <li>
-                    This product uses the <a href="https://www.themoviedb.org/" target="_blank" rel="noopener noreferrer" className="text-zinc-300 hover:text-violet-400 underline underline-offset-2">TMDB API</a> but is not endorsed or certified by TMDB. 
-                    <br/><span className="text-xs text-zinc-500 italic">Not: Film araması geçici olarak devre dışı. TMDB erişimi düzeldiğinde aktif edilebilir.</span>
-                  </li>
-                </ul>
+              {/* Uygulama Bilgisi & Credits — satırı tam kaplar */}
+              <div className="lg:col-span-2 bg-zinc-900/30 rounded-2xl border border-zinc-800/60 p-6">
+                <h3 className="text-base font-semibold text-zinc-100 mb-4 tracking-tight">
+                  Uygulama Bilgisi
+                </h3>
+                <div className="space-y-4 text-sm text-zinc-400">
+                  <p>
+                    <strong>MediaTracker</strong> tüm verileri tarayıcınızın yerel depolama alanında (localStorage) tutar. Verileriniz hiçbir dış sunucuya gönderilmez veya bir veritabanına kaydedilmez.
+                  </p>
+                  <div className="h-px bg-zinc-800/60 my-4" />
+                  <h4 className="font-medium text-zinc-300">Veri Kaynakları (APIs)</h4>
+                  <ul className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-2 list-disc pl-5">
+                    <li>
+                      TV show data powered by <a href="https://www.tvmaze.com/" target="_blank" rel="noopener noreferrer" className="text-zinc-300 hover:text-amber-400 underline underline-offset-2">TVmaze</a>.
+                    </li>
+                    <li>
+                      Anime and manga data from <a href="https://anilist.co/" target="_blank" rel="noopener noreferrer" className="text-zinc-300 hover:text-amber-400 underline underline-offset-2">AniList</a>.
+                    </li>
+                    <li>
+                      Book data from <a href="https://openlibrary.org/" target="_blank" rel="noopener noreferrer" className="text-zinc-300 hover:text-amber-400 underline underline-offset-2">Open Library</a>.
+                    </li>
+                    <li>
+                      This product uses the <a href="https://www.themoviedb.org/" target="_blank" rel="noopener noreferrer" className="text-zinc-300 hover:text-amber-400 underline underline-offset-2">TMDB API</a> but is not endorsed or certified by TMDB.
+                      <br/><span className="text-xs text-zinc-500 italic">Not: Film araması geçici olarak devre dışı. TMDB erişimi düzeldiğinde aktif edilebilir.</span>
+                    </li>
+                  </ul>
+                </div>
               </div>
             </div>
           </div>
@@ -1661,12 +1714,16 @@ export default function HomePage() {
         </main>
       </div>
 
-      <RightRail
-        mediaList={mediaList}
-        progressLogs={progressLogs}
-        stats={dashboardStats}
-        onOpenDetail={handleOpenDetailModal}
-      />
+      {/* R7.1: Ayarlar bağlam-dışı kalıyor; RightRail bu sekmede gizleniyor.
+          Main column otomatik olarak genişler (xl rail sütunu kaybolur). */}
+      {activeTab !== "settings" && (
+        <RightRail
+          mediaList={mediaList}
+          progressLogs={progressLogs}
+          stats={dashboardStats}
+          onOpenDetail={handleOpenDetailModal}
+        />
+      )}
 
       {/* Medya Ekle / Düzenle Modalı */}
       <MediaModal

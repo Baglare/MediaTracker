@@ -2,6 +2,10 @@
 // Medya Filtreleme Bileşeni
 // ============================================
 // Theme Mode (Doğu/Ekran/Kütüphane), medya türü ve durum filtreleri.
+//
+// R6.1: Görsel yerleşim kompakt yatay filtre rail'ine taşındı. Logic
+// (themeFilters/typeFilters/statusFilters listeleri, TYPE_VALUES_BY_THEME
+// haritası, Doğu seçiliyken type bloğunun gizlenmesi) aynen korunuyor.
 
 "use client";
 
@@ -73,6 +77,39 @@ const statusFilters: { label: string; value: MediaStatus | "active" | "all" }[] 
   { label: "Bırakıldı", value: "dropped" },
 ];
 
+// Kompakt pill stilleri — accent farklılaşması için tone parametresi.
+type PillTone = "amber" | "violet" | "fuchsia";
+
+function pillClasses(active: boolean, tone: PillTone): string {
+  if (active) {
+    if (tone === "amber") {
+      return "bg-amber-500/15 text-amber-200 ring-1 ring-amber-500/40";
+    }
+    if (tone === "violet") {
+      return "bg-violet-500/15 text-violet-200 ring-1 ring-violet-500/40";
+    }
+    return "bg-fuchsia-500/15 text-fuchsia-200 ring-1 ring-fuchsia-500/40";
+  }
+  return "bg-zinc-900/50 text-zinc-400 ring-1 ring-zinc-800 hover:bg-zinc-800/60 hover:text-zinc-200";
+}
+
+function FilterGroup({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-center gap-2 min-w-0">
+      <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500 shrink-0">
+        {label}
+      </span>
+      <div className="flex items-center gap-1 flex-wrap">{children}</div>
+    </div>
+  );
+}
+
 export default function MediaFilters({
   activeTheme,
   activeType,
@@ -83,107 +120,72 @@ export default function MediaFilters({
 }: MediaFiltersProps) {
   // V5A.2: Doğu seçiliyken type bloğu tamamen gizlenir (header alt-ayrımı üstlenir).
   const showTypeBlock = activeTheme !== "east";
-  // Görünen tür listesini theme'e göre filtrele.
   const visibleTypeFilters =
     activeTheme === "east"
       ? []
       : typeFilters.filter((f) =>
           TYPE_VALUES_BY_THEME[activeTheme].includes(f.value),
         );
+
   return (
-    <div className="space-y-4">
-      {/* V5A.1: Theme Mode (üst seviye) */}
-      <div>
-        <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-2">
-          Tema
-        </p>
-        <div className="flex flex-wrap gap-2">
-          {themeFilters.map((filter) => {
-            const isActive = activeTheme === filter.value;
-            return (
-              <button
-                key={filter.value}
-                onClick={() => onThemeChange(filter.value)}
-                className={`
-                  flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-medium
-                  transition-all duration-200 cursor-pointer
-                  ${
-                    isActive
-                      ? "bg-amber-500/20 text-amber-200 ring-1 ring-amber-500/40 shadow-lg shadow-amber-500/10"
-                      : "bg-zinc-900/50 text-zinc-400 hover:bg-zinc-800/80 hover:text-zinc-300 ring-1 ring-zinc-800"
-                  }
-                `}
-              >
-                <span className="text-base">{filter.icon}</span>
-                <span>{filter.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
+    // R6.1: Kompakt yatay rail. Geniş ekranlarda gruplar yan yana; dar
+    // ekranlarda flex-wrap ile alt satıra geçer. Dikey yığılma kalktı.
+    <div className="flex items-center flex-wrap gap-x-5 gap-y-2">
+      {/* Tema */}
+      <FilterGroup label="Tema">
+        {themeFilters.map((filter) => {
+          const isActive = activeTheme === filter.value;
+          return (
+            <button
+              key={filter.value}
+              onClick={() => onThemeChange(filter.value)}
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[11.5px] font-medium transition-colors cursor-pointer ${pillClasses(isActive, "amber")}`}
+            >
+              <span className="text-xs leading-none">{filter.icon}</span>
+              <span>{filter.label}</span>
+            </button>
+          );
+        })}
+      </FilterGroup>
 
-      {/* V5A.2: Doğu alt filtresi artık EastThemeHeader içinde; burada render edilmez. */}
-
-      {/* Medya türü filtreleri — Doğu aktifken gizli */}
+      {/* Tür — sadece doğu dışında */}
       {showTypeBlock && (
-      <div>
-        <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-2">
-          Medya Türü
-        </p>
-        <div className="flex flex-wrap gap-2">
-          {visibleTypeFilters.map((filter) => {
-            const isActive = activeType === filter.value;
-            return (
-              <button
-                key={filter.value}
-                onClick={() => onTypeChange(filter.value)}
-                className={`
-                  flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-medium
-                  transition-all duration-200 cursor-pointer
-                  ${
-                    isActive
-                      ? "bg-violet-500/20 text-violet-300 ring-1 ring-violet-500/40 shadow-lg shadow-violet-500/10"
-                      : "bg-zinc-900/50 text-zinc-400 hover:bg-zinc-800/80 hover:text-zinc-300 ring-1 ring-zinc-800"
-                  }
-                `}
-              >
-                <span className="text-base">{filter.icon}</span>
-                <span>{filter.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
+        <>
+          <span aria-hidden="true" className="hidden md:block w-px h-5 bg-zinc-800/70" />
+          <FilterGroup label="Tür">
+            {visibleTypeFilters.map((filter) => {
+              const isActive = activeType === filter.value;
+              return (
+                <button
+                  key={filter.value}
+                  onClick={() => onTypeChange(filter.value)}
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[11.5px] font-medium transition-colors cursor-pointer ${pillClasses(isActive, "violet")}`}
+                >
+                  <span className="text-xs leading-none">{filter.icon}</span>
+                  <span>{filter.label}</span>
+                </button>
+              );
+            })}
+          </FilterGroup>
+        </>
       )}
 
-      {/* Durum filtreleri */}
-      <div>
-        <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-2">
-          Durum
-        </p>
-        <div className="flex flex-wrap gap-2">
-          {statusFilters.map((filter) => {
-            const isActive = activeStatus === filter.value;
-            return (
-              <button
-                key={filter.value}
-                onClick={() => onStatusChange(filter.value)}
-                className={`
-                  px-3.5 py-2 rounded-xl text-sm font-medium
-                  transition-all duration-200 cursor-pointer
-                  ${
-                    isActive
-                      ? "bg-fuchsia-500/20 text-fuchsia-300 ring-1 ring-fuchsia-500/40 shadow-lg shadow-fuchsia-500/10"
-                      : "bg-zinc-900/50 text-zinc-400 hover:bg-zinc-800/80 hover:text-zinc-300 ring-1 ring-zinc-800"
-                  }
-                `}
-              >
-                {filter.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+      {/* Durum */}
+      <span aria-hidden="true" className="hidden md:block w-px h-5 bg-zinc-800/70" />
+      <FilterGroup label="Durum">
+        {statusFilters.map((filter) => {
+          const isActive = activeStatus === filter.value;
+          return (
+            <button
+              key={filter.value}
+              onClick={() => onStatusChange(filter.value)}
+              className={`px-2.5 py-1 rounded-md text-[11.5px] font-medium transition-colors cursor-pointer ${pillClasses(isActive, "fuchsia")}`}
+            >
+              {filter.label}
+            </button>
+          );
+        })}
+      </FilterGroup>
     </div>
   );
 }

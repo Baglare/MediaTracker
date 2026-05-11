@@ -68,8 +68,8 @@ export default function LibraryControlBar({
 }: LibraryControlBarProps) {
   return (
     <div className="rounded-2xl border border-zinc-800/60 bg-zinc-900/30">
-      {/* Üst satır: search · medya ekle */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 sm:p-4 border-b border-zinc-800/60">
+      {/* Üst satır: search · medya ekle (R6.1: padding sıkılaştı) */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 px-3 py-2.5 sm:px-4 sm:py-3 border-b border-zinc-800/60">
         {/* Search */}
         <div className="relative flex-1 min-w-0">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 pointer-events-none" />
@@ -98,8 +98,9 @@ export default function LibraryControlBar({
         </button>
       </div>
 
-      {/* Filtre bloğu (mevcut MediaFilters reuse) */}
-      <div className="p-3 sm:p-4">
+      {/* Filtre bloğu (mevcut MediaFilters reuse) — R6.1: tek satırlık
+          yatay rail; padding ihtiyaç kadar. */}
+      <div className="px-3 py-2.5 sm:px-4 sm:py-3">
         <MediaFilters
           activeTheme={themeFilter}
           activeType={typeFilter}
