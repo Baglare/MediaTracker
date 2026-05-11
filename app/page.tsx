@@ -106,7 +106,9 @@ export default function HomePage() {
   const [typeFilter, setTypeFilter] = useState<MediaType | "all">("all");
   // Seçili durum filtresi
   const [statusFilter, setStatusFilter] = useState<MediaStatus | "active" | "all">("all");
-  // V5A.1: Üst seviye theme mode filtresi (Tümü / Doğu / Ekran / Kütüphane)
+  // V5A.1 / R9: Üst seviye "Dünya" filtresi (Tümü / Doğu / Kadraj / Arşiv).
+  // State adı `themeFilter` ve "east"/"screen"/"library" iç değerleri R9'da
+  // korundu; sadece UI label'ı ve sekme adları yenilendi.
   const [themeFilter, setThemeFilter] = useState<ThemeFilter>("all");
   // V5A.1: Doğu seçiliyken aktif alt filtre (Tümü / Anime / Manga / Novel)
   const [eastSubFilter, setEastSubFilter] = useState<EastSubFilter>("all");
@@ -1217,9 +1219,15 @@ export default function HomePage() {
         matchesStatus = item.status === statusFilter;
       }
 
-      // V5A.1: Theme mode + Doğu alt filtresi.
+      // V5A.1 / R9: "Dünya" filtresi + Doğu alt filtresi.
       // Eski item'larda theme/mediaType eksik olabilir; classification akışını
       // bozmamak için withMediaClassification ile fallback değerleri okuyoruz.
+      // R9 eşleşmeleri (state değerleri aynı, label'lar yeni):
+      //   "east"    = Doğu   → anime/manga/novel ailesinin tamamı
+      //                       (anime_movie/ova/ona/special, light/web/visual novel dahil)
+      //   "screen"  = Kadraj → tv + movie (ekran medyaları)
+      //   "library" = Arşiv  → book (klasik kitap/okuma)
+      // Overlap yok: anime film Doğu'da kalır, novel'lar Arşiv'e geçmez, kitap Doğu'ya sızmaz.
       let matchesTheme = true;
       if (themeFilter !== "all") {
         const cls = withMediaClassification(item);
@@ -1236,9 +1244,10 @@ export default function HomePage() {
             matchesTheme = cls.mediaType === eastSubFilter;
           }
         } else if (themeFilter === "screen") {
+          // Kadraj: ekran medyaları. tv/movie mediaType'lı item'lar buraya düşer.
           matchesTheme = cls.mediaType === "tv" || cls.mediaType === "movie";
         } else if (themeFilter === "library") {
-          // Kütüphane sadece kitap ailesi; novel'lar Doğu altına düştüğü için burada yok.
+          // Arşiv: sadece klasik kitap. Novel'lar Doğu altına düştüğü için burada yok.
           matchesTheme = cls.mediaType === "book";
         }
       }

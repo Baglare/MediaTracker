@@ -1,21 +1,24 @@
 // ============================================
 // Medya Filtreleme Bileşeni
 // ============================================
-// Theme Mode (Doğu/Ekran/Kütüphane), medya türü ve durum filtreleri.
+// Dünya Mode (Doğu/Kadraj/Arşiv), medya türü ve durum filtreleri.
 //
-// R6.1: Görsel yerleşim kompakt yatay filtre rail'ine taşındı. Logic
-// (themeFilters/typeFilters/statusFilters listeleri, TYPE_VALUES_BY_THEME
-// haritası, Doğu seçiliyken type bloğunun gizlenmesi) aynen korunuyor.
+// R6.1: Görsel yerleşim kompakt yatay filtre rail'ine taşındı.
+// R9: Eski "Tema" konsepti "Dünya" olarak yeniden isimlendirildi; sekmeler
+// "Ekran"→"Kadraj", "Kütüphane"→"Arşiv" oldu. Filtre eşleşme mantığı
+// (anime/manga/novel ailesi Doğu, tv+movie Kadraj, book Arşiv) aynı kaldı.
+// State adı `themeFilter` ve değerler ("east"/"screen"/"library") şimdilik
+// korundu — büyük refactor bu turun kapsamı dışı.
 
 "use client";
 
 import { MediaType, MediaStatus } from "@/lib/types";
 
-// V5A.1: Üst seviye theme mode filtresi.
-// "all" — tüm temalar
-// "east" — Doğu (anime + manga + novel mediaType'ları)
-// "screen" — Ekran (tv + movie)
-// "library" — Kütüphane (book)
+// V5A.1 / R9: Üst seviye "Dünya" filtresi.
+// "all"     — Tümü
+// "east"    — Doğu (anime + manga + novel; light/web/visual novel dahil)
+// "screen"  — Kadraj (tv + movie + miniseries/documentary benzeri ekran medyaları)
+// "library" — Arşiv (book — klasik kitap/okuma)
 export type ThemeFilter = "all" | "east" | "screen" | "library";
 
 // V5A.1: Doğu seçiliyken aktifleşen ikinci seviye alt filtre.
@@ -34,11 +37,13 @@ interface MediaFiltersProps {
 }
 
 // V5A.1: Theme mode filtre butonlarının listesi
+// R9: "Dünya" sekmeleri. Değerler internal (themeFilter state) için aynı kalıyor,
+// sadece görünen etiketler yeniden isimlendirildi.
 const themeFilters: { label: string; value: ThemeFilter; icon: string }[] = [
   { label: "Tümü", value: "all", icon: "🌐" },
   { label: "Doğu", value: "east", icon: "🏯" },
-  { label: "Ekran", value: "screen", icon: "🎞️" },
-  { label: "Kütüphane", value: "library", icon: "📚" },
+  { label: "Kadraj", value: "screen", icon: "🎞️" },
+  { label: "Arşiv", value: "library", icon: "📚" },
 ];
 
 // Medya türü filtre butonlarının listesi
@@ -131,8 +136,8 @@ export default function MediaFilters({
     // R6.1: Kompakt yatay rail. Geniş ekranlarda gruplar yan yana; dar
     // ekranlarda flex-wrap ile alt satıra geçer. Dikey yığılma kalktı.
     <div className="flex items-center flex-wrap gap-x-5 gap-y-2">
-      {/* Tema */}
-      <FilterGroup label="Tema">
+      {/* Dünya (R9: eski "Tema") */}
+      <FilterGroup label="Dünya">
         {themeFilters.map((filter) => {
           const isActive = activeTheme === filter.value;
           return (
