@@ -1,12 +1,12 @@
 // ============================================
-// Series Group Card — V2
+// Series Group Card — R3 (Layout Redesign)
 // ============================================
-// Aynı seriesGroupId'ye sahip 2+ MediaItem'ı tek bir
-// aç/kapat kart altında toplar. V2'de:
-// - Grup seviyesinde "Sezon/Parça Ekle" aksiyonu
-// - Kapalı haldeki özet: parça/tamamlanan/yüzde + devam edilen parça
-// - Normal MediaCard'tan görsel olarak ayırt edilen kart
-// - Açıldığında child kartlar görsel olarak grup altına bağlı görünür
+// Aynı seriesGroupId'ye sahip 2+ MediaItem'ı tek bir aç/kapat kart altında
+// toplar. R3 turunda görsel/yerleşim güçlendirildi: featured-collection
+// hissi veren header, üst accent şeridi, sağda kompakt ilerleme paneli ve
+// child item'lar için daha temiz bir iç container. Veri/logic akışı
+// (computeGroupProgress, getOngoingItem, describeOngoingLabel, props
+// arayüzü) aynen korunuyor. Child kartlar hâlâ MediaCard.
 
 "use client";
 
@@ -156,10 +156,15 @@ export default function SeriesGroupCard({
   const total = items.length;
   const completed = items.filter(isItemCompleted).length;
 
-  // V3.1: yüzde, child item'ların gerçek progress toplamına göre hesaplanır.
+  // yüzde, child item'ların gerçek progress toplamına göre hesaplanır.
   // currentProgress/totalProgress değişince anında güncellenir.
   const groupProgress = computeGroupProgress(items);
   const percent = groupProgress.percent;
+
+  // Toplam bilinen birim (bölüm/chapter) — child'lardan toplanır; bilinmeyen
+  // (totalProgress=0) child'lar dahil edilmez.
+  const unitTotal = groupProgress.hasUnitTotals ? groupProgress.total : 0;
+  const unitCurrent = groupProgress.hasUnitTotals ? groupProgress.current : 0;
 
   const cover = items[0]?.coverImage;
   const title = group.seriesGroupTitle || items[0]?.title || "Seri";
@@ -174,7 +179,7 @@ export default function SeriesGroupCard({
   const ongoingLabel = ongoing ? describeOngoingLabel(ongoing) : null;
   const ongoingProgressLabel = ongoing ? getProgressLabel(ongoing.type) : "";
 
-  // V5A.3: Grup tek bir Doğu ailesinden mi (hepsi anime / hepsi manga / hepsi novel)?
+  // Grup tek bir Doğu ailesinden mi (hepsi anime / hepsi manga / hepsi novel)?
   // Öyleyse sol kenar accent + küçük rozet themeden tonlanır. Karışıksa fallback violet.
   const accents = items.map(resolveThemeAccent);
   const firstFamily = accents[0]?.family ?? null;
@@ -196,29 +201,75 @@ export default function SeriesGroupCard({
   const canAddAtGroupLevel =
     !!groupRelated?.canAdd && !!onAddRelatedParts && !!representative;
 
+  // Accent palet: Doğu ailesi varsa tema rengi; aksi halde violet/fuchsia fallback.
+  // R3: tek bir yerden okunsun diye class'ları burada topluyoruz.
+  const palette = groupAccent
+    ? {
+        topStrip: groupAccent.groupSideGradient, // "from-x to-y"
+        progressBar: groupAccent.groupSideGradient,
+        ringBorder: "border-amber-500/30",
+        ringHover: "hover:border-amber-500/40",
+        ringOpen: "border-amber-500/45 ring-amber-500/15",
+        bgGradient: "from-amber-500/[0.05]",
+        seriBadge:
+          "bg-amber-500/15 text-amber-200 ring-1 ring-amber-500/30",
+        addBtn:
+          "bg-amber-500/15 text-amber-200 ring-1 ring-amber-500/30 hover:bg-amber-500/25",
+        editBtn:
+          "bg-zinc-800/70 text-zinc-300 ring-1 ring-zinc-700/60 hover:bg-zinc-700/70",
+        partCountBadge: "bg-black/70 text-amber-200 ring-1 ring-amber-500/30",
+        innerDivider: "border-amber-500/15",
+        innerBg: "bg-zinc-950/40",
+        innerLine: "bg-amber-500/20",
+        addChildBtn:
+          "border-amber-500/30 text-amber-200 hover:bg-amber-500/10",
+      }
+    : {
+        topStrip: "from-violet-500/70 to-fuchsia-500/40",
+        progressBar: "from-violet-500 to-fuchsia-500",
+        ringBorder: "border-zinc-800/60",
+        ringHover: "hover:border-violet-500/30",
+        ringOpen: "border-violet-500/40 ring-violet-500/20",
+        bgGradient: "from-violet-500/[0.04]",
+        seriBadge:
+          "bg-violet-500/15 text-violet-300 ring-1 ring-violet-500/30",
+        addBtn:
+          "bg-violet-500/15 text-violet-200 ring-1 ring-violet-500/30 hover:bg-violet-500/25",
+        editBtn:
+          "bg-fuchsia-500/10 text-fuchsia-300 ring-1 ring-fuchsia-500/25 hover:bg-fuchsia-500/20",
+        partCountBadge:
+          "bg-black/70 text-violet-200 ring-1 ring-violet-500/30",
+        innerDivider: "border-violet-500/15",
+        innerBg: "bg-zinc-950/40",
+        innerLine: "bg-violet-500/20",
+        addChildBtn:
+          "border-violet-500/30 text-violet-200 hover:bg-violet-500/10",
+      };
+
   return (
     <div
-      className={`relative rounded-2xl border bg-gradient-to-b from-violet-500/[0.04] to-zinc-900/50 ring-1 transition-colors ${
+      className={`relative rounded-2xl border bg-gradient-to-b ${palette.bgGradient} to-zinc-900/60 ring-1 transition-colors overflow-hidden ${
         open
-          ? "border-violet-500/40 ring-violet-500/20"
-          : "border-zinc-800/60 ring-transparent hover:border-violet-500/30"
+          ? `${palette.ringOpen}`
+          : `${palette.ringBorder} ring-transparent ${palette.ringHover}`
       }`}
     >
-      {/* Sol kenar accent — grup olduğunu güçlü şekilde belli eder.
-          V5A.3: Tüm parçalar aynı Doğu ailesindense theme tonu kullanılır. */}
+      {/* Üst accent şeridi — "featured collection" hissi.
+          Hem tema ailesi (Doğu) hem de fallback için aynı yapı. */}
       <div
-        className={`absolute left-0 top-3 bottom-3 w-0.5 rounded-full bg-gradient-to-b ${
-          groupAccent ? groupAccent.groupSideGradient : "from-violet-500/60 to-fuchsia-500/40"
-        }`}
+        aria-hidden="true"
+        className={`absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r ${palette.topStrip} opacity-80`}
       />
 
+      {/* HEADER — toggle alanı + sağda kompakt progress paneli */}
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-start gap-4 p-4 text-left rounded-2xl hover:bg-zinc-900/40 transition-colors cursor-pointer"
+        className="w-full grid grid-cols-[auto_1fr_auto] gap-4 p-4 sm:p-5 text-left hover:bg-zinc-900/30 transition-colors cursor-pointer"
         aria-expanded={open}
       >
-        <div className="relative w-16 h-22 rounded-lg overflow-hidden flex-shrink-0 ring-1 ring-zinc-800">
+        {/* Cover — biraz daha belirgin (20x28) */}
+        <div className="relative w-20 h-28 rounded-lg overflow-hidden flex-shrink-0 ring-1 ring-zinc-800 shadow-md shadow-black/30">
           {cover ? (
             <Image
               src={cover}
@@ -229,18 +280,23 @@ export default function SeriesGroupCard({
             />
           ) : (
             <div className="w-full h-full bg-zinc-800 flex items-center justify-center">
-              <Layers className="w-5 h-5 text-zinc-600" />
+              <Layers className="w-6 h-6 text-zinc-600" />
             </div>
           )}
           {/* Parça sayısı rozeti */}
-          <span className="absolute bottom-1 right-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-black/70 text-violet-200 ring-1 ring-violet-500/30">
+          <span
+            className={`absolute bottom-1 right-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${palette.partCountBadge}`}
+          >
             {total}
           </span>
         </div>
 
-        <div className="flex-1 min-w-0">
+        {/* Orta: badges + title + meta + devam */}
+        <div className="min-w-0 flex flex-col gap-1.5">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-md bg-violet-500/15 text-violet-300 ring-1 ring-violet-500/30">
+            <span
+              className={`inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-md ${palette.seriBadge}`}
+            >
               <Layers className="w-3 h-3" />
               Seri
             </span>
@@ -249,7 +305,6 @@ export default function SeriesGroupCard({
                 {getMediaTypeLabel(firstType!)}
               </span>
             )}
-            {/* V5A.3: Tüm parçalar aynı Doğu ailesindense küçük theme rozeti */}
             {groupAccent && firstFamily && (
               <span
                 className={`inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-md ring-1 ${groupAccent.badge}`}
@@ -261,55 +316,68 @@ export default function SeriesGroupCard({
             )}
           </div>
 
-          <h3 className="mt-1.5 font-semibold text-zinc-100 text-sm leading-tight truncate">
+          <h3 className="font-semibold text-zinc-50 text-base sm:text-[17px] leading-tight tracking-tight line-clamp-2">
             {title}
           </h3>
 
-          <div className="mt-1.5 flex items-center gap-1.5 flex-wrap text-[11px] text-zinc-500">
+          <div className="flex items-center gap-1.5 flex-wrap text-[11px] text-zinc-500">
             <span>
-              <span className="text-zinc-300 font-medium">{total}</span> {partsLabel}
+              <span className="text-zinc-200 font-medium tabular-nums">{total}</span> {partsLabel}
             </span>
-            <span className="text-zinc-700">•</span>
+            <span className="text-zinc-700">·</span>
             <span>
-              <span className="text-emerald-400 font-medium">{completed}</span> tamamlandı
+              <span className="text-emerald-400 font-medium tabular-nums">{completed}</span> tamamlandı
             </span>
-            {ongoingLabel && completed < total && (
+            {unitTotal > 0 && (
               <>
-                <span className="text-zinc-700">•</span>
-                <span className="text-blue-300/90">
-                  Devam: {ongoingLabel}
-                  {ongoing && ongoing.totalProgress > 0 && (
-                    <span className="text-zinc-500">
-                      {" "}
-                      ({ongoing.currentProgress}/{ongoing.totalProgress} {ongoingProgressLabel})
-                    </span>
-                  )}
+                <span className="text-zinc-700">·</span>
+                <span className="font-mono text-zinc-400 tabular-nums">
+                  {unitCurrent}/{unitTotal}
                 </span>
               </>
             )}
           </div>
 
-          <div className="mt-2 flex items-center gap-2">
-            <div className="flex-1 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+          {ongoingLabel && completed < total && (
+            <div className="text-[11.5px] text-zinc-400">
+              <span className="text-zinc-500">Devam: </span>
+              <span className="text-blue-300/90 font-medium">{ongoingLabel}</span>
+              {ongoing && ongoing.totalProgress > 0 && (
+                <span className="text-zinc-500 ml-1 font-mono tabular-nums">
+                  ({ongoing.currentProgress}/{ongoing.totalProgress} {ongoingProgressLabel})
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Sağ: kompakt progress + chevron */}
+        <div className="flex flex-col items-end justify-between gap-2 min-w-[110px]">
+          <div className="flex items-center text-zinc-500">
+            {open ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+          </div>
+          <div className="w-full">
+            <div className="flex items-baseline justify-between mb-1">
+              <span className="text-[10px] uppercase tracking-[0.12em] text-zinc-500 font-semibold">
+                İlerleme
+              </span>
+              <span className="text-sm font-semibold text-zinc-100 tabular-nums">
+                {percent}%
+              </span>
+            </div>
+            <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
               <div
-                className="h-full rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500 transition-all duration-500 ease-out"
+                className={`h-full rounded-full bg-gradient-to-r ${palette.progressBar} transition-all duration-500 ease-out`}
                 style={{ width: `${percent}%` }}
               />
             </div>
-            <span className="text-[11px] text-zinc-400 font-medium tabular-nums">
-              {percent}%
-            </span>
           </div>
-        </div>
-
-        <div className="flex items-center text-zinc-500 self-center">
-          {open ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
         </div>
       </button>
 
       {/* Grup seviyesi aksiyonlar */}
       {(canAddAtGroupLevel || (onOpenGroupEdit && representative)) && (
-        <div className="px-4 pb-3 -mt-1 flex items-center gap-2 flex-wrap">
+        <div className="px-4 sm:px-5 pb-3 -mt-1 flex items-center gap-2 flex-wrap">
           {canAddAtGroupLevel && (
             <button
               type="button"
@@ -319,7 +387,7 @@ export default function SeriesGroupCard({
                   onAddRelatedParts(representative);
                 }
               }}
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-violet-500/15 text-violet-200 ring-1 ring-violet-500/30 hover:bg-violet-500/25 transition-colors cursor-pointer"
+              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors cursor-pointer ${palette.addBtn}`}
             >
               <Plus className="w-3 h-3" />
               {groupRelated?.label ?? "Sezon Ekle"}
@@ -333,7 +401,7 @@ export default function SeriesGroupCard({
                 onOpenGroupEdit(representative);
               }}
               title="Grup başlığını düzenle"
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-fuchsia-500/10 text-fuchsia-300 ring-1 ring-fuchsia-500/25 hover:bg-fuchsia-500/20 transition-colors cursor-pointer"
+              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors cursor-pointer ${palette.editBtn}`}
             >
               <Pencil className="w-3 h-3" />
               Grubu Düzenle
@@ -343,10 +411,13 @@ export default function SeriesGroupCard({
       )}
 
       {open && (
-        <div className="border-t border-violet-500/15 bg-zinc-950/40 rounded-b-2xl">
-          <div className="relative pl-3 pr-3 py-3 sm:pl-4 sm:pr-4 sm:py-4 space-y-3">
-            {/* Soldaki ince hiyerarşi çizgisi */}
-            <div className="pointer-events-none absolute left-1.5 top-3 bottom-3 w-px bg-violet-500/20" />
+        <div className={`border-t ${palette.innerDivider} ${palette.innerBg} rounded-b-2xl`}>
+          <div className="relative pl-4 pr-3 py-4 sm:pl-5 sm:pr-4 sm:py-5 space-y-3">
+            {/* Soldaki ince hiyerarşi çizgisi — child'ların bağlı olduğunu gösterir */}
+            <div
+              className={`pointer-events-none absolute left-2 top-4 bottom-4 w-px ${palette.innerLine}`}
+              aria-hidden="true"
+            />
             {items.map((child) => {
               const related = resolveRelatedAction?.(child);
               return (
@@ -367,6 +438,23 @@ export default function SeriesGroupCard({
                 </div>
               );
             })}
+
+            {/* Expanded içinde de bir "Sezon/Parça Ekle" affordance'ı bırakıyoruz —
+                referans tasarımda dashed ghost slot olarak görünüyor. Aynı handler. */}
+            {canAddAtGroupLevel && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (representative && onAddRelatedParts) {
+                    onAddRelatedParts(representative);
+                  }
+                }}
+                className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-dashed text-xs font-medium transition-colors cursor-pointer ${palette.addChildBtn}`}
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>{groupRelated?.label ?? "Sezon / Parça Ekle"}</span>
+              </button>
+            )}
           </div>
         </div>
       )}

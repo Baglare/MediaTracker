@@ -46,7 +46,7 @@ import ManualGroupModal, {
 } from "@/components/manual-group-modal";
 import EnhancedDashboard from "@/components/enhanced-dashboard";
 import AiAdvisor from "@/components/ai-advisor";
-import { ChevronDown, ChevronUp, Search, Plus } from "lucide-react";
+import { ChevronDown, ChevronUp, Search, Plus, PlayCircle, Layers, Library as LibraryIcon } from "lucide-react";
 import { GlobalSearchLibraryStatus, GlobalSearchResult } from "@/lib/global-search-types";
 import { mockMediaList } from "@/lib/mock-media";
 import { loadMediaList, saveMediaList, clearMediaList, loadProgressLogs, saveProgressLogs } from "@/lib/storage";
@@ -1316,46 +1316,171 @@ export default function HomePage() {
             </div>
 
             {filteredMedia.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
-                {groupMediaItems(filteredMedia).map((group) => {
-                  // V1: 2+ parça varsa grup kartı; aksi halde tek MediaCard.
-                  if (group.isGroup && group.items.length >= 2) {
-                    return (
-                      <SeriesGroupCard
-                        key={group.key}
-                        group={group}
-                        onIncrement={handleIncrement}
-                        onComplete={handleComplete}
-                        onEdit={handleOpenEditModal}
-                        onDelete={handleDeleteRequest}
-                        onToggleFavorite={handleToggleFavorite}
-                        onOpenDetail={handleOpenDetailModal}
-                        onAddRelatedParts={handleAddMissingTvmazeParts}
-                        resolveRelatedAction={getLibraryRelatedAction}
-                        onOpenGroupEdit={handleOpenGroupEdit}
-                      />
-                    );
-                  }
-                  const item = group.items[0];
-                  const relatedAction = getLibraryRelatedAction(item);
-                  return (
-                    <MediaCard
-                      key={item.id}
-                      item={item}
-                      onIncrement={handleIncrement}
-                      onComplete={handleComplete}
-                      onEdit={handleOpenEditModal}
-                      onDelete={handleDeleteRequest}
-                      onToggleFavorite={handleToggleFavorite}
-                      onOpenDetail={handleOpenDetailModal}
-                      onAddRelatedParts={handleAddMissingTvmazeParts}
-                      relatedPartsLabel={relatedAction.label}
-                      canAddRelatedParts={relatedAction.canAdd}
-                      onOpenGroupEdit={handleOpenGroupEdit}
-                    />
-                  );
-                })}
-              </div>
+              (() => {
+                // R2: Kütüphanem dashboard-style section layout.
+                // groupMediaItems sonucu tek kez hesaplanıyor; "Seri Koleksiyonlarım"
+                // ve "Kütüphanem (tekil)" bu ayrımdan türeyor. "Devam Ettiklerim"
+                // ise filteredMedia üzerinden bağımsız bir slice — bilinçli olarak
+                // bir item'ın hem üst Devam slice'ında hem de altta seri/tekil
+                // listesinde görünmesine izin veriyoruz (spec: "üstte öne çıkar,
+                // genel listede de kalabilir"). SeriesGroupCard ve MediaCard
+                // davranışları aynen korunuyor.
+
+                const groupedAll = groupMediaItems(filteredMedia);
+                const seriesGroupCards = groupedAll.filter(
+                  (g) => g.isGroup && g.items.length >= 2,
+                );
+                const singletonItems = groupedAll
+                  .filter((g) => !(g.isGroup && g.items.length >= 2))
+                  .map((g) => g.items[0]);
+
+                // "Devam Ettiklerim" kuralı:
+                //   - status "watching" veya "reading"; veya
+                //   - currentProgress > 0 AND status not in {completed, dropped}.
+                // Sıralama: en son progress log'una göre azalan; log yoksa kayıt
+                // sırasını koruyalım diye stable Array.prototype.sort kullanılıyor.
+                const lastLogAt = new Map<string, number>();
+                for (const log of progressLogs) {
+                  const t = new Date(log.createdAt).getTime();
+                  const prev = lastLogAt.get(log.mediaId) ?? 0;
+                  if (t > prev) lastLogAt.set(log.mediaId, t);
+                }
+                const continueItems = filteredMedia
+                  .filter((it) => {
+                    if (it.status === "watching" || it.status === "reading") return true;
+                    if (
+                      (it.currentProgress ?? 0) > 0 &&
+                      it.status !== "completed" &&
+                      it.status !== "dropped"
+                    ) {
+                      return true;
+                    }
+                    return false;
+                  })
+                  .slice()
+                  .sort((a, b) => (lastLogAt.get(b.id) ?? 0) - (lastLogAt.get(a.id) ?? 0))
+                  .slice(0, 6);
+
+                const SectionHead = ({
+                  icon: Icon,
+                  title,
+                  count,
+                  hint,
+                }: {
+                  icon: typeof PlayCircle;
+                  title: string;
+                  count: number;
+                  hint?: string;
+                }) => (
+                  <div className="flex items-end justify-between gap-3 mb-3">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Icon className="w-4 h-4 text-amber-400/80 shrink-0" />
+                      <h2 className="text-base font-semibold text-zinc-100 tracking-tight truncate">
+                        {title}
+                      </h2>
+                      <span className="text-xs font-mono text-zinc-500">{count}</span>
+                    </div>
+                    {hint && <span className="text-[11px] text-zinc-500">{hint}</span>}
+                  </div>
+                );
+
+                return (
+                  <div className="space-y-10">
+                    {/* 1) Devam Ettiklerim — in-progress slice (max 6) */}
+                    {continueItems.length > 0 && (
+                      <section aria-label="Devam Ettiklerim">
+                        <SectionHead
+                          icon={PlayCircle}
+                          title="Devam Ettiklerim"
+                          count={continueItems.length}
+                          hint="Son aktiviteye göre"
+                        />
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
+                          {continueItems.map((item) => {
+                            const relatedAction = getLibraryRelatedAction(item);
+                            return (
+                              <MediaCard
+                                key={`continue-${item.id}`}
+                                item={item}
+                                onIncrement={handleIncrement}
+                                onComplete={handleComplete}
+                                onEdit={handleOpenEditModal}
+                                onDelete={handleDeleteRequest}
+                                onToggleFavorite={handleToggleFavorite}
+                                onOpenDetail={handleOpenDetailModal}
+                                onAddRelatedParts={handleAddMissingTvmazeParts}
+                                relatedPartsLabel={relatedAction.label}
+                                canAddRelatedParts={relatedAction.canAdd}
+                                onOpenGroupEdit={handleOpenGroupEdit}
+                              />
+                            );
+                          })}
+                        </div>
+                      </section>
+                    )}
+
+                    {/* 2) Seri Koleksiyonlarım — group cards (2+ parça) */}
+                    {seriesGroupCards.length > 0 && (
+                      <section aria-label="Seri Koleksiyonlarım">
+                        <SectionHead
+                          icon={Layers}
+                          title="Seri Koleksiyonlarım"
+                          count={seriesGroupCards.length}
+                        />
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
+                          {seriesGroupCards.map((group) => (
+                            <SeriesGroupCard
+                              key={group.key}
+                              group={group}
+                              onIncrement={handleIncrement}
+                              onComplete={handleComplete}
+                              onEdit={handleOpenEditModal}
+                              onDelete={handleDeleteRequest}
+                              onToggleFavorite={handleToggleFavorite}
+                              onOpenDetail={handleOpenDetailModal}
+                              onAddRelatedParts={handleAddMissingTvmazeParts}
+                              resolveRelatedAction={getLibraryRelatedAction}
+                              onOpenGroupEdit={handleOpenGroupEdit}
+                            />
+                          ))}
+                        </div>
+                      </section>
+                    )}
+
+                    {/* 3) Kütüphanem — kalan tekil item'lar */}
+                    {singletonItems.length > 0 && (
+                      <section aria-label="Kütüphanem">
+                        <SectionHead
+                          icon={LibraryIcon}
+                          title="Kütüphanem"
+                          count={singletonItems.length}
+                        />
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
+                          {singletonItems.map((item) => {
+                            const relatedAction = getLibraryRelatedAction(item);
+                            return (
+                              <MediaCard
+                                key={item.id}
+                                item={item}
+                                onIncrement={handleIncrement}
+                                onComplete={handleComplete}
+                                onEdit={handleOpenEditModal}
+                                onDelete={handleDeleteRequest}
+                                onToggleFavorite={handleToggleFavorite}
+                                onOpenDetail={handleOpenDetailModal}
+                                onAddRelatedParts={handleAddMissingTvmazeParts}
+                                relatedPartsLabel={relatedAction.label}
+                                canAddRelatedParts={relatedAction.canAdd}
+                                onOpenGroupEdit={handleOpenGroupEdit}
+                              />
+                            );
+                          })}
+                        </div>
+                      </section>
+                    )}
+                  </div>
+                );
+              })()
             ) : (
               <div className="flex flex-col items-center justify-center py-20 bg-zinc-900/20 rounded-2xl border border-zinc-800/50">
                 <div className="w-16 h-16 rounded-2xl bg-zinc-900 flex items-center justify-center mb-4">
