@@ -166,3 +166,168 @@ body {
     opacity: 1 !important;
   }
 }
+
+/* ============================================ */
+/* R13 — World Macro Transitions               */
+/* ============================================ */
+/* Dünya değişiminde tek seferlik, transform/opacity tabanlı, loopsuz
+   katmanlar. JS tarafı ([components/world-transition.tsx]) prop değişimi
+   yakaladığında overlay'i mount eder; animasyon süresi dolunca DOM'dan
+   kaldırır. Tüm katmanlar pointer-events: none (parent zaten ekliyor) ve
+   layout shift yaratmaz (position: absolute). Reduced-motion'da JS de
+   skip eder, CSS de kapatır (defense in depth). */
+
+/* R13.1: Görünürlük artırıldı — slash kalın + parlak, aperture kalın çerçeve,
+   seal daha belirgin. Süreler 700–1400ms aralığında kaldı (loop yok). */
+
+/* Doğu — diagonal light sweep + sıcak tint */
+.r13-east-tint {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    1100px 700px at 35% 40%,
+    color-mix(in srgb, var(--w-primary) 18%, transparent),
+    transparent 65%
+  );
+  opacity: 0;
+  animation: r13-east-tint 1100ms ease-out forwards;
+}
+@keyframes r13-east-tint {
+  0%   { opacity: 0; }
+  35%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.r13-east-slash {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 220vmax;
+  height: 18px;                  /* R13.1: 6 → 18 */
+  margin: -9px 0 0 -110vmax;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--w-primary) 30%, transparent) 30%,
+    var(--w-primary) 47%,
+    var(--w-primary-strong) 50%, /* parlak çekirdek */
+    var(--w-primary) 53%,
+    color-mix(in srgb, var(--w-secondary) 60%, transparent) 70%,
+    transparent 100%
+  );
+  filter: drop-shadow(0 0 24px var(--w-primary))
+          drop-shadow(0 0 8px var(--w-primary-strong));
+  transform: rotate(-22deg) translateX(-65%);
+  opacity: 0;
+  animation: r13-east-slash 1000ms cubic-bezier(0.22, 0.9, 0.34, 1) forwards;
+}
+@keyframes r13-east-slash {
+  0%   { transform: rotate(-22deg) translateX(-65%); opacity: 0; }
+  10%  { opacity: 1; }
+  85%  { opacity: 1; }
+  100% { transform: rotate(-22deg) translateX(65%); opacity: 0; }
+}
+
+/* Kadraj — aperture açılışı + projektör sweep */
+.r13-screen-aperture {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 60vmax;
+  height: 60vmax;
+  margin: -30vmax 0 0 -30vmax;
+  border-radius: 9999px;
+  border: 6px solid color-mix(in srgb, var(--w-primary) 90%, transparent); /* 1 → 6 */
+  box-shadow:
+    0 0 120px color-mix(in srgb, var(--w-primary) 65%, transparent),
+    inset 0 0 90px color-mix(in srgb, var(--w-primary) 40%, transparent);
+  transform: scale(0);
+  opacity: 0;
+  animation: r13-screen-aperture 1200ms cubic-bezier(0.16, 0.84, 0.34, 1) forwards;
+}
+@keyframes r13-screen-aperture {
+  0%   { transform: scale(0);    opacity: 0; }
+  25%  { opacity: 1; }
+  100% { transform: scale(1.4);  opacity: 0; }
+}
+
+.r13-screen-beam {
+  position: absolute;
+  top: 50%;
+  left: -5%;
+  width: 110%;
+  height: 64px;                  /* 28 → 64 */
+  margin-top: -32px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--w-primary) 75%, transparent) 50%,
+    color-mix(in srgb, var(--w-secondary) 50%, transparent) 70%,
+    transparent 100%
+  );
+  filter: blur(6px);
+  transform-origin: center;
+  transform: scaleX(0);
+  opacity: 0;
+  animation: r13-screen-beam 1100ms ease-out forwards;
+}
+@keyframes r13-screen-beam {
+  0%   { transform: scaleX(0); opacity: 0; }
+  35%  { transform: scaleX(1); opacity: 1; }
+  100% { transform: scaleX(1); opacity: 0; }
+}
+
+/* Arşiv — wax seal stamp + ink spread */
+.r13-arch-ink {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    circle at 50% 50%,
+    color-mix(in srgb, var(--w-primary) 35%, transparent) 0%,
+    color-mix(in srgb, var(--w-secondary) 18%, transparent) 25%,
+    transparent 60%
+  );
+  transform: scale(0.4);
+  opacity: 0;
+  animation: r13-arch-ink 1000ms ease-out forwards;
+}
+@keyframes r13-arch-ink {
+  0%   { transform: scale(0.4); opacity: 0; }
+  40%  { opacity: 1; }
+  100% { transform: scale(1.5); opacity: 0; }
+}
+
+.r13-arch-seal {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 280px;                  /* 220 → 280 */
+  height: 280px;
+  margin: -140px 0 0 -140px;
+  border-radius: 9999px;
+  border: 6px solid color-mix(in srgb, var(--w-secondary) 95%, transparent); /* 3 → 6 */
+  box-shadow:
+    0 0 60px color-mix(in srgb, var(--w-secondary) 70%, transparent),
+    inset 0 0 50px color-mix(in srgb, var(--w-primary) 40%, transparent);
+  transform: scale(2.4);
+  opacity: 0;
+  animation: r13-arch-seal 900ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+@keyframes r13-arch-seal {
+  0%   { transform: scale(2.4); opacity: 0; }
+  45%  { transform: scale(1);   opacity: 1; }
+  100% { transform: scale(1);   opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .r13-east-tint,
+  .r13-east-slash,
+  .r13-screen-aperture,
+  .r13-screen-beam,
+  .r13-arch-ink,
+  .r13-arch-seal {
+    animation: none !important;
+    opacity: 0 !important;
+    transform: none !important;
+  }
+}

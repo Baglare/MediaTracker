@@ -24,6 +24,10 @@ import { type ThemeFilter, type EastSubFilter } from "@/components/media-filters
 // Eski component dosyası şimdilik silinmedi — yedek/diff için kalıyor;
 // hiçbir yerden import edilmediği için runtime'da yükü yok.
 import WorldHero from "@/components/world-hero";
+// R13: Dünya değişiminde tek seferlik macro overlay. Sadece worldAttr prop'una
+// bakar; search/status/type/sort'a duyarlı değil. Ayarlar'da neutral olduğu
+// için zaten tetiklenmez.
+import WorldTransition from "@/components/world-transition";
 import MediaCard from "@/components/media-card";
 import SeriesGroupCard from "@/components/series-group-card";
 import MediaModal from "@/components/media-modal";
@@ -1296,6 +1300,11 @@ export default function HomePage() {
     // R10: data-world scope (yukarıdaki worldAttr). globals.css altındaki
     // [data-world="..."] selector'ları --w-* tokenlarını set eder.
     <div data-world={worldAttr} className="min-h-screen bg-zinc-950 text-zinc-100 flex">
+      {/* R13: Macro transition overlay — data-world scope'unun *içinde* duruyor
+          ki --w-* tokenları aktif dünyanın renklerine resolve olsun. Kendisi
+          fixed inset-0 + pointer-events-none + z-30 (topbar z-40, modallar
+          z-50 üstte). Sadece worldAttr değişimine tepki verir. */}
+      <WorldTransition world={worldAttr} />
       <AppSidebar activeTab={activeTab} onChange={handleTabChange} />
 
       <div className="flex-1 min-w-0 flex flex-col">

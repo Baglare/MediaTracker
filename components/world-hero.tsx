@@ -441,14 +441,31 @@ function SubBadge({
   label: string;
   Icon: (props: { className?: string }) => React.ReactElement;
 }) {
-  // Salt görsel: button değil, span — a11y için tıklanabilir intibası bırakmaz.
+  // R13.1: Salt-görsel kategori — Kadraj/Arşiv için. Önceki versiyon
+  // interaktif pill'lerle aynı stildeydi → tıklanabilir intibası veriyordu.
+  // Şimdi açıkça pasif:
+  //   - dotted ring (interaktif olanlar solid ring kullanıyor)
+  //   - cursor-not-allowed
+  //   - opacity-60 (sessizleşir)
+  //   - aria-disabled="true" (a11y)
+  //   - sağ üstte küçük "Yakında" mikro-rozeti (UI niyeti açık)
+  // hover transition yok; kullanıcı parmağı üzerine geldiğinde hiçbir şey
+  // değişmez → "buton" beklentisi yok.
   return (
     <span
-      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium tracking-wide ring-1 ring-zinc-800 bg-zinc-900/40 text-zinc-400 select-none"
-      title="Bu dünyada alt filtre yakında"
+      role="presentation"
+      aria-disabled="true"
+      title={`${label} · alt filtre yakında`}
+      className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium tracking-wide border border-dashed border-zinc-700/70 bg-zinc-900/30 text-zinc-500 opacity-60 cursor-not-allowed select-none"
     >
       <Icon className="w-3.5 h-3.5" />
       <span>{label}</span>
+      <span
+        aria-hidden="true"
+        className="ml-0.5 text-[9px] font-mono uppercase tracking-[0.12em] text-zinc-600"
+      >
+        soon
+      </span>
     </span>
   );
 }
