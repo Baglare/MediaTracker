@@ -11,7 +11,9 @@
 "use client";
 
 import { useState, useMemo, useEffect, useCallback } from "react";
-import AppHeader from "@/components/app-header";
+import AppSidebar from "@/components/app-sidebar";
+import AppTopbar from "@/components/app-topbar";
+import RightRail from "@/components/right-rail";
 import { TabType } from "@/components/app-tabs";
 import ActivityLogPanel from "@/components/activity-log-panel";
 import MediaFilters, { type ThemeFilter, type EastSubFilter } from "@/components/media-filters";
@@ -1238,12 +1240,16 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 flex flex-col">
-      {/* Üst başlık ve Sekmeler */}
-      <AppHeader activeTab={activeTab} onChangeTab={handleTabChange} />
+    // R1 App Shell: sol sidebar (lg+) + main column + opsiyonel sağ rail (xl+).
+    // Mobile/tablet'te sidebar gizli; AppTopbar fallback AppTabs gösterir.
+    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex">
+      <AppSidebar activeTab={activeTab} onChange={handleTabChange} />
 
-      {/* Ana içerik alanı */}
-      <main className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full">
+      <div className="flex-1 min-w-0 flex flex-col">
+        <AppTopbar activeTab={activeTab} onChangeTab={handleTabChange} />
+
+        {/* Ana içerik alanı */}
+        <main className="relative mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-8 flex-1">
         
         {/* DASHBOARD SEKMESI */}
         {activeTab === "dashboard" && (
@@ -1472,7 +1478,10 @@ export default function HomePage() {
             </div>
           </div>
         )}
-      </main>
+        </main>
+      </div>
+
+      <RightRail />
 
       {/* Medya Ekle / Düzenle Modalı */}
       <MediaModal
