@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<title>MediaTracker — Dünya Sistemleri (Doğu · Kadraj · Arşiv)</title>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&family=Noto+Serif+JP:wght@400;500;700&family=Cormorant+Garamond:ital,wght@0,500;0,700;1,500;1,700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="worlds.css">
+<style>
+  /* Page-level controls for the variant browser */
+  .topbar-fixed {
+    position: sticky; top: 0; z-index: 50;
+    background: rgba(10,11,15,0.85);
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--line-1);
+    padding: 14px 32px;
+    display: flex; align-items: center; gap: 18px;
+  }
+  .doc-title { font-size: 15px; font-weight: 700; color: var(--fg-0); letter-spacing: -0.01em; }
+  .doc-sub { font-size: 11.5px; color: var(--fg-2); }
+  .doc-toggle { margin-left: auto; display: flex; gap: 4px; padding: 4px; border: 1px solid var(--line-1); border-radius: 10px; background: var(--bg-1); }
+  .doc-toggle button { padding: 6px 12px; border-radius: 7px; font-size: 12px; font-weight: 500; color: var(--fg-2); display: flex; align-items: center; gap: 6px; }
+  .doc-toggle button[data-on="true"] { background: var(--bg-3); color: var(--fg-0); }
+  .doc-toggle button .dot { width: 6px; height: 6px; border-radius: 50%; }
+</style>
+</head>
+<body>
+
+<div class="topbar-fixed">
+  <div>
+    <div class="doc-title">MediaTracker · Dünya Sistemleri</div>
+    <div class="doc-sub">Three visual identities applied to the existing dashboard shell</div>
+  </div>
+  <div class="doc-toggle" id="jump-toggle">
+    <button data-target="east" data-on="true"><span class="dot" style="background:#e8b86a"></span>Doğu</button>
+    <button data-target="screen"><span class="dot" style="background:#6fb0e0"></span>Kadraj</button>
+    <button data-target="arch"><span class="dot" style="background:#b8956a"></span>Arşiv</button>
+    <button data-target="handoff" style="border-left:1px solid var(--line-1); padding-left:14px; margin-left:4px;">Handoff →</button>
+  </div>
+</div>
+
+<div class="variants" id="variants">
+  <!-- VARIANT 1: DOĞU -->
+  <section class="variant" data-screen-label="01 Doğu Active">
+    <div class="variant-tag">
+      <span class="variant-eyebrow">VARIANT 01</span>
+      <span class="variant-title"><span class="variant-kanji" data-world="east" style="color:#e8b86a">東</span>Doğu Active</span>
+      <span class="variant-desc">Anime · Manga · Novel — elegant, sharp, ink and katana</span>
+    </div>
+    <div id="shell-east"></div>
+  </section>
+
+  <!-- VARIANT 2: KADRAJ -->
+  <section class="variant" data-screen-label="02 Kadraj Active">
+    <div class="variant-tag">
+      <span class="variant-eyebrow">VARIANT 02</span>
+      <span class="variant-title"><span class="variant-kanji" style="color:#6fb0e0; font-family:'Geist'; font-weight:700; font-size:18px;">◉</span>Kadraj Active</span>
+      <span class="variant-desc">Film · Dizi · Belgesel — lens, projector beam, frame lines</span>
+    </div>
+    <div id="shell-screen"></div>
+  </section>
+
+  <!-- VARIANT 3: ARŞİV -->
+  <section class="variant" data-screen-label="03 Arşiv Active">
+    <div class="variant-tag">
+      <span class="variant-eyebrow">VARIANT 03</span>
+      <span class="variant-title"><span class="variant-kanji" style="color:#b8956a; font-family:'Cormorant Garamond'; font-style:italic; font-weight:700;">Æ</span>Arşiv Active</span>
+      <span class="variant-desc">Kitap · Roman · Klasikler — wax seal, parchment, ink spread</span>
+    </div>
+    <div id="shell-arch"></div>
+  </section>
+
+  <!-- HANDOFF -->
+  <section class="handoff" id="handoff" data-screen-label="04 Developer Handoff">
+    <h1>Developer Handoff</h1>
+    <div class="handoff-sub">Tokens, Tailwind notes, component impact, and shipping order for Claude Code / Codex.</div>
+
+    <h3 style="font-size:11px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:var(--fg-3); margin: 0 0 12px;">Design Tokens · Per World</h3>
+    <div class="token-grid">
+      <!-- Doğu tokens -->
+      <div class="token-card" data-world="east">
+        <div class="token-head">
+          <div class="token-glyph">東</div>
+          <div>
+            <div class="token-name">Doğu</div>
+            <div class="token-tagline">Anime · Manga · Novel</div>
+          </div>
+        </div>
+        <div class="token-row"><span class="k">--w-primary</span><span class="v"><span class="swatch" style="background:#e8b86a"></span>#e8b86a</span></div>
+        <div class="token-row"><span class="k">--w-primary-strong</span><span class="v"><span class="swatch" style="background:#f3c878"></span>#f3c878</span></div>
+        <div class="token-row"><span class="k">--w-secondary</span><span class="v"><span class="swatch" style="background:#d96f5b"></span>#d96f5b</span></div>
+        <div class="token-row"><span class="k">--w-ink</span><span class="v"><span class="swatch" style="background:#2c1a08"></span>#2c1a08</span></div>
+        <div class="token-row"><span class="k">--w-soft</span><span class="v"><span class="swatch" style="background:rgba(232,184,106,0.14)"></span>α 0.14</span></div>
+        <div class="token-row"><span class="k">font-display</span><span class="v">Noto Serif JP</span></div>
+        <div class="token-row"><span class="k">motif</span><span class="v">katana · yin-yang · scroll</span></div>
+        <div class="token-row"><span class="k">macro-anim</span><span class="v">katana slash (1.4s)</span></div>
+      </div>
+
+      <!-- Kadraj tokens -->
+      <div class="token-card" data-world="screen">
+        <div class="token-head">
+          <div class="token-glyph">幕</div>
+          <div>
+            <div class="token-name">Kadraj</div>
+            <div class="token-tagline">Film · Dizi · Belgesel</div>
+          </div>
+        </div>
+        <div class="token-row"><span class="k">--w-primary</span><span class="v"><span class="swatch" style="background:#6fb0e0"></span>#6fb0e0</span></div>
+        <div class="token-row"><span class="k">--w-primary-strong</span><span class="v"><span class="swatch" style="background:#92c4ec"></span>#92c4ec</span></div>
+        <div class="token-row"><span class="k">--w-secondary</span><span class="v"><span class="swatch" style="background:#e84a4a"></span>#e84a4a</span></div>
+        <div class="token-row"><span class="k">--w-ink</span><span class="v"><span class="swatch" style="background:#0a1622"></span>#0a1622</span></div>
+        <div class="token-row"><span class="k">--w-soft</span><span class="v"><span class="swatch" style="background:rgba(111,176,224,0.14)"></span>α 0.14</span></div>
+        <div class="token-row"><span class="k">font-display</span><span class="v">Geist · 600/700</span></div>
+        <div class="token-row"><span class="k">motif</span><span class="v">lens · projector · frame</span></div>
+        <div class="token-row"><span class="k">macro-anim</span><span class="v">aperture open (1.6s)</span></div>
+      </div>
+
+      <!-- Arşiv tokens -->
+      <div class="token-card" data-world="arch">
+        <div class="token-head">
+          <div class="token-glyph">Æ</div>
+          <div>
+            <div class="token-name">Arşiv</div>
+            <div class="token-tagline">Kitap · Roman · Klasikler</div>
+          </div>
+        </div>
+        <div class="token-row"><span class="k">--w-primary</span><span class="v"><span class="swatch" style="background:#b8956a"></span>#b8956a</span></div>
+        <div class="token-row"><span class="k">--w-primary-strong</span><span class="v"><span class="swatch" style="background:#d4b385"></span>#d4b385</span></div>
+        <div class="token-row"><span class="k">--w-secondary</span><span class="v"><span class="swatch" style="background:#9d4646"></span>#9d4646</span></div>
+        <div class="token-row"><span class="k">--w-ink</span><span class="v"><span class="swatch" style="background:#2a1810"></span>#2a1810</span></div>
+        <div class="token-row"><span class="k">--w-soft</span><span class="v"><span class="swatch" style="background:rgba(184,149,106,0.14)"></span>α 0.14</span></div>
+        <div class="token-row"><span class="k">font-display</span><span class="v">Cormorant · italic</span></div>
+        <div class="token-row"><span class="k">motif</span><span class="v">wax seal · feather · scroll</span></div>
+        <div class="token-row"><span class="k">macro-anim</span><span class="v">wax stamp (0.9s)</span></div>
+      </div>
+    </div>
+
+    <h3 style="font-size:11px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:var(--fg-3); margin: 24px 0 12px;">Tailwind-friendly Notes</h3>
+    <div class="handoff-cols">
+      <div class="handoff-block">
+        <h3>Theming approach</h3>
+        <ul>
+          <li>Apply <code>data-world="east|screen|arch"</code> to <code>&lt;html&gt;</code> or the dashboard root. CSS variables under the selector cascade everywhere.</li>
+          <li>Add tailwind tokens via <code>tailwind.config.ts</code> <code>extend.colors</code>: <code>world.primary</code>, <code>world.secondary</code>, <code>world.soft</code>, <code>world.line</code>, <code>world.ink</code> — all <code>var(--w-*)</code>.</li>
+          <li>Settings page sets <code>data-world="neutral"</code> on its layout to opt out of world tinting per the brief.</li>
+          <li>Persist the selected world to <code>localStorage("mt:world")</code>; hydrate on mount before paint to avoid flash.</li>
+        </ul>
+      </div>
+      <div class="handoff-block">
+        <h3>Component impact</h3>
+        <ul>
+          <li><span class="pill">edit</span>App shell stays. No structural changes.</li>
+          <li><span class="pill">new</span><code>&lt;WorldHero/&gt;</code> — replaces today's static Kütüphanem hero. Slots: glyph, eyebrow, title, sub, subgroup tabs.</li>
+          <li><span class="pill">edit</span><code>MediaCard</code> — accent border + chip color from <code>var(--w-primary)</code>. No prop changes.</li>
+          <li><span class="pill">edit</span><code>SeriesGroupCard</code> — corner ornaments are <code>::before</code> only; behavior identical.</li>
+          <li><span class="pill">edit</span><code>RightRail</code> widgets — accent stripe / corner stamp via world data-attr.</li>
+          <li><span class="pill">new</span><code>&lt;WorldTransition/&gt;</code> — full-bleed macro animation on world change.</li>
+        </ul>
+      </div>
+      <div class="handoff-block">
+        <h3>Animation budget</h3>
+        <ul>
+          <li><strong>Macro (world change):</strong> one transition per change, 0.9–1.6s. Block input during; pre-render in compositor layer (<code>will-change: transform, opacity</code>).</li>
+          <li><strong>Micro (hover, active subgroup):</strong> ≤200ms, transform/opacity only, respect <code>prefers-reduced-motion: reduce</code>.</li>
+          <li>No looping ambient motion — brief said "no constant loud motion".</li>
+          <li>Subgroup switch inside a world uses a soft 180ms crossfade; no macro replay.</li>
+        </ul>
+      </div>
+      <div class="handoff-block">
+        <h3>Ship order</h3>
+        <ul>
+          <li><span class="pill">P0</span>Token plumbing + <code>data-world</code> attribute + Settings opt-out.</li>
+          <li><span class="pill">P0</span><code>WorldHero</code> + subgroup tabs (static motifs, no anim yet).</li>
+          <li><span class="pill">P0</span>Card/SeriesGroup/RightRail accent layer.</li>
+          <li><span class="pill">P1</span>Macro transition component (katana / aperture / wax).</li>
+          <li><span class="pill">P1</span>Empty/ghost state world treatment.</li>
+          <li><span class="pill">P2</span>Per-subgroup micro-motifs (manga yin-yang spin, novel ink wash, film perforation scroll).</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3 style="font-size:11px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:var(--fg-3); margin: 24px 0 12px;">Animation Direction</h3>
+    <div class="anim-grid">
+      <div class="anim-card">
+        <div class="anim-title"><span class="dot" style="background:#e8b86a"></span>Doğu</div>
+        <div class="anim-list">
+          <strong>Macro:</strong> diagonal katana slash sweeps the hero left→right, exposing the world. 1.4s, ease-out.<br>
+          <strong>Micro:</strong> Anime tab — soft sword-glint on hover. Manga — yin-yang seal half-rotation (180°) on activation. Novel — vertical ink-brush reveal under tab label.
+        </div>
+      </div>
+      <div class="anim-card">
+        <div class="anim-title"><span class="dot" style="background:#6fb0e0"></span>Kadraj</div>
+        <div class="anim-list">
+          <strong>Macro:</strong> camera aperture irises open from center, projector cone sweeps across hero. 1.6s, cubic-bezier(.16,.84,.34,1).<br>
+          <strong>Micro:</strong> Film — perforation marks scroll vertically inside the chip. Dizi — frame brackets pulse once on activation. Belgesel — subtle scan-line shimmer.
+        </div>
+      </div>
+      <div class="anim-card">
+        <div class="anim-title"><span class="dot" style="background:#b8956a"></span>Arşiv</div>
+        <div class="anim-list">
+          <strong>Macro:</strong> wax seal stamps down on the hero (scale 2 → 1, spring), ink spreads radially. 0.9s, back-out.<br>
+          <strong>Micro:</strong> Kitap — page-corner fold lifts on hover. Roman — feather pen draws underline under tab. Klasikler — candle flicker on the seal corner (≤1.5s, then settles).
+        </div>
+      </div>
+    </div>
+
+    <h3 style="font-size:11px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:var(--fg-3); margin: 24px 0 12px;">Claude Code / Codex Handoff</h3>
+    <div class="handoff-cols">
+      <div class="handoff-block">
+        <h3>What to delegate</h3>
+        <ul>
+          <li>Wire <code>useWorld()</code> hook (context + localStorage) and route changes through it.</li>
+          <li>Generate Tailwind plugin that exposes <code>bg-world-soft</code>, <code>text-world-primary</code>, <code>border-world-line</code>, <code>ring-world-glow</code> mapped to CSS vars.</li>
+          <li>Refactor existing <code>MediaCard</code>/<code>SeriesGroupCard</code> to read accent from CSS vars (no prop drilling).</li>
+          <li>Add <code>data-world</code> to <code>&lt;html&gt;</code> via Next.js layout, with a no-flash inline script.</li>
+        </ul>
+      </div>
+      <div class="handoff-block">
+        <h3>What to keep in design</h3>
+        <ul>
+          <li>Exact motif geometry (slash angle, aperture timing, wax seal scale curve).</li>
+          <li>Subgroup tab micro-animations — review with motion lead before shipping.</li>
+          <li>Empty/ghost state copy and glyph choice — needs editorial pass.</li>
+          <li>Theme contrast review for AA on dark surfaces — Doğu gold on bg-1 may need to step to <code>--w-primary-strong</code>.</li>
+        </ul>
+      </div>
+    </div>
+
+  </section>
+</div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel" src="dashboard.jsx"></script>
+
+<script>
+  // Jump toggle
+  document.getElementById('jump-toggle').addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-target]');
+    if (!btn) return;
+    const target = btn.dataset.target;
+    let el;
+    if (target === 'handoff') el = document.getElementById('handoff');
+    else el = document.getElementById('shell-' + target);
+    if (!el) return;
+    const top = el.getBoundingClientRect().top + window.scrollY - 80;
+    window.scrollTo({ top, behavior: 'smooth' });
+    document.querySelectorAll('#jump-toggle button').forEach(b => b.dataset.on = 'false');
+    btn.dataset.on = 'true';
+  });
+</script>
+
+</body>
+</html>

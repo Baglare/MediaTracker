@@ -87,8 +87,12 @@ type PillTone = "amber" | "violet" | "fuchsia";
 
 function pillClasses(active: boolean, tone: PillTone): string {
   if (active) {
+    // R12: "amber" tone (Dünya filter pill'leri için kullanılıyor) artık aktif
+    // dünyanın --w-primary tonuna bağlı. "Tümü" iken nötr zinc'e düşer; bir
+    // dünya seçili iken o dünyanın rengini yansıtır. Tür/Durum tone'ları
+    // (violet/fuchsia) semantik olarak app-level kalır.
     if (tone === "amber") {
-      return "bg-amber-500/15 text-amber-200 ring-1 ring-amber-500/40";
+      return "bg-[var(--w-soft)] text-[var(--w-primary-strong)] ring-1 ring-[color-mix(in_srgb,var(--w-primary)_40%,transparent)]";
     }
     if (tone === "violet") {
       return "bg-violet-500/15 text-violet-200 ring-1 ring-violet-500/40";

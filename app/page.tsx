@@ -20,7 +20,10 @@ import ActivityLogPanel from "@/components/activity-log-panel";
 // MediaFilters artık LibraryControlBar tarafından sarmalanıyor; burada
 // yalnızca type re-export'lar gerekli.
 import { type ThemeFilter, type EastSubFilter } from "@/components/media-filters";
-import EastThemeHeader from "@/components/east-theme-header";
+// R11: EastThemeHeader yerini WorldHero alıyor (üç dünya için genelleştirilmiş).
+// Eski component dosyası şimdilik silinmedi — yedek/diff için kalıyor;
+// hiçbir yerden import edilmediği için runtime'da yükü yok.
+import WorldHero from "@/components/world-hero";
 import MediaCard from "@/components/media-card";
 import SeriesGroupCard from "@/components/series-group-card";
 import MediaModal from "@/components/media-modal";
@@ -1271,10 +1274,28 @@ export default function HomePage() {
     );
   }
 
+  // R10: Üst seviye "Dünya" scope. themeFilter → data-world attribute mapping:
+  //   all → neutral · east → east · screen → screen · library → arch
+  // Settings sekmesinde dünya efektlerini kasıtlı olarak nötrlüyoruz; ayar
+  // ekranı dünya bağlamından bağımsız (R8'deki RightRail gizleme kararıyla
+  // tutarlı). Bu tur sadece CSS variable plumbing — tüketici bileşen yok.
+  const worldAttr: "east" | "screen" | "arch" | "neutral" =
+    activeTab === "settings"
+      ? "neutral"
+      : themeFilter === "east"
+        ? "east"
+        : themeFilter === "screen"
+          ? "screen"
+          : themeFilter === "library"
+            ? "arch"
+            : "neutral";
+
   return (
     // R1 App Shell: sol sidebar (lg+) + main column + opsiyonel sağ rail (xl+).
     // Mobile/tablet'te sidebar gizli; AppTopbar fallback AppTabs gösterir.
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex">
+    // R10: data-world scope (yukarıdaki worldAttr). globals.css altındaki
+    // [data-world="..."] selector'ları --w-* tokenlarını set eder.
+    <div data-world={worldAttr} className="min-h-screen bg-zinc-950 text-zinc-100 flex">
       <AppSidebar activeTab={activeTab} onChange={handleTabChange} />
 
       <div className="flex-1 min-w-0 flex flex-col">
@@ -1326,14 +1347,16 @@ export default function HomePage() {
               resultCount={filteredMedia.length}
             />
 
-            {/* V5A.2: Doğu seçiliyken kompakt theme header — alt filtre burada.
-                Control bar'la çakışmasın diye altına yerleşiyor. */}
-            {themeFilter === "east" && (
-              <EastThemeHeader
-                activeSub={eastSubFilter}
-                onChangeSub={setEastSubFilter}
-              />
-            )}
+            {/* R11: WorldHero — Doğu/Kadraj/Arşiv için ortak hero.
+                "Tümü" iken hero'yu hiç çıkarmıyoruz (sade kalsın); component
+                içeride de erken null döner. Doğu için mevcut eastSubFilter
+                wiring birebir korunur (V5A.2 davranışı). Kadraj/Arşiv
+                pill'leri bu turda salt görsel — yeni filtre state'i yok. */}
+            <WorldHero
+              themeFilter={themeFilter}
+              eastSub={eastSubFilter}
+              onEastSubChange={setEastSubFilter}
+            />
 
             {filteredMedia.length > 0 ? (
               (() => {

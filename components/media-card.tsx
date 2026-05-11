@@ -148,7 +148,11 @@ export default function MediaCard({
   const accentGradient = topAccentGradient(themeAccent, getProgressGradient(item.type));
 
   return (
-    <div className="group relative flex flex-col bg-zinc-900/50 rounded-2xl border border-zinc-800/50 overflow-hidden hover:border-zinc-700/50 transition-all duration-300">
+    // R12: Hover border'ı aktif dünya tonuna doğru hafifçe çekiyoruz —
+    // data-world scope'undan gelen --w-primary'ı color-mix ile zinc-700'e
+    // karıştırarak nötr (Tümü) seçimde hâlâ zinc hissi koruyoruz.
+    // Top accent gradient ve ThemeSubBadge davranışı dokunulmadı (V5A).
+    <div className="group relative flex flex-col bg-zinc-900/50 rounded-2xl border border-zinc-800/50 overflow-hidden hover:border-[color-mix(in_srgb,var(--w-primary)_35%,#52525b)] transition-all duration-300">
       <div
         className={`absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r ${accentGradient} opacity-50 group-hover:opacity-100 transition-opacity`}
       />

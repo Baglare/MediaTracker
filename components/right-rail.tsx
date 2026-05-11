@@ -93,12 +93,15 @@ function Widget({
   iconTone?: "amber" | "violet" | "emerald";
   children?: React.ReactNode;
 }) {
+  // R12: "amber" tone artık aktif dünyanın primary tonuna bağlı (data-world
+  // scope'undan miras alınan --w-primary). violet/emerald semantik kalır.
+  // "Tümü" / settings (neutral) iken zinc-400'e düşer; sessiz nötr durum.
   const iconClass =
     iconTone === "violet"
       ? "text-violet-300"
       : iconTone === "emerald"
         ? "text-emerald-300"
-        : "text-amber-400/90";
+        : "text-[var(--w-primary-strong)]";
   return (
     <div className="rounded-xl border border-zinc-800/60 bg-zinc-900/30 p-3.5">
       <div className="flex items-center justify-between mb-2.5">
@@ -158,7 +161,9 @@ function OverallWidget({ stats }: { stats: DashboardStats }) {
                 strokeLinecap="round"
                 strokeDasharray={c}
                 strokeDashoffset={offset}
-                className="stroke-amber-400 transition-[stroke-dashoffset] duration-500"
+                // R12: Halka rengi aktif dünyaya bağlı (--w-primary). Tailwind 4
+                // arbitrary stroke arbitrary value ile.
+                className="stroke-[var(--w-primary)] transition-[stroke-dashoffset] duration-500"
               />
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
@@ -293,12 +298,15 @@ function DailyGoalWidget({
               title={`${d.label}: ${d.count} aktivite`}
             >
               <div
+                // R12: Sparkbar barları artık aktif dünya tonunu yansıtıyor.
+                // Bugün barı tam --w-primary; geçmiş günler color-mix ile
+                // yumuşatılmış varyant. Sıfır bar zinc kalır.
                 className={`w-full rounded ${
                   d.count === 0
                     ? "bg-zinc-800/60"
                     : d.isToday
-                      ? "bg-amber-400/80"
-                      : "bg-amber-500/40"
+                      ? "bg-[var(--w-primary)]"
+                      : "bg-[color-mix(in_srgb,var(--w-primary)_45%,transparent)]"
                 } transition-all`}
                 style={{ height: `${h}%`, minHeight: 4 }}
                 aria-hidden="true"
@@ -311,7 +319,7 @@ function DailyGoalWidget({
         {days.map((d, i) => (
           <span
             key={i}
-            className={d.isToday ? "text-amber-400/80" : ""}
+            className={d.isToday ? "text-[var(--w-primary-strong)]" : ""}
             style={{ flex: 1, textAlign: "center" }}
           >
             {d.label}
@@ -374,7 +382,8 @@ function SuggestionWidget({
               className="group w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-zinc-800/40 transition-colors text-left cursor-pointer"
               title={item.title}
             >
-              <div className="w-1 self-stretch rounded-full bg-violet-500/60 shrink-0" />
+              {/* R12: Sol şerit aktif dünyanın tonuna geçiyor; "Tümü"de zinc'e düşer. */}
+              <div className="w-1 self-stretch rounded-full bg-[color-mix(in_srgb,var(--w-primary)_60%,transparent)] shrink-0" />
               <div className="min-w-0 flex-1">
                 <div className="text-xs font-medium text-zinc-200 truncate group-hover:text-zinc-50">
                   {item.title}

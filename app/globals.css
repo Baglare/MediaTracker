@@ -1,6 +1,65 @@
 @import "tailwindcss";
 
 /* ============================================ */
+/* R10 — Dünya (World) token altyapısı          */
+/* ============================================ */
+/* Sadece CSS variable plumbing. Hero/motif/animasyon yok.
+   Scope: dashboard root wrapper'a `data-world="east|screen|arch|neutral"`
+   attribute'u biner ([app/page.tsx]). themeFilter mapping:
+     all     → neutral (veya attr yok)
+     east    → east
+     screen  → screen
+     library → arch
+   Settings sekmesinde dünya efektlerini kapatmak için neutral'a düşeriz.
+
+   Mevcut Doğu amber accent sistemi (theme-accent.tsx, V5A) BAĞIMSIZ çalışır;
+   bu tokenlar onun üstüne ek bir katman; kasıtlı çakıştırma yok. UI bileşen-
+   leri henüz bu utility'leri tüketmiyor — sonraki turlarda dokunulacak. */
+
+:root,
+[data-world="neutral"] {
+  --w-primary: #a1a1aa;             /* zinc-400, sessiz nötr */
+  --w-primary-strong: #d4d4d8;      /* zinc-300 */
+  --w-secondary: #71717a;           /* zinc-500 */
+  --w-ink: #18181b;                 /* zinc-900 */
+  --w-soft: rgba(161, 161, 170, 0.10);
+}
+
+/* Doğu — sıcak altın + lake kırmızı */
+[data-world="east"] {
+  --w-primary: #e8b86a;
+  --w-primary-strong: #f3c878;
+  --w-secondary: #d96f5b;
+  --w-ink: #2c1a08;
+  --w-soft: rgba(232, 184, 106, 0.14);
+}
+
+/* Kadraj — sinema mavisi + spot kırmızı */
+[data-world="screen"] {
+  --w-primary: #6fb0e0;
+  --w-primary-strong: #92c4ec;
+  --w-secondary: #e84a4a;
+  --w-ink: #0a1622;
+  --w-soft: rgba(111, 176, 224, 0.14);
+}
+
+/* Arşiv — parşömen altını + mum mührü kırmızısı */
+[data-world="arch"] {
+  --w-primary: #b8956a;
+  --w-primary-strong: #d4b385;
+  --w-secondary: #9d4646;
+  --w-ink: #2a1810;
+  --w-soft: rgba(184, 149, 106, 0.14);
+}
+
+/* Hafif utility'ler — sadece CSS variable'ı tüketenler.
+   Tailwind class'larıyla yarışmasınlar; tüketim ileri turlarda. */
+.text-world-primary { color: var(--w-primary); }
+.bg-world-soft { background-color: var(--w-soft); }
+.border-world { border-color: var(--w-primary); }
+.ring-world { --tw-ring-color: var(--w-primary); }
+
+/* ============================================ */
 /* Global Stiller                               */
 /* ============================================ */
 

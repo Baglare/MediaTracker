@@ -225,25 +225,37 @@ export default function SeriesGroupCard({
           "border-amber-500/30 text-amber-200 hover:bg-amber-500/10",
       }
     : {
-        topStrip: "from-violet-500/70 to-fuchsia-500/40",
-        progressBar: "from-violet-500 to-fuchsia-500",
+        // R12: Doğu ailesi dışındaki gruplar (karışık veya tek aile değil)
+        // için fallback artık world tokenlarından besleniyor. Aktif dünya
+        // "Tümü" iken --w-primary nötr zinc-400 olduğundan kart sessiz kalır;
+        // Kadraj/Arşiv'de hafifçe o dünyanın tonuna çekilir. Tailwind 4 JIT
+        // arbitrary-value (color-mix) sınıflarını yakalar.
+        topStrip:
+          "from-[color-mix(in_srgb,var(--w-primary)_70%,transparent)] to-[color-mix(in_srgb,var(--w-secondary)_40%,transparent)]",
+        progressBar:
+          "from-[var(--w-primary)] to-[var(--w-primary-strong)]",
         ringBorder: "border-zinc-800/60",
-        ringHover: "hover:border-violet-500/30",
-        ringOpen: "border-violet-500/40 ring-violet-500/20",
-        bgGradient: "from-violet-500/[0.04]",
+        ringHover:
+          "hover:border-[color-mix(in_srgb,var(--w-primary)_30%,transparent)]",
+        ringOpen:
+          "border-[color-mix(in_srgb,var(--w-primary)_40%,transparent)] ring-[color-mix(in_srgb,var(--w-primary)_20%,transparent)]",
+        bgGradient:
+          "from-[color-mix(in_srgb,var(--w-primary)_4%,transparent)]",
         seriBadge:
-          "bg-violet-500/15 text-violet-300 ring-1 ring-violet-500/30",
+          "bg-[var(--w-soft)] text-[var(--w-primary-strong)] ring-1 ring-[color-mix(in_srgb,var(--w-primary)_30%,transparent)]",
         addBtn:
-          "bg-violet-500/15 text-violet-200 ring-1 ring-violet-500/30 hover:bg-violet-500/25",
+          "bg-[var(--w-soft)] text-[var(--w-primary-strong)] ring-1 ring-[color-mix(in_srgb,var(--w-primary)_30%,transparent)] hover:bg-[color-mix(in_srgb,var(--w-primary)_22%,transparent)]",
         editBtn:
-          "bg-fuchsia-500/10 text-fuchsia-300 ring-1 ring-fuchsia-500/25 hover:bg-fuchsia-500/20",
+          "bg-zinc-800/70 text-zinc-300 ring-1 ring-zinc-700/60 hover:bg-zinc-700/70",
         partCountBadge:
-          "bg-black/70 text-violet-200 ring-1 ring-violet-500/30",
-        innerDivider: "border-violet-500/15",
+          "bg-black/70 text-[var(--w-primary-strong)] ring-1 ring-[color-mix(in_srgb,var(--w-primary)_30%,transparent)]",
+        innerDivider:
+          "border-[color-mix(in_srgb,var(--w-primary)_15%,transparent)]",
         innerBg: "bg-zinc-950/40",
-        innerLine: "bg-violet-500/20",
+        innerLine:
+          "bg-[color-mix(in_srgb,var(--w-primary)_20%,transparent)]",
         addChildBtn:
-          "border-violet-500/30 text-violet-200 hover:bg-violet-500/10",
+          "border-[color-mix(in_srgb,var(--w-primary)_30%,transparent)] text-[var(--w-primary-strong)] hover:bg-[var(--w-soft)]",
       };
 
   return (
