@@ -22,6 +22,7 @@
 
 "use client";
 
+import type { MediaType } from "@/lib/types";
 import type { EastSubFilter, ThemeFilter } from "./media-filters";
 
 // ----- Glyph + Sub-pill ikonları -----
@@ -125,30 +126,10 @@ function ClapperIcon({ className }: { className?: string }) {
   );
 }
 
-function FilmStripIcon({ className }: { className?: string }) {
-  // Belgesel için film şeridi metaforu
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      className={className}
-      aria-hidden="true"
-    >
-      <rect x="4" y="3" width="16" height="18" rx="1.5" />
-      <path d="M4 8h16M4 16h16" />
-      <circle cx="7" cy="5.5" r="0.6" fill="currentColor" />
-      <circle cx="12" cy="5.5" r="0.6" fill="currentColor" />
-      <circle cx="17" cy="5.5" r="0.6" fill="currentColor" />
-      <circle cx="7" cy="18.5" r="0.6" fill="currentColor" />
-      <circle cx="12" cy="18.5" r="0.6" fill="currentColor" />
-      <circle cx="17" cy="18.5" r="0.6" fill="currentColor" />
-    </svg>
-  );
-}
+// R13.2: FilmStripIcon (Belgesel) kaldırıldı — `documentary` data modelde
+// ayrı bir tür değil, sahte filtre yaratmamak için pill da gösterilmiyor.
 
-// Arşiv — kitap / tüy kalem / mum mührü
+// Arşiv — kitap
 function BookIcon({ className }: { className?: string }) {
   return (
     <svg
@@ -166,69 +147,47 @@ function BookIcon({ className }: { className?: string }) {
   );
 }
 
-function FeatherIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-      aria-hidden="true"
-    >
-      <path d="M20 4c-6 0-12 5-12 11v3l3-1c6 0 9-6 9-13z" />
-      <path d="M8 18l-4 4" />
-      <path d="M11 15h4" opacity="0.6" />
-    </svg>
-  );
-}
-
-function SealIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      className={className}
-      aria-hidden="true"
-    >
-      <circle cx="12" cy="10" r="6" />
-      <path
-        d="M9 14l-1.5 6 4.5-2 4.5 2L15 14"
-        strokeLinejoin="round"
-      />
-      <circle cx="12" cy="10" r="2.2" fill="currentColor" stroke="none" opacity="0.6" />
-    </svg>
-  );
-}
+// R13.2: FeatherIcon (Roman) ve SealIcon (Klasikler) kaldırıldı — Arşiv
+// içinde data modelde karşılığı olmayan alt türleri (sahte buton ya da
+// disabled etiket olarak) göstermiyoruz.
 
 // ----- World config -----
-// `interactive: false` olan pill'ler tıklanabilir görünür ama hiçbir şeyi
-// değiştirmez (cursor-default + onClick yok). İleride Kadraj/Arşiv için
-// gerçek alt filtre eklenince burada `interactive: true`'ya çevirip
-// onChange handler'larını parent'a bağlayacağız.
+// R13.2: Tüm dünyalar artık interaktif. Davranış kaynağı dünyaya göre değişir:
+//   - east   → eastSubFilter state'i (mevcut V5A davranışı, korundu)
+//   - screen → typeFilter state'i (Tümü / Film / Dizi)
+//   - arch   → typeFilter state'i (Tümü / Kitap)
+// Brief gereği Belgesel / Roman / Klasikler hiç gösterilmiyor; data modelde
+// karşılıkları olmadığı için sahte buton yaratmıyoruz.
 type WorldKey = "east" | "screen" | "arch";
 
-interface SubPill {
-  id: string;
+// Pill aksiyon paradigmaları (her pill kendi kind'ını taşır):
+//   "east-sub" → eastSubFilter setter'ını çağırır.
+//   "type"     → typeFilter setter'ını çağırır.
+
+interface EastSubPill {
+  kind: "east-sub";
+  id: EastSubFilter;             // "all" | "anime" | "manga" | "novel"
   label: string;
-  Icon: (props: { className?: string }) => React.ReactElement;
-  // V5A.4 ile uyumlu animasyon class'ı; sadece Doğu pill'lerinde anlamlı.
-  activeAnimClass?: string;
+  Icon?: (props: { className?: string }) => React.ReactElement;
+  activeAnimClass?: string;       // V5A.4 mikro animasyon class'ı
 }
+
+interface TypePill {
+  kind: "type";
+  id: MediaType | "all";
+  label: string;
+  Icon?: (props: { className?: string }) => React.ReactElement;
+}
+
+type Pill = EastSubPill | TypePill;
 
 interface WorldConfig {
   key: WorldKey;
-  glyph: string;        // sol rozetteki sembol
+  glyph: string;
   glyphFontClass: string;
   title: string;
   subtitle: string;
-  subgroups: SubPill[];
-  // east → kullanıcı seçimi anlamlı; diğerleri sadece görsel.
-  interactive: boolean;
+  pills: Pill[];                  // İlk pill genellikle "Tümü".
 }
 
 const WORLDS: Record<WorldKey, WorldConfig> = {
@@ -238,12 +197,12 @@ const WORLDS: Record<WorldKey, WorldConfig> = {
     glyphFontClass: "text-base font-semibold",
     title: "Doğu",
     subtitle: "Anime, manga ve novel koleksiyonların.",
-    subgroups: [
-      { id: "anime", label: "Anime", Icon: KatanaIcon, activeAnimClass: "v5a-slash-anim" },
-      { id: "manga", label: "Manga", Icon: YinYangIcon, activeAnimClass: "v5a-yin-anim" },
-      { id: "novel", label: "Novel", Icon: ScrollBrushIcon, activeAnimClass: "v5a-ink-anim" },
+    pills: [
+      { kind: "east-sub", id: "all", label: "Tümü" },
+      { kind: "east-sub", id: "anime", label: "Anime", Icon: KatanaIcon, activeAnimClass: "v5a-slash-anim" },
+      { kind: "east-sub", id: "manga", label: "Manga", Icon: YinYangIcon, activeAnimClass: "v5a-yin-anim" },
+      { kind: "east-sub", id: "novel", label: "Novel", Icon: ScrollBrushIcon, activeAnimClass: "v5a-ink-anim" },
     ],
-    interactive: true,
   },
   screen: {
     key: "screen",
@@ -251,26 +210,22 @@ const WORLDS: Record<WorldKey, WorldConfig> = {
     glyphFontClass: "text-lg font-bold",
     title: "Kadraj",
     subtitle: "Film ve dizi koleksiyonların.",
-    subgroups: [
-      { id: "film", label: "Film", Icon: LensIcon },
-      { id: "dizi", label: "Dizi", Icon: ClapperIcon },
-      { id: "doc", label: "Belgesel", Icon: FilmStripIcon },
+    pills: [
+      { kind: "type", id: "all", label: "Tümü" },
+      { kind: "type", id: "movie", label: "Film", Icon: LensIcon },
+      { kind: "type", id: "tv", label: "Dizi", Icon: ClapperIcon },
     ],
-    interactive: false,
   },
   arch: {
     key: "arch",
-    // "Æ" Cormorant italik ima eder; system fonta düşse bile okunaklı kalır.
     glyph: "Æ",
     glyphFontClass: "text-lg font-bold italic",
     title: "Arşiv",
-    subtitle: "Kitaplar, eski kayıtlar ve okuma arşivin.",
-    subgroups: [
-      { id: "book", label: "Kitap", Icon: BookIcon },
-      { id: "novel", label: "Roman", Icon: FeatherIcon },
-      { id: "classics", label: "Klasikler", Icon: SealIcon },
+    subtitle: "Kitap koleksiyonun.",
+    pills: [
+      { kind: "type", id: "all", label: "Tümü" },
+      { kind: "type", id: "book", label: "Kitap", Icon: BookIcon },
     ],
-    interactive: false,
   },
 };
 
@@ -285,15 +240,21 @@ function themeToWorld(theme: ThemeFilter): WorldKey | null {
 // ----- Component -----
 interface WorldHeroProps {
   themeFilter: ThemeFilter;
-  // Sadece Doğu için tüketilir; diğer dünyalarda görmezden gelinir.
+  // Doğu için tüketilir; diğer dünyalarda görmezden gelinir.
   eastSub: EastSubFilter;
   onEastSubChange: (next: EastSubFilter) => void;
+  // R13.2: Kadraj/Arşiv pill'leri mevcut typeFilter üzerinden çalışır.
+  // Doğu pill'lerinde tüketilmez.
+  typeFilter: MediaType | "all";
+  onTypeChange: (next: MediaType | "all") => void;
 }
 
 export default function WorldHero({
   themeFilter,
   eastSub,
   onEastSubChange,
+  typeFilter,
+  onTypeChange,
 }: WorldHeroProps) {
   const worldKey = themeToWorld(themeFilter);
   // "Tümü" seçiliyken hero hiç çıkmasın — control bar sade kalsın.
@@ -343,41 +304,35 @@ export default function WorldHero({
           </div>
         </div>
 
-        {/* Subgroup pill'leri.
-            Doğu interaktif; Kadraj/Arşiv salt-görsel (visual only).
-            Salt-görsel pill'lerde hover değişimi yapmıyoruz, böylece
-            kullanıcı hiçbir şey beklemez. */}
+        {/* R13.2: Tüm dünyalarda pill'ler artık interaktif. Doğu eastSubFilter
+            üzerinden, Kadraj/Arşiv ise mevcut typeFilter üzerinden çalışır.
+            SubBadge / "soon" sahte etiket KALDIRILDI. */}
         <div className="flex flex-wrap items-center gap-2">
-          {w.interactive && (
-            <SubButton
-              label="Tümü"
-              active={eastSub === "all"}
-              onClick={() => onEastSubChange("all")}
-            />
-          )}
-          {w.subgroups.map((sg) => {
-            if (w.interactive) {
-              const isActive = eastSub === sg.id;
+          {w.pills.map((pill) => {
+            if (pill.kind === "east-sub") {
+              const isActive = eastSub === pill.id;
               return (
                 <SubButton
-                  key={sg.id}
-                  label={sg.label}
+                  key={`east-${pill.id}`}
+                  label={pill.label}
                   active={isActive}
-                  onClick={() => onEastSubChange(sg.id as EastSubFilter)}
-                  Icon={sg.Icon}
+                  onClick={() => onEastSubChange(pill.id)}
+                  Icon={pill.Icon}
                   // V5A.4: aktif/pasif geçişinde key remount → animasyon bir kez oynar.
                   iconKey={isActive ? "active" : "idle"}
-                  iconAnimClass={isActive ? sg.activeAnimClass : undefined}
+                  iconAnimClass={isActive ? pill.activeAnimClass : undefined}
                 />
               );
             }
-            // Görsel-only: tıklama yok, cursor default. İlk pill'i hafifçe
-            // "öne çıkmış" göstermiyoruz — yanıltıcı olur (gerçek filtre yok).
+            // pill.kind === "type" → typeFilter wiring (Kadraj/Arşiv)
+            const isActive = typeFilter === pill.id;
             return (
-              <SubBadge
-                key={sg.id}
-                label={sg.label}
-                Icon={sg.Icon}
+              <SubButton
+                key={`type-${pill.id}`}
+                label={pill.label}
+                active={isActive}
+                onClick={() => onTypeChange(pill.id)}
+                Icon={pill.Icon}
               />
             );
           })}
@@ -434,38 +389,6 @@ function SubButton({
   );
 }
 
-function SubBadge({
-  label,
-  Icon,
-}: {
-  label: string;
-  Icon: (props: { className?: string }) => React.ReactElement;
-}) {
-  // R13.1: Salt-görsel kategori — Kadraj/Arşiv için. Önceki versiyon
-  // interaktif pill'lerle aynı stildeydi → tıklanabilir intibası veriyordu.
-  // Şimdi açıkça pasif:
-  //   - dotted ring (interaktif olanlar solid ring kullanıyor)
-  //   - cursor-not-allowed
-  //   - opacity-60 (sessizleşir)
-  //   - aria-disabled="true" (a11y)
-  //   - sağ üstte küçük "Yakında" mikro-rozeti (UI niyeti açık)
-  // hover transition yok; kullanıcı parmağı üzerine geldiğinde hiçbir şey
-  // değişmez → "buton" beklentisi yok.
-  return (
-    <span
-      role="presentation"
-      aria-disabled="true"
-      title={`${label} · alt filtre yakında`}
-      className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium tracking-wide border border-dashed border-zinc-700/70 bg-zinc-900/30 text-zinc-500 opacity-60 cursor-not-allowed select-none"
-    >
-      <Icon className="w-3.5 h-3.5" />
-      <span>{label}</span>
-      <span
-        aria-hidden="true"
-        className="ml-0.5 text-[9px] font-mono uppercase tracking-[0.12em] text-zinc-600"
-      >
-        soon
-      </span>
-    </span>
-  );
-}
+// R13.2: SubBadge kaldırıldı. Önceki versiyonda Kadraj/Arşiv için salt-görsel
+// "soon" pill'leri vardı; artık tüm pill'ler interaktif (typeFilter veya
+// eastSubFilter üzerinden), desteklenmeyen alt türler hiç gösterilmiyor.

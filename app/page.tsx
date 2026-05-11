@@ -125,6 +125,15 @@ export default function HomePage() {
   const [librarySort, setLibrarySort] = useState<LibrarySort>("recent");
   const [libraryView, setLibraryView] = useState<LibraryView>("grid");
 
+  // R13.2: Macro transition tetik state'i. WorldTransition artık worldAttr
+  // prop'unu otomatik izlemiyor — sadece kullanıcı Dünya filtresini
+  // değiştirince burada token bumpluyoruz. Sekme geçişi, medya ekleme,
+  // settings'e girip çıkma vb. olaylar transition tetiklemez.
+  const [worldTransition, setWorldTransition] = useState<{
+    token: number;
+    world: "east" | "screen" | "arch" | "neutral";
+  } | null>(null);
+
   // V5A.1/V5A.2: Theme mode değişince bağımlı filtreleri tutarlı tut.
   // - Doğu dışına çıkılırsa eastSubFilter "all"a düşer (anlamı kalmaz).
   // - typeFilter, yeni theme altında MediaFilters'da görünmeyecek bir değere
@@ -148,6 +157,20 @@ export default function HomePage() {
         setTypeFilter("all");
       }
     }
+
+    // R13.2: Macro transition tetiklemesi *yalnız burada*. ThemeFilter →
+    // WorldKey eşlemesi worldAttr ile aynı; ama tetik bu fonksiyondan başka
+    // hiçbir yerden bumplanmaz. Neutral'ı da gönderiyoruz (component zaten
+    // skipliyor) — token monotonik artsın diye.
+    const targetWorld =
+      next === "east" ? "east"
+      : next === "screen" ? "screen"
+      : next === "library" ? "arch"
+      : "neutral";
+    setWorldTransition((prev) => ({
+      token: (prev?.token ?? 0) + 1,
+      world: targetWorld,
+    }));
   };
 
   // Gelişmiş aramaları (eski panelleri) gösterme durumu
@@ -1300,11 +1323,11 @@ export default function HomePage() {
     // R10: data-world scope (yukarıdaki worldAttr). globals.css altındaki
     // [data-world="..."] selector'ları --w-* tokenlarını set eder.
     <div data-world={worldAttr} className="min-h-screen bg-zinc-950 text-zinc-100 flex">
-      {/* R13: Macro transition overlay — data-world scope'unun *içinde* duruyor
-          ki --w-* tokenları aktif dünyanın renklerine resolve olsun. Kendisi
-          fixed inset-0 + pointer-events-none + z-30 (topbar z-40, modallar
-          z-50 üstte). Sadece worldAttr değişimine tepki verir. */}
-      <WorldTransition world={worldAttr} />
+      {/* R13.2: Macro transition overlay — data-world scope'unun içinde
+          duruyor ki --w-* tokenları aktif dünyanın renklerine resolve olsun.
+          Artık worldAttr otomatik izlenmiyor; sadece handleThemeFilterChange
+          içinde bumplanan worldTransition token'ına tepki veriyor. */}
+      <WorldTransition trigger={worldTransition} />
       <AppSidebar activeTab={activeTab} onChange={handleTabChange} />
 
       <div className="flex-1 min-w-0 flex flex-col">
@@ -1356,15 +1379,15 @@ export default function HomePage() {
               resultCount={filteredMedia.length}
             />
 
-            {/* R11: WorldHero — Doğu/Kadraj/Arşiv için ortak hero.
-                "Tümü" iken hero'yu hiç çıkarmıyoruz (sade kalsın); component
-                içeride de erken null döner. Doğu için mevcut eastSubFilter
-                wiring birebir korunur (V5A.2 davranışı). Kadraj/Arşiv
-                pill'leri bu turda salt görsel — yeni filtre state'i yok. */}
+            {/* R13.2: Kadraj/Arşiv pill'leri artık mevcut typeFilter üzerinden
+                interaktif. Doğu pill'leri eastSubFilter ile birebir korunur.
+                Yeni filtre state'i eklenmedi; sahte/dummy pill yok. */}
             <WorldHero
               themeFilter={themeFilter}
               eastSub={eastSubFilter}
               onEastSubChange={setEastSubFilter}
+              typeFilter={typeFilter}
+              onTypeChange={setTypeFilter}
             />
 
             {filteredMedia.length > 0 ? (
