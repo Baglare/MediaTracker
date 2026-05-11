@@ -13,10 +13,7 @@
 // yerleştiriyor.
 
 import { Search, Plus, ArrowUpDown, LayoutGrid, List } from "lucide-react";
-import MediaFilters, {
-  type ThemeFilter,
-  type EastSubFilter,
-} from "@/components/media-filters";
+import MediaFilters, { type ThemeFilter } from "@/components/media-filters";
 import type { MediaType, MediaStatus } from "@/lib/types";
 
 export type LibrarySort = "recent" | "lastActivity" | "title" | "progress" | "rating";
@@ -48,10 +45,6 @@ interface LibraryControlBarProps {
 
   // Sayım göstergesi (opsiyonel)
   resultCount?: number;
-
-  // R5'te tutulmuştu; bu prop artık control bar tarafından kullanılmıyor
-  // ama tip stabilitesi için opsiyonel bıraktım.
-  eastSubFilter?: EastSubFilter;
 }
 
 export default function LibraryControlBar({

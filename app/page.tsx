@@ -72,7 +72,6 @@ import { loadMediaList, saveMediaList, clearMediaList, loadProgressLogs, savePro
 import { getIncrementAmount, getProgressLabel, getProgressUnit, getStatusLabel, isMovieLike } from "@/lib/progress";
 import { MediaItem, MediaType, MediaStatus, ProgressLog, withMediaClassification } from "@/lib/types";
 import {
-  getTvmazeExistingSeasonNumbers,
   getTvmazeSeasonExternalId,
   getTvmazeSeasonNumber,
   getTvmazeShowExternalId,
@@ -1316,7 +1315,6 @@ export default function HomePage() {
               onStatusChange={setStatusFilter}
               onAddMedia={handleOpenAddModal}
               resultCount={filteredMedia.length}
-              eastSubFilter={eastSubFilter}
             />
 
             {/* V5A.2: Doğu seçiliyken kompakt theme header — alt filtre burada.
