@@ -197,11 +197,65 @@ API route'ları proxy görevi görür:
 
 [components/ai-advisor.tsx](components/ai-advisor.tsx) UI + [lib/ai/](lib/ai/) provider abstraction (`openai-compatible-provider`, settings, types). [app/api/ai/recommend/route.ts](app/api/ai/recommend/route.ts) proxy. AI sekmesi dışına çıkıldığında `aiResetSignal` artırılır → component aktif sohbeti sıfırlar (render sırasında setState etmeden, modal-style prop-karşılaştırma kalıbıyla).
 
+## UI Shell ve Layout (R1–R8 redesign)
+
+Eski tek-üst-nav layout'u (kaldırılan `AppHeader`) dashboard-style shell ile değiştirildi. `app/page.tsx` hâlâ tek route ve tüm tab'ları koşullu render ediyor, ama dış kabuk artık üç sütun:
+
+```
+┌─ AppSidebar (lg+, w-64) ─┬─ AppTopbar (sticky, h-14) ──────────────┐
+│                          ├─ main (px responsive, min-w-0) ─────────┤
+│  nav sections + Settings │                                   │RightRail│
+│                          │                                   │(xl+, 18rem)│
+└──────────────────────────┴───────────────────────────────────┴────────┘
+```
+
+### Shell componentleri ([components/app-{sidebar,topbar}.tsx](components/app-sidebar.tsx), [components/right-rail.tsx](components/right-rail.tsx))
+
+- **`AppSidebar`** — lg altında gizli. Nav öğeleri `TabType`'ın hepsini içerir + ileride gelecek ghost item'lar (`calendar`, `progress`, `watchlist`, `favorites`, `ratings`, `notes`, `stats`). Ghost item'lar `disabled` + `cursor-not-allowed`; `onChange` sadece `REAL_TABS = {dashboard, library, discover, ai, activity, settings}` üyeleri için tetiklenir. Yeni "Yakında" sayfa eklerken `REAL_TABS` setini büyütmeyi unutma — aksi halde tıklama sessizce yutulur.
+- **`AppTopbar`** — lg+ breadcrumb (`MediaTracker › <TabLabel>`) + `CloudModeBadge`. lg altında mevcut `AppTabs` fallback olarak topbar'ın altında render edilir (sidebar erişimsiz). Yeni tab eklerken `app-topbar.tsx`'in `TAB_LABELS` map'ine de eklenmeli.
+- **`RightRail`** — xl+ görünür. Salt okuma; parent'tan `mediaList`, `progressLogs`, `stats: DashboardStats`, `onOpenDetail` prop'larıyla beslenir. Widget'lar (`OverallWidget`, `DailyGoalWidget`, `SuggestionWidget`, `ActivityWidget`, `UpcomingWidget`) içeride memo'lu türetimler yapar. **Ayarlar sekmesinde `activeTab !== "settings"` koşulu ile gizlenir** — settings bağlam-dışıydı; main column rail kaybolunca tüm xl genişliği alır. Yeni "ağır" sayfa eklerken aynı kararı vermek gerekebilir.
+- **Page surface dialect:** `rounded-2xl border-zinc-800/60 bg-zinc-900/30` panel + amber-400/80 accent. Yeni panel/widget yazarken bu üçlüyü kullan.
+
+### Kütüphanem dashboard section layout
+
+`activeTab === "library"` bloğu `filteredMedia`'yı **üç ayrı section**'a böler. Pipeline aşağıdaki sırada `app/page.tsx` içinde tek bir IIFE'de hesaplanır:
+
+1. **Devam Ettiklerim** — `filteredMedia` üzerinden `status ∈ {watching, reading}` veya `currentProgress > 0 && status ∉ {completed, dropped}`; son `progressLogs` timestamp'ine göre sırala, ilk 6. **Bilinçli karar:** burada görünen item alt section'larda da tekrar görünebilir (üstte öne çıkar, listede kalır). React key çakışmasını engellemek için bu section `key={\`continue-${item.id}\`}` prefix'i kullanır.
+2. **Seri Koleksiyonlarım** — `groupMediaItems(filteredMedia)` çıktısının `isGroup && items.length >= 2` olan kısmı; `SeriesGroupCard` ile render.
+3. **Kütüphanem (tekil)** — kalan singleton item'lar. **Yalnızca bu section** `librarySort` ve `libraryView` state'lerinden etkilenir.
+
+### LibraryControlBar + LibrarySectionControls ([components/library-control-bar.tsx](components/library-control-bar.tsx))
+
+- **`LibraryControlBar`** (üst global): arama, "Medya Ekle", `MediaFilters` (Tema/Tür/Durum). Tüm pipeline'ı etkiler. `MediaFilters` R6.1'de yatay kompakt rail'e taşındı (3 dikey blok → tek satır flex-wrap); logic aynen, sadece görsel.
+- **`LibrarySectionControls`** (named export): kompakt sort dropdown + grid/list toggle. **Kütüphanem section header'ının `actions` slot'una** gömülür (R5.1: kontrolün etkilediği bölüme yakın olsun). `Devam Ettiklerim` ve `Seri Koleksiyonlarım` section header'ları `actions` geçmediği için bu kontroller orada görünmez.
+- **Sort:** `recent` (mediaList index, reverse), `lastActivity` (progressLogs timestamp), `title` (`localeCompare("tr")`), `progress` (ratio; `totalProgress=0` → `-1` → sona), `rating` (`userRating ?? -1` → sona). Veri mutate etmez; her zaman `slice().sort(...)`.
+- **View:** `grid` → `grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4`; `list` → `grid-cols-1 gap-3` (yine `MediaCard`).
+
+### Filtre-tema bağımlılıkları (V5A korundu)
+
+`handleThemeFilterChange` (app/page.tsx) tema değişiminde yan filtreleri konsolide eder:
+- `east` dışına çıkış → `eastSubFilter = "all"`
+- `east` → `typeFilter = "all"` (type bloğu zaten gizli)
+- `screen` → `typeFilter` sadece `"all" | "movie" | "tv"` kalır
+- `library` → `typeFilter` sadece `"all" | "book"` kalır
+
+Bu kural `MediaFilters`'ın `TYPE_VALUES_BY_THEME` haritasıyla eşleşmek zorunda; ikisinden birini değiştirirken diğerini de güncelle.
+
+### PageHeader ([components/page-header.tsx](components/page-header.tsx))
+
+Dashboard / Keşfet / AI Danışman / Aktivite / Ayarlar tab'larının başına gelen ortak başlık bandı (amber ikon kutusu + zinc-50 başlık + subtitle + bottom border). **Kütüphanem'de PageHeader yok** — control bar + section heads zaten yapıyı kuruyor, topbar breadcrumb'ı "Kütüphanem" diyor; dördüncü "Kütüphanem" yazısı görsel gürültü olurdu. Yeni tab eklerken: `<PageHeader icon={...} title="..." subtitle="..." />` ile başla.
+
+### SeriesGroupCard featured-collection (R3)
+
+[components/series-group-card.tsx](components/series-group-card.tsx) tek `palette` objesinden tüm renkleri çeker: Doğu ailesi (`resolveThemeAccent` → `groupAccent`) varsa amber, aksi halde violet/fuchsia fallback. Üst gradient şerit, progress bar, sezon ekle/grubu düzenle butonları, expanded iç hiyerarşi çizgisi ve dashed "Sezon/Parça Ekle" slot'u hepsi aynı paletten beslenir. Yeni accent yolu eklerken `palette` objesini genişlet — class string'lerini cardın içinde dağıtma.
+
 ## Dosya hiyerarşisi (özet)
 
 ```
 app/             — page.tsx (tek route) + api/{tvmaze,anilist,openlibrary,omdb,tmdb,ai}/...
-components/      — UI parçaları (modal, panel, kart, header, dashboard, ai-advisor)
+components/      — UI parçaları (modal, panel, kart, ai-advisor)
+                   shell: app-sidebar, app-topbar, app-tabs (mobil fallback),
+                          right-rail, page-header, library-control-bar
 hooks/           — useAuth, useSyncStatus
 lib/             — storage, types, progress, dashboard-stats, mock-media, sync-manager,
                    sync-queue, backup, series-group, global-search-types,
@@ -210,6 +264,7 @@ lib/ai/          — AI provider (openai-compatible) + settings/types
 lib/supabase/    — client, server, status, types, mapping, cloud-repository
 supabase/        — schema.sql (RLS + index + trigger)
 docs/            — supabase-offline-sync-plan.md
+design_references/ — sadece görsel/layout referans; runtime'da kullanılmaz
 ```
 
 ## Bilinçli olarak yapılmayanlar
