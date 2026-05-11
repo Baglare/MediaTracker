@@ -1606,7 +1606,12 @@ export default function HomePage() {
         </main>
       </div>
 
-      <RightRail />
+      <RightRail
+        mediaList={mediaList}
+        progressLogs={progressLogs}
+        stats={dashboardStats}
+        onOpenDetail={handleOpenDetailModal}
+      />
 
       {/* Medya Ekle / Düzenle Modalı */}
       <MediaModal
