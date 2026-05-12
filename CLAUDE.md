@@ -16,7 +16,7 @@ npm run start    # Build sonrası prod sunucu
 npx tsc --noEmit # Build'siz salt tip kontrolü
 ```
 
-Test runner kurulu değil — manuel test yolu `npm run dev` veya `npm run build` üzerinden ilerler. Lint+TS+build geçmesi pratikte gerekli minimum.
+Test runner kurulu değil — manuel test yolu `npm run dev` veya `npm run build` üzerinden ilerler. Lint+TS+build geçmesi pratikte gerekli minimum. `eslint.config.mjs` `design_references/**` yolunu kapsam dışı bırakır (R19); o klasördeki JSX prototype snapshot'larını düzenlemeye gerek yok.
 
 ## Mimari
 
@@ -30,12 +30,13 @@ Next.js 16 App Router + React 19 + Tailwind 4 üzerine kurulu, **offline-first**
   - `media-tracker-list` — `MediaItem[]`
   - `media-tracker-logs` — `ProgressLog[]`
   - `media-tracker-sync-queue` — `SyncQueueItem[]`
+  - `mediaTracker:uiPreferences` — R18 UI tercihleri (aşağıya bak)
 - Mount'ta `app/page.tsx` storage'tan okur. Sonraki tüm değişikliklerde otomatik yazma için bir `useEffect`.
 - Supabase env yoksa veya kullanıcı giriş yapmadıysa hiçbir cloud çağrısı tetiklenmez.
 
 ### Sync mimarisi
 
-[lib/sync-manager.ts](lib/sync-manager.ts) singleton bir orchestrator'dır. Mutasyon noktaları (`app/page.tsx` içindeki `handleIncrement`, `handleComplete`, `handleSaveMedia`, `handleDeleteRequest`, `handleToggleFavorite`, `addProgressLog`, `handleCommitGroupAction`, `handleAddFromAniList` relation patch'leri) lokal state'i güncellerken **aynı zamanda** kuyruğa item düşürür:
+[lib/sync-manager.ts](lib/sync-manager.ts) singleton bir orchestrator'dır. Mutasyon noktaları (`app/page.tsx` içindeki `handleIncrement`, `handleComplete`, `handleSaveMedia`, `handleDeleteRequest`, `handleToggleFavorite`, `handleUpdateRating`, `addProgressLog`, `handleCommitGroupAction`, `handleAddFromAniList` relation patch'leri) lokal state'i güncellerken **aynı zamanda** kuyruğa item düşürür:
 
 - `enqueueMediaUpsert(item)` / `enqueueMediaDelete(id)` / `enqueueProgressLog(log)`
 - Coalescing: aynı `entity` + aynı `payload.id` için bekleyen kayıt yenisiyle değiştirilir.
@@ -64,7 +65,7 @@ setMediaList(nextList);
 for (const m of touched) enqueueMediaUpsert(m);
 ```
 
-Örnekler: [app/page.tsx](app/page.tsx) `handleCommitGroupAction`, `handleAddFromAniList` (relation patches). Yeni bir batch güncelleme yazarken bu kalıba uy.
+Örnekler: [app/page.tsx](app/page.tsx) `handleCommitGroupAction`, `handleAddFromAniList` (relation patches), `handleUpdateRating` (R18.3). Yeni bir batch güncelleme yazarken bu kalıba uy.
 
 ### Supabase katmanı
 
@@ -156,9 +157,13 @@ UI bunlar için bölüm/dakika progress bloğunu **gizler**; ana aksiyon "İzlen
 
 ## React 19 / Next.js 16 dikkat noktaları
 
-- **`react-hooks/set-state-in-effect`** lint kuralı aktif. Effect içinde sync setState etmek hata. Localstorage hidrasyonu için `eslint-disable-next-line react-hooks/set-state-in-effect` ile yorum gerekli olduğu yerlerde kullanıldı (örn. `app/page.tsx`'in mount-only effect'i).
-- **`react-hooks/refs`** kuralı render sırasında `ref.current` okumayı yasaklar. `useAuth` bunu önlemek için `useState` lazy init ile client kontrolü yapar.
-- **Modal state reset** kalıbı: `useEffect` ile prop-driven reset yerine "render sırasında prev-prop karşılaştırması" — bkz. `media-modal.tsx`, `quick-add-modal.tsx`, `manual-group-modal.tsx`.
+- **`react-hooks/set-state-in-effect`** lint kuralı aktif. Effect içinde sync setState etmek hata. Üç tip çözüm var (kullanıma göre):
+  1. **Hidrasyon** (mount-only localStorage okuma): `eslint-disable-next-line react-hooks/set-state-in-effect` yorum gerekir (örn. `app/page.tsx`'in mediaList + UI prefs hidrasyon effect'leri).
+  2. **Prop-driven reset** (örn. ai-advisor `resetSignal`): **modal-style prev-prop karşılaştırması** — render içinde `lastResetSignal` izleme state'iyle setState'leri guard'layıp çalıştır; **ref + timer mutasyonları ayrı bir useEffect**'e taşı ki kural tetiklenmesin (R19'da bu kalıba geçildi).
+  3. **Async resolve** (örn. global-search status haritası): async callback içinde setState ⇒ kural tetiklenmiyor; ama **boş input → harita temizleme** kısmı render-phase guard'a taşınmalı (R19 fix'i).
+- **`react-hooks/refs`** kuralı render sırasında `ref.current` okuma/yazmayı yasaklar. `useAuth` bunu önlemek için `useState` lazy init ile client kontrolü yapar.
+- **`react-hooks/exhaustive-deps`** — `useCallback`/`useMemo` deps'ine `function` declaration referansı koyma her render'da yeni referans olduğundan uyarı verir. Sarmalamak çoğu zaman doğru, ancak **TDZ veya React Compiler `react-hooks/preserve-manual-memoization`** çakışması olabilir (örn. `app/page.tsx` `getTvmazeItemsForShow`). Bu durumda hoisted `function` formu bırakılır, uyarı kabul edilir; davranış etkisi pratikte yok.
+- **Modal state reset** kalıbı: `useEffect` ile prop-driven reset yerine "render sırasında prev-prop karşılaştırması" — bkz. `media-modal.tsx`, `quick-add-modal.tsx`, `manual-group-modal.tsx`, `ai-advisor.tsx` (R19).
 - Server component'lerde `cookies()` artık async; `lib/supabase/server.ts` buna göre yazılmış.
 - Render-phase update kuralı (yukarıda ayrı bölüm) — özellikle batch state update + sync queue enqueue kombinasyonlarında.
 
@@ -195,9 +200,9 @@ API route'ları proxy görevi görür:
 
 ## AI Danışman
 
-[components/ai-advisor.tsx](components/ai-advisor.tsx) UI + [lib/ai/](lib/ai/) provider abstraction (`openai-compatible-provider`, settings, types). [app/api/ai/recommend/route.ts](app/api/ai/recommend/route.ts) proxy. AI sekmesi dışına çıkıldığında `aiResetSignal` artırılır → component aktif sohbeti sıfırlar (render sırasında setState etmeden, modal-style prop-karşılaştırma kalıbıyla).
+[components/ai-advisor.tsx](components/ai-advisor.tsx) UI + [lib/ai/](lib/ai/) provider abstraction (`openai-compatible-provider`, settings, types). [app/api/ai/recommend/route.ts](app/api/ai/recommend/route.ts) proxy. AI sekmesi dışına çıkıldığında `aiResetSignal` artırılır → component aktif sohbeti sıfırlar; R19'da bu mantık modal-style prev-prop karşılaştırması + ayrı ref-cleanup effect şeklinde refactor edildi.
 
-## UI Shell ve Layout (R1–R8 redesign)
+## UI Shell ve Layout (R1–R8 redesign + R17/R18.5.1 polish)
 
 Eski tek-üst-nav layout'u (kaldırılan `AppHeader`) dashboard-style shell ile değiştirildi. `app/page.tsx` hâlâ tek route ve tüm tab'ları koşullu render ediyor, ama dış kabuk artık üç sütun:
 
@@ -209,45 +214,161 @@ Eski tek-üst-nav layout'u (kaldırılan `AppHeader`) dashboard-style shell ile 
 └──────────────────────────┴───────────────────────────────────┴────────┘
 ```
 
+### Shell overflow + sticky kuralı (R18.5.1 — kritik)
+
+Outer shell `<div>`'i **`overflow-x-clip`** kullanır, `overflow-x-hidden` DEĞİL. `hidden` bir **CSS scroll container** oluşturur; bu durumda sidebar/rail'ın `sticky top-0` davranışı viewport yerine bu container'a anchor olur ve sticky efektif olarak static gibi davranır. `overflow: clip` scroll container kurmadan taşmayı kırpar — sticky çalışmaya devam eder. Yeni shell-level overflow guard eklerken **`clip` kullan**.
+
 ### Shell componentleri ([components/app-{sidebar,topbar}.tsx](components/app-sidebar.tsx), [components/right-rail.tsx](components/right-rail.tsx))
 
-- **`AppSidebar`** — lg altında gizli. Nav öğeleri `TabType`'ın hepsini içerir + ileride gelecek ghost item'lar (`calendar`, `progress`, `watchlist`, `favorites`, `ratings`, `notes`, `stats`). Ghost item'lar `disabled` + `cursor-not-allowed`; `onChange` sadece `REAL_TABS = {dashboard, library, discover, ai, activity, settings}` üyeleri için tetiklenir. Yeni "Yakında" sayfa eklerken `REAL_TABS` setini büyütmeyi unutma — aksi halde tıklama sessizce yutulur.
-- **`AppTopbar`** — lg+ breadcrumb (`MediaTracker › <TabLabel>`) + `CloudModeBadge`. lg altında mevcut `AppTabs` fallback olarak topbar'ın altında render edilir (sidebar erişimsiz). Yeni tab eklerken `app-topbar.tsx`'in `TAB_LABELS` map'ine de eklenmeli.
-- **`RightRail`** — xl+ görünür. Salt okuma; parent'tan `mediaList`, `progressLogs`, `stats: DashboardStats`, `onOpenDetail` prop'larıyla beslenir. Widget'lar (`OverallWidget`, `DailyGoalWidget`, `SuggestionWidget`, `ActivityWidget`, `UpcomingWidget`) içeride memo'lu türetimler yapar. **Ayarlar sekmesinde `activeTab !== "settings"` koşulu ile gizlenir** — settings bağlam-dışıydı; main column rail kaybolunca tüm xl genişliği alır. Yeni "ağır" sayfa eklerken aynı kararı vermek gerekebilir.
+- **`AppSidebar`** — `hidden lg:flex sticky top-0 h-screen w-64 ... flex-col`, iç nav `flex-1 min-h-0 overflow-y-auto`. Ghost item'lar (`calendar`, `progress`, `watchlist`, `favorites`, `ratings`, `notes`, `stats`) `disabled + cursor-not-allowed`; `onChange` sadece `REAL_TABS = {dashboard, library, discover, ai, activity, settings}` üyeleri için tetiklenir. Yeni "Yakında" sayfa eklerken `REAL_TABS` setini büyütmeyi unutma.
+- **`AppTopbar`** — `sticky top-0 z-40`. lg+ breadcrumb (`MediaTracker › <TabLabel>`) + `CloudModeBadge`. lg altında mevcut `AppTabs` fallback olarak topbar'ın altında render edilir. Yeni tab eklerken `app-topbar.tsx`'in `TAB_LABELS` map'ine de eklenmeli.
+- **`RightRail`** — `hidden xl:flex sticky top-0 h-screen w-[18rem] ... overflow-y-auto`. Salt okuma; parent'tan `mediaList`, `progressLogs`, `stats: DashboardStats`, `themeFilter` (R15 — dünya bazlı widget hesapları), `onOpenDetail` prop'larıyla beslenir. Widget'lar (`OverallWidget`, `DailyGoalWidget`, `SuggestionWidget`, `ActivityWidget`, `UpcomingWidget`) içeride memo'lu türetimler yapar. **Ayarlar sekmesinde `activeTab !== "settings"` koşulu ile gizlenir** — settings bağlam-dışıydı; main column rail kaybolunca tüm xl genişliği alır.
 - **Page surface dialect:** `rounded-2xl border-zinc-800/60 bg-zinc-900/30` panel + amber-400/80 accent. Yeni panel/widget yazarken bu üçlüyü kullan.
 
-### Kütüphanem dashboard section layout
+### Z-index hiyerarşisi
 
-`activeTab === "library"` bloğu `filteredMedia`'yı **üç ayrı section**'a böler. Pipeline aşağıdaki sırada `app/page.tsx` içinde tek bir IIFE'de hesaplanır:
+Yeni overlay/popover eklerken bu sıralamaya uy:
+- Modal'lar (`confirm-dialog`, `manual-group-modal`, `media-modal`, `quick-add-modal`): `z-[100]`
+- `MediaDetailModal`: `z-50`
+- `WorldTransition` macro overlay: `z-[45]`
+- `AppTopbar`: `z-40`
+- MediaCard favori ribbon ve rating popover: `z-30` (kart-içi stacking; topbar/modal'ların altında)
+- MediaCard title hover-expansion: `hover:z-40`
 
-1. **Devam Ettiklerim** — `filteredMedia` üzerinden `status ∈ {watching, reading}` veya `currentProgress > 0 && status ∉ {completed, dropped}`; son `progressLogs` timestamp'ine göre sırala, ilk 6. **Bilinçli karar:** burada görünen item alt section'larda da tekrar görünebilir (üstte öne çıkar, listede kalır). React key çakışmasını engellemek için bu section `key={\`continue-${item.id}\`}` prefix'i kullanır.
-2. **Seri Koleksiyonlarım** — `groupMediaItems(filteredMedia)` çıktısının `isGroup && items.length >= 2` olan kısmı; `SeriesGroupCard` ile render.
-3. **Kütüphanem (tekil)** — kalan singleton item'lar. **Yalnızca bu section** `librarySort` ve `libraryView` state'lerinden etkilenir.
+## Dünya (World) sistemi (R9–R16)
 
-### LibraryControlBar + LibrarySectionControls ([components/library-control-bar.tsx](components/library-control-bar.tsx))
+Eski "Tema" konsepti R9'da **Dünya**'ya yeniden isimlendirildi. State adları (`themeFilter`, `eastSubFilter`, `EastSubFilter`, `ThemeFilter`) ve internal değerler (`"all"`/`"east"`/`"screen"`/`"library"`) **korundu** — sadece UI label'ı ve sekme adları yenilendi.
 
-- **`LibraryControlBar`** (üst global): arama, "Medya Ekle", `MediaFilters` (Tema/Tür/Durum). Tüm pipeline'ı etkiler. `MediaFilters` R6.1'de yatay kompakt rail'e taşındı (3 dikey blok → tek satır flex-wrap); logic aynen, sadece görsel.
-- **`LibrarySectionControls`** (named export): kompakt sort dropdown + grid/list toggle. **Kütüphanem section header'ının `actions` slot'una** gömülür (R5.1: kontrolün etkilediği bölüme yakın olsun). `Devam Ettiklerim` ve `Seri Koleksiyonlarım` section header'ları `actions` geçmediği için bu kontroller orada görünmez.
-- **Sort:** `recent` (mediaList index, reverse), `lastActivity` (progressLogs timestamp), `title` (`localeCompare("tr")`), `progress` (ratio; `totalProgress=0` → `-1` → sona), `rating` (`userRating ?? -1` → sona). Veri mutate etmez; her zaman `slice().sort(...)`.
-- **View:** `grid` → `grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4`; `list` → `grid-cols-1 gap-3` (yine `MediaCard`).
+### `data-world` scope (R10)
 
-### Filtre-tema bağımlılıkları (V5A korundu)
+`app/page.tsx`'in kök `<div>`'i `data-world={worldAttr}` taşır; `themeFilter` → world key eşlemesi:
+- `all` → `neutral`
+- `east` → `east`
+- `screen` → `screen`
+- `library` → `arch`
+- **Ayarlar sekmesinde her zaman `neutral`** (settings bağlam-dışı).
 
-`handleThemeFilterChange` (app/page.tsx) tema değişiminde yan filtreleri konsolide eder:
+[app/globals.css](app/globals.css) `[data-world="..."]` selector'ları altında `--w-primary`, `--w-primary-strong`, `--w-soft` token'larını set eder. Yeni dünya-aware öğe yazarken hardcoded amber/blue/parchment kullanma; bu token'lardan beslen (`text-[var(--w-primary-strong)]`, `bg-[var(--w-soft)]`, `ring-[color-mix(in_srgb,var(--w-primary)_40%,transparent)]`).
+
+### Bileşenler
+
+- **`WorldSwitcher`** ([components/media-filters.tsx](components/media-filters.tsx)) — Dünya seçim segmented control. LibraryControlBar üst slot'unda yaşar. Aktif Dünya `--w-*` token'larına bağlanır → "Tümü"de nötr zinc, dünya seçili iken o dünyanın tonu.
+- **`StatusFilterRow`** ([components/media-filters.tsx](components/media-filters.tsx)) — Durum filtre satırı. R18.1'de `WorldSwitcher`'dan ayrıldı, WorldHero'nun **altına** ayrı satır olarak yerleşir.
+- **`WorldHero`** ([components/world-hero.tsx](components/world-hero.tsx)) — `themeFilter ∈ {east, screen, library}` iken render edilir; `all`/`settings` için hiç render edilmez. Sub-pill'ler:
+  - Doğu: Anime/Manga/Novel → `eastSubFilter`
+  - Kadraj: Film/Dizi → `typeFilter`
+  - Arşiv: Kitap → `typeFilter`
+  R14 mikro animasyonları (`r14-hero-*-enter` keyframe'leri) **yalnızca dünya değişiminde** `key={worldKey}` remount yoluyla oynar; sub-pill seçimi entrance'ı re-trigger ETMEZ.
+- **`WorldTransition`** ([components/world-transition.tsx](components/world-transition.tsx)) — R13.2 macro overlay. `pointer-events-none fixed inset-0 z-[45]`, **sadece `worldTransition` token bumplandığında** oynar (Dünya değişimi event'inde, başka tetik yok). `handleThemeFilterChange` içinde bumplanır; sekme geçişi, medya ekleme, settings'e giriş tetiklemez.
+
+### Filtre mimarisi (R18.1)
+
+Kütüphanem üst kontrol alanı şu yapıdadır:
+1. `LibraryControlBar` — search input + Medya Ekle butonu + altında `WorldSwitcher`
+2. `WorldHero` (sadece `themeFilter !== "all"`) — alt kategori pill'leri
+3. `StatusFilterRow` — bağımsız durum filtresi satırı
+4. İçerik bölümleri
+
+**R18.1 değişikliği**: Eski `MediaFilters`'taki "Tür" bloğu **tamamen kaldırıldı**. Tür seçimi artık yalnızca WorldHero alt pill'leri üzerinden yapılır (Doğu→`eastSubFilter`, Kadraj/Arşiv→`typeFilter`). LibraryControlBar artık sadece `themeFilter`/`onThemeChange` taşır.
+
+### Filtre-tema bağımlılıkları (`handleThemeFilterChange` — değişmedi)
+
+Tema değişiminde yan filtreleri konsolide eder:
 - `east` dışına çıkış → `eastSubFilter = "all"`
-- `east` → `typeFilter = "all"` (type bloğu zaten gizli)
+- `east` → `typeFilter = "all"`
 - `screen` → `typeFilter` sadece `"all" | "movie" | "tv"` kalır
 - `library` → `typeFilter` sadece `"all" | "book"` kalır
 
-Bu kural `MediaFilters`'ın `TYPE_VALUES_BY_THEME` haritasıyla eşleşmek zorunda; ikisinden birini değiştirirken diğerini de güncelle.
+Aynı kurallar R18 `normalizeUIPreferences` (lib/storage.ts) içinde de uygulanır — eski/uyumsuz snapshot'la dönen kullanıcı görmediği bir filtreye sabitlenmiş kalmaz. Birini değiştirirken diğerini de güncelle.
+
+## UI Preferences localStorage (R18 + R18.2)
+
+[lib/storage.ts](lib/storage.ts) `loadUIPreferences()` / `saveUIPreferences()` / `normalizeUIPreferences()`. Key: **`mediaTracker:uiPreferences`**. Tek JSON objesi.
+
+Saklanan alanlar:
+- `themeFilter`, `eastSubFilter`, `typeFilter`, `statusFilter` — filtre durumu
+- `librarySort`, `libraryView` — Kütüphanem (tekil) bölümü kontrolleri
+- `continueSectionOpen`, `seriesSectionOpen` — R18.2 collapsible section durumları
+
+**Saklanmayanlar (bilinçli)**: `activeTab`, `searchQuery`, modal state, selected detail.
+
+### Hidrasyon davranışı (kritik)
+
+`app/page.tsx`'in mount-only effect'i `loadUIPreferences()` çağırıp 8 setter'ı **doğrudan** çalıştırır — `handleThemeFilterChange` üzerinden DEĞİL. Bu kasıtlı: `handleThemeFilterChange` `worldTransition` token'ını bumplar, hidrasyon sırasında bu çağrılırsa **mount'ta WorldTransition oynar** (istenmez). Persist effect'i `uiPrefsLoaded` flag'iyle guard'lanır — default değerlerin gerçek snapshot'ı ezmesini engeller.
+
+### Validation
+
+`normalizeUIPreferences` alan-alan whitelist set'leriyle (`THEME_FILTER_VALUES`, `EAST_SUB_VALUES`, `MEDIA_TYPE_VALUES`, `STATUS_VALUES`, `SORT_VALUES`, `VIEW_VALUES`) validate eder. Boolean alanlar (`continueSectionOpen`, `seriesSectionOpen`) typeof === "boolean" kontrolü. Geçersiz/eksik alan → default. Sonra theme↔type tutarlılığı uygulanır (yukarıdaki `handleThemeFilterChange` kurallarıyla aynı).
+
+## Kütüphanem dashboard section layout
+
+`activeTab === "library"` bloğu `filteredMedia`'yı **üç ayrı section**'a böler. Pipeline aşağıdaki sırada `app/page.tsx` içinde tek bir IIFE'de hesaplanır:
+
+1. **Devam Ettiklerim** (R18.2: collapsible, default açık) — `filteredMedia` üzerinden `status ∈ {watching, reading}` veya `currentProgress > 0 && status ∉ {completed, dropped}`; son `progressLogs` timestamp'ine göre sırala, ilk 6. **Bilinçli karar:** burada görünen item alt section'larda da tekrar görünebilir (üstte öne çıkar, listede kalır). React key çakışmasını engellemek için bu section `key={\`continue-${item.id}\`}` prefix'i kullanır.
+2. **Seri Koleksiyonlarım** (R18.2: collapsible, default açık) — `groupMediaItems(filteredMedia)` çıktısının `isGroup && items.length >= 2` olan kısmı; `SeriesGroupCard` ile render.
+3. **Kütüphanem (tekil)** (R18.2: **collapsible değil**, her zaman açık) — kalan singleton item'lar. **Yalnızca bu section** `librarySort` ve `libraryView` state'lerinden etkilenir.
+
+`SectionHead` (page.tsx'te inline) `collapsible` + `isOpen` + `onToggle` prop'ları alır; collapsible varyantta header satırının kendisi `<button>` olur (ChevronDown rotation animasyonu `motion-safe:transition-transform`).
+
+### `LibraryControlBar` + `LibrarySectionControls` ([components/library-control-bar.tsx](components/library-control-bar.tsx))
+
+- **`LibraryControlBar`** (R18.1 sonrası): arama, "Medya Ekle", `WorldSwitcher`. Sadece `themeFilter`/`onThemeChange` taşır. "Tür" ve "Durum" blokları kaldırıldı (Tür → WorldHero pill'leri, Durum → ayrı `StatusFilterRow`).
+- **`LibrarySectionControls`** (named export): kompakt sort dropdown + grid/list toggle. **Kütüphanem section header'ının `actions` slot'una** gömülür. `Devam Ettiklerim` ve `Seri Koleksiyonlarım` `actions` geçmediği için bu kontroller orada görünmez.
+- **Sort:** `recent` (mediaList index, reverse), `lastActivity` (progressLogs timestamp), `title` (`localeCompare("tr")`), `progress` (ratio; `totalProgress=0` → `-1` → sona), `rating` (`userRating ?? -1` → sona). Veri mutate etmez; her zaman `slice().sort(...)`.
+- **View:** `grid` → `grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4`; `list` → `grid-cols-1 gap-3` (yine `MediaCard`).
 
 ### PageHeader ([components/page-header.tsx](components/page-header.tsx))
 
 Dashboard / Keşfet / AI Danışman / Aktivite / Ayarlar tab'larının başına gelen ortak başlık bandı (amber ikon kutusu + zinc-50 başlık + subtitle + bottom border). **Kütüphanem'de PageHeader yok** — control bar + section heads zaten yapıyı kuruyor, topbar breadcrumb'ı "Kütüphanem" diyor; dördüncü "Kütüphanem" yazısı görsel gürültü olurdu. Yeni tab eklerken: `<PageHeader icon={...} title="..." subtitle="..." />` ile başla.
 
+## MediaCard görsel sistemi (R18.3–R18.6)
+
+[components/media-card.tsx](components/media-card.tsx) modernize edildi. Kart prop arayüzü:
+
+```ts
+interface MediaCardProps {
+  item: MediaItem;
+  onIncrement: (id: string) => void;
+  onComplete: (id: string) => void;
+  onEdit: (item: MediaItem) => void;
+  onDelete: (id: string) => void;
+  onToggleFavorite: (id: string) => void;
+  onOpenDetail: (item: MediaItem) => void;
+  onAddRelatedParts?: (item: MediaItem) => void;
+  relatedPartsLabel?: string;
+  canAddRelatedParts?: boolean;
+  onOpenGroupEdit?: (item: MediaItem) => void;
+  onUpdateRating?: (id: string, rating: number | null) => void; // R18.3
+}
+```
+
+### Hızlı puanlama (R18.3 / R18.6)
+
+- **Trigger**: cover top-left'te frosted pill (`pl-1.5 pr-2 h-[22px] rounded-full`). Puanı varsa amber ★ + sayı; puansız + `canRate` ise **icon-only** (R18.6: "Puanla" text'i gürültü yaratıyordu) hover-reveal `opacity-0 group-hover:opacity-100`.
+- **Popover** (`z-30`): `absolute top-full left-0 mt-1.5 w-[11rem]` — cover sol-üstüne anchor olduğu için kart sağ kenarına sıkışıp 1–10 grid'i kesilmez. 5×2 grid + opsiyonel "Puanı Temizle" (yalnızca `hasRating` iken).
+- ESC + outside click (`mousedown`) + `stopPropagation` listener'ları `useEffect`'te.
+- `handleUpdateRating(id, rating: number | null)` — `handleToggleFavorite` kalıbının aynısı: validate (0–10 integer veya null), short-circuit, sync queue enqueue.
+- **Threading**: `onUpdateRating` `SeriesGroupCard` ve `EnhancedDashboard` üzerinden tüm MediaCard call site'lara geçirilir.
+
+### Favori corner ribbon (R18.5 + R18.5.1)
+
+- Kartın **sağ-üst köşesinde** clip-path flag şekli (`polygon(0 0, 100% 0, 100% 100%, 50% 72%, 0 100%)`), `absolute top-0 right-4 w-6 h-9 z-30`. Cover'da DEĞİL.
+- Pasif: zinc gradient + içe ring (silik outline, görünür). Aktif: rose gradient + drop-shadow glow.
+- İçindeki ikon **`Heart`** (R18.5.1 fix — başlangıçta yanlışlıkla `Bookmark` ikonuydu). Aktifte `fill-current scale-110` snap; `motion-safe:transition-transform duration-200`.
+- `stopPropagation` — detay açmaz.
+- Title row'a `pr-7` reserve → ribbon çakışmaz.
+
+### Aksiyon cluster
+
+Title row sağında frosted şerit (`rounded-lg ring-1 ring-zinc-800/70 bg-zinc-950/70 backdrop-blur-sm`), `opacity-0 group-hover:opacity-100 focus-within:opacity-100`. İçeride: Detay (Info) / Düzenle (Pencil) / Grup Düzenle (Layers, opsiyonel) / Sil (Trash2). **Favori bu cluster'da YOK** (ribbon'da yaşıyor — R18.5'ten itibaren).
+
+### Bottom action bar
+
+Frosted footer (`bg-zinc-950/40 backdrop-blur-sm`). Movie-like için tek buton "İzlendi Olarak İşaretle"; aksi halde "+N bölüm" / "Tamamla" iki buton + dikey self-stretch divider. Disabled state: `isCompleted` / `isFinished` koşullarına bağlı.
+
 ### SeriesGroupCard featured-collection (R3)
 
-[components/series-group-card.tsx](components/series-group-card.tsx) tek `palette` objesinden tüm renkleri çeker: Doğu ailesi (`resolveThemeAccent` → `groupAccent`) varsa amber, aksi halde violet/fuchsia fallback. Üst gradient şerit, progress bar, sezon ekle/grubu düzenle butonları, expanded iç hiyerarşi çizgisi ve dashed "Sezon/Parça Ekle" slot'u hepsi aynı paletten beslenir. Yeni accent yolu eklerken `palette` objesini genişlet — class string'lerini cardın içinde dağıtma.
+[components/series-group-card.tsx](components/series-group-card.tsx) tek `palette` objesinden tüm renkleri çeker: Doğu ailesi (`resolveThemeAccent` → `groupAccent`) varsa amber, aksi halde violet/fuchsia fallback. Üst gradient şerit, progress bar, sezon ekle/grubu düzenle butonları, expanded iç hiyerarşi çizgisi ve dashed "Sezon/Parça Ekle" slot'u hepsi aynı paletten beslenir. Yeni accent yolu eklerken `palette` objesini genişlet — class string'lerini cardın içinde dağıtma. Child MediaCard'lara `onUpdateRating` passthrough geçer.
 
 ## Dosya hiyerarşisi (özet)
 
@@ -256,15 +377,17 @@ app/             — page.tsx (tek route) + api/{tvmaze,anilist,openlibrary,omdb
 components/      — UI parçaları (modal, panel, kart, ai-advisor)
                    shell: app-sidebar, app-topbar, app-tabs (mobil fallback),
                           right-rail, page-header, library-control-bar
+                   world: world-hero, world-transition, media-filters
+                          (WorldSwitcher + StatusFilterRow)
 hooks/           — useAuth, useSyncStatus
-lib/             — storage, types, progress, dashboard-stats, mock-media, sync-manager,
-                   sync-queue, backup, series-group, global-search-types,
-                   {anilist,omdb,openlibrary,tmdb,tvmaze}{-types}.ts
+lib/             — storage (UI prefs dahil), types, progress, dashboard-stats,
+                   mock-media, sync-manager, sync-queue, backup, series-group,
+                   global-search-types, {anilist,omdb,openlibrary,tmdb,tvmaze}{-types}.ts
 lib/ai/          — AI provider (openai-compatible) + settings/types
 lib/supabase/    — client, server, status, types, mapping, cloud-repository
 supabase/        — schema.sql (RLS + index + trigger)
 docs/            — supabase-offline-sync-plan.md
-design_references/ — sadece görsel/layout referans; runtime'da kullanılmaz
+design_references/ — sadece görsel/layout referans; runtime'da kullanılmaz; lint kapsamı dışı (R19)
 ```
 
 ## Bilinçli olarak yapılmayanlar
@@ -278,3 +401,5 @@ design_references/ — sadece görsel/layout referans; runtime'da kullanılmaz
 - `handleSaveMedia`'nın merge davranışı (`{...exists, ...new}`) override yapar; bu yüzden Quick Add ve manuel grup akışları ayrı defansif yollarla locked/existing item'ları submit'e sızdırmaz. Yeni bir ekleme akışı yazarken aynı korumayı uygula.
 - Manuel grup işlemleri yalnızca `SERIES_KEYS` whitelist'i (`seriesGroupId`, `seriesGroupTitle`, `seriesRelationType`, `seasonNumber`, `orderIndex`) yazar; diğer alanlara dokunmaz. Yeni bir series-only patch noktası eklerken aynı whitelist + render-phase kuralını uygula.
 - Sahte `totalProgress = 1` fallback'i AniList normalizer'da yok (V3.2). Yeni bir kaynak normalizer'ı yazarken "bilinmiyorsa 0" semantiğine uy.
+- WorldTransition macro overlay **sadece `handleThemeFilterChange` token bumpı ile** oynar; başka tetikleyici eklenmez. Sayfa açılışında hidrasyon setter'ları doğrudan kullanılır, handler üzerinden değil.
+- Title benzerliği ile favorit/rating türetme yok — kullanıcı eylemiyle değişir.

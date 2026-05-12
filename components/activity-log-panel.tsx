@@ -87,14 +87,14 @@ export default function ActivityLogPanel({ progressLogs }: ActivityLogPanelProps
                 key={log.id}
                 className="p-4 sm:p-5 hover:bg-zinc-800/30 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3"
               >
-                <div className="flex flex-col gap-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-zinc-100">{log.mediaTitle}</span>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 uppercase tracking-wider">
+                <div className="flex flex-col gap-1 min-w-0">
+                  <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                    <span className="text-sm font-semibold text-zinc-100 break-words">{log.mediaTitle}</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 uppercase tracking-wider shrink-0">
                       {log.mediaType}
                     </span>
                   </div>
-                  <div className="text-sm text-zinc-400">
+                  <div className="text-sm text-zinc-400 break-words">
                     <span className="text-zinc-300">{getActionLabel(log)}</span>
                     <span className="mx-2 text-zinc-600">•</span>
                     {log.action === "added" ? (

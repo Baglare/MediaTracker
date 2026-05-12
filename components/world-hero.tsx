@@ -265,7 +265,9 @@ export default function WorldHero({
     <div
       // Surface: --w-* tokenları üzerinden ince kimlik. Stiller dünyadan
       // bağımsız aynı; sadece renk değişkenleri swap olur (R10 plumbing).
-      className="relative overflow-hidden rounded-2xl px-5 py-4 sm:px-6 sm:py-5"
+      // R20: Mobilde hero kompakt — px/py küçüldü, glyph daha küçük.
+      // Desktop boyutları (sm+) korunur.
+      className="relative overflow-hidden rounded-2xl px-4 py-3 sm:px-6 sm:py-5"
       style={{
         background:
           "linear-gradient(135deg, rgba(24,24,27,0.85), rgba(9,9,11,0.85)), var(--w-soft)",
@@ -313,8 +315,10 @@ export default function WorldHero({
 
         {/* R13.2: Tüm dünyalarda pill'ler interaktif. Doğu eastSubFilter,
             Kadraj/Arşiv typeFilter üzerinden. R14: pill grubunun entrance'ı
-            text bloğundan sonra (120ms gecikmeli) gelir. */}
-        <div className="r14-hero-pills-enter flex flex-wrap items-center gap-2">
+            text bloğundan sonra (120ms gecikmeli) gelir.
+            R20: Mobilde pill grubu yatay scroll'a düşer; sm+ wrap davranışı
+            korunur. -mx ile container kenarına nefes alır. */}
+        <div className="r14-hero-pills-enter -mx-1 flex sm:flex-wrap items-center gap-2 overflow-x-auto sm:overflow-visible scrollbar-hide px-1 touch-pan-x w-full sm:w-auto">
           {w.pills.map((pill) => {
             if (pill.kind === "east-sub") {
               const isActive = eastSub === pill.id;
@@ -395,7 +399,7 @@ function SubButton({
     <button
       type="button"
       onClick={onClick}
-      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium tracking-wide transition-colors cursor-pointer ${
+      className={`shrink-0 flex items-center gap-1.5 px-3 h-9 sm:h-auto sm:py-1.5 rounded-lg text-xs font-medium tracking-wide transition-colors cursor-pointer ${
         active
           ? `ring-1 ${activeExtraClass ?? ""}`
           : "bg-zinc-900/60 text-zinc-400 hover:text-zinc-200 ring-1 ring-zinc-800"

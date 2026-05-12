@@ -56,9 +56,16 @@ export default function AppTopbar({ activeTab, onChangeTab }: AppTopbarProps) {
       </div>
 
       {/* Mobil/tablet fallback tab bar (lg altı). Sidebar gizliyken kullanıcıya
-          sekmeleri kaybolmuş hissi vermemek için mevcut AppTabs'i kullanıyoruz. */}
-      <div className="lg:hidden border-t border-zinc-800/60 px-4 sm:px-6 py-2">
+          sekmeleri kaybolmuş hissi vermemek için mevcut AppTabs'i kullanıyoruz.
+          R20: Mobilde edge padding sıkılaştı, sekmeler full-bleed yatay scroll'a
+          yaslanır; gradient edge fade ile scroll'un devam ettiği ipucu verir. */}
+      <div className="lg:hidden relative border-t border-zinc-800/60 px-3 sm:px-6 py-1.5 sm:py-2">
         <AppTabs activeTab={activeTab} onChange={onChangeTab} />
+        {/* Sağ kenar fade — taşan tab olduğunda kullanıcıya kaydırma sinyali */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute top-0 right-0 h-full w-6 bg-gradient-to-l from-zinc-950/80 to-transparent"
+        />
       </div>
     </header>
   );

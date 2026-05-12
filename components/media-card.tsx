@@ -239,7 +239,8 @@ export default function MediaCard({
         />
       </button>
 
-      <div className="flex gap-4 p-4 pr-5 flex-1">
+      {/* R20: Mobilde gap/padding hafifçe daraltıldı, sm+'da eski değerler. */}
+      <div className="flex gap-3 sm:gap-4 p-3 pr-4 sm:p-4 sm:pr-5 flex-1">
         {/* R18.5: Cover artık tek overlay taşıyor: sol-üstte rating badge.
             Favori cover'dan tamamen alındı; kartın sağ-üst köşesinde shaped
             corner ribbon olarak yaşıyor (aşağıda <FavoriteRibbon/>).
@@ -282,7 +283,7 @@ export default function MediaCard({
                   className={`inline-flex items-center gap-1 h-[22px] rounded-full text-[11px] font-semibold tabular-nums backdrop-blur-md ring-1 transition-all cursor-pointer ${
                     hasRating
                       ? "pl-1.5 pr-2 bg-zinc-950/70 text-amber-200 ring-amber-300/35 shadow-sm shadow-black/40 hover:bg-zinc-950/85"
-                      : "w-[22px] justify-center bg-zinc-950/55 text-zinc-300 ring-white/10 hover:text-amber-200 hover:ring-amber-400/35 opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+                      : "w-[22px] justify-center bg-zinc-950/55 text-zinc-300 ring-white/10 hover:text-amber-200 hover:ring-amber-400/35 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 lg:focus-visible:opacity-100"
                   }`}
                 >
                   <Star
@@ -386,7 +387,7 @@ export default function MediaCard({
                 className="
                   flex items-center gap-px rounded-lg ring-1 ring-zinc-800/70 bg-zinc-950/70 backdrop-blur-sm
                   shrink-0
-                  opacity-0 group-hover:opacity-100 focus-within:opacity-100
+                  opacity-100 lg:opacity-0 lg:group-hover:opacity-100 lg:focus-within:opacity-100
                   motion-safe:transition-opacity motion-safe:duration-150
                 "
               >
@@ -394,7 +395,7 @@ export default function MediaCard({
                   type="button"
                   onClick={() => onOpenDetail(item)}
                   title="Detaylar"
-                  className="w-6 h-6 rounded-md flex items-center justify-center text-zinc-400 hover:text-sky-300 hover:bg-sky-500/10 transition-colors cursor-pointer"
+                  className="w-7 h-7 sm:w-6 sm:h-6 rounded-md flex items-center justify-center text-zinc-400 hover:text-sky-300 hover:bg-sky-500/10 transition-colors cursor-pointer"
                 >
                   <Info className="w-3.5 h-3.5" />
                 </button>
@@ -402,7 +403,7 @@ export default function MediaCard({
                   type="button"
                   onClick={() => onEdit(item)}
                   title="Düzenle"
-                  className="w-6 h-6 rounded-md flex items-center justify-center text-zinc-400 hover:text-violet-300 hover:bg-violet-500/10 transition-colors cursor-pointer"
+                  className="w-7 h-7 sm:w-6 sm:h-6 rounded-md flex items-center justify-center text-zinc-400 hover:text-violet-300 hover:bg-violet-500/10 transition-colors cursor-pointer"
                 >
                   <Pencil className="w-3 h-3" />
                 </button>
@@ -411,7 +412,7 @@ export default function MediaCard({
                     type="button"
                     onClick={() => onOpenGroupEdit(item)}
                     title="Grup Düzenle"
-                    className="w-6 h-6 rounded-md flex items-center justify-center text-zinc-400 hover:text-fuchsia-300 hover:bg-fuchsia-500/10 transition-colors cursor-pointer"
+                    className="w-7 h-7 sm:w-6 sm:h-6 rounded-md flex items-center justify-center text-zinc-400 hover:text-fuchsia-300 hover:bg-fuchsia-500/10 transition-colors cursor-pointer"
                   >
                     <Layers className="w-3 h-3" />
                   </button>
@@ -420,7 +421,7 @@ export default function MediaCard({
                   type="button"
                   onClick={() => onDelete(item.id)}
                   title="Sil"
-                  className="w-6 h-6 rounded-md flex items-center justify-center text-zinc-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                  className="w-7 h-7 sm:w-6 sm:h-6 rounded-md flex items-center justify-center text-zinc-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors cursor-pointer"
                 >
                   <Trash2 className="w-3 h-3" />
                 </button>
@@ -629,7 +630,7 @@ export default function MediaCard({
             onClick={() => onComplete(item.id)}
             disabled={isCompleted}
             className={`
-              flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[12px] font-semibold tracking-tight
+              flex-1 flex items-center justify-center gap-1.5 min-h-[44px] sm:min-h-0 py-3 sm:py-2.5 text-[13px] sm:text-[12px] font-semibold tracking-tight
               transition-colors duration-150 cursor-pointer
               ${
                 isCompleted

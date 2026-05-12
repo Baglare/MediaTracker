@@ -828,9 +828,9 @@ export default function AiAdvisor({
             {messages.map((m) => (
               <div
                 key={m.id}
-                className={`p-3 rounded-xl text-sm leading-relaxed ${
+                className={`p-3 rounded-xl text-sm leading-relaxed break-words whitespace-pre-wrap ${
                   m.role === "user"
-                    ? "bg-violet-500/10 border border-violet-500/20 text-zinc-100 ml-auto max-w-[85%]"
+                    ? "bg-violet-500/10 border border-violet-500/20 text-zinc-100 ml-auto max-w-[90%] sm:max-w-[85%]"
                     : "bg-zinc-900/50 border border-zinc-800/60 text-zinc-300"
                 }`}
               >

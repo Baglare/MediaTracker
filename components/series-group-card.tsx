@@ -280,7 +280,10 @@ export default function SeriesGroupCard({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="w-full grid grid-cols-[auto_1fr_auto] gap-4 p-4 sm:p-5 text-left hover:bg-zinc-900/30 transition-colors cursor-pointer"
+        // R20: Mobilde header iki satır gride düşer — cover+orta üstte,
+        // ilerleme/chev alt satırda tam genişlikte. sm+'da eski 3 kolonlu
+        // yatay diziliş aynen korunur.
+        className="w-full grid grid-cols-[auto_1fr] sm:grid-cols-[auto_1fr_auto] gap-3 sm:gap-4 p-3 sm:p-5 text-left hover:bg-zinc-900/30 transition-colors cursor-pointer"
         aria-expanded={open}
       >
         {/* Cover — biraz daha belirgin (20x28) */}
@@ -366,8 +369,11 @@ export default function SeriesGroupCard({
           )}
         </div>
 
-        {/* Sağ: kompakt progress + chevron */}
-        <div className="flex flex-col items-end justify-between gap-2 min-w-[110px]">
+        {/* Sağ: kompakt progress + chevron.
+            R20: Mobilde col-span-2 ile alt satıra düşer ve yatay diziliş alır
+            (chevron sağda, progress bar sola yayılır). sm+'da eski dikey
+            sağ kolon davranışı korunur. */}
+        <div className="col-span-2 sm:col-span-1 flex flex-row-reverse sm:flex-col items-center sm:items-end justify-between gap-3 sm:gap-2 sm:min-w-[110px]">
           <div className="flex items-center text-zinc-500">
             {open ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
           </div>
@@ -402,7 +408,7 @@ export default function SeriesGroupCard({
                   onAddRelatedParts(representative);
                 }
               }}
-              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors cursor-pointer ${palette.addBtn}`}
+              className={`inline-flex items-center gap-1 px-3 h-8 sm:px-2.5 sm:h-auto sm:py-1 rounded-lg text-[11px] font-medium transition-colors cursor-pointer ${palette.addBtn}`}
             >
               <Plus className="w-3 h-3" />
               {groupRelated?.label ?? "Sezon Ekle"}
@@ -416,7 +422,7 @@ export default function SeriesGroupCard({
                 onOpenGroupEdit(representative);
               }}
               title="Grup başlığını düzenle"
-              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors cursor-pointer ${palette.editBtn}`}
+              className={`inline-flex items-center gap-1 px-3 h-8 sm:px-2.5 sm:h-auto sm:py-1 rounded-lg text-[11px] font-medium transition-colors cursor-pointer ${palette.editBtn}`}
             >
               <Pencil className="w-3 h-3" />
               Grubu Düzenle

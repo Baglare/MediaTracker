@@ -53,7 +53,10 @@ export function WorldSwitcher({ activeTheme, onThemeChange }: WorldSwitcherProps
     <div
       role="tablist"
       aria-label="Dünya"
-      className="inline-flex flex-wrap items-center gap-1 rounded-xl border border-zinc-800/70 bg-zinc-950/50 p-1"
+      // R20: Mobilde wrap yerine yatay scroll (parent overflow-x-auto'lar).
+      // Pill'ler shrink etmesin; aktif/pasif state aynı genişlikte ve net.
+      // sm+'da kontrol bar dar olursa wrap'a izin verilir.
+      className="inline-flex flex-nowrap sm:flex-wrap items-center gap-1 rounded-xl border border-zinc-800/70 bg-zinc-950/50 p-1 w-max sm:w-auto"
     >
       {WORLD_OPTIONS.map((opt) => {
         const isActive = activeTheme === opt.value;
@@ -64,7 +67,7 @@ export function WorldSwitcher({ activeTheme, onThemeChange }: WorldSwitcherProps
             role="tab"
             aria-selected={isActive}
             onClick={() => onThemeChange(opt.value)}
-            className={`group inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12.5px] font-medium tracking-wide transition-colors cursor-pointer ${
+            className={`group inline-flex shrink-0 items-center gap-1.5 px-3 h-9 sm:h-auto sm:py-1.5 rounded-lg text-[12.5px] font-medium tracking-wide transition-colors cursor-pointer ${
               isActive
                 ? "bg-[var(--w-soft)] text-[var(--w-primary-strong)] ring-1 ring-[color-mix(in_srgb,var(--w-primary)_40%,transparent)]"
                 : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/40"
@@ -104,11 +107,14 @@ const STATUS_OPTIONS: { label: string; value: MediaStatus | "active" | "all" }[]
  */
 export function StatusFilterRow({ activeStatus, onStatusChange }: StatusFilterRowProps) {
   return (
-    <div className="flex items-center flex-wrap gap-x-3 gap-y-2">
+    // R20: Mobilde "Durum" label'ı üstte, chip'ler altta yatay scroll'a
+    // (flex-nowrap + overflow-x-auto) düşer. sm+'da eski tek-satır flex-wrap
+    // davranışı korunur. Chip yüksekliği h-8 → daha rahat dokunma.
+    <div className="flex flex-col sm:flex-row sm:items-center sm:flex-wrap gap-y-1.5 sm:gap-x-3 sm:gap-y-2">
       <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-500 shrink-0">
         Durum
       </span>
-      <div className="flex items-center gap-1.5 flex-wrap">
+      <div className="-mx-1 flex sm:flex-wrap items-center gap-1.5 overflow-x-auto sm:overflow-visible scrollbar-hide px-1 touch-pan-x">
         {STATUS_OPTIONS.map((opt) => {
           const isActive = activeStatus === opt.value;
           return (
@@ -116,7 +122,7 @@ export function StatusFilterRow({ activeStatus, onStatusChange }: StatusFilterRo
               key={opt.value}
               type="button"
               onClick={() => onStatusChange(opt.value)}
-              className={`px-2.5 py-1 rounded-md text-[11.5px] font-medium transition-colors cursor-pointer ${
+              className={`shrink-0 inline-flex items-center px-2.5 h-8 sm:h-auto sm:py-1 rounded-md text-[11.5px] font-medium transition-colors cursor-pointer whitespace-nowrap ${
                 isActive
                   ? "bg-fuchsia-500/15 text-fuchsia-200 ring-1 ring-fuchsia-500/40"
                   : "bg-zinc-900/40 text-zinc-400 ring-1 ring-zinc-800 hover:bg-zinc-800/50 hover:text-zinc-200"

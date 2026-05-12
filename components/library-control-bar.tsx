@@ -53,7 +53,9 @@ export default function LibraryControlBar({
 }: LibraryControlBarProps) {
   return (
     <div className="rounded-2xl border border-zinc-800/60 bg-zinc-900/30">
-      {/* Üst satır: search · medya ekle (R6.1: padding sıkılaştı) */}
+      {/* Üst satır: search · medya ekle (R6.1: padding sıkılaştı).
+          R20: Mobilde Medya Ekle butonu search'in **altına** tam genişlikte
+          düşer; touch hedefi büyük kalır. sm+ aynı yatay diziliş. */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 px-3 py-2.5 sm:px-4 sm:py-3 border-b border-zinc-800/60">
         {/* Search */}
         <div className="relative flex-1 min-w-0">
@@ -65,7 +67,8 @@ export default function LibraryControlBar({
             onChange={(e) => onSearchChange(e.target.value)}
             // R17: resultCount badge `right-3`'te overlay. Sayı uzasa bile
             // input metni çarpışmasın diye sağ padding'i koşullu büyütüyoruz.
-            className={`w-full pl-9 py-2 bg-zinc-950/60 border border-zinc-800 rounded-lg text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-amber-500/40 transition-colors ${
+            // R20: mobilde input yüksekliği büyük (h-10) → rahat dokunma.
+            className={`w-full pl-9 h-10 sm:h-9 bg-zinc-950/60 border border-zinc-800 rounded-lg text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-amber-500/40 transition-colors ${
               typeof resultCount === "number" ? "pr-10" : "pr-3"
             }`}
           />
@@ -76,13 +79,13 @@ export default function LibraryControlBar({
           )}
         </div>
 
-        {/* Add */}
+        {/* Add — R20: mobilde tam genişlik + h-10; sm+'da kompakt */}
         <button
           type="button"
           onClick={onAddMedia}
-          className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-amber-500/15 text-amber-200 ring-1 ring-amber-500/40 hover:bg-amber-500/25 transition-colors cursor-pointer whitespace-nowrap"
+          className="inline-flex items-center justify-center gap-1.5 w-full sm:w-auto h-10 sm:h-9 px-3 rounded-lg text-[13px] sm:text-xs font-medium bg-amber-500/15 text-amber-200 ring-1 ring-amber-500/40 hover:bg-amber-500/25 transition-colors cursor-pointer whitespace-nowrap"
         >
-          <Plus className="w-3.5 h-3.5" />
+          <Plus className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
           <span>Medya Ekle</span>
         </button>
       </div>
@@ -90,8 +93,11 @@ export default function LibraryControlBar({
       {/* R18.1: Filtre bloğu artık sadece **Dünya** segmented switcher
           taşıyor. Eski "Tür" bloğu kaldırıldı (tür seçimi WorldHero alt
           pill'leri üzerinden), "Durum" bloğu page.tsx'te WorldHero'nun
-          altına bağımsız bir satır olarak yerleştirildi. */}
-      <div className="px-3 py-2.5 sm:px-4 sm:py-3">
+          altına bağımsız bir satır olarak yerleştirildi.
+          R20: WorldSwitcher mobilde taşmasın diye yatay scroll wrapper'a
+          alındı (kontrollü flex-nowrap + overflow-x-auto). sm+'da wrap
+          davranışı (gerekirse) korunur. */}
+      <div className="px-3 py-2.5 sm:px-4 sm:py-3 overflow-x-auto scrollbar-hide -mx-px">
         <WorldSwitcher activeTheme={themeFilter} onThemeChange={onThemeChange} />
       </div>
     </div>
