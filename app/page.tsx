@@ -1990,6 +1990,8 @@ export default function HomePage() {
         onToggleFavorite={handleToggleFavorite}
         onIncrementProgress={handleIncrement}
         onComplete={handleComplete}
+        // R21: detay modalına da hızlı rating bağlandı; MediaCard ile aynı handler.
+        onUpdateRating={handleUpdateRating}
       />
 
       {/* Onay Penceresi (Sil / Sıfırla) */}
