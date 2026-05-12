@@ -71,7 +71,11 @@ export default function LibraryControlBar({
             placeholder="Kütüphanende ara…"
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 bg-zinc-950/60 border border-zinc-800 rounded-lg text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-amber-500/40 transition-colors"
+            // R17: resultCount badge `right-3`'te overlay. Sayı uzasa bile
+            // input metni çarpışmasın diye sağ padding'i koşullu büyütüyoruz.
+            className={`w-full pl-9 py-2 bg-zinc-950/60 border border-zinc-800 rounded-lg text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-amber-500/40 transition-colors ${
+              typeof resultCount === "number" ? "pr-10" : "pr-3"
+            }`}
           />
           {typeof resultCount === "number" && (
             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono tabular-nums text-zinc-500 pointer-events-none">

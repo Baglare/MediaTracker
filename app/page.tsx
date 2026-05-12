@@ -1321,7 +1321,11 @@ export default function HomePage() {
     // Mobile/tablet'te sidebar gizli; AppTopbar fallback AppTabs gösterir.
     // R10: data-world scope (yukarıdaki worldAttr). globals.css altındaki
     // [data-world="..."] selector'ları --w-* tokenlarını set eder.
-    <div data-world={worldAttr} className="min-h-screen bg-zinc-950 text-zinc-100 flex">
+    // R17: `overflow-x-hidden` shell-level horizontal scroll güvencesi. İçeride
+    // truncate/min-w-0/flex-wrap doğru kullanıldığı sürece kazmaya gerek
+    // kalmaz; dar ekranda taşan bir öğe olursa shell scroll bar yerine
+    // sessizce kırpılır.
+    <div data-world={worldAttr} className="min-h-screen bg-zinc-950 text-zinc-100 flex overflow-x-hidden">
       {/* R13.2: Macro transition overlay — data-world scope'unun içinde
           duruyor ki --w-* tokenları aktif dünyanın renklerine resolve olsun.
           Artık worldAttr otomatik izlenmiyor; sadece handleThemeFilterChange
@@ -1494,17 +1498,20 @@ export default function HomePage() {
                   // (Kütüphanem için sort + view toggle).
                   actions?: React.ReactNode;
                 }) => (
-                  <div className="flex items-end justify-between gap-3 mb-3 pb-2 border-b border-zinc-800/50">
+                  <div className="flex flex-wrap items-end justify-between gap-x-3 gap-y-2 mb-3 pb-2 border-b border-zinc-800/50">
                     <div className="flex items-center gap-2 min-w-0">
                       <Icon className="w-4 h-4 text-amber-400/80 shrink-0" />
                       <h2 className="text-[15px] font-semibold text-zinc-100 tracking-tight truncate">
                         {title}
                       </h2>
-                      <span className="text-[11px] font-mono tabular-nums text-zinc-500 px-1.5 py-0.5 rounded-md bg-zinc-900/60 border border-zinc-800/60">
+                      <span className="text-[11px] font-mono tabular-nums text-zinc-500 px-1.5 py-0.5 rounded-md bg-zinc-900/60 border border-zinc-800/60 shrink-0">
                         {count}
                       </span>
                     </div>
-                    <div className="flex items-center gap-3">
+                    {/* R17: dar ekranda sort+view kontrolleri başlığın altına
+                        düşebilsin diye flex-wrap. Geniş ekranda sağa hizalı
+                        davranış değişmez. */}
+                    <div className="flex items-center gap-3 flex-wrap">
                       {hint && <span className="text-[11px] text-zinc-500">{hint}</span>}
                       {actions}
                     </div>
