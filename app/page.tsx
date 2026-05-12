@@ -74,7 +74,16 @@ import LibraryControlBar, {
 } from "@/components/library-control-bar";
 import { GlobalSearchLibraryStatus, GlobalSearchResult } from "@/lib/global-search-types";
 import { mockMediaList } from "@/lib/mock-media";
-import { loadMediaList, saveMediaList, clearMediaList, loadProgressLogs, saveProgressLogs } from "@/lib/storage";
+import {
+  loadMediaList,
+  saveMediaList,
+  clearMediaList,
+  loadProgressLogs,
+  saveProgressLogs,
+  loadUIPreferences,
+  saveUIPreferences,
+  DEFAULT_UI_PREFERENCES,
+} from "@/lib/storage";
 import { getIncrementAmount, getProgressLabel, getProgressUnit, getStatusLabel, isMovieLike } from "@/lib/progress";
 import { MediaItem, MediaType, MediaStatus, ProgressLog, withMediaClassification } from "@/lib/types";
 import {
@@ -106,23 +115,32 @@ export default function HomePage() {
 
   // İlk yüklenme tamamlandı mı? (localStorage okunana kadar bekliyoruz)
   const [isLoaded, setIsLoaded] = useState(false);
-  // Arama çubuğundaki metin
+  // R18: UI tercihleri (themeFilter/eastSubFilter/typeFilter/statusFilter/
+  // librarySort/libraryView) localStorage'dan hidrate edilene kadar persist
+  // effect'ini bekletiyoruz. Hidrasyon hem SSR/build, hem `mediaList`
+  // hidrasyonu ile aynı pattern'i izler.
+  const [uiPrefsLoaded, setUiPrefsLoaded] = useState(false);
+  // Arama çubuğundaki metin (R18: kasıtlı olarak persist edilmiyor)
   const [searchQuery, setSearchQuery] = useState("");
-  // Seçili medya türü filtresi
-  const [typeFilter, setTypeFilter] = useState<MediaType | "all">("all");
-  // Seçili durum filtresi
-  const [statusFilter, setStatusFilter] = useState<MediaStatus | "active" | "all">("all");
+  // Seçili medya türü filtresi (R18: persist)
+  const [typeFilter, setTypeFilter] = useState<MediaType | "all">(DEFAULT_UI_PREFERENCES.typeFilter);
+  // Seçili durum filtresi (R18: persist)
+  const [statusFilter, setStatusFilter] = useState<MediaStatus | "active" | "all">(
+    DEFAULT_UI_PREFERENCES.statusFilter
+  );
   // V5A.1 / R9: Üst seviye "Dünya" filtresi (Tümü / Doğu / Kadraj / Arşiv).
   // State adı `themeFilter` ve "east"/"screen"/"library" iç değerleri R9'da
-  // korundu; sadece UI label'ı ve sekme adları yenilendi.
-  const [themeFilter, setThemeFilter] = useState<ThemeFilter>("all");
-  // V5A.1: Doğu seçiliyken aktif alt filtre (Tümü / Anime / Manga / Novel)
-  const [eastSubFilter, setEastSubFilter] = useState<EastSubFilter>("all");
+  // korundu; sadece UI label'ı ve sekme adları yenilendi. (R18: persist)
+  const [themeFilter, setThemeFilter] = useState<ThemeFilter>(DEFAULT_UI_PREFERENCES.themeFilter);
+  // V5A.1: Doğu seçiliyken aktif alt filtre (Tümü / Anime / Manga / Novel). (R18: persist)
+  const [eastSubFilter, setEastSubFilter] = useState<EastSubFilter>(
+    DEFAULT_UI_PREFERENCES.eastSubFilter
+  );
   // R5: Kütüphanem singleton bölümü için sıralama + görünüm tercihi.
   // Sadece üçüncü bölümü (tekil item'lar) etkiler; "Devam Ettiklerim" ve
-  // "Seri Koleksiyonlarım" kendi sıralamasını korur.
-  const [librarySort, setLibrarySort] = useState<LibrarySort>("recent");
-  const [libraryView, setLibraryView] = useState<LibraryView>("grid");
+  // "Seri Koleksiyonlarım" kendi sıralamasını korur. (R18: persist)
+  const [librarySort, setLibrarySort] = useState<LibrarySort>(DEFAULT_UI_PREFERENCES.librarySort);
+  const [libraryView, setLibraryView] = useState<LibraryView>(DEFAULT_UI_PREFERENCES.libraryView);
 
   // R13.2: Macro transition tetik state'i. WorldTransition artık worldAttr
   // prop'unu otomatik izlemiyor — sadece kullanıcı Dünya filtresini
@@ -234,6 +252,48 @@ export default function HomePage() {
     saveMediaList(mediaList);
     saveProgressLogs(progressLogs);
   }, [mediaList, progressLogs, isLoaded]);
+
+  // ---- R18: UI tercihlerini localStorage'dan hidrate et (mount-only) ----
+  // Kritik: setState'leri burada doğrudan `setThemeFilter` üzerinden yapıyoruz,
+  // `handleThemeFilterChange` üzerinden değil. Aksi halde mount sırasında
+  // `worldTransition` token'ı bumplanır ve R13.2 macro overlay sayfa
+  // açılışında oynar — istemiyoruz. `normalizeUIPreferences` zaten theme↔type
+  // tutarlılığını uyguladığı için hidrasyon sonrası worldAttr direkt doğru
+  // değere oturur.
+  useEffect(() => {
+    const prefs = loadUIPreferences();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-only hydration from localStorage
+    setThemeFilter(prefs.themeFilter);
+    setEastSubFilter(prefs.eastSubFilter);
+    setTypeFilter(prefs.typeFilter);
+    setStatusFilter(prefs.statusFilter);
+    setLibrarySort(prefs.librarySort);
+    setLibraryView(prefs.libraryView);
+    setUiPrefsLoaded(true);
+  }, []);
+
+  // ---- R18: UI tercihlerini her değişimde kaydet ----
+  // `uiPrefsLoaded` bayrağı, hidrasyon tamamlanmadan default değerlerin
+  // localStorage'a yazılıp gerçek snapshot'ı ezmesini engeller.
+  useEffect(() => {
+    if (!uiPrefsLoaded) return;
+    saveUIPreferences({
+      themeFilter,
+      eastSubFilter,
+      typeFilter,
+      statusFilter,
+      librarySort,
+      libraryView,
+    });
+  }, [
+    uiPrefsLoaded,
+    themeFilter,
+    eastSubFilter,
+    typeFilter,
+    statusFilter,
+    librarySort,
+    libraryView,
+  ]);
 
   // ---- EYLEMLER (Actions) ----
 
