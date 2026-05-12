@@ -65,6 +65,7 @@ import {
   LayoutDashboard,
   Compass,
   Calendar,
+  TrendingUp,
   Sparkles,
   Heart,
   ListChecks,
@@ -217,6 +218,8 @@ export default function HomePage() {
   const [favoritesSort, setFavoritesSort] = useState<"recent" | "title" | "rating">("recent");
   const [watchlistSearch, setWatchlistSearch] = useState("");
   const [watchlistSort, setWatchlistSort] = useState<"recent" | "title" | "rating">("recent");
+  const [progressSearch, setProgressSearch] = useState("");
+  const [progressSort, setProgressSort] = useState<"lastActivity" | "progress" | "title" | "rating">("lastActivity");
   const [ratingsSearch, setRatingsSearch] = useState("");
   const [ratingsSort, setRatingsSort] = useState<"ratingDesc" | "ratingAsc" | "title" | "recent">("ratingDesc");
   const [notesSearch, setNotesSearch] = useState("");
@@ -2318,6 +2321,194 @@ export default function HomePage() {
                       </div>
                     )}
                   </CalendarSection>
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
+        {/* İLERLEMEM SEKMESİ (R32)
+            - Kütüphanem filtre/grup sisteminden bağımsızdır.
+            - Başlanmış ama completed/dropped olmayan item'ları MediaCard ile gösterir.
+            - Kart aksiyonları mevcut handler'lara bağlıdır; tamamlanan item bu
+              local filtreden otomatik düşer. */}
+        {activeTab === "progress" && (
+          <div>
+            <PageHeader
+              icon={TrendingUp}
+              title="İlerlemem"
+              subtitle="Başladığın ve hâlâ açık olan medya ilerlemelerini tek yerde gör."
+            />
+            {(() => {
+              const lastLogAt = new Map<string, number>();
+              for (const log of progressLogs) {
+                const t = new Date(log.createdAt).getTime();
+                const prev = lastLogAt.get(log.mediaId) ?? 0;
+                if (t > prev) lastLogAt.set(log.mediaId, t);
+              }
+
+              const progressRatio = (item: MediaItem) =>
+                item.totalProgress > 0 ? item.currentProgress / item.totalProgress : -1;
+              const progressPercent = (item: MediaItem) =>
+                item.totalProgress > 0
+                  ? Math.min(100, Math.round((item.currentProgress / item.totalProgress) * 100))
+                  : 0;
+              const isStartedOpen = (item: MediaItem) => {
+                if (item.status === "watching" || item.status === "reading") return true;
+                return (
+                  (item.currentProgress ?? 0) > 0 &&
+                  item.status !== "completed" &&
+                  item.status !== "dropped"
+                );
+              };
+
+              const progressItems = mediaList.filter(isStartedOpen);
+              const nearCompletionItems = progressItems.filter(
+                (item) =>
+                  item.totalProgress > 0 &&
+                  progressRatio(item) >= 0.75 &&
+                  item.status !== "completed"
+              );
+              const pausedCount = progressItems.filter((item) => item.status === "paused").length;
+              const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+              const recentProgressLogCount = progressLogs.filter((log) => {
+                if (log.action === "added") return false;
+                if (new Date(log.createdAt).getTime() < sevenDaysAgo) return false;
+                return progressItems.some((item) => item.id === log.mediaId);
+              }).length;
+
+              const q = progressSearch.trim().toLowerCase();
+              const searched = q
+                ? progressItems.filter((item) => item.title.toLowerCase().includes(q))
+                : progressItems;
+              const sorted = searched.slice().sort((a, b) => {
+                if (progressSort === "progress") return progressRatio(b) - progressRatio(a);
+                if (progressSort === "title") return a.title.localeCompare(b.title, "tr");
+                if (progressSort === "rating") return (b.userRating ?? -1) - (a.userRating ?? -1);
+                return (lastLogAt.get(b.id) ?? 0) - (lastLogAt.get(a.id) ?? 0);
+              });
+
+              if (progressItems.length === 0) {
+                return (
+                  <PersonalEmptyState
+                    icon={TrendingUp}
+                    title="Devam eden ilerleme yok"
+                    description="Bir medyada ilerleme başlattığında veya izleniyor/okunuyor durumuna aldığında burada görünecek."
+                    tone="text-violet-400/80"
+                  />
+                );
+              }
+
+              return (
+                <div className="space-y-6 min-w-0">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+                    <PersonalMetricCard label="Devam eden toplam" value={progressItems.length} />
+                    <PersonalMetricCard label="Bitirmeye yakın" value={nearCompletionItems.length} accent />
+                    <PersonalMetricCard label="Duraklatılmış" value={pausedCount} />
+                    <PersonalMetricCard label="Son 7 gün ilerleme" value={recentProgressLogCount} hint="aktivite" />
+                  </div>
+
+                  <PersonalControls
+                    searchValue={progressSearch}
+                    onSearchChange={setProgressSearch}
+                    searchPlaceholder="İlerlemelerinde ara..."
+                    sortValue={progressSort}
+                    onSortChange={(value) => setProgressSort(value as typeof progressSort)}
+                    sortOptions={[
+                      { value: "lastActivity", label: "Son aktivite" },
+                      { value: "progress", label: "İlerleme yüzdesi" },
+                      { value: "title", label: "Başlık" },
+                      { value: "rating", label: "Puan" },
+                    ]}
+                    countLabel={`${sorted.length} / ${progressItems.length}`}
+                  />
+
+                  {nearCompletionItems.length > 0 && (
+                    <section aria-label="Bitirmeye Yakın" className="space-y-3">
+                      <div className="flex flex-wrap items-end justify-between gap-3 pb-2 border-b border-zinc-800/50">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <TrendingUp className="w-4 h-4 text-amber-400/80 shrink-0" />
+                          <h2 className="text-[15px] font-semibold text-zinc-100 tracking-tight truncate">
+                            Bitirmeye Yakın
+                          </h2>
+                          <span className="text-[11px] font-mono tabular-nums text-zinc-500 px-1.5 py-0.5 rounded-md bg-zinc-900/60 border border-zinc-800/60 shrink-0">
+                            {nearCompletionItems.length}
+                          </span>
+                        </div>
+                        <span className="text-[11px] text-zinc-500">Bilinen toplamda %75 ve üzeri</span>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
+                        {nearCompletionItems
+                          .slice()
+                          .sort((a, b) => progressPercent(b) - progressPercent(a))
+                          .map((item) => {
+                            const relatedAction = getLibraryRelatedAction(item);
+                            return (
+                              <MediaCard
+                                key={`near-${item.id}`}
+                                item={item}
+                                onIncrement={handleIncrement}
+                                onComplete={handleComplete}
+                                onEdit={handleOpenEditModal}
+                                onDelete={handleDeleteRequest}
+                                onToggleFavorite={handleToggleFavorite}
+                                onOpenDetail={handleOpenDetailModal}
+                                onAddRelatedParts={handleAddMissingTvmazeParts}
+                                relatedPartsLabel={relatedAction.label}
+                                canAddRelatedParts={relatedAction.canAdd}
+                                onOpenGroupEdit={handleOpenGroupEdit}
+                                onUpdateRating={handleUpdateRating}
+                              />
+                            );
+                          })}
+                      </div>
+                    </section>
+                  )}
+
+                  {sorted.length === 0 ? (
+                    <PersonalEmptyState
+                      icon={Search}
+                      title="Sonuç bulunamadı"
+                      description="Arama terimini değiştirerek tekrar deneyebilirsin."
+                      tone="text-zinc-500"
+                    />
+                  ) : (
+                    <section aria-label="Tüm İlerlemeler" className="space-y-3">
+                      <div className="flex flex-wrap items-end justify-between gap-3 pb-2 border-b border-zinc-800/50">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <PlayCircle className="w-4 h-4 text-amber-400/80 shrink-0" />
+                          <h2 className="text-[15px] font-semibold text-zinc-100 tracking-tight truncate">
+                            Tüm İlerlemeler
+                          </h2>
+                          <span className="text-[11px] font-mono tabular-nums text-zinc-500 px-1.5 py-0.5 rounded-md bg-zinc-900/60 border border-zinc-800/60 shrink-0">
+                            {sorted.length}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
+                        {sorted.map((item) => {
+                          const relatedAction = getLibraryRelatedAction(item);
+                          return (
+                            <MediaCard
+                              key={item.id}
+                              item={item}
+                              onIncrement={handleIncrement}
+                              onComplete={handleComplete}
+                              onEdit={handleOpenEditModal}
+                              onDelete={handleDeleteRequest}
+                              onToggleFavorite={handleToggleFavorite}
+                              onOpenDetail={handleOpenDetailModal}
+                              onAddRelatedParts={handleAddMissingTvmazeParts}
+                              relatedPartsLabel={relatedAction.label}
+                              canAddRelatedParts={relatedAction.canAdd}
+                              onOpenGroupEdit={handleOpenGroupEdit}
+                              onUpdateRating={handleUpdateRating}
+                            />
+                          );
+                        })}
+                      </div>
+                    </section>
+                  )}
                 </div>
               );
             })()}

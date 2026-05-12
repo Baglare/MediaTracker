@@ -17,6 +17,7 @@ const TAB_LABELS: Record<TabType, string> = {
   library: "Kütüphanem",
   discover: "Keşfet",
   calendar: "Takvim",
+  progress: "İlerlemem",
   watchlist: "İzleme Listem",
   favorites: "Favorilerim",
   ratings: "Puanlamalarım",
