@@ -1416,11 +1416,13 @@ export default function HomePage() {
     // Mobile/tablet'te sidebar gizli; AppTopbar fallback AppTabs gösterir.
     // R10: data-world scope (yukarıdaki worldAttr). globals.css altındaki
     // [data-world="..."] selector'ları --w-* tokenlarını set eder.
-    // R17: `overflow-x-hidden` shell-level horizontal scroll güvencesi. İçeride
-    // truncate/min-w-0/flex-wrap doğru kullanıldığı sürece kazmaya gerek
-    // kalmaz; dar ekranda taşan bir öğe olursa shell scroll bar yerine
-    // sessizce kırpılır.
-    <div data-world={worldAttr} className="min-h-screen bg-zinc-950 text-zinc-100 flex overflow-x-hidden">
+    // R17 + R18.5.1: Horizontal taşma güvencesi `overflow-x-clip` ile sağlanır;
+    // `overflow-x-hidden` bir **scroll container** oluşturduğu için AppSidebar
+    // ve RightRail'ın `sticky top-0` davranışını bozuyordu (sticky ancestor
+    // viewport yerine bu container'a anchor oluyordu). `clip` scroll
+    // container oluşturmadan taşan içeriği kırpar — sticky çalışmaya devam
+    // eder, dar ekran taşması da yutulur.
+    <div data-world={worldAttr} className="min-h-screen bg-zinc-950 text-zinc-100 flex overflow-x-clip">
       {/* R13.2: Macro transition overlay — data-world scope'unun içinde
           duruyor ki --w-* tokenları aktif dünyanın renklerine resolve olsun.
           Artık worldAttr otomatik izlenmiyor; sadece handleThemeFilterChange

@@ -26,7 +26,7 @@ import {
   BookOpen,
   Pencil,
   Trash2,
-  Bookmark,
+  Heart,
   Star,
   StickyNote,
   Info,
@@ -189,20 +189,64 @@ export default function MediaCard({
     // data-world scope'undan gelen --w-primary'ı color-mix ile zinc-700'e
     // karıştırarak nötr (Tümü) seçimde hâlâ zinc hissi koruyoruz.
     // Top accent gradient ve ThemeSubBadge davranışı dokunulmadı (V5A).
-    <div className="group relative flex flex-col bg-zinc-900/50 rounded-2xl border border-zinc-800/50 overflow-hidden hover:border-[color-mix(in_srgb,var(--w-primary)_35%,#52525b)] transition-all duration-300">
+    // R18.5: Kart yüzey dili rafine edildi.
+    //   - bg artık iki katmanlı (gradient + zinc) — flat 2015 hissi gitti.
+    //   - hover'da hafif lift (translate-y) + accent border + soft shadow.
+    //   - overflow-hidden korunuyor (ribbon kart sınırı içinde yaşıyor).
+    <div className="group relative flex flex-col rounded-2xl border border-zinc-800/60 bg-gradient-to-b from-zinc-900/60 to-zinc-900/30 overflow-hidden transition-all duration-300 hover:border-[color-mix(in_srgb,var(--w-primary)_38%,#52525b)] hover:shadow-lg hover:shadow-black/40 motion-safe:hover:-translate-y-0.5">
+      {/* Üst accent — hover'da öne çıkan ince çizgi. */}
       <div
-        className={`absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r ${accentGradient} opacity-50 group-hover:opacity-100 transition-opacity`}
+        aria-hidden
+        className={`absolute top-0 left-0 right-0 h-px bg-gradient-to-r ${accentGradient} opacity-40 group-hover:opacity-90 transition-opacity`}
       />
 
-      <div className="flex gap-4 p-4 flex-1">
-        {/* R18.4: Cover artık iki overlay taşıyor. Cover'ın kendi ring/rounded
-            wrapper'ı görsel için overflow-hidden kalır; overlay'ler bu
-            wrapper'ın *üstünde* (DOM olarak içinde, position absolute) durur
-            ve dış kart `overflow-hidden`'ı popover'a izin verir çünkü popover
-            cover'ın sol kenarına yapışır ve aşağı doğru açılır — kart sınırını
-            aşmaz. */}
+      {/* === R18.5: Favori corner ribbon ===
+          Kartın sağ-üst köşesinde clip-path'li flag/bayrak şeklinde küçük
+          bir overlay. Cover'dan bağımsız; kart kimliğinin bir parçası.
+          Pasifse silik zinc outline; aktifse rose dolu + drop-shadow + glow.
+          Mikro animasyon: ikon kısaca scale (motion-safe), bg/color smooth
+          transition. Aşırı değil — premium "snap". */}
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggleFavorite(item.id);
+        }}
+        title={isFavorite ? "Favoriden Çıkar" : "Favoriye Ekle"}
+        aria-pressed={isFavorite}
+        className={`absolute top-0 right-4 z-30 inline-flex items-start justify-center w-6 h-9 transition-all duration-200 cursor-pointer ${
+          isFavorite
+            ? "text-rose-50 drop-shadow-[0_2px_6px_rgba(244,63,94,0.55)]"
+            : "text-zinc-500 hover:text-rose-300"
+        }`}
+        style={{
+          clipPath: "polygon(0 0, 100% 0, 100% 100%, 50% 72%, 0 100%)",
+          background: isFavorite
+            ? "linear-gradient(180deg, #f43f5e 0%, #e11d48 100%)"
+            : "linear-gradient(180deg, rgba(39,39,42,0.85) 0%, rgba(24,24,27,0.75) 100%)",
+          boxShadow: isFavorite
+            ? "inset 0 0 0 1px rgba(255,255,255,0.18)"
+            : "inset 0 0 0 1px rgba(82,82,91,0.55)",
+        }}
+      >
+        {/* R18.5.1: Ribbon ŞEKLİ (clip-path flag) korunur; ikon ❤ Heart oldu.
+            Aktifte fill-current + scale-110 snap; pasifte outline. */}
+        <Heart
+          className={`mt-1.5 w-3.5 h-3.5 motion-safe:transition-transform motion-safe:duration-200 ${
+            isFavorite ? "fill-current scale-110" : "scale-100"
+          }`}
+          strokeWidth={isFavorite ? 1.5 : 1.75}
+        />
+      </button>
+
+      <div className="flex gap-4 p-4 pr-5 flex-1">
+        {/* R18.5: Cover artık tek overlay taşıyor: sol-üstte rating badge.
+            Favori cover'dan tamamen alındı; kartın sağ-üst köşesinde shaped
+            corner ribbon olarak yaşıyor (aşağıda <FavoriteRibbon/>).
+            Cover'ın iç ring/rounded wrapper'ı sadece görseli kırpar; rating
+            popover bu wrapper'ın dışında, aşağı doğru açılır. */}
         <div className="relative w-20 h-28 flex-shrink-0">
-          <div className="absolute inset-0 rounded-xl overflow-hidden ring-1 ring-zinc-800">
+          <div className="absolute inset-0 rounded-xl overflow-hidden ring-1 ring-zinc-800 shadow-sm shadow-black/40">
             <Image
               src={item.coverImage}
               alt={item.title}
@@ -210,14 +254,14 @@ export default function MediaCard({
               unoptimized
               className="object-cover"
             />
-            {/* İnce alt-vignet — overlay'lerin altına oturduğu zemin */}
+            {/* Üst vignette — rating badge'in altına oturduğu yumuşak zemin */}
             <div
               aria-hidden
-              className="pointer-events-none absolute inset-x-0 top-0 h-10 bg-gradient-to-b from-black/55 to-transparent"
+              className="pointer-events-none absolute inset-x-0 top-0 h-12 bg-gradient-to-b from-black/65 via-black/25 to-transparent"
             />
           </div>
 
-          {/* === Rating badge — cover top-left === */}
+          {/* === Rating badge — cover top-left (R18.5: rafine) === */}
           {(hasRating || canRate) && (
             <div ref={ratingWrapRef} className="absolute top-1.5 left-1.5">
               {canRate ? (
@@ -230,31 +274,33 @@ export default function MediaCard({
                   aria-haspopup="menu"
                   aria-expanded={ratingOpen}
                   title={hasRating ? "Puanı değiştir" : "Puan ver"}
-                  className={`inline-flex items-center gap-0.5 px-1.5 h-5 rounded-md text-[10.5px] font-semibold tabular-nums backdrop-blur-md ring-1 transition-colors cursor-pointer ${
+                  className={`inline-flex items-center gap-1 pl-1.5 pr-2 h-[22px] rounded-full text-[11px] font-semibold tabular-nums backdrop-blur-md ring-1 transition-all cursor-pointer ${
                     hasRating
-                      ? "bg-zinc-950/65 text-amber-300 ring-amber-400/30 hover:bg-zinc-950/80"
-                      : "bg-zinc-950/55 text-zinc-300 ring-white/10 hover:text-amber-200 hover:ring-amber-400/30 opacity-0 group-hover:opacity-100 focus:opacity-100"
+                      ? "bg-zinc-950/70 text-amber-200 ring-amber-300/35 shadow-sm shadow-black/40 hover:bg-zinc-950/85"
+                      : "bg-zinc-950/55 text-zinc-300 ring-white/10 hover:text-amber-200 hover:ring-amber-400/35 opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
                   }`}
                 >
                   <Star
-                    className={`w-2.5 h-2.5 ${hasRating ? "fill-amber-300" : ""}`}
+                    className={`w-3 h-3 ${hasRating ? "fill-amber-300 text-amber-300" : ""}`}
                   />
-                  {hasRating ? item.userRating : "Puanla"}
+                  <span className="leading-none">
+                    {hasRating ? item.userRating : "Puanla"}
+                  </span>
                 </button>
               ) : (
-                <span className="inline-flex items-center gap-0.5 px-1.5 h-5 rounded-md text-[10.5px] font-semibold tabular-nums backdrop-blur-md bg-zinc-950/65 text-amber-300 ring-1 ring-amber-400/30">
-                  <Star className="w-2.5 h-2.5 fill-amber-300" />
-                  {item.userRating}
+                <span className="inline-flex items-center gap-1 pl-1.5 pr-2 h-[22px] rounded-full text-[11px] font-semibold tabular-nums backdrop-blur-md bg-zinc-950/70 text-amber-200 ring-1 ring-amber-300/35 shadow-sm shadow-black/40">
+                  <Star className="w-3 h-3 fill-amber-300 text-amber-300" />
+                  <span className="leading-none">{item.userRating}</span>
                 </span>
               )}
 
-              {/* Popover — trigger'ın altına, sol hizalı. Cover top-left'te
-                  durduğu için aşağı + sağa açılır, kart sınırlarını aşmaz. */}
+              {/* Popover — trigger altında, sol hizalı. Cover top-left'te
+                  durduğu için aşağı + sağa açılır; kart sınırlarını aşmaz. */}
               {canRate && ratingOpen && (
                 <div
                   role="menu"
                   aria-label="Hızlı puanlama"
-                  className="absolute top-full left-0 mt-1 z-40 rounded-lg border border-zinc-800 bg-zinc-950/95 backdrop-blur p-2 shadow-xl shadow-black/40 w-[10.5rem]"
+                  className="absolute top-full left-0 mt-1.5 z-40 rounded-xl border border-zinc-800 bg-zinc-950/95 backdrop-blur p-2 shadow-xl shadow-black/50 w-[11rem]"
                 >
                   <div className="grid grid-cols-5 gap-1">
                     {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => {
@@ -270,7 +316,7 @@ export default function MediaCard({
                             onUpdateRating?.(item.id, n);
                             setRatingOpen(false);
                           }}
-                          className={`h-7 rounded-md text-[11px] font-mono tabular-nums font-medium transition-colors cursor-pointer ${
+                          className={`h-7 rounded-md text-[11px] font-mono tabular-nums font-semibold transition-colors cursor-pointer ${
                             isCurrent
                               ? "bg-amber-500/20 text-amber-200 ring-1 ring-amber-500/40"
                               : "text-zinc-300 hover:bg-zinc-800/80 hover:text-amber-300"
@@ -299,41 +345,21 @@ export default function MediaCard({
               )}
             </div>
           )}
-
-          {/* === Favori ribbon — cover top-right ===
-              Her zaman görünür. Aktifse rose dolu bookmark; pasifse silik outline.
-              Bookmark ikonu kendi içinde "kurdele" şeklini taşır; ekstra clip-path
-              gerekmiyor. */}
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleFavorite(item.id);
-            }}
-            title={isFavorite ? "Favoriden Çıkar" : "Favoriye Ekle"}
-            aria-pressed={isFavorite}
-            className={`absolute top-0 right-1.5 inline-flex items-start justify-center w-5 h-6 transition-colors cursor-pointer ${
-              isFavorite
-                ? "text-rose-400 drop-shadow-[0_2px_4px_rgba(244,63,94,0.45)]"
-                : "text-zinc-200/45 hover:text-rose-300"
-            }`}
-          >
-            <Bookmark
-              className={`w-5 h-6 ${isFavorite ? "fill-rose-400" : ""}`}
-              strokeWidth={isFavorite ? 1.5 : 1.75}
-            />
-          </button>
         </div>
 
         <div className="flex-1 min-w-0 flex flex-col justify-between">
           <div>
-            {/* === Row: Title + üst aksiyon ikonları (hover'da) === */}
-            <div className="flex items-start justify-between gap-2">
+            {/* === Row: Title + ikincil aksiyon cluster ===
+                R18.5: Başlık + (hover'da) Detay/Düzenle/Grup/Sil. Favori artık
+                kart ribbon'unda (yukarıda) — bu cluster'da yok. Sağ tarafta
+                ribbon için pr-7 reserve. Cluster tek bir frosted şerit gibi
+                davranır: opacity-0 default + group-hover:opacity-100. */}
+            <div className="flex items-start gap-2 pr-7">
               <div className="relative min-w-0 flex-1 h-[1.15rem]">
                 <h3
                   className="
                     absolute left-0 top-0 z-20 max-w-full
-                    font-semibold text-zinc-100 text-sm leading-tight cursor-default
+                    font-semibold text-zinc-100 text-[14.5px] leading-tight tracking-tight cursor-default
                     whitespace-nowrap overflow-hidden text-ellipsis
                     transition-[max-width,padding,background-color,box-shadow,border-color] duration-150
                     hover:z-40 hover:max-w-[26rem] hover:whitespace-normal hover:break-words
@@ -347,14 +373,19 @@ export default function MediaCard({
                   {item.title}
                 </h3>
               </div>
-              {/* R18.4: Favori artık cover ribbon'unda — bu ikon kümesinde DEĞİL.
-                  Geriye: Detay / Düzenle / Grup / Sil. Yine hover'da görünür. */}
-              <div className="flex items-center gap-1 flex-shrink-0">
+              <div
+                className="
+                  flex items-center gap-px rounded-lg ring-1 ring-zinc-800/70 bg-zinc-950/70 backdrop-blur-sm
+                  shrink-0
+                  opacity-0 group-hover:opacity-100 focus-within:opacity-100
+                  motion-safe:transition-opacity motion-safe:duration-150
+                "
+              >
                 <button
                   type="button"
                   onClick={() => onOpenDetail(item)}
                   title="Detaylar"
-                  className="w-6 h-6 rounded-md flex items-center justify-center text-zinc-500 hover:text-sky-400 hover:bg-sky-500/10 transition-colors cursor-pointer opacity-0 group-hover:opacity-100"
+                  className="w-6 h-6 rounded-md flex items-center justify-center text-zinc-400 hover:text-sky-300 hover:bg-sky-500/10 transition-colors cursor-pointer"
                 >
                   <Info className="w-3.5 h-3.5" />
                 </button>
@@ -362,7 +393,7 @@ export default function MediaCard({
                   type="button"
                   onClick={() => onEdit(item)}
                   title="Düzenle"
-                  className="w-6 h-6 rounded-md flex items-center justify-center text-zinc-500 hover:text-violet-400 hover:bg-violet-500/10 transition-colors cursor-pointer opacity-0 group-hover:opacity-100"
+                  className="w-6 h-6 rounded-md flex items-center justify-center text-zinc-400 hover:text-violet-300 hover:bg-violet-500/10 transition-colors cursor-pointer"
                 >
                   <Pencil className="w-3 h-3" />
                 </button>
@@ -371,7 +402,7 @@ export default function MediaCard({
                     type="button"
                     onClick={() => onOpenGroupEdit(item)}
                     title="Grup Düzenle"
-                    className="w-6 h-6 rounded-md flex items-center justify-center text-zinc-500 hover:text-fuchsia-400 hover:bg-fuchsia-500/10 transition-colors cursor-pointer opacity-0 group-hover:opacity-100"
+                    className="w-6 h-6 rounded-md flex items-center justify-center text-zinc-400 hover:text-fuchsia-300 hover:bg-fuchsia-500/10 transition-colors cursor-pointer"
                   >
                     <Layers className="w-3 h-3" />
                   </button>
@@ -380,16 +411,18 @@ export default function MediaCard({
                   type="button"
                   onClick={() => onDelete(item.id)}
                   title="Sil"
-                  className="w-6 h-6 rounded-md flex items-center justify-center text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer opacity-0 group-hover:opacity-100"
+                  className="w-6 h-6 rounded-md flex items-center justify-center text-zinc-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors cursor-pointer"
                 >
                   <Trash2 className="w-3 h-3" />
                 </button>
               </div>
             </div>
 
-            {/* === Row: Type · SubBadge · Status === */}
-            <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-              <span className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-zinc-800/80 text-zinc-400 ring-1 ring-zinc-700/50">
+            {/* === Row: Type · SubBadge · Status ===
+                R18.5: Rafine — daha küçük tipografi, yumuşak ring, status
+                rengi öne çıkıyor; type/subtype daha sakin. */}
+            <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+              <span className="text-[10.5px] font-medium px-1.5 py-0.5 rounded-md bg-zinc-800/60 text-zinc-400 ring-1 ring-zinc-700/40">
                 {getMediaTypeLabel(item.type)}
               </span>
 
@@ -398,7 +431,7 @@ export default function MediaCard({
               <ThemeSubBadge item={item} />
 
               <span
-                className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md ring-1 ${getStatusColor(
+                className={`inline-flex items-center gap-1 text-[10.5px] font-medium px-1.5 py-0.5 rounded-md ring-1 ${getStatusColor(
                   item.status
                 )}`}
               >
@@ -409,7 +442,7 @@ export default function MediaCard({
               {hasNotes && (
                 <span
                   title="Kişisel not var"
-                  className="inline-flex items-center text-[11px] px-1.5 py-0.5 rounded-md bg-zinc-800/60 text-zinc-500 ring-1 ring-zinc-700/30"
+                  className="inline-flex items-center text-[10.5px] px-1 py-0.5 rounded-md bg-zinc-800/50 text-zinc-500 ring-1 ring-zinc-700/30"
                 >
                   <StickyNote className="w-3 h-3" />
                 </span>
@@ -528,26 +561,32 @@ export default function MediaCard({
           </div>
 
           {showProgressBlock && (
+            // R18.5: Progress bloğu daha okunur — sayılar tabular-nums + sağda
+            // yüzde monospace; bar 1px daha ince ve overflow-hidden ring'i
+            // dünya tonuyla hafif zenginleştirilmiş.
             <div className="mt-3">
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xs text-zinc-500">
-                  <span className="text-zinc-300 font-medium">{item.currentProgress}</span>
-                  {" / "}
-                  {hasKnownTotal ? item.totalProgress : "??"} {progressLabel}
+              <div className="flex items-baseline justify-between mb-1.5">
+                <span className="text-[11px] text-zinc-500 tabular-nums">
+                  <span className="text-zinc-200 font-semibold">{item.currentProgress}</span>
+                  <span className="text-zinc-700 mx-1">/</span>
+                  <span className="text-zinc-400">{hasKnownTotal ? item.totalProgress : "??"}</span>
+                  <span className="ml-1 text-zinc-500">{progressLabel}</span>
                 </span>
                 {hasKnownTotal ? (
-                  <span className="text-xs text-zinc-500 font-medium">{Math.round(percent)}%</span>
+                  <span className="text-[11px] font-mono tabular-nums font-semibold text-zinc-300">
+                    {Math.round(percent)}<span className="text-zinc-500">%</span>
+                  </span>
                 ) : (
                   <span
                     title="Toplam bilinmiyor"
-                    className="text-xs text-zinc-600 font-medium"
+                    className="text-[11px] font-mono text-zinc-600"
                   >
                     —
                   </span>
                 )}
               </div>
 
-              <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+              <div className="w-full h-1.5 bg-zinc-800/80 rounded-full overflow-hidden ring-1 ring-inset ring-zinc-800/40">
                 {hasKnownTotal ? (
                   <div
                     className={`h-full rounded-full bg-gradient-to-r ${getProgressGradient(
@@ -571,36 +610,41 @@ export default function MediaCard({
         </div>
       </div>
 
-      <div className="mt-auto flex border-t border-zinc-800/50">
+      {/* R18.5: Alt aksiyon barı yenilendi — sade frosted footer + tek-piksel
+          iç ayraç + uniform hover bg. Buton davranışı aynı; sadece tipografi
+          ve geçişler rafine. */}
+      <div className="mt-auto flex border-t border-zinc-800/60 bg-zinc-950/40 backdrop-blur-sm">
         {isMovie ? (
           <button
+            type="button"
             onClick={() => onComplete(item.id)}
             disabled={isCompleted}
             className={`
-              flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium
-              transition-all duration-200 cursor-pointer
+              flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[12px] font-semibold tracking-tight
+              transition-colors duration-150 cursor-pointer
               ${
                 isCompleted
                   ? "text-emerald-500/50 cursor-not-allowed"
-                  : "text-zinc-400 hover:text-emerald-300 hover:bg-emerald-500/10"
+                  : "text-zinc-300 hover:text-emerald-200 hover:bg-emerald-500/10"
               }
             `}
           >
             <Check className="w-3.5 h-3.5" />
-            <span>{isCompleted ? "Tamamlandi" : "Izlendi Olarak Isaretle"}</span>
+            <span>{isCompleted ? "Tamamlandı" : "İzlendi Olarak İşaretle"}</span>
           </button>
         ) : (
           <>
             <button
+              type="button"
               onClick={() => onIncrement(item.id)}
               disabled={isCompleted || isFinished}
               className={`
-                flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium
-                transition-all duration-200 cursor-pointer
+                flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[12px] font-semibold tracking-tight
+                transition-colors duration-150 cursor-pointer
                 ${
                   isCompleted || isFinished
                     ? "text-zinc-600 cursor-not-allowed"
-                    : "text-zinc-400 hover:text-violet-300 hover:bg-violet-500/10"
+                    : "text-zinc-300 hover:text-violet-200 hover:bg-violet-500/10"
                 }
               `}
             >
@@ -608,23 +652,24 @@ export default function MediaCard({
               <span>{incrementLabel}</span>
             </button>
 
-            <div className="w-px bg-zinc-800/50" />
+            <div className="w-px self-stretch my-1.5 bg-zinc-800/70" />
 
             <button
+              type="button"
               onClick={() => onComplete(item.id)}
               disabled={isCompleted}
               className={`
-                flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium
-                transition-all duration-200 cursor-pointer
+                flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[12px] font-semibold tracking-tight
+                transition-colors duration-150 cursor-pointer
                 ${
                   isCompleted
                     ? "text-emerald-500/50 cursor-not-allowed"
-                    : "text-zinc-400 hover:text-emerald-300 hover:bg-emerald-500/10"
+                    : "text-zinc-300 hover:text-emerald-200 hover:bg-emerald-500/10"
                 }
               `}
             >
               <Check className="w-3.5 h-3.5" />
-              <span>{isCompleted ? "Tamamlandi" : "Tamamla"}</span>
+              <span>{isCompleted ? "Tamamlandı" : "Tamamla"}</span>
             </button>
           </>
         )}
