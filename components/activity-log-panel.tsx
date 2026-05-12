@@ -1,8 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { ProgressLog } from "@/lib/types";
 import { History } from "lucide-react";
+import {
+  formatProgressLogAction,
+  formatProgressLogDateTime,
+  formatProgressLogDetail,
+  getDisplayProgressLogs,
+} from "@/lib/activity-log";
+import type { ProgressLog } from "@/lib/types";
 
 interface ActivityLogPanelProps {
   progressLogs: ProgressLog[];
@@ -23,29 +29,7 @@ export default function ActivityLogPanel({ progressLogs }: ActivityLogPanelProps
     return true;
   });
 
-  const sortedLogs = [...filteredLogs].sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  );
-
-  function formatDate(isoStr: string) {
-    const d = new Date(isoStr);
-    return new Intl.DateTimeFormat("tr-TR", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    }).format(d);
-  }
-
-  function getActionLabel(log: ProgressLog) {
-    const { action, amount } = log;
-    if (action === "added") return "Eklendi";
-    if (action === "increment") return `+${amount} Eklendi`;
-    if (action === "complete") return "Tamamlandı";
-    if (action === "manual_adjust") return "Manuel Düzenleme";
-    return action;
-  }
+  const sortedLogs = getDisplayProgressLogs(filteredLogs);
 
   return (
     <div className="space-y-6">
@@ -95,24 +79,14 @@ export default function ActivityLogPanel({ progressLogs }: ActivityLogPanelProps
                     </span>
                   </div>
                   <div className="text-sm text-zinc-400 break-words">
-                    <span className="text-zinc-300">{getActionLabel(log)}</span>
+                    <span className="text-zinc-300">{formatProgressLogAction(log)}</span>
                     <span className="mx-2 text-zinc-600">•</span>
-                    {log.action === "added" ? (
-                      <span>{log.detail || "Kütüphaneye eklendi"}</span>
-                    ) : log.action === "complete" ? (
-                      <span>Tamamı izlendi / okundu</span>
-                    ) : (
-                      <span>
-                        {log.previousProgress} →{" "}
-                        <span className="text-violet-400 font-medium">{log.newProgress}</span>{" "}
-                        {log.unit}
-                      </span>
-                    )}
+                    <span>{formatProgressLogDetail(log)}</span>
                   </div>
                 </div>
 
                 <div className="text-xs text-zinc-500 whitespace-nowrap sm:text-right">
-                  {formatDate(log.createdAt)}
+                  {formatProgressLogDateTime(log.createdAt)}
                 </div>
               </div>
             ))}

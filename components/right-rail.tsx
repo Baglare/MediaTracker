@@ -37,6 +37,12 @@ import {
   scopeProgressLogsByWorld,
   type WorldScope,
 } from "@/lib/world-scope";
+import {
+  formatProgressLogAction,
+  formatProgressLogDetail,
+  formatProgressLogRelativeTime,
+  getDisplayProgressLogs,
+} from "@/lib/activity-log";
 
 interface RightRailProps {
   mediaList: MediaItem[];
@@ -49,35 +55,6 @@ interface RightRailProps {
 }
 
 // --- Helpers ---------------------------------------------------------------
-
-function relativeTime(iso: string): string {
-  const now = Date.now();
-  const t = new Date(iso).getTime();
-  const diff = Math.max(0, now - t);
-  const m = Math.floor(diff / 60_000);
-  if (m < 1) return "şimdi";
-  if (m < 60) return `${m}dk`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}sa`;
-  const d = Math.floor(h / 24);
-  if (d < 7) return `${d}g`;
-  const w = Math.floor(d / 7);
-  if (w < 5) return `${w}h`;
-  return `${Math.floor(d / 30)}ay`;
-}
-
-function actionVerb(a: ProgressLogAction): string {
-  switch (a) {
-    case "increment":
-      return "ilerletildi";
-    case "complete":
-      return "tamamlandı";
-    case "manual_adjust":
-      return "güncellendi";
-    case "added":
-      return "eklendi";
-  }
-}
 
 function actionTone(
   a: ProgressLogAction,
@@ -800,13 +777,14 @@ function ActivityWidget({ logs }: { logs: ProgressLog[] }) {
               <div className="min-w-0 flex-1 text-[11px]">
                 <div className="text-zinc-300 truncate">
                   <span className="text-zinc-100 font-medium">{log.mediaTitle}</span>{" "}
-                  <span className="text-zinc-500">{actionVerb(log.action)}</span>
+                  <span className="text-zinc-500">{formatProgressLogAction(log)}</span>
                 </div>
-                <div className="text-[10px] text-zinc-500 font-mono tabular-nums">
-                  {relativeTime(log.createdAt)}
-                  {log.action === "increment" && log.amount > 0 && (
-                    <span className="ml-1.5">+{log.amount}</span>
-                  )}
+                <div
+                  className="text-[10px] text-zinc-500 font-mono tabular-nums truncate"
+                  title={formatProgressLogDetail(log)}
+                >
+                  {formatProgressLogRelativeTime(log.createdAt)}
+                  <span className="ml-1.5">{formatProgressLogDetail(log)}</span>
                 </div>
               </div>
             </li>
@@ -880,7 +858,7 @@ export default function RightRail({
   }, [scopedItems, scopedLogs]);
 
   const recentLogs = useMemo(
-    () => scopedLogs.slice(0, 5),
+    () => getDisplayProgressLogs(scopedLogs, 5),
     [scopedLogs],
   );
 
