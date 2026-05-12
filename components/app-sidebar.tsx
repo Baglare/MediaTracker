@@ -54,7 +54,7 @@ const SECTIONS: { label: string; items: NavItem[] }[] = [
     label: "Kişisel",
     items: [
       { id: "progress", label: "İlerlemem", icon: TrendingUp, ghost: true, badge: "Yakında", badgeTone: "soon" },
-      { id: "watchlist", label: "İzleme Listem", icon: ListChecks, ghost: true, badge: "Yakında", badgeTone: "soon" },
+      { id: "watchlist", label: "İzleme Listem", icon: ListChecks },
       { id: "favorites", label: "Favorilerim", icon: Heart },
       { id: "ratings", label: "Puanlamalarım", icon: Star, ghost: true, badge: "Yakında", badgeTone: "soon" },
       { id: "notes", label: "Notlarım", icon: NotebookPen, ghost: true, badge: "Yakında", badgeTone: "soon" },
@@ -76,6 +76,7 @@ const REAL_TABS = new Set<TabType>([
   "dashboard",
   "library",
   "discover",
+  "watchlist",
   "favorites",
   "ai",
   "activity",
