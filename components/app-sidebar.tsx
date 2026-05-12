@@ -5,8 +5,9 @@
 // ============================================
 // Sol dikey navigasyon. Mevcut TabType'ların hepsini koruyor; ek olarak
 // henüz implement edilmemiş sayfalar (Takvim, İlerlemem, İzleme Listem,
-// Favorilerim, Puanlamalarım, Notlarım, İstatistikler) "ghost / Yakında"
-// olarak görünüyor — tıklanabilir değiller, mevcut sekmeyi değiştirmiyorlar.
+// Puanlamalarım, Notlarım, İstatistikler) "ghost / Yakında" olarak görünüyor
+// — tıklanabilir değiller, mevcut sekmeyi değiştirmiyorlar. R24'te Favorilerim
+// ghost listesinden çıkarıldı; gerçek bir sekme oldu.
 //
 // Aktif/ghost stilleri Tailwind ile zinc + amber accent paletinde kurulu.
 // Referans: design_references/layout-redesign-v1/sidebar.jsx + styles.css.
@@ -54,7 +55,7 @@ const SECTIONS: { label: string; items: NavItem[] }[] = [
     items: [
       { id: "progress", label: "İlerlemem", icon: TrendingUp, ghost: true, badge: "Yakında", badgeTone: "soon" },
       { id: "watchlist", label: "İzleme Listem", icon: ListChecks, ghost: true, badge: "Yakında", badgeTone: "soon" },
-      { id: "favorites", label: "Favorilerim", icon: Heart, ghost: true, badge: "Yakında", badgeTone: "soon" },
+      { id: "favorites", label: "Favorilerim", icon: Heart },
       { id: "ratings", label: "Puanlamalarım", icon: Star, ghost: true, badge: "Yakında", badgeTone: "soon" },
       { id: "notes", label: "Notlarım", icon: NotebookPen, ghost: true, badge: "Yakında", badgeTone: "soon" },
       { id: "stats", label: "İstatistikler", icon: BarChart3, ghost: true, badge: "Yakında", badgeTone: "soon" },
@@ -71,7 +72,15 @@ const SECTIONS: { label: string; items: NavItem[] }[] = [
 
 const FOOT: NavItem[] = [{ id: "settings", label: "Ayarlar", icon: Settings }];
 
-const REAL_TABS = new Set<TabType>(["dashboard", "library", "discover", "ai", "activity", "settings"]);
+const REAL_TABS = new Set<TabType>([
+  "dashboard",
+  "library",
+  "discover",
+  "favorites",
+  "ai",
+  "activity",
+  "settings",
+]);
 
 interface AppSidebarProps {
   activeTab: TabType;

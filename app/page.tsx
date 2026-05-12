@@ -65,6 +65,8 @@ import {
   LayoutDashboard,
   Compass,
   Sparkles,
+  Heart,
+  Search,
   Activity as ActivityIcon,
   Settings as SettingsIcon,
 } from "lucide-react";
@@ -202,6 +204,12 @@ export default function HomePage() {
 
   // Gelişmiş aramaları (eski panelleri) gösterme durumu
   const [showAdvancedSearches, setShowAdvancedSearches] = useState(false);
+
+  // R24: Favorilerim sayfası lokal kontrolleri. Bilinçli olarak UI preferences
+  // sistemine eklenmediler — sayfa kapsamı küçük, "Kütüphanem filtre sistemini
+  // bozma" sınırına uyuyoruz. Sayfa geçişinde sıfırlanmaları sorun değil.
+  const [favoritesSearch, setFavoritesSearch] = useState("");
+  const [favoritesSort, setFavoritesSort] = useState<"recent" | "title" | "rating">("recent");
 
   // AI Danışman sekmesi dışına çıkıldığında aktif sohbeti sıfırlamak için sinyal
   const [aiResetSignal, setAiResetSignal] = useState(0);
@@ -1969,6 +1977,131 @@ export default function HomePage() {
                 )}
               </div>
             </div>
+          </div>
+        )}
+
+        {/* FAVORİLERİM SEKMESI (R24)
+            — Kütüphanem filtre/grup sistemine dokunmadan, favorite=true olan
+              item'ları MediaCard ile listeler. Lokal arama + basit sıralama.
+            — handleToggleFavorite mediaList'i mutasyona uğrattığı için favori
+              kaldırılınca item bu sayfanın filter'ından otomatik düşer. */}
+        {activeTab === "favorites" && (
+          <div>
+            <PageHeader
+              icon={Heart}
+              title="Favorilerim"
+              subtitle="Favori olarak işaretlediğin medyalar tek bir yerde."
+            />
+            {(() => {
+              const favItems = mediaList.filter((it) => it.favorite === true);
+              const q = favoritesSearch.trim().toLowerCase();
+              const searched = q
+                ? favItems.filter((it) => it.title.toLowerCase().includes(q))
+                : favItems;
+              const sorted = searched.slice().sort((a, b) => {
+                if (favoritesSort === "title") return a.title.localeCompare(b.title, "tr");
+                if (favoritesSort === "rating") {
+                  return (b.userRating ?? -1) - (a.userRating ?? -1);
+                }
+                // recent: mediaList index (ekleme sırası proxy'si) — son eklenen önce
+                return mediaList.indexOf(b) - mediaList.indexOf(a);
+              });
+
+              // Sayfa hiç favori yokken: modern empty state.
+              if (favItems.length === 0) {
+                return (
+                  <div className="flex flex-col items-center justify-center py-24 bg-zinc-900/30 rounded-2xl border border-zinc-800/60">
+                    <div className="w-16 h-16 rounded-2xl bg-zinc-900 ring-1 ring-zinc-800/80 grid place-items-center mb-4">
+                      <Heart className="w-7 h-7 text-rose-400/80" />
+                    </div>
+                    <p className="text-zinc-200 text-sm font-medium">
+                      Henüz favori eklemedin
+                    </p>
+                    <p className="text-zinc-500 text-xs mt-1.5 max-w-xs text-center">
+                      Kütüphanendeki bir kartın sağ üst köşesindeki kalp şeridine
+                      tıklayarak medyaları buraya sabitleyebilirsin.
+                    </p>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="space-y-5">
+                  {/* Kompakt kontrol satırı: arama + sort. Kütüphanem'in
+                      LibraryControlBar'ından bilinçli olarak ayrı tutuldu —
+                      orada Dünya/Tür/Durum sistemine kasıtlı dokunmuyoruz. */}
+                  <div className="flex flex-col sm:flex-row gap-2.5 sm:items-center">
+                    <div className="relative flex-1 min-w-0">
+                      <Search
+                        aria-hidden
+                        className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 pointer-events-none"
+                      />
+                      <input
+                        type="text"
+                        value={favoritesSearch}
+                        onChange={(e) => setFavoritesSearch(e.target.value)}
+                        placeholder="Favorilerinde ara…"
+                        className="w-full h-10 pl-9 pr-3 rounded-xl bg-zinc-900/40 border border-zinc-800/70 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500/40"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <label className="text-[11px] uppercase tracking-[0.14em] text-zinc-500 font-semibold">
+                        Sırala
+                      </label>
+                      <select
+                        value={favoritesSort}
+                        onChange={(e) =>
+                          setFavoritesSort(e.target.value as typeof favoritesSort)
+                        }
+                        className="h-10 px-3 rounded-xl bg-zinc-900/40 border border-zinc-800/70 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500/40 cursor-pointer"
+                      >
+                        <option value="recent">En son eklenen</option>
+                        <option value="title">İsim (A→Z)</option>
+                        <option value="rating">Puan (yüksek→düşük)</option>
+                      </select>
+                    </div>
+                    <div className="text-[12px] text-zinc-500 sm:ml-2 shrink-0">
+                      {sorted.length} / {favItems.length}
+                    </div>
+                  </div>
+
+                  {sorted.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-16 bg-zinc-900/20 rounded-2xl border border-zinc-800/60">
+                      <div className="w-12 h-12 rounded-xl bg-zinc-900 grid place-items-center mb-3">
+                        <Search className="w-5 h-5 text-zinc-500" />
+                      </div>
+                      <p className="text-zinc-300 text-sm">Sonuç bulunamadı</p>
+                      <p className="text-zinc-500 text-xs mt-1">
+                        Arama terimini değiştirmeyi deneyebilirsin.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
+                      {sorted.map((item) => {
+                        const relatedAction = getLibraryRelatedAction(item);
+                        return (
+                          <MediaCard
+                            key={item.id}
+                            item={item}
+                            onIncrement={handleIncrement}
+                            onComplete={handleComplete}
+                            onEdit={handleOpenEditModal}
+                            onDelete={handleDeleteRequest}
+                            onToggleFavorite={handleToggleFavorite}
+                            onOpenDetail={handleOpenDetailModal}
+                            onAddRelatedParts={handleAddMissingTvmazeParts}
+                            relatedPartsLabel={relatedAction.label}
+                            canAddRelatedParts={relatedAction.canAdd}
+                            onOpenGroupEdit={handleOpenGroupEdit}
+                            onUpdateRating={handleUpdateRating}
+                          />
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         )}
 
