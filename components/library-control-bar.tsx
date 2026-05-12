@@ -13,8 +13,7 @@
 // yerleştiriyor.
 
 import { Search, Plus, ArrowUpDown, LayoutGrid, List } from "lucide-react";
-import MediaFilters, { type ThemeFilter } from "@/components/media-filters";
-import type { MediaType, MediaStatus } from "@/lib/types";
+import { WorldSwitcher, type ThemeFilter } from "@/components/media-filters";
 
 export type LibrarySort = "recent" | "lastActivity" | "title" | "progress" | "rating";
 export type LibraryView = "grid" | "list";
@@ -32,13 +31,10 @@ interface LibraryControlBarProps {
   searchQuery: string;
   onSearchChange: (q: string) => void;
 
-  // Filtreler (MediaFilters'a aynen aktarılıyor)
+  // R18.1: Bar artık sadece Dünya filtresini barındırıyor; Tür bloğu silindi,
+  // Durum bloğu WorldHero altına `StatusFilterRow` olarak ayrıldı.
   themeFilter: ThemeFilter;
-  typeFilter: MediaType | "all";
-  statusFilter: MediaStatus | "active" | "all";
   onThemeChange: (theme: ThemeFilter) => void;
-  onTypeChange: (type: MediaType | "all") => void;
-  onStatusChange: (status: MediaStatus | "active" | "all") => void;
 
   // Üst aksiyon
   onAddMedia: () => void;
@@ -51,11 +47,7 @@ export default function LibraryControlBar({
   searchQuery,
   onSearchChange,
   themeFilter,
-  typeFilter,
-  statusFilter,
   onThemeChange,
-  onTypeChange,
-  onStatusChange,
   onAddMedia,
   resultCount,
 }: LibraryControlBarProps) {
@@ -95,17 +87,12 @@ export default function LibraryControlBar({
         </button>
       </div>
 
-      {/* Filtre bloğu (mevcut MediaFilters reuse) — R6.1: tek satırlık
-          yatay rail; padding ihtiyaç kadar. */}
+      {/* R18.1: Filtre bloğu artık sadece **Dünya** segmented switcher
+          taşıyor. Eski "Tür" bloğu kaldırıldı (tür seçimi WorldHero alt
+          pill'leri üzerinden), "Durum" bloğu page.tsx'te WorldHero'nun
+          altına bağımsız bir satır olarak yerleştirildi. */}
       <div className="px-3 py-2.5 sm:px-4 sm:py-3">
-        <MediaFilters
-          activeTheme={themeFilter}
-          activeType={typeFilter}
-          activeStatus={statusFilter}
-          onThemeChange={onThemeChange}
-          onTypeChange={onTypeChange}
-          onStatusChange={onStatusChange}
-        />
+        <WorldSwitcher activeTheme={themeFilter} onThemeChange={onThemeChange} />
       </div>
     </div>
   );

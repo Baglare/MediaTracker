@@ -1,18 +1,22 @@
 // ============================================
-// Medya Filtreleme Bileşeni
+// Medya Filtreleme Bileşenleri (R18.1)
 // ============================================
-// Dünya Mode (Doğu/Kadraj/Arşiv), medya türü ve durum filtreleri.
+// R18.1: Eski tek "MediaFilters" paneli üç bloktan (Dünya / Tür / Durum)
+// ibaretti; "Tür" bloğu Doğu/Kadraj/Arşiv arasında simetrisiz ve WorldHero
+// alt pill'leri ile fonksiyon olarak çakışıyordu. Bu turda:
+//   - Tür bloğu **kaldırıldı**. Tür seçimi artık tamamen WorldHero alt
+//     pill'leri üzerinden yapılır (Doğu→eastSubFilter, Kadraj/Arşiv→typeFilter).
+//   - Dünya filtresi daha belirgin bir **segmented control**'e (`WorldSwitcher`)
+//     dönüştürüldü; LibraryControlBar'da öne çıkar.
+//   - Durum filtresi `StatusFilterRow` adıyla bağımsız, sakin bir alt-satır
+//     olarak ayrıldı; sayfa hiyerarşisinde WorldHero'nun **altına** yerleşir.
 //
-// R6.1: Görsel yerleşim kompakt yatay filtre rail'ine taşındı.
-// R9: Eski "Tema" konsepti "Dünya" olarak yeniden isimlendirildi; sekmeler
-// "Ekran"→"Kadraj", "Kütüphane"→"Arşiv" oldu. Filtre eşleşme mantığı
-// (anime/manga/novel ailesi Doğu, tv+movie Kadraj, book Arşiv) aynı kaldı.
-// State adı `themeFilter` ve değerler ("east"/"screen"/"library") şimdilik
-// korundu — büyük refactor bu turun kapsamı dışı.
+// Tip ve değer setleri korunur (R18 normalize'ı, world-hero ve page.tsx
+// hâlâ bu tipleri tüketir). State semantikleri aynı; sadece kompozisyon değişti.
 
 "use client";
 
-import { MediaType, MediaStatus } from "@/lib/types";
+import { MediaStatus } from "@/lib/types";
 
 // V5A.1 / R9: Üst seviye "Dünya" filtresi.
 // "all"     — Tümü
@@ -24,57 +28,65 @@ export type ThemeFilter = "all" | "east" | "screen" | "library";
 // V5A.1: Doğu seçiliyken aktifleşen ikinci seviye alt filtre.
 export type EastSubFilter = "all" | "anime" | "manga" | "novel";
 
-// Filtre bileşeninin dışarıdan aldığı değerler
-// V5A.2 / R16: Doğu alt filtresi WorldHero (R11) içinde yönetiliyor (eski
-// EastThemeHeader yerini aldı, R16'da silindi). MediaFilters yalnızca üst
-// seviye theme + tür + durum filtrelerinden sorumlu.
-interface MediaFiltersProps {
-  activeTheme: ThemeFilter;                              // Seçili theme mode
-  activeType: MediaType | "all";                        // Seçili medya türü
-  activeStatus: MediaStatus | "active" | "all";         // Seçili durum
+// ----- Dünya switcher (R18.1) -----
+
+interface WorldSwitcherProps {
+  activeTheme: ThemeFilter;
   onThemeChange: (theme: ThemeFilter) => void;
-  onTypeChange: (type: MediaType | "all") => void;      // Tür değişince çağrılır
-  onStatusChange: (status: MediaStatus | "active" | "all") => void; // Durum değişince çağrılır
 }
 
-// V5A.1: Theme mode filtre butonlarının listesi
-// R9: "Dünya" sekmeleri. Değerler internal (themeFilter state) için aynı kalıyor,
-// sadece görünen etiketler yeniden isimlendirildi.
-const themeFilters: { label: string; value: ThemeFilter; icon: string }[] = [
+const WORLD_OPTIONS: { label: string; value: ThemeFilter; icon: string }[] = [
   { label: "Tümü", value: "all", icon: "🌐" },
   { label: "Doğu", value: "east", icon: "🏯" },
   { label: "Kadraj", value: "screen", icon: "🎞️" },
   { label: "Arşiv", value: "library", icon: "📚" },
 ];
 
-// Medya türü filtre butonlarının listesi
-const typeFilters: { label: string; value: MediaType | "all"; icon: string }[] = [
-  { label: "Hepsi", value: "all", icon: "🎯" },
-  { label: "Film", value: "movie", icon: "🎬" },
-  { label: "Dizi", value: "tv", icon: "📺" },
-  { label: "Anime", value: "anime", icon: "🌸" },
-  { label: "Manga", value: "manga", icon: "📖" },
-  { label: "Manhwa", value: "manhwa", icon: "📚" },
-  { label: "Manhua", value: "manhua", icon: "🀄" },
-  { label: "Kitap", value: "book", icon: "📕" },
-];
+/**
+ * R18.1: Dünya filtresi artık küçük bir filtre chip'i değil; LibraryControlBar
+ * altında öne çıkan bir segmented control. Aktif Dünya `--w-*` token'larına
+ * bağlanır (R12) — "Tümü" iken nötr zinc, bir dünya seçili iken o dünyanın
+ * tonu. WorldHero ile aynı renk kimliğini paylaşır.
+ */
+export function WorldSwitcher({ activeTheme, onThemeChange }: WorldSwitcherProps) {
+  return (
+    <div
+      role="tablist"
+      aria-label="Dünya"
+      className="inline-flex flex-wrap items-center gap-1 rounded-xl border border-zinc-800/70 bg-zinc-950/50 p-1"
+    >
+      {WORLD_OPTIONS.map((opt) => {
+        const isActive = activeTheme === opt.value;
+        return (
+          <button
+            key={opt.value}
+            type="button"
+            role="tab"
+            aria-selected={isActive}
+            onClick={() => onThemeChange(opt.value)}
+            className={`group inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12.5px] font-medium tracking-wide transition-colors cursor-pointer ${
+              isActive
+                ? "bg-[var(--w-soft)] text-[var(--w-primary-strong)] ring-1 ring-[color-mix(in_srgb,var(--w-primary)_40%,transparent)]"
+                : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/40"
+            }`}
+          >
+            <span className="text-sm leading-none">{opt.icon}</span>
+            <span>{opt.label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
-// V5A.2: Aktif theme mode'a göre Medya Türü bloğunda hangi türler görünür?
-// "east" → blok tamamen gizleniyor (alt ayrım WorldHero'nun Doğu pill'leri).
-// "screen" → Film / Dizi
-// "library" → Kitap
-// "all" → tüm türler
-const TYPE_VALUES_BY_THEME: Record<
-  Exclude<ThemeFilter, "east">,
-  ReadonlyArray<MediaType | "all">
-> = {
-  all: ["all", "movie", "tv", "anime", "manga", "manhwa", "manhua", "book"],
-  screen: ["all", "movie", "tv"],
-  library: ["all", "book"],
-};
+// ----- Durum filtresi (R18.1) -----
 
-// Durum filtre butonlarının listesi
-const statusFilters: { label: string; value: MediaStatus | "active" | "all" }[] = [
+interface StatusFilterRowProps {
+  activeStatus: MediaStatus | "active" | "all";
+  onStatusChange: (status: MediaStatus | "active" | "all") => void;
+}
+
+const STATUS_OPTIONS: { label: string; value: MediaStatus | "active" | "all" }[] = [
   { label: "Tümü", value: "all" },
   { label: "Devam Ediyor", value: "active" },
   { label: "Planlandı", value: "planning" },
@@ -83,119 +95,39 @@ const statusFilters: { label: string; value: MediaStatus | "active" | "all" }[] 
   { label: "Bırakıldı", value: "dropped" },
 ];
 
-// Kompakt pill stilleri — accent farklılaşması için tone parametresi.
-type PillTone = "amber" | "violet" | "fuchsia";
-
-function pillClasses(active: boolean, tone: PillTone): string {
-  if (active) {
-    // R12: "amber" tone (Dünya filter pill'leri için kullanılıyor) artık aktif
-    // dünyanın --w-primary tonuna bağlı. "Tümü" iken nötr zinc'e düşer; bir
-    // dünya seçili iken o dünyanın rengini yansıtır. Tür/Durum tone'ları
-    // (violet/fuchsia) semantik olarak app-level kalır.
-    if (tone === "amber") {
-      return "bg-[var(--w-soft)] text-[var(--w-primary-strong)] ring-1 ring-[color-mix(in_srgb,var(--w-primary)_40%,transparent)]";
-    }
-    if (tone === "violet") {
-      return "bg-violet-500/15 text-violet-200 ring-1 ring-violet-500/40";
-    }
-    return "bg-fuchsia-500/15 text-fuchsia-200 ring-1 ring-fuchsia-500/40";
-  }
-  return "bg-zinc-900/50 text-zinc-400 ring-1 ring-zinc-800 hover:bg-zinc-800/60 hover:text-zinc-200";
-}
-
-function FilterGroup({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
+/**
+ * R18.1: Eski "Durum" pill grubu WorldHero'nun altına bağımsız bir satır
+ * olarak taşındı. "Daha sakin, modern, kompakt" tasarım hedefi:
+ *   - Eyebrow label ("Durum") küçük + uppercase tracking
+ *   - Pill'ler hafif, ring-only; aktif state ince fuchsia accent
+ *   - flex-wrap ile dar ekranda alt satıra düşer
+ */
+export function StatusFilterRow({ activeStatus, onStatusChange }: StatusFilterRowProps) {
   return (
-    <div className="flex items-center gap-2 min-w-0">
-      <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500 shrink-0">
-        {label}
+    <div className="flex items-center flex-wrap gap-x-3 gap-y-2">
+      <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-500 shrink-0">
+        Durum
       </span>
-      <div className="flex items-center gap-1 flex-wrap">{children}</div>
-    </div>
-  );
-}
-
-export default function MediaFilters({
-  activeTheme,
-  activeType,
-  activeStatus,
-  onThemeChange,
-  onTypeChange,
-  onStatusChange,
-}: MediaFiltersProps) {
-  // V5A.2: Doğu seçiliyken type bloğu tamamen gizlenir (header alt-ayrımı üstlenir).
-  const showTypeBlock = activeTheme !== "east";
-  const visibleTypeFilters =
-    activeTheme === "east"
-      ? []
-      : typeFilters.filter((f) =>
-          TYPE_VALUES_BY_THEME[activeTheme].includes(f.value),
-        );
-
-  return (
-    // R6.1: Kompakt yatay rail. Geniş ekranlarda gruplar yan yana; dar
-    // ekranlarda flex-wrap ile alt satıra geçer. Dikey yığılma kalktı.
-    <div className="flex items-center flex-wrap gap-x-5 gap-y-2">
-      {/* Dünya (R9: eski "Tema") */}
-      <FilterGroup label="Dünya">
-        {themeFilters.map((filter) => {
-          const isActive = activeTheme === filter.value;
+      <div className="flex items-center gap-1.5 flex-wrap">
+        {STATUS_OPTIONS.map((opt) => {
+          const isActive = activeStatus === opt.value;
           return (
             <button
-              key={filter.value}
-              onClick={() => onThemeChange(filter.value)}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[11.5px] font-medium transition-colors cursor-pointer ${pillClasses(isActive, "amber")}`}
+              key={opt.value}
+              type="button"
+              onClick={() => onStatusChange(opt.value)}
+              className={`px-2.5 py-1 rounded-md text-[11.5px] font-medium transition-colors cursor-pointer ${
+                isActive
+                  ? "bg-fuchsia-500/15 text-fuchsia-200 ring-1 ring-fuchsia-500/40"
+                  : "bg-zinc-900/40 text-zinc-400 ring-1 ring-zinc-800 hover:bg-zinc-800/50 hover:text-zinc-200"
+              }`}
+              aria-pressed={isActive}
             >
-              <span className="text-xs leading-none">{filter.icon}</span>
-              <span>{filter.label}</span>
+              {opt.label}
             </button>
           );
         })}
-      </FilterGroup>
-
-      {/* Tür — sadece doğu dışında */}
-      {showTypeBlock && (
-        <>
-          <span aria-hidden="true" className="hidden md:block w-px h-5 bg-zinc-800/70" />
-          <FilterGroup label="Tür">
-            {visibleTypeFilters.map((filter) => {
-              const isActive = activeType === filter.value;
-              return (
-                <button
-                  key={filter.value}
-                  onClick={() => onTypeChange(filter.value)}
-                  className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[11.5px] font-medium transition-colors cursor-pointer ${pillClasses(isActive, "violet")}`}
-                >
-                  <span className="text-xs leading-none">{filter.icon}</span>
-                  <span>{filter.label}</span>
-                </button>
-              );
-            })}
-          </FilterGroup>
-        </>
-      )}
-
-      {/* Durum */}
-      <span aria-hidden="true" className="hidden md:block w-px h-5 bg-zinc-800/70" />
-      <FilterGroup label="Durum">
-        {statusFilters.map((filter) => {
-          const isActive = activeStatus === filter.value;
-          return (
-            <button
-              key={filter.value}
-              onClick={() => onStatusChange(filter.value)}
-              className={`px-2.5 py-1 rounded-md text-[11.5px] font-medium transition-colors cursor-pointer ${pillClasses(isActive, "fuchsia")}`}
-            >
-              {filter.label}
-            </button>
-          );
-        })}
-      </FilterGroup>
+      </div>
     </div>
   );
 }

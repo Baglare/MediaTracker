@@ -19,7 +19,9 @@ import { TabType } from "@/components/app-tabs";
 import ActivityLogPanel from "@/components/activity-log-panel";
 // MediaFilters artık LibraryControlBar tarafından sarmalanıyor; burada
 // yalnızca type re-export'lar gerekli.
-import { type ThemeFilter, type EastSubFilter } from "@/components/media-filters";
+// R18.1: Durum filtresi WorldHero altında bağımsız bir satır; bu yüzden
+// `StatusFilterRow`'u doğrudan burada da tüketiyoruz.
+import { type ThemeFilter, type EastSubFilter, StatusFilterRow } from "@/components/media-filters";
 // R11: WorldHero — Doğu/Kadraj/Arşiv için genelleştirilmiş hero
 // (eski EastThemeHeader R16'da silindi).
 import WorldHero from "@/components/world-hero";
@@ -1429,15 +1431,14 @@ export default function HomePage() {
                 — search, sort, view, "Medya Ekle" + altta MediaFilters reuse */}
             {/* R5.1: Sort + view kontrolleri buradan çıkarıldı; aşağıda
                 Kütüphanem section header'ının sağına taşındı. */}
+            {/* R18.1: LibraryControlBar artık sadece arama + Medya Ekle +
+                Dünya switcher taşır. Tür bloğu silindi, Durum bloğu aşağıya
+                bağımsız satıra ayrıldı. */}
             <LibraryControlBar
               searchQuery={searchQuery}
               onSearchChange={setSearchQuery}
               themeFilter={themeFilter}
-              typeFilter={typeFilter}
-              statusFilter={statusFilter}
               onThemeChange={handleThemeFilterChange}
-              onTypeChange={setTypeFilter}
-              onStatusChange={setStatusFilter}
               onAddMedia={handleOpenAddModal}
               resultCount={filteredMedia.length}
             />
@@ -1451,6 +1452,14 @@ export default function HomePage() {
               onEastSubChange={setEastSubFilter}
               typeFilter={typeFilter}
               onTypeChange={setTypeFilter}
+            />
+
+            {/* R18.1: Durum filtresi — WorldHero'nun altında bağımsız, sakin
+                bir alt-satır. Tür ile karışmasın diye Dünya switcher'dan ve
+                WorldHero'dan ayrıldı. */}
+            <StatusFilterRow
+              activeStatus={statusFilter}
+              onStatusChange={setStatusFilter}
             />
 
             {filteredMedia.length > 0 ? (
