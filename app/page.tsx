@@ -1783,6 +1783,9 @@ export default function HomePage() {
           mediaList={mediaList}
           progressLogs={progressLogs}
           stats={dashboardStats}
+          // R15: RightRail dünya bazlı çalışsın diye themeFilter geçiyoruz.
+          // Search/status/type/eastSubFilter'a kasıtlı olarak duyarsız.
+          themeFilter={themeFilter}
           onOpenDetail={handleOpenDetailModal}
         />
       )}
