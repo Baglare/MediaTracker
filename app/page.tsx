@@ -1508,6 +1508,140 @@ export default function HomePage() {
     return calculateDashboardStats(mediaList, progressLogs);
   }, [mediaList, progressLogs]);
 
+  type PersonalPageIcon = typeof Heart;
+
+  const PersonalEmptyState = ({
+    icon: Icon,
+    title,
+    description,
+    tone = "text-amber-400/80",
+  }: {
+    icon: PersonalPageIcon;
+    title: string;
+    description: string;
+    tone?: string;
+  }) => (
+    <div className="flex flex-col items-center justify-center py-20 sm:py-24 bg-zinc-900/30 rounded-2xl border border-zinc-800/60 min-w-0">
+      <div className="w-16 h-16 rounded-2xl bg-zinc-900 ring-1 ring-zinc-800/80 grid place-items-center mb-4 shadow-sm shadow-black/30">
+        <Icon className={`w-7 h-7 ${tone}`} />
+      </div>
+      <p className="text-zinc-200 text-sm font-medium text-center">{title}</p>
+      <p className="text-zinc-500 text-xs mt-1.5 max-w-xs text-center leading-relaxed">
+        {description}
+      </p>
+    </div>
+  );
+
+  const PersonalControls = ({
+    searchValue,
+    onSearchChange,
+    searchPlaceholder,
+    sortValue,
+    onSortChange,
+    sortOptions,
+    countLabel,
+  }: {
+    searchValue: string;
+    onSearchChange: (value: string) => void;
+    searchPlaceholder: string;
+    sortValue: string;
+    onSortChange: (value: string) => void;
+    sortOptions: { value: string; label: string }[];
+    countLabel: string;
+  }) => (
+    <div className="flex flex-col sm:flex-row gap-2.5 sm:items-center min-w-0">
+      <div className="relative flex-1 min-w-0">
+        <Search
+          aria-hidden
+          className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 pointer-events-none"
+        />
+        <input
+          type="text"
+          value={searchValue}
+          onChange={(e) => onSearchChange(e.target.value)}
+          placeholder={searchPlaceholder}
+          className="w-full h-10 pl-9 pr-3 rounded-xl bg-zinc-900/40 border border-zinc-800/70 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500/40"
+        />
+      </div>
+      <div className="flex items-center gap-2 min-w-0">
+        <label className="text-[11px] uppercase tracking-[0.14em] text-zinc-500 font-semibold shrink-0">
+          Sırala
+        </label>
+        <select
+          value={sortValue}
+          onChange={(e) => onSortChange(e.target.value)}
+          className="h-10 min-w-0 max-w-full px-3 rounded-xl bg-zinc-900/40 border border-zinc-800/70 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500/40 cursor-pointer"
+        >
+          {sortOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="text-[12px] text-zinc-500 sm:ml-2 shrink-0">{countLabel}</div>
+    </div>
+  );
+
+  const PersonalMetricCard = ({
+    label,
+    value,
+    hint,
+    accent = false,
+  }: {
+    label: string;
+    value: string | number;
+    hint?: string;
+    accent?: boolean;
+  }) => (
+    <div className="rounded-2xl border border-zinc-800/60 bg-zinc-900/35 p-4 min-w-0">
+      <p className="text-[11px] uppercase tracking-[0.14em] text-zinc-500 font-semibold truncate">
+        {label}
+      </p>
+      <p className={`mt-2 text-2xl font-semibold tabular-nums truncate ${accent ? "text-amber-200" : "text-zinc-100"}`}>
+        {value}
+      </p>
+      {hint && <p className="mt-1 text-xs text-zinc-500 truncate">{hint}</p>}
+    </div>
+  );
+
+  const DistributionBar = ({
+    label,
+    count,
+    max,
+    tone = "amber",
+  }: {
+    label: string;
+    count: number;
+    max: number;
+    tone?: "amber" | "violet" | "emerald" | "rose" | "sky";
+  }) => {
+    const toneClass =
+      tone === "violet"
+        ? "bg-violet-400"
+        : tone === "emerald"
+          ? "bg-emerald-400"
+          : tone === "rose"
+            ? "bg-rose-400"
+            : tone === "sky"
+              ? "bg-sky-400"
+              : "bg-amber-400";
+    const width = count > 0 && max > 0 ? Math.max(4, Math.round((count / max) * 100)) : 0;
+    return (
+      <div className="min-w-0">
+        <div className="flex items-center justify-between gap-3 mb-1">
+          <span className="text-[12px] text-zinc-300 truncate">{label}</span>
+          <span className="text-[12px] font-mono tabular-nums text-zinc-500 shrink-0">
+            {count}
+          </span>
+        </div>
+        <div className="h-2 rounded-full bg-zinc-800/70 overflow-hidden">
+          <div className={`h-full rounded-full ${toneClass}`} style={{ width: `${width}%` }} />
+        </div>
+      </div>
+    );
+  };
+
   // ---- RENDER ----
 
   if (!isLoaded) {
@@ -2000,7 +2134,7 @@ export default function HomePage() {
             <PageHeader
               icon={ListChecks}
               title="İzleme Listem"
-              subtitle="Planladığın ve henüz başlamadığın medyalar."
+              subtitle="Kütüphanendeki planlanan medyaları tek yerde gör."
             />
             {(() => {
               const plannedItems = mediaList.filter(
@@ -2020,67 +2154,37 @@ export default function HomePage() {
 
               if (plannedItems.length === 0) {
                 return (
-                  <div className="flex flex-col items-center justify-center py-24 bg-zinc-900/30 rounded-2xl border border-zinc-800/60">
-                    <div className="w-16 h-16 rounded-2xl bg-zinc-900 ring-1 ring-zinc-800/80 grid place-items-center mb-4">
-                      <ListChecks className="w-7 h-7 text-amber-400/80" />
-                    </div>
-                    <p className="text-zinc-200 text-sm font-medium">
-                      Planlanan medya yok
-                    </p>
-                    <p className="text-zinc-500 text-xs mt-1.5 max-w-xs text-center">
-                      Keşfet veya Medya Ekle akışından durumunu planlandı seçtiğin kayıtlar burada görünür.
-                    </p>
-                  </div>
+                  <PersonalEmptyState
+                    icon={ListChecks}
+                    title="Planlanan medya yok"
+                    description="Keşfet veya Medya Ekle akışında planlandı durumuyla kaydettiğin içerikler burada görünür."
+                  />
                 );
               }
 
               return (
-                <div className="space-y-5">
-                  <div className="flex flex-col sm:flex-row gap-2.5 sm:items-center">
-                    <div className="relative flex-1 min-w-0">
-                      <Search
-                        aria-hidden
-                        className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 pointer-events-none"
-                      />
-                      <input
-                        type="text"
-                        value={watchlistSearch}
-                        onChange={(e) => setWatchlistSearch(e.target.value)}
-                        placeholder="İzleme listende ara..."
-                        className="w-full h-10 pl-9 pr-3 rounded-xl bg-zinc-900/40 border border-zinc-800/70 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500/40"
-                      />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <label className="text-[11px] uppercase tracking-[0.14em] text-zinc-500 font-semibold">
-                        Sırala
-                      </label>
-                      <select
-                        value={watchlistSort}
-                        onChange={(e) =>
-                          setWatchlistSort(e.target.value as typeof watchlistSort)
-                        }
-                        className="h-10 px-3 rounded-xl bg-zinc-900/40 border border-zinc-800/70 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500/40 cursor-pointer"
-                      >
-                        <option value="recent">Son eklenen</option>
-                        <option value="title">Başlık</option>
-                        <option value="rating">Puan</option>
-                      </select>
-                    </div>
-                    <div className="text-[12px] text-zinc-500 sm:ml-2 shrink-0">
-                      {sorted.length} / {plannedItems.length}
-                    </div>
-                  </div>
+                <div className="space-y-5 min-w-0">
+                  <PersonalControls
+                    searchValue={watchlistSearch}
+                    onSearchChange={setWatchlistSearch}
+                    searchPlaceholder="İzleme listende ara..."
+                    sortValue={watchlistSort}
+                    onSortChange={(value) => setWatchlistSort(value as typeof watchlistSort)}
+                    sortOptions={[
+                      { value: "recent", label: "Son eklenen" },
+                      { value: "title", label: "Başlık" },
+                      { value: "rating", label: "Puan" },
+                    ]}
+                    countLabel={`${sorted.length} / ${plannedItems.length}`}
+                  />
 
                   {sorted.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-16 bg-zinc-900/20 rounded-2xl border border-zinc-800/60">
-                      <div className="w-12 h-12 rounded-xl bg-zinc-900 grid place-items-center mb-3">
-                        <Search className="w-5 h-5 text-zinc-500" />
-                      </div>
-                      <p className="text-zinc-300 text-sm">Sonuç bulunamadı</p>
-                      <p className="text-zinc-500 text-xs mt-1">
-                        Arama terimini değiştirmeyi deneyebilirsin.
-                      </p>
-                    </div>
+                    <PersonalEmptyState
+                      icon={Search}
+                      title="Sonuç bulunamadı"
+                      description="Arama terimini değiştirerek tekrar deneyebilirsin."
+                      tone="text-zinc-500"
+                    />
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
                       {sorted.map((item) => {
@@ -2121,7 +2225,7 @@ export default function HomePage() {
             <PageHeader
               icon={Heart}
               title="Favorilerim"
-              subtitle="Favori olarak işaretlediğin medyalar tek bir yerde."
+              subtitle="Kütüphanende öne çıkardığın medyaları tek yerde gör."
             />
             {(() => {
               const favItems = mediaList.filter((it) => it.favorite === true);
@@ -2141,71 +2245,41 @@ export default function HomePage() {
               // Sayfa hiç favori yokken: modern empty state.
               if (favItems.length === 0) {
                 return (
-                  <div className="flex flex-col items-center justify-center py-24 bg-zinc-900/30 rounded-2xl border border-zinc-800/60">
-                    <div className="w-16 h-16 rounded-2xl bg-zinc-900 ring-1 ring-zinc-800/80 grid place-items-center mb-4">
-                      <Heart className="w-7 h-7 text-rose-400/80" />
-                    </div>
-                    <p className="text-zinc-200 text-sm font-medium">
-                      Henüz favori eklemedin
-                    </p>
-                    <p className="text-zinc-500 text-xs mt-1.5 max-w-xs text-center">
-                      Kütüphanendeki bir kartın sağ üst köşesindeki kalp şeridine
-                      tıklayarak medyaları buraya sabitleyebilirsin.
-                    </p>
-                  </div>
+                  <PersonalEmptyState
+                    icon={Heart}
+                    title="Henüz favori eklemedin"
+                    description="Kartların sağ üst köşesindeki kalp şeridiyle medyaları buraya sabitleyebilirsin."
+                    tone="text-rose-400/80"
+                  />
                 );
               }
 
               return (
-                <div className="space-y-5">
+                <div className="space-y-5 min-w-0">
                   {/* Kompakt kontrol satırı: arama + sort. Kütüphanem'in
                       LibraryControlBar'ından bilinçli olarak ayrı tutuldu —
                       orada Dünya/Tür/Durum sistemine kasıtlı dokunmuyoruz. */}
-                  <div className="flex flex-col sm:flex-row gap-2.5 sm:items-center">
-                    <div className="relative flex-1 min-w-0">
-                      <Search
-                        aria-hidden
-                        className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 pointer-events-none"
-                      />
-                      <input
-                        type="text"
-                        value={favoritesSearch}
-                        onChange={(e) => setFavoritesSearch(e.target.value)}
-                        placeholder="Favorilerinde ara…"
-                        className="w-full h-10 pl-9 pr-3 rounded-xl bg-zinc-900/40 border border-zinc-800/70 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500/40"
-                      />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <label className="text-[11px] uppercase tracking-[0.14em] text-zinc-500 font-semibold">
-                        Sırala
-                      </label>
-                      <select
-                        value={favoritesSort}
-                        onChange={(e) =>
-                          setFavoritesSort(e.target.value as typeof favoritesSort)
-                        }
-                        className="h-10 px-3 rounded-xl bg-zinc-900/40 border border-zinc-800/70 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500/40 cursor-pointer"
-                      >
-                        <option value="recent">En son eklenen</option>
-                        <option value="title">İsim (A→Z)</option>
-                        <option value="rating">Puan (yüksek→düşük)</option>
-                      </select>
-                    </div>
-                    <div className="text-[12px] text-zinc-500 sm:ml-2 shrink-0">
-                      {sorted.length} / {favItems.length}
-                    </div>
-                  </div>
+                  <PersonalControls
+                    searchValue={favoritesSearch}
+                    onSearchChange={setFavoritesSearch}
+                    searchPlaceholder="Favorilerinde ara..."
+                    sortValue={favoritesSort}
+                    onSortChange={(value) => setFavoritesSort(value as typeof favoritesSort)}
+                    sortOptions={[
+                      { value: "recent", label: "Son eklenen" },
+                      { value: "title", label: "Başlık" },
+                      { value: "rating", label: "Puan" },
+                    ]}
+                    countLabel={`${sorted.length} / ${favItems.length}`}
+                  />
 
                   {sorted.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-16 bg-zinc-900/20 rounded-2xl border border-zinc-800/60">
-                      <div className="w-12 h-12 rounded-xl bg-zinc-900 grid place-items-center mb-3">
-                        <Search className="w-5 h-5 text-zinc-500" />
-                      </div>
-                      <p className="text-zinc-300 text-sm">Sonuç bulunamadı</p>
-                      <p className="text-zinc-500 text-xs mt-1">
-                        Arama terimini değiştirmeyi deneyebilirsin.
-                      </p>
-                    </div>
+                    <PersonalEmptyState
+                      icon={Search}
+                      title="Sonuç bulunamadı"
+                      description="Arama terimini değiştirerek tekrar deneyebilirsin."
+                      tone="text-zinc-500"
+                    />
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
                       {sorted.map((item) => {
@@ -2245,7 +2319,7 @@ export default function HomePage() {
             <PageHeader
               icon={Star}
               title="Puanlamalarım"
-              subtitle="Puan verdiğin medyaları tek bir yerde gözden geçir."
+              subtitle="Kütüphanende puanladığın medyaları tek yerde gör."
             />
             {(() => {
               const ratedItems = mediaList.filter(
@@ -2276,98 +2350,44 @@ export default function HomePage() {
 
               if (ratedItems.length === 0) {
                 return (
-                  <div className="flex flex-col items-center justify-center py-24 bg-zinc-900/30 rounded-2xl border border-zinc-800/60">
-                    <div className="w-16 h-16 rounded-2xl bg-zinc-900 ring-1 ring-zinc-800/80 grid place-items-center mb-4">
-                      <Star className="w-7 h-7 text-amber-400/80" />
-                    </div>
-                    <p className="text-zinc-200 text-sm font-medium">
-                      Henüz puan verilmiş medya yok
-                    </p>
-                    <p className="text-zinc-500 text-xs mt-1.5 max-w-xs text-center">
-                      Kartların kapak alanındaki yıldızdan puan verdiğin kayıtlar burada görünür.
-                    </p>
-                  </div>
+                  <PersonalEmptyState
+                    icon={Star}
+                    title="Henüz puan verilmiş medya yok"
+                    description="Kartların kapak alanındaki yıldızla puanladığın kayıtlar burada görünür."
+                  />
                 );
               }
 
               return (
-                <div className="space-y-5">
+                <div className="space-y-5 min-w-0">
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div className="rounded-2xl border border-zinc-800/60 bg-zinc-900/35 p-4">
-                      <p className="text-[11px] uppercase tracking-[0.14em] text-zinc-500 font-semibold">
-                        Puanlanan
-                      </p>
-                      <p className="mt-2 text-2xl font-semibold text-zinc-100 tabular-nums">
-                        {ratedItems.length}
-                      </p>
-                    </div>
-                    <div className="rounded-2xl border border-zinc-800/60 bg-zinc-900/35 p-4">
-                      <p className="text-[11px] uppercase tracking-[0.14em] text-zinc-500 font-semibold">
-                        Ortalama
-                      </p>
-                      <p className="mt-2 text-2xl font-semibold text-amber-200 tabular-nums">
-                        {averageRating.toFixed(1)}
-                      </p>
-                    </div>
-                    <div className="rounded-2xl border border-zinc-800/60 bg-zinc-900/35 p-4">
-                      <p className="text-[11px] uppercase tracking-[0.14em] text-zinc-500 font-semibold">
-                        En yüksek
-                      </p>
-                      <p className="mt-2 text-2xl font-semibold text-zinc-100 tabular-nums">
-                        {highestCount}
-                        <span className="ml-2 text-sm font-medium text-zinc-500">
-                          adet / {highestRating}
-                        </span>
-                      </p>
-                    </div>
+                    <PersonalMetricCard label="Puanlanan" value={ratedItems.length} />
+                    <PersonalMetricCard label="Ortalama" value={averageRating.toFixed(1)} accent />
+                    <PersonalMetricCard label="En yüksek" value={highestCount} hint={`adet / ${highestRating}`} />
                   </div>
 
-                  <div className="flex flex-col sm:flex-row gap-2.5 sm:items-center">
-                    <div className="relative flex-1 min-w-0">
-                      <Search
-                        aria-hidden
-                        className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 pointer-events-none"
-                      />
-                      <input
-                        type="text"
-                        value={ratingsSearch}
-                        onChange={(e) => setRatingsSearch(e.target.value)}
-                        placeholder="Puanlamalarında ara..."
-                        className="w-full h-10 pl-9 pr-3 rounded-xl bg-zinc-900/40 border border-zinc-800/70 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500/40"
-                      />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <label className="text-[11px] uppercase tracking-[0.14em] text-zinc-500 font-semibold">
-                        Sırala
-                      </label>
-                      <select
-                        value={ratingsSort}
-                        onChange={(e) =>
-                          setRatingsSort(e.target.value as typeof ratingsSort)
-                        }
-                        className="h-10 px-3 rounded-xl bg-zinc-900/40 border border-zinc-800/70 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500/40 cursor-pointer"
-                      >
-                        <option value="ratingDesc">Puan yüksekten düşüğe</option>
-                        <option value="ratingAsc">Puan düşükten yükseğe</option>
-                        <option value="title">Başlık</option>
-                        <option value="recent">Son eklenen</option>
-                      </select>
-                    </div>
-                    <div className="text-[12px] text-zinc-500 sm:ml-2 shrink-0">
-                      {sorted.length} / {ratedItems.length}
-                    </div>
-                  </div>
+                  <PersonalControls
+                    searchValue={ratingsSearch}
+                    onSearchChange={setRatingsSearch}
+                    searchPlaceholder="Puanlamalarında ara..."
+                    sortValue={ratingsSort}
+                    onSortChange={(value) => setRatingsSort(value as typeof ratingsSort)}
+                    sortOptions={[
+                      { value: "ratingDesc", label: "Puan yüksekten düşüğe" },
+                      { value: "ratingAsc", label: "Puan düşükten yükseğe" },
+                      { value: "title", label: "Başlık" },
+                      { value: "recent", label: "Son eklenen" },
+                    ]}
+                    countLabel={`${sorted.length} / ${ratedItems.length}`}
+                  />
 
                   {sorted.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-16 bg-zinc-900/20 rounded-2xl border border-zinc-800/60">
-                      <div className="w-12 h-12 rounded-xl bg-zinc-900 grid place-items-center mb-3">
-                        <Search className="w-5 h-5 text-zinc-500" />
-                      </div>
-                      <p className="text-zinc-300 text-sm">Sonuç bulunamadı</p>
-                      <p className="text-zinc-500 text-xs mt-1">
-                        Arama terimini değiştirmeyi deneyebilirsin.
-                      </p>
-                    </div>
+                    <PersonalEmptyState
+                      icon={Search}
+                      title="Sonuç bulunamadı"
+                      description="Arama terimini değiştirerek tekrar deneyebilirsin."
+                      tone="text-zinc-500"
+                    />
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
                       {sorted.map((item) => {
@@ -2408,7 +2428,7 @@ export default function HomePage() {
             <PageHeader
               icon={NotebookPen}
               title="Notlarım"
-              subtitle="Kişisel not eklediğin medyalar."
+              subtitle="Kütüphanende not eklediğin medyaları tek yerde gör."
             />
             {(() => {
               type LegacyNoteItem = MediaItem & { notes?: unknown };
@@ -2448,65 +2468,37 @@ export default function HomePage() {
 
               if (notedItems.length === 0) {
                 return (
-                  <div className="flex flex-col items-center justify-center py-24 bg-zinc-900/30 rounded-2xl border border-zinc-800/60">
-                    <div className="w-16 h-16 rounded-2xl bg-zinc-900 ring-1 ring-zinc-800/80 grid place-items-center mb-4">
-                      <NotebookPen className="w-7 h-7 text-amber-400/80" />
-                    </div>
-                    <p className="text-zinc-200 text-sm font-medium">
-                      Henüz not eklenmiş medya yok
-                    </p>
-                    <p className="text-zinc-500 text-xs mt-1.5 max-w-xs text-center">
-                      Kartları düzenlerken kişisel not alanını doldurduğun kayıtlar burada görünür.
-                    </p>
-                  </div>
+                  <PersonalEmptyState
+                    icon={NotebookPen}
+                    title="Henüz not eklenmiş medya yok"
+                    description="Kartları düzenlerken kişisel not alanını doldurduğun kayıtlar burada görünür."
+                  />
                 );
               }
 
               return (
-                <div className="space-y-5">
-                  <div className="flex flex-col sm:flex-row gap-2.5 sm:items-center">
-                    <div className="relative flex-1 min-w-0">
-                      <Search
-                        aria-hidden
-                        className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 pointer-events-none"
-                      />
-                      <input
-                        type="text"
-                        value={notesSearch}
-                        onChange={(e) => setNotesSearch(e.target.value)}
-                        placeholder="Başlık, not veya tag ara..."
-                        className="w-full h-10 pl-9 pr-3 rounded-xl bg-zinc-900/40 border border-zinc-800/70 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500/40"
-                      />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <label className="text-[11px] uppercase tracking-[0.14em] text-zinc-500 font-semibold">
-                        Sırala
-                      </label>
-                      <select
-                        value={notesSort}
-                        onChange={(e) => setNotesSort(e.target.value as typeof notesSort)}
-                        className="h-10 px-3 rounded-xl bg-zinc-900/40 border border-zinc-800/70 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500/40 cursor-pointer"
-                      >
-                        <option value="recent">Son eklenen</option>
-                        <option value="title">Başlık</option>
-                        <option value="rating">Puan</option>
-                      </select>
-                    </div>
-                    <div className="text-[12px] text-zinc-500 sm:ml-2 shrink-0">
-                      {sorted.length} / {notedItems.length}
-                    </div>
-                  </div>
+                <div className="space-y-5 min-w-0">
+                  <PersonalControls
+                    searchValue={notesSearch}
+                    onSearchChange={setNotesSearch}
+                    searchPlaceholder="Başlık, not veya tag ara..."
+                    sortValue={notesSort}
+                    onSortChange={(value) => setNotesSort(value as typeof notesSort)}
+                    sortOptions={[
+                      { value: "recent", label: "Son eklenen" },
+                      { value: "title", label: "Başlık" },
+                      { value: "rating", label: "Puan" },
+                    ]}
+                    countLabel={`${sorted.length} / ${notedItems.length}`}
+                  />
 
                   {sorted.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-16 bg-zinc-900/20 rounded-2xl border border-zinc-800/60">
-                      <div className="w-12 h-12 rounded-xl bg-zinc-900 grid place-items-center mb-3">
-                        <Search className="w-5 h-5 text-zinc-500" />
-                      </div>
-                      <p className="text-zinc-300 text-sm">Sonuç bulunamadı</p>
-                      <p className="text-zinc-500 text-xs mt-1">
-                        Başlık, not veya tag aramasını değiştirmeyi deneyebilirsin.
-                      </p>
-                    </div>
+                    <PersonalEmptyState
+                      icon={Search}
+                      title="Sonuç bulunamadı"
+                      description="Başlık, not veya tag aramasını değiştirerek tekrar deneyebilirsin."
+                      tone="text-zinc-500"
+                    />
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
                       {sorted.map((item) => {
@@ -2557,7 +2549,7 @@ export default function HomePage() {
             <PageHeader
               icon={BarChart3}
               title="İstatistikler"
-              subtitle="Kütüphanenin genel dağılımı, puanları ve aktivite özeti."
+              subtitle="Kütüphanendeki dağılımı, puanları ve aktiviteyi tek yerde gör."
             />
             {(() => {
               const ratedItems = mediaList.filter(
@@ -2625,103 +2617,43 @@ export default function HomePage() {
                     return action;
                 }
               };
-              const StatCard = ({
-                label,
-                value,
-                hint,
-              }: {
-                label: string;
-                value: string | number;
-                hint?: string;
-              }) => (
-                <div className="rounded-2xl border border-zinc-800/60 bg-zinc-900/35 p-4 min-w-0">
-                  <p className="text-[11px] uppercase tracking-[0.14em] text-zinc-500 font-semibold truncate">
-                    {label}
-                  </p>
-                  <p className="mt-2 text-2xl font-semibold text-zinc-100 tabular-nums truncate">
-                    {value}
-                  </p>
-                  {hint && <p className="mt-1 text-xs text-zinc-500 truncate">{hint}</p>}
-                </div>
-              );
-              const BarRow = ({
-                label,
-                count,
-                max,
-                tone = "amber",
-              }: {
-                label: string;
-                count: number;
-                max: number;
-                tone?: "amber" | "violet" | "emerald" | "rose" | "sky";
-              }) => {
-                const toneClass =
-                  tone === "violet"
-                    ? "bg-violet-400"
-                    : tone === "emerald"
-                      ? "bg-emerald-400"
-                      : tone === "rose"
-                        ? "bg-rose-400"
-                        : tone === "sky"
-                          ? "bg-sky-400"
-                          : "bg-amber-400";
-                const width = max > 0 ? Math.max(4, Math.round((count / max) * 100)) : 0;
-                return (
-                  <div className="min-w-0">
-                    <div className="flex items-center justify-between gap-3 mb-1">
-                      <span className="text-[12px] text-zinc-300 truncate">{label}</span>
-                      <span className="text-[12px] font-mono tabular-nums text-zinc-500 shrink-0">
-                        {count}
-                      </span>
-                    </div>
-                    <div className="h-2 rounded-full bg-zinc-800/70 overflow-hidden">
-                      <div className={`h-full rounded-full ${toneClass}`} style={{ width: `${width}%` }} />
-                    </div>
-                  </div>
-                );
-              };
-
               return (
                 <div className="space-y-5 min-w-0">
                   <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-3">
-                    <StatCard label="Toplam medya" value={dashboardStats.totalItems} />
-                    <StatCard label="Tamamlanan" value={dashboardStats.completedItems} />
-                    <StatCard label="Devam eden" value={dashboardStats.inProgressItems} />
-                    <StatCard label="Planlanan" value={dashboardStats.planningItems} />
-                    <StatCard label="Ortalama puan" value={ratedItems.length > 0 ? averageRating.toFixed(1) : "—"} />
-                    <StatCard label="Favoriler" value={dashboardStats.favoriteItems} />
+                    <PersonalMetricCard label="Toplam medya" value={dashboardStats.totalItems} />
+                    <PersonalMetricCard label="Tamamlanan" value={dashboardStats.completedItems} />
+                    <PersonalMetricCard label="Devam eden" value={dashboardStats.inProgressItems} />
+                    <PersonalMetricCard label="Planlanan" value={dashboardStats.planningItems} />
+                    <PersonalMetricCard label="Ortalama puan" value={ratedItems.length > 0 ? averageRating.toFixed(1) : "—"} accent />
+                    <PersonalMetricCard label="Favoriler" value={dashboardStats.favoriteItems} />
                   </div>
 
                   {mediaList.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-20 bg-zinc-900/30 rounded-2xl border border-zinc-800/60">
-                      <div className="w-16 h-16 rounded-2xl bg-zinc-900 ring-1 ring-zinc-800/80 grid place-items-center mb-4">
-                        <BarChart3 className="w-7 h-7 text-amber-400/80" />
-                      </div>
-                      <p className="text-zinc-200 text-sm font-medium">Henüz istatistik yok</p>
-                      <p className="text-zinc-500 text-xs mt-1.5 max-w-xs text-center">
-                        Kütüphanene medya ekledikçe dağılımlar ve aktivite özeti burada görünür.
-                      </p>
-                    </div>
+                    <PersonalEmptyState
+                      icon={BarChart3}
+                      title="Henüz istatistik yok"
+                      description="Kütüphanene medya ekledikçe dağılımlar ve aktivite özeti burada görünür."
+                    />
                   ) : (
                     <>
                       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
                         <section className="rounded-2xl border border-zinc-800/60 bg-zinc-900/30 p-4 min-w-0">
                           <h2 className="text-sm font-semibold text-zinc-100 mb-4">Dünya dağılımı</h2>
                           <div className="space-y-3">
-                            <BarRow label="Doğu" count={worldCounts.east} max={maxWorld} tone="violet" />
-                            <BarRow label="Kadraj" count={worldCounts.screen} max={maxWorld} tone="sky" />
-                            <BarRow label="Arşiv" count={worldCounts.library} max={maxWorld} tone="amber" />
+                            <DistributionBar label="Doğu" count={worldCounts.east} max={maxWorld} tone="violet" />
+                            <DistributionBar label="Kadraj" count={worldCounts.screen} max={maxWorld} tone="sky" />
+                            <DistributionBar label="Arşiv" count={worldCounts.library} max={maxWorld} tone="amber" />
                           </div>
                         </section>
 
                         <section className="rounded-2xl border border-zinc-800/60 bg-zinc-900/30 p-4 min-w-0">
                           <h2 className="text-sm font-semibold text-zinc-100 mb-4">Status dağılımı</h2>
                           <div className="space-y-3">
-                            <BarRow label="Tamamlandı" count={statusCounts.completed} max={maxStatus} tone="emerald" />
-                            <BarRow label="Devam ediyor" count={statusCounts.active} max={maxStatus} tone="sky" />
-                            <BarRow label="Planlandı" count={statusCounts.planning} max={maxStatus} tone="amber" />
-                            <BarRow label="Duraklatıldı" count={statusCounts.paused} max={maxStatus} tone="violet" />
-                            <BarRow label="Bırakıldı" count={statusCounts.dropped} max={maxStatus} tone="rose" />
+                            <DistributionBar label="Tamamlandı" count={statusCounts.completed} max={maxStatus} tone="emerald" />
+                            <DistributionBar label="Devam ediyor" count={statusCounts.active} max={maxStatus} tone="sky" />
+                            <DistributionBar label="Planlandı" count={statusCounts.planning} max={maxStatus} tone="amber" />
+                            <DistributionBar label="Duraklatıldı" count={statusCounts.paused} max={maxStatus} tone="violet" />
+                            <DistributionBar label="Bırakıldı" count={statusCounts.dropped} max={maxStatus} tone="rose" />
                           </div>
                         </section>
 
@@ -2775,7 +2707,7 @@ export default function HomePage() {
                           <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(16rem,24rem)] gap-5">
                             <div className="space-y-2 min-w-0">
                               {ratingCounts.map((row) => (
-                                <BarRow
+                                <DistributionBar
                                   key={row.rating}
                                   label={`${row.rating} puan`}
                                   count={row.count}
