@@ -52,3 +52,43 @@ export interface TmdbNormalizedResult {
   coverUrl?: string;
   totalProgress: number;     // movie: 1, tv: 1 (ileride detail ile güncellenecek)
 }
+
+/**
+ * R21.2: TMDB `/movie/{id}` detay yanıtı için kullandığımız alanlar.
+ * `append_to_response=external_ids` ile IMDb id de alınıyor → siteUrl üretimi.
+ */
+export interface TmdbMovieDetailResponse {
+  id: number;
+  title: string;
+  original_title?: string;
+  overview?: string;
+  release_date?: string;
+  poster_path?: string | null;
+  runtime?: number | null;
+  vote_average?: number;
+  genres?: { id: number; name: string }[];
+  external_ids?: { imdb_id?: string | null };
+  homepage?: string | null;
+}
+
+/**
+ * R21.2: TMDB detayını normalize ederek MediaItem üretiminde kullanırız.
+ * OMDb normalize sonucuyla niyet eşdeğer (movie + metadata); fark sadece
+ * kaynak kimliği.
+ */
+export interface TmdbNormalizedDetail {
+  externalSource: "tmdb";
+  externalId: string;
+  type: "movie";
+  title: string;
+  originalTitle?: string;
+  overview?: string;
+  releaseYear?: number;
+  coverUrl?: string;
+  totalProgress: 1;
+  runtime?: number;
+  genres?: string[];
+  averageScore?: number;  // 0-100 (TMDB vote_average 0-10 → ×10)
+  imdbId?: string;
+  siteUrl?: string;        // homepage veya TMDB sayfa linki
+}

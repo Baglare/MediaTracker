@@ -16,6 +16,7 @@ import { TvmazeNormalizedResult } from "@/lib/tvmaze-types";
 import { AniListNormalizedResult } from "@/lib/anilist-types";
 import { OpenLibraryNormalizedResult } from "@/lib/openlibrary-types";
 import { OmdbNormalizedResult } from "@/lib/omdb-types";
+import { TmdbNormalizedResult } from "@/lib/tmdb-types";
 
 interface GlobalSearchProps {
   getLibraryStatus: (item: GlobalSearchResult) => Promise<GlobalSearchLibraryStatus> | GlobalSearchLibraryStatus;
@@ -85,39 +86,97 @@ export default function GlobalSearch({ getLibraryStatus, onAddToLibrary }: Globa
       const fetchPromises: Promise<GlobalSearchResult[]>[] = [];
 
       if (activeCategory === "all" || activeCategory === "movie") {
-        fetchPromises.push(
-          fetch(`/api/omdb/search?q=${encodeURIComponent(query)}`)
-            .then(async (res) => {
-              const data = await res.json().catch(() => ({ results: [] }));
-              if (!res.ok) {
-                if (activeCategory === "movie") {
-                  throw new Error(data?.error || "OMDb araması başarısız.");
-                }
-                return { results: [] };
-              }
-              return data as { results: OmdbNormalizedResult[] };
-            })
-            .then((data) => {
-              const resArray = data.results || [];
-              return resArray.map((item): GlobalSearchResult => ({
-                source: "omdb",
+        // R21.2: Film pipeline'ı — TMDB **birincil**, OMDb fallback.
+        //
+        // Akış:
+        //   1) /api/tmdb/search → 200 + results.length > 0 ise TMDB sonuçlarını döndür.
+        //   2) TMDB unavailable (503), upstream hata (502), network exception veya
+        //      0 sonuç durumunda /api/omdb/search'e düş.
+        //   3) Kategori "movie" iken her iki kaynak da kırılırsa hatayı yukarı fırlat
+        //      ki kullanıcıya "Sonuç bulunamadı / arama başarısız" notu çıksın
+        //      (eski OMDb-only davranışın korunması).
+        //   4) Kategori "all" iken iki kaynak da boşsa sessizce boş döner —
+        //      diğer kaynaklar (tvmaze/anilist/openlibrary) etkilenmez.
+        //
+        // Bilinçli karar: paralel çalıştırıp dedupe ETMİYORUZ. Sıralı çalışma
+        // hem rate-limit dostu hem de "TMDB başarılıysa OMDb karışmasın"
+        // şartını doğal olarak sağlıyor. Sadece düşülen fallback'te OMDb
+        // sonuçları görünür — duplicate yüzeyi yok.
+        const moviePipeline: Promise<GlobalSearchResult[]> = (async () => {
+          // --- 1) TMDB dene ---
+          let tmdbResults: GlobalSearchResult[] = [];
+          let tmdbOk = false;
+          try {
+            const res = await fetch(`/api/tmdb/search?q=${encodeURIComponent(query)}`);
+            const data = (await res.json().catch(() => ({ results: [] }))) as {
+              results?: TmdbNormalizedResult[];
+              error?: string;
+            };
+            if (res.ok) {
+              tmdbOk = true;
+              const arr = data.results || [];
+              tmdbResults = arr.map((item): GlobalSearchResult => ({
+                source: "tmdb",
                 externalId: item.externalId,
                 type: "movie",
                 title: item.title,
-                subtitle: item.director,
+                subtitle: item.originalTitle,
                 overview: item.overview,
                 releaseYear: item.releaseYear,
                 coverUrl: item.coverUrl,
-                genres: item.genres,
                 totalProgress: item.totalProgress,
                 raw: item,
               }));
-            })
-            .catch((err) => {
-              if (activeCategory === "movie") throw err;
+            } else {
+              // 502/503 vb. → fallback'e geç; logu sessizce bırak.
+              console.warn(
+                `[tmdb] arama başarısız (${res.status}) — OMDb fallback'ine düşülüyor.`,
+                data?.error,
+              );
+            }
+          } catch (err) {
+            console.warn("[tmdb] fetch exception — OMDb fallback'ine düşülüyor:", err);
+          }
+
+          if (tmdbOk && tmdbResults.length > 0) {
+            return tmdbResults;
+          }
+
+          // --- 2) OMDb fallback ---
+          try {
+            const res = await fetch(`/api/omdb/search?q=${encodeURIComponent(query)}`);
+            const data = (await res.json().catch(() => ({ results: [] }))) as {
+              results?: OmdbNormalizedResult[];
+              error?: string;
+            };
+            if (!res.ok) {
+              if (activeCategory === "movie") {
+                // Hem TMDB hem OMDb kırıldı → kullanıcıya görünür hata.
+                throw new Error(data?.error || "Film araması başarısız.");
+              }
               return [];
-            })
-        );
+            }
+            const arr = data.results || [];
+            return arr.map((item): GlobalSearchResult => ({
+              source: "omdb",
+              externalId: item.externalId,
+              type: "movie",
+              title: item.title,
+              subtitle: item.director,
+              overview: item.overview,
+              releaseYear: item.releaseYear,
+              coverUrl: item.coverUrl,
+              genres: item.genres,
+              totalProgress: item.totalProgress,
+              raw: item,
+            }));
+          } catch (err) {
+            if (activeCategory === "movie") throw err;
+            return [];
+          }
+        })();
+
+        fetchPromises.push(moviePipeline);
       }
 
       if (activeCategory === "all" || activeCategory === "tv") {

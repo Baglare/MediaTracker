@@ -27,7 +27,13 @@ function getSourceBadge(source: string) {
     case "openlibrary":
       return { label: "Open Library", cls: "bg-lime-500/15 text-lime-400 ring-lime-500/25" };
     case "omdb":
-      return { label: "OMDb", cls: "bg-amber-500/15 text-amber-300 ring-amber-500/25" };
+      // R21.2: OMDb artık film aramalarında fallback kaynağı. Etiket
+      // "OMDb · fallback" ile kullanıcıya kaynağın ikincil olduğunu hissettir.
+      return { label: "OMDb · fallback", cls: "bg-amber-500/15 text-amber-300 ring-amber-500/25" };
+    case "tmdb":
+      // R21.2: TMDB film aramalarında birincil kaynak. Eski TMDB rengiyle uyum:
+      // teal/cyan tonu, diğer kaynak rozetlerinden ayrışsın.
+      return { label: "TMDB", cls: "bg-teal-500/15 text-teal-300 ring-teal-500/25" };
     default:
       return { label: source, cls: "bg-zinc-500/15 text-zinc-400 ring-zinc-500/25" };
   }

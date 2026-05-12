@@ -101,6 +101,7 @@ import { TvmazeNormalizedDetail } from "@/lib/tvmaze-types";
 import { OpenLibraryNormalizedResult } from "@/lib/openlibrary-types";
 import { AniListNormalizedResult } from "@/lib/anilist-types";
 import { OmdbNormalizedResult } from "@/lib/omdb-types";
+import type { TmdbNormalizedDetail } from "@/lib/tmdb-types";
 
 export default function HomePage() {
   // ---- AUTH (cloud aktarım için) ----
@@ -341,7 +342,32 @@ export default function HomePage() {
   // (Listede / Sezon Ekle) çağrılır — sonuçları KESİNLİKLE filtrelemez. Listede
   // olan item'lar GlobalSearch içinde aynen render edilir.
   async function getGlobalSearchLibraryStatus(item: GlobalSearchResult): Promise<GlobalSearchLibraryStatus> {
-    const inLibrary = isInLibrary(item.source, item.externalId);
+    let inLibrary = isInLibrary(item.source, item.externalId);
+
+    // R21.2: TMDB↔OMDb cross-source duplicate fallback.
+    // Kullanıcı eski bir filmi OMDb ile eklediyse ve şimdi aynı filmi TMDB
+    // üzerinden arıyorsa (veya tam tersi) externalId'ler farklı olduğu için
+    // "Listede" rozeti çıkmıyordu → kullanıcı tekrar ekleyip duplicate
+    // yaratabiliyordu. Defansif olarak film tipinde title (case-insensitive,
+    // boşluk normalize) + releaseYear ile bir yumuşak kontrol ekliyoruz.
+    // Sadece **rozet** için kullanılır; ekleme yolu hâlâ Quick Add modal
+    // gating'ine düşer ve kullanıcı bilinçli onay verir.
+    if (
+      !inLibrary &&
+      item.type === "movie" &&
+      (item.source === "tmdb" || item.source === "omdb") &&
+      typeof item.releaseYear === "number"
+    ) {
+      const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
+      const wanted = norm(item.title);
+      inLibrary = mediaList.some(
+        (m) =>
+          m.type === "movie" &&
+          (m.externalSource === "tmdb" || m.externalSource === "omdb") &&
+          m.releaseYear === item.releaseYear &&
+          norm(m.title) === wanted,
+      );
+    }
 
     if (item.source !== "tvmaze") {
       return { isInLibrary: inLibrary, hasAddableParts: false };
@@ -1255,6 +1281,37 @@ export default function HomePage() {
     [isInLibrary]
   );
 
+  // R21.2: TMDB filmden MediaItem üretip Quick Add modalına gönderir.
+  // OMDb akışıyla simetrik; tek fark `id` prefix'i ve `externalSource`.
+  // imdbRating yerine TMDB vote_average (0-100'e ölçeklenmiş) `averageScore`'a
+  // yerleşir; `siteUrl` TMDB detail route'unun ürettiği IMDb/TMDB linki.
+  const handleAddFromTmdb = useCallback(
+    (result: TmdbNormalizedDetail) => {
+      if (isInLibrary("tmdb", result.externalId)) return;
+
+      const newItem: MediaItem = {
+        id: `tmdb-${result.externalId}`,
+        title: result.title,
+        type: "movie",
+        status: "planning",
+        coverImage: result.coverUrl || "/placeholders/movie.svg",
+        currentProgress: 0,
+        totalProgress: 1,
+        externalSource: "tmdb",
+        externalId: result.externalId,
+        overview: result.overview,
+        releaseYear: result.releaseYear,
+        runtime: result.runtime,
+        genres: result.genres,
+        averageScore: result.averageScore,
+        siteUrl: result.siteUrl,
+      };
+
+      setPendingQuickAdd({ singleItem: newItem, seasonItems: null });
+    },
+    [isInLibrary]
+  );
+
   /**
    * Global Search'ten dönen sonucu doğru formata çevirip ekler.
    */
@@ -1290,13 +1347,55 @@ export default function HomePage() {
           const detail = await res.json().catch(() => null);
           if (!res.ok || !detail) throw new Error(detail?.error || "OMDb detay verisi alınamadı");
           handleAddFromOmdb(detail as OmdbNormalizedResult);
+        } else if (item.source === "tmdb") {
+          // R21.2: TMDB sonucu için detail endpoint'ten runtime/genres/IMDb
+          // metadata çek; başarısız olursa search raw'ına geri düş (eklenir,
+          // ama runtime/genres olmadan). Bu davranış AniList akışıyla simetrik.
+          let detailResult: TmdbNormalizedDetail | null = null;
+          try {
+            const res = await fetch(`/api/tmdb/details?id=${item.externalId}`);
+            if (res.ok) {
+              const data = await res.json();
+              if (data?.result) detailResult = data.result as TmdbNormalizedDetail;
+            }
+          } catch {
+            // sessizce raw'a düş
+          }
+          if (detailResult) {
+            handleAddFromTmdb(detailResult);
+          } else if (item.raw) {
+            // Detail çekilemediyse search raw'ından minimal TmdbNormalizedDetail
+            // türet — runtime/genres yok; mevcut alanlar yeterli.
+            const raw = item.raw as {
+              externalId: string;
+              title: string;
+              overview?: string;
+              releaseYear?: number;
+              coverUrl?: string;
+              originalTitle?: string;
+            };
+            handleAddFromTmdb({
+              externalSource: "tmdb",
+              externalId: raw.externalId,
+              type: "movie",
+              title: raw.title,
+              originalTitle: raw.originalTitle,
+              overview: raw.overview,
+              releaseYear: raw.releaseYear,
+              coverUrl: raw.coverUrl,
+              totalProgress: 1,
+              siteUrl: `https://www.themoviedb.org/movie/${raw.externalId}`,
+            });
+          } else {
+            throw new Error("TMDB detay verisi alınamadı");
+          }
         }
       } catch (err) {
         console.error("Global search ekleme hatası:", err);
         alert("Ekleme sırasında bir hata oluştu. Lütfen tekrar deneyin.");
       }
     },
-    [handleAddFromTvmaze, handleAddFromAniList, handleAddFromOpenLibrary, handleAddFromOmdb]
+    [handleAddFromTvmaze, handleAddFromAniList, handleAddFromOpenLibrary, handleAddFromOmdb, handleAddFromTmdb]
   );
 
   // ---- FİLTRELEME ----
