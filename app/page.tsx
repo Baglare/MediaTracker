@@ -1710,6 +1710,8 @@ export default function HomePage() {
             />
             <EnhancedDashboard
               stats={dashboardStats}
+              mediaList={mediaList}
+              progressLogs={progressLogs}
               onSelectMedia={handleOpenDetailModal}
               onIncrement={handleIncrement}
               onComplete={handleComplete}
