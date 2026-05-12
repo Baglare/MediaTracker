@@ -20,6 +20,7 @@ const TAB_LABELS: Record<TabType, string> = {
   favorites: "Favorilerim",
   ratings: "Puanlamalarım",
   notes: "Notlarım",
+  stats: "İstatistikler",
   ai: "AI Danışman",
   activity: "Aktivite",
   settings: "Ayarlar",

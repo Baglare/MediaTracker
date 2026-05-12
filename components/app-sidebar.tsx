@@ -58,7 +58,7 @@ const SECTIONS: { label: string; items: NavItem[] }[] = [
       { id: "favorites", label: "Favorilerim", icon: Heart },
       { id: "ratings", label: "Puanlamalarım", icon: Star },
       { id: "notes", label: "Notlarım", icon: NotebookPen },
-      { id: "stats", label: "İstatistikler", icon: BarChart3, ghost: true, badge: "Yakında", badgeTone: "soon" },
+      { id: "stats", label: "İstatistikler", icon: BarChart3 },
     ],
   },
   {
@@ -80,6 +80,7 @@ const REAL_TABS = new Set<TabType>([
   "favorites",
   "ratings",
   "notes",
+  "stats",
   "ai",
   "activity",
   "settings",

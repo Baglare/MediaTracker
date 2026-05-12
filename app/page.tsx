@@ -69,6 +69,7 @@ import {
   ListChecks,
   Star,
   NotebookPen,
+  BarChart3,
   Search,
   Activity as ActivityIcon,
   Settings as SettingsIcon,
@@ -2540,6 +2541,266 @@ export default function HomePage() {
                         );
                       })}
                     </div>
+                  )}
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
+        {/* ISTATISTIKLER SEKMESI (R28)
+            - Persistence/API/sync yok; sadece mevcut mediaList ve progressLogs.
+            - RightRail hesap mantigina dokunmadan sayfa ici turetilmis metrikler.
+            - Chart kutuphanesi eklemeden responsive CSS bar'lar kullanilir. */}
+        {activeTab === "stats" && (
+          <div>
+            <PageHeader
+              icon={BarChart3}
+              title="İstatistikler"
+              subtitle="Kütüphanenin genel dağılımı, puanları ve aktivite özeti."
+            />
+            {(() => {
+              const ratedItems = mediaList.filter(
+                (it) => typeof it.userRating === "number" && Number.isFinite(it.userRating)
+              );
+              const averageRating =
+                ratedItems.length > 0
+                  ? ratedItems.reduce((sum, it) => sum + (it.userRating ?? 0), 0) / ratedItems.length
+                  : 0;
+              const now = Date.now();
+              const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
+              const sortedLogs = progressLogs
+                .slice()
+                .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+              const logsLast7Days = sortedLogs.filter(
+                (log) => new Date(log.createdAt).getTime() >= sevenDaysAgo
+              );
+              const worldCounts = { east: 0, screen: 0, library: 0 };
+              for (const item of mediaList) {
+                const cls = withMediaClassification(item);
+                if (cls.mediaType === "anime" || cls.mediaType === "manga" || cls.mediaType === "novel") {
+                  worldCounts.east += 1;
+                } else if (cls.mediaType === "tv" || cls.mediaType === "movie") {
+                  worldCounts.screen += 1;
+                } else {
+                  worldCounts.library += 1;
+                }
+              }
+              const statusCounts = {
+                completed: mediaList.filter((it) => it.status === "completed").length,
+                active: mediaList.filter((it) => it.status === "watching" || it.status === "reading").length,
+                planning: mediaList.filter((it) => it.status === "planning").length,
+                paused: mediaList.filter((it) => it.status === "paused").length,
+                dropped: mediaList.filter((it) => it.status === "dropped").length,
+              };
+              const ratingCounts = Array.from({ length: 10 }, (_, i) => {
+                const rating = i + 1;
+                return {
+                  rating,
+                  count: ratedItems.filter((it) => it.userRating === rating).length,
+                };
+              });
+              const topRated = ratedItems
+                .slice()
+                .sort((a, b) => {
+                  const ratingDiff = (b.userRating ?? -1) - (a.userRating ?? -1);
+                  if (ratingDiff !== 0) return ratingDiff;
+                  return a.title.localeCompare(b.title, "tr");
+                })
+                .slice(0, 5);
+              const maxWorld = Math.max(1, ...Object.values(worldCounts));
+              const maxStatus = Math.max(1, ...Object.values(statusCounts));
+              const maxRating = Math.max(1, ...ratingCounts.map((row) => row.count));
+              const logActionLabel = (action: ProgressLog["action"]) => {
+                switch (action) {
+                  case "increment":
+                    return "İlerleme";
+                  case "complete":
+                    return "Tamamlandı";
+                  case "manual_adjust":
+                    return "Düzenleme";
+                  case "added":
+                    return "Eklendi";
+                  default:
+                    return action;
+                }
+              };
+              const StatCard = ({
+                label,
+                value,
+                hint,
+              }: {
+                label: string;
+                value: string | number;
+                hint?: string;
+              }) => (
+                <div className="rounded-2xl border border-zinc-800/60 bg-zinc-900/35 p-4 min-w-0">
+                  <p className="text-[11px] uppercase tracking-[0.14em] text-zinc-500 font-semibold truncate">
+                    {label}
+                  </p>
+                  <p className="mt-2 text-2xl font-semibold text-zinc-100 tabular-nums truncate">
+                    {value}
+                  </p>
+                  {hint && <p className="mt-1 text-xs text-zinc-500 truncate">{hint}</p>}
+                </div>
+              );
+              const BarRow = ({
+                label,
+                count,
+                max,
+                tone = "amber",
+              }: {
+                label: string;
+                count: number;
+                max: number;
+                tone?: "amber" | "violet" | "emerald" | "rose" | "sky";
+              }) => {
+                const toneClass =
+                  tone === "violet"
+                    ? "bg-violet-400"
+                    : tone === "emerald"
+                      ? "bg-emerald-400"
+                      : tone === "rose"
+                        ? "bg-rose-400"
+                        : tone === "sky"
+                          ? "bg-sky-400"
+                          : "bg-amber-400";
+                const width = max > 0 ? Math.max(4, Math.round((count / max) * 100)) : 0;
+                return (
+                  <div className="min-w-0">
+                    <div className="flex items-center justify-between gap-3 mb-1">
+                      <span className="text-[12px] text-zinc-300 truncate">{label}</span>
+                      <span className="text-[12px] font-mono tabular-nums text-zinc-500 shrink-0">
+                        {count}
+                      </span>
+                    </div>
+                    <div className="h-2 rounded-full bg-zinc-800/70 overflow-hidden">
+                      <div className={`h-full rounded-full ${toneClass}`} style={{ width: `${width}%` }} />
+                    </div>
+                  </div>
+                );
+              };
+
+              return (
+                <div className="space-y-5 min-w-0">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-3">
+                    <StatCard label="Toplam medya" value={dashboardStats.totalItems} />
+                    <StatCard label="Tamamlanan" value={dashboardStats.completedItems} />
+                    <StatCard label="Devam eden" value={dashboardStats.inProgressItems} />
+                    <StatCard label="Planlanan" value={dashboardStats.planningItems} />
+                    <StatCard label="Ortalama puan" value={ratedItems.length > 0 ? averageRating.toFixed(1) : "—"} />
+                    <StatCard label="Favoriler" value={dashboardStats.favoriteItems} />
+                  </div>
+
+                  {mediaList.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-20 bg-zinc-900/30 rounded-2xl border border-zinc-800/60">
+                      <div className="w-16 h-16 rounded-2xl bg-zinc-900 ring-1 ring-zinc-800/80 grid place-items-center mb-4">
+                        <BarChart3 className="w-7 h-7 text-amber-400/80" />
+                      </div>
+                      <p className="text-zinc-200 text-sm font-medium">Henüz istatistik yok</p>
+                      <p className="text-zinc-500 text-xs mt-1.5 max-w-xs text-center">
+                        Kütüphanene medya ekledikçe dağılımlar ve aktivite özeti burada görünür.
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
+                        <section className="rounded-2xl border border-zinc-800/60 bg-zinc-900/30 p-4 min-w-0">
+                          <h2 className="text-sm font-semibold text-zinc-100 mb-4">Dünya dağılımı</h2>
+                          <div className="space-y-3">
+                            <BarRow label="Doğu" count={worldCounts.east} max={maxWorld} tone="violet" />
+                            <BarRow label="Kadraj" count={worldCounts.screen} max={maxWorld} tone="sky" />
+                            <BarRow label="Arşiv" count={worldCounts.library} max={maxWorld} tone="amber" />
+                          </div>
+                        </section>
+
+                        <section className="rounded-2xl border border-zinc-800/60 bg-zinc-900/30 p-4 min-w-0">
+                          <h2 className="text-sm font-semibold text-zinc-100 mb-4">Status dağılımı</h2>
+                          <div className="space-y-3">
+                            <BarRow label="Tamamlandı" count={statusCounts.completed} max={maxStatus} tone="emerald" />
+                            <BarRow label="Devam ediyor" count={statusCounts.active} max={maxStatus} tone="sky" />
+                            <BarRow label="Planlandı" count={statusCounts.planning} max={maxStatus} tone="amber" />
+                            <BarRow label="Duraklatıldı" count={statusCounts.paused} max={maxStatus} tone="violet" />
+                            <BarRow label="Bırakıldı" count={statusCounts.dropped} max={maxStatus} tone="rose" />
+                          </div>
+                        </section>
+
+                        <section className="rounded-2xl border border-zinc-800/60 bg-zinc-900/30 p-4 min-w-0">
+                          <h2 className="text-sm font-semibold text-zinc-100 mb-4">Aktivite özeti</h2>
+                          <div className="rounded-xl bg-zinc-950/35 border border-zinc-800/60 p-3 mb-4">
+                            <p className="text-[11px] uppercase tracking-[0.14em] text-zinc-500 font-semibold">
+                              Son 7 gün
+                            </p>
+                            <p className="mt-1 text-2xl font-semibold text-zinc-100 tabular-nums">
+                              {logsLast7Days.length}
+                            </p>
+                          </div>
+                          {sortedLogs.length === 0 ? (
+                            <p className="text-sm text-zinc-500">Henüz aktivite kaydı yok.</p>
+                          ) : (
+                            <div className="space-y-2">
+                              {sortedLogs.slice(0, 5).map((log) => (
+                                <div key={log.id} className="min-w-0 rounded-xl bg-zinc-950/25 border border-zinc-800/50 p-3">
+                                  <div className="flex items-center justify-between gap-3">
+                                    <span className="text-[12px] font-medium text-zinc-200 truncate">
+                                      {log.mediaTitle}
+                                    </span>
+                                    <span className="text-[11px] text-zinc-500 shrink-0">
+                                      {logActionLabel(log.action)}
+                                    </span>
+                                  </div>
+                                  <p className="mt-1 text-[11px] text-zinc-500 truncate">
+                                    {new Date(log.createdAt).toLocaleDateString("tr-TR")}
+                                    {log.detail ? ` · ${log.detail}` : ""}
+                                  </p>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </section>
+                      </div>
+
+                      <section className="rounded-2xl border border-zinc-800/60 bg-zinc-900/30 p-4 min-w-0">
+                        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-2 mb-4">
+                          <div>
+                            <h2 className="text-sm font-semibold text-zinc-100">Rating dağılımı</h2>
+                            <p className="text-xs text-zinc-500 mt-1">
+                              {ratedItems.length} puanlı içerik · ortalama {ratedItems.length > 0 ? averageRating.toFixed(1) : "—"}
+                            </p>
+                          </div>
+                        </div>
+                        {ratedItems.length === 0 ? (
+                          <p className="text-sm text-zinc-500">Henüz puanlanmış içerik yok.</p>
+                        ) : (
+                          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(16rem,24rem)] gap-5">
+                            <div className="space-y-2 min-w-0">
+                              {ratingCounts.map((row) => (
+                                <BarRow
+                                  key={row.rating}
+                                  label={`${row.rating} puan`}
+                                  count={row.count}
+                                  max={maxRating}
+                                  tone={row.rating >= 8 ? "emerald" : row.rating >= 5 ? "amber" : "rose"}
+                                />
+                              ))}
+                            </div>
+                            <div className="min-w-0 rounded-xl bg-zinc-950/25 border border-zinc-800/50 p-3">
+                              <h3 className="text-[12px] font-semibold text-zinc-200 mb-3">En yüksek puanlılar</h3>
+                              <div className="space-y-2">
+                                {topRated.map((item) => (
+                                  <div key={item.id} className="flex items-center justify-between gap-3 min-w-0">
+                                    <span className="text-[12px] text-zinc-300 truncate">{item.title}</span>
+                                    <span className="text-[12px] font-mono tabular-nums text-amber-300 shrink-0">
+                                      {item.userRating}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </section>
+                    </>
                   )}
                 </div>
               );
