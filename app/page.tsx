@@ -67,6 +67,7 @@ import {
   Sparkles,
   Heart,
   ListChecks,
+  Star,
   Search,
   Activity as ActivityIcon,
   Settings as SettingsIcon,
@@ -213,6 +214,8 @@ export default function HomePage() {
   const [favoritesSort, setFavoritesSort] = useState<"recent" | "title" | "rating">("recent");
   const [watchlistSearch, setWatchlistSearch] = useState("");
   const [watchlistSort, setWatchlistSort] = useState<"recent" | "title" | "rating">("recent");
+  const [ratingsSearch, setRatingsSearch] = useState("");
+  const [ratingsSort, setRatingsSort] = useState<"ratingDesc" | "ratingAsc" | "title" | "recent">("ratingDesc");
 
   // AI Danışman sekmesi dışına çıkıldığında aktif sohbeti sıfırlamak için sinyal
   const [aiResetSignal, setAiResetSignal] = useState(0);
@@ -2186,6 +2189,168 @@ export default function HomePage() {
                     </div>
                     <div className="text-[12px] text-zinc-500 sm:ml-2 shrink-0">
                       {sorted.length} / {favItems.length}
+                    </div>
+                  </div>
+
+                  {sorted.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-16 bg-zinc-900/20 rounded-2xl border border-zinc-800/60">
+                      <div className="w-12 h-12 rounded-xl bg-zinc-900 grid place-items-center mb-3">
+                        <Search className="w-5 h-5 text-zinc-500" />
+                      </div>
+                      <p className="text-zinc-300 text-sm">Sonuç bulunamadı</p>
+                      <p className="text-zinc-500 text-xs mt-1">
+                        Arama terimini değiştirmeyi deneyebilirsin.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
+                      {sorted.map((item) => {
+                        const relatedAction = getLibraryRelatedAction(item);
+                        return (
+                          <MediaCard
+                            key={item.id}
+                            item={item}
+                            onIncrement={handleIncrement}
+                            onComplete={handleComplete}
+                            onEdit={handleOpenEditModal}
+                            onDelete={handleDeleteRequest}
+                            onToggleFavorite={handleToggleFavorite}
+                            onOpenDetail={handleOpenDetailModal}
+                            onAddRelatedParts={handleAddMissingTvmazeParts}
+                            relatedPartsLabel={relatedAction.label}
+                            canAddRelatedParts={relatedAction.canAdd}
+                            onOpenGroupEdit={handleOpenGroupEdit}
+                            onUpdateRating={handleUpdateRating}
+                          />
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
+        {/* PUANLAMALARIM SEKMESI (R26)
+            - Yeni rating sistemi kurmaz; mevcut userRating alanini kullanir.
+            - Kutuphanem filtre/grup sisteminden bagimsiz, lokal arama/siralama.
+            - Puan temizlenince item userRating filtresinden otomatik duser. */}
+        {activeTab === "ratings" && (
+          <div>
+            <PageHeader
+              icon={Star}
+              title="Puanlamalarım"
+              subtitle="Puan verdiğin medyaları tek bir yerde gözden geçir."
+            />
+            {(() => {
+              const ratedItems = mediaList.filter(
+                (it) => typeof it.userRating === "number" && Number.isFinite(it.userRating)
+              );
+              const q = ratingsSearch.trim().toLowerCase();
+              const searched = q
+                ? ratedItems.filter((it) => it.title.toLowerCase().includes(q))
+                : ratedItems;
+              const sorted = searched.slice().sort((a, b) => {
+                const ra = a.userRating ?? -1;
+                const rb = b.userRating ?? -1;
+                if (ratingsSort === "ratingAsc") return ra - rb;
+                if (ratingsSort === "title") return a.title.localeCompare(b.title, "tr");
+                if (ratingsSort === "recent") return mediaList.indexOf(b) - mediaList.indexOf(a);
+                return rb - ra;
+              });
+              const totalRating = ratedItems.reduce((sum, it) => sum + (it.userRating ?? 0), 0);
+              const averageRating = ratedItems.length > 0 ? totalRating / ratedItems.length : 0;
+              const highestRating = ratedItems.reduce(
+                (max, it) => Math.max(max, it.userRating ?? -1),
+                -1
+              );
+              const highestCount =
+                highestRating >= 0
+                  ? ratedItems.filter((it) => it.userRating === highestRating).length
+                  : 0;
+
+              if (ratedItems.length === 0) {
+                return (
+                  <div className="flex flex-col items-center justify-center py-24 bg-zinc-900/30 rounded-2xl border border-zinc-800/60">
+                    <div className="w-16 h-16 rounded-2xl bg-zinc-900 ring-1 ring-zinc-800/80 grid place-items-center mb-4">
+                      <Star className="w-7 h-7 text-amber-400/80" />
+                    </div>
+                    <p className="text-zinc-200 text-sm font-medium">
+                      Henüz puan verilmiş medya yok
+                    </p>
+                    <p className="text-zinc-500 text-xs mt-1.5 max-w-xs text-center">
+                      Kartların kapak alanındaki yıldızdan puan verdiğin kayıtlar burada görünür.
+                    </p>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="space-y-5">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="rounded-2xl border border-zinc-800/60 bg-zinc-900/35 p-4">
+                      <p className="text-[11px] uppercase tracking-[0.14em] text-zinc-500 font-semibold">
+                        Puanlanan
+                      </p>
+                      <p className="mt-2 text-2xl font-semibold text-zinc-100 tabular-nums">
+                        {ratedItems.length}
+                      </p>
+                    </div>
+                    <div className="rounded-2xl border border-zinc-800/60 bg-zinc-900/35 p-4">
+                      <p className="text-[11px] uppercase tracking-[0.14em] text-zinc-500 font-semibold">
+                        Ortalama
+                      </p>
+                      <p className="mt-2 text-2xl font-semibold text-amber-200 tabular-nums">
+                        {averageRating.toFixed(1)}
+                      </p>
+                    </div>
+                    <div className="rounded-2xl border border-zinc-800/60 bg-zinc-900/35 p-4">
+                      <p className="text-[11px] uppercase tracking-[0.14em] text-zinc-500 font-semibold">
+                        En yüksek
+                      </p>
+                      <p className="mt-2 text-2xl font-semibold text-zinc-100 tabular-nums">
+                        {highestCount}
+                        <span className="ml-2 text-sm font-medium text-zinc-500">
+                          adet / {highestRating}
+                        </span>
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row gap-2.5 sm:items-center">
+                    <div className="relative flex-1 min-w-0">
+                      <Search
+                        aria-hidden
+                        className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 pointer-events-none"
+                      />
+                      <input
+                        type="text"
+                        value={ratingsSearch}
+                        onChange={(e) => setRatingsSearch(e.target.value)}
+                        placeholder="Puanlamalarında ara..."
+                        className="w-full h-10 pl-9 pr-3 rounded-xl bg-zinc-900/40 border border-zinc-800/70 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500/40"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <label className="text-[11px] uppercase tracking-[0.14em] text-zinc-500 font-semibold">
+                        Sırala
+                      </label>
+                      <select
+                        value={ratingsSort}
+                        onChange={(e) =>
+                          setRatingsSort(e.target.value as typeof ratingsSort)
+                        }
+                        className="h-10 px-3 rounded-xl bg-zinc-900/40 border border-zinc-800/70 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500/40 cursor-pointer"
+                      >
+                        <option value="ratingDesc">Puan yüksekten düşüğe</option>
+                        <option value="ratingAsc">Puan düşükten yükseğe</option>
+                        <option value="title">Başlık</option>
+                        <option value="recent">Son eklenen</option>
+                      </select>
+                    </div>
+                    <div className="text-[12px] text-zinc-500 sm:ml-2 shrink-0">
+                      {sorted.length} / {ratedItems.length}
                     </div>
                   </div>
 
