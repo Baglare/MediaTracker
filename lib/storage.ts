@@ -113,6 +113,10 @@ export interface UIPreferences {
   statusFilter: MediaStatus | "active" | "all";
   librarySort: LibrarySort;
   libraryView: LibraryView;
+  // R18.2: Kütüphanem section collapse durumları. Sadece görünüm; veri
+  // pipeline'ı (filteredMedia / groupMediaItems / continueItems) etkilenmez.
+  continueSectionOpen: boolean;
+  seriesSectionOpen: boolean;
 }
 
 export const DEFAULT_UI_PREFERENCES: UIPreferences = {
@@ -122,6 +126,9 @@ export const DEFAULT_UI_PREFERENCES: UIPreferences = {
   statusFilter: "all",
   librarySort: "recent",
   libraryView: "grid",
+  // R18.2: default olarak iki section da açık (mevcut davranışla aynı).
+  continueSectionOpen: true,
+  seriesSectionOpen: true,
 };
 
 const THEME_FILTER_VALUES = new Set<ThemeFilter>(["all", "east", "screen", "library"]);
@@ -188,6 +195,13 @@ function normalizeUIPreferences(raw: unknown): UIPreferences {
   }
   if (typeof r.libraryView === "string" && VIEW_VALUES.has(r.libraryView as LibraryView)) {
     base.libraryView = r.libraryView as LibraryView;
+  }
+  // R18.2: boolean alanlar; geçersiz değer → default (true).
+  if (typeof r.continueSectionOpen === "boolean") {
+    base.continueSectionOpen = r.continueSectionOpen;
+  }
+  if (typeof r.seriesSectionOpen === "boolean") {
+    base.seriesSectionOpen = r.seriesSectionOpen;
   }
 
   // Theme ↔ Type tutarlılığı (handleThemeFilterChange ile aynı kurallar):

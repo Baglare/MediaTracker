@@ -143,6 +143,14 @@ export default function HomePage() {
   // "Seri Koleksiyonlarım" kendi sıralamasını korur. (R18: persist)
   const [librarySort, setLibrarySort] = useState<LibrarySort>(DEFAULT_UI_PREFERENCES.librarySort);
   const [libraryView, setLibraryView] = useState<LibraryView>(DEFAULT_UI_PREFERENCES.libraryView);
+  // R18.2: Kütüphanem section collapse durumları. Sadece görünümü kontrol
+  // eder; hesap pipeline'larına dokunmaz.
+  const [continueSectionOpen, setContinueSectionOpen] = useState<boolean>(
+    DEFAULT_UI_PREFERENCES.continueSectionOpen
+  );
+  const [seriesSectionOpen, setSeriesSectionOpen] = useState<boolean>(
+    DEFAULT_UI_PREFERENCES.seriesSectionOpen
+  );
 
   // R13.2: Macro transition tetik state'i. WorldTransition artık worldAttr
   // prop'unu otomatik izlemiyor — sadece kullanıcı Dünya filtresini
@@ -271,6 +279,8 @@ export default function HomePage() {
     setStatusFilter(prefs.statusFilter);
     setLibrarySort(prefs.librarySort);
     setLibraryView(prefs.libraryView);
+    setContinueSectionOpen(prefs.continueSectionOpen);
+    setSeriesSectionOpen(prefs.seriesSectionOpen);
     setUiPrefsLoaded(true);
   }, []);
 
@@ -286,6 +296,8 @@ export default function HomePage() {
       statusFilter,
       librarySort,
       libraryView,
+      continueSectionOpen,
+      seriesSectionOpen,
     });
   }, [
     uiPrefsLoaded,
@@ -295,6 +307,8 @@ export default function HomePage() {
     statusFilter,
     librarySort,
     libraryView,
+    continueSectionOpen,
+    seriesSectionOpen,
   ]);
 
   // ---- EYLEMLER (Actions) ----
@@ -1558,6 +1572,9 @@ export default function HomePage() {
                   count,
                   hint,
                   actions,
+                  collapsible,
+                  isOpen,
+                  onToggle,
                 }: {
                   icon: typeof PlayCircle;
                   title: string;
@@ -1566,30 +1583,73 @@ export default function HomePage() {
                   // R5.1: Section başlığının sağ tarafına opsiyonel aksiyon slotu
                   // (Kütüphanem için sort + view toggle).
                   actions?: React.ReactNode;
-                }) => (
-                  <div className="flex flex-wrap items-end justify-between gap-x-3 gap-y-2 mb-3 pb-2 border-b border-zinc-800/50">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <Icon className="w-4 h-4 text-amber-400/80 shrink-0" />
-                      <h2 className="text-[15px] font-semibold text-zinc-100 tracking-tight truncate">
-                        {title}
-                      </h2>
-                      <span className="text-[11px] font-mono tabular-nums text-zinc-500 px-1.5 py-0.5 rounded-md bg-zinc-900/60 border border-zinc-800/60 shrink-0">
-                        {count}
-                      </span>
-                    </div>
-                    {/* R17: dar ekranda sort+view kontrolleri başlığın altına
-                        düşebilsin diye flex-wrap. Geniş ekranda sağa hizalı
-                        davranış değişmez. */}
-                    <div className="flex items-center gap-3 flex-wrap">
-                      {hint && <span className="text-[11px] text-zinc-500">{hint}</span>}
-                      {actions}
-                    </div>
-                  </div>
-                );
+                  // R18.2: Collapse/expand desteği. `collapsible` true ise
+                  // başlık satırı bütünüyle butona dönüşür; chevron sağa
+                  // yapışır. Kütüphanem (tekil) bölümünde kullanılmaz.
+                  collapsible?: boolean;
+                  isOpen?: boolean;
+                  onToggle?: () => void;
+                }) => {
+                  const headerInner = (
+                    <>
+                      <div className="flex items-center gap-2 min-w-0">
+                        {collapsible && (
+                          // Chevron başlığın **solunda** dursun ki "buton hissi"
+                          // immediate; ikon ondan sonra gelsin. Açık/kapalı için
+                          // rotasyon: motion-safe altında smooth, reduce-motion
+                          // varsa anlık geçer.
+                          <ChevronDown
+                            className={`w-4 h-4 text-zinc-500 shrink-0 motion-safe:transition-transform motion-safe:duration-200 ${
+                              isOpen ? "rotate-0" : "-rotate-90"
+                            }`}
+                            aria-hidden="true"
+                          />
+                        )}
+                        <Icon className="w-4 h-4 text-amber-400/80 shrink-0" />
+                        <h2 className="text-[15px] font-semibold text-zinc-100 tracking-tight truncate">
+                          {title}
+                        </h2>
+                        <span className="text-[11px] font-mono tabular-nums text-zinc-500 px-1.5 py-0.5 rounded-md bg-zinc-900/60 border border-zinc-800/60 shrink-0">
+                          {count}
+                        </span>
+                      </div>
+                      {/* R17: dar ekranda sort+view kontrolleri başlığın altına
+                          düşebilsin diye flex-wrap. Geniş ekranda sağa hizalı
+                          davranış değişmez. */}
+                      <div className="flex items-center gap-3 flex-wrap">
+                        {hint && <span className="text-[11px] text-zinc-500">{hint}</span>}
+                        {actions}
+                      </div>
+                    </>
+                  );
+
+                  // R18.2: Collapsible varyant — başlık satırının kendisi
+                  // <button>. Aksiyonlar (sort/view) kullanılan section'da
+                  // (Kütüphanem) collapsible OLMAYACAĞI için iç içe button
+                  // çakışması yok. Defense-in-depth: `actions` interaktif olsa
+                  // bile event.stopPropagation gerektiğinde aşağıda eklenir.
+                  const wrapperClass =
+                    "flex flex-wrap items-end justify-between gap-x-3 gap-y-2 mb-3 pb-2 border-b border-zinc-800/50";
+                  if (collapsible) {
+                    return (
+                      <button
+                        type="button"
+                        onClick={onToggle}
+                        aria-expanded={isOpen ? "true" : "false"}
+                        className={`${wrapperClass} w-full text-left cursor-pointer group hover:border-zinc-700/70 transition-colors`}
+                      >
+                        {headerInner}
+                      </button>
+                    );
+                  }
+                  return <div className={wrapperClass}>{headerInner}</div>;
+                };
 
                 return (
                   <div className="space-y-8">
-                    {/* 1) Devam Ettiklerim — in-progress slice (max 6) */}
+                    {/* 1) Devam Ettiklerim — in-progress slice (max 6).
+                        R18.2: section header collapsible; kapalıyken grid
+                        DOM'dan tamamen çıkar (height transition yok — basit). */}
                     {continueItems.length > 0 && (
                       <section aria-label="Devam Ettiklerim">
                         <SectionHead
@@ -1597,7 +1657,11 @@ export default function HomePage() {
                           title="Devam Ettiklerim"
                           count={continueItems.length}
                           hint="Son aktiviteye göre"
+                          collapsible
+                          isOpen={continueSectionOpen}
+                          onToggle={() => setContinueSectionOpen((v) => !v)}
                         />
+                        {continueSectionOpen && (
                         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
                           {continueItems.map((item) => {
                             const relatedAction = getLibraryRelatedAction(item);
@@ -1619,17 +1683,23 @@ export default function HomePage() {
                             );
                           })}
                         </div>
+                        )}
                       </section>
                     )}
 
-                    {/* 2) Seri Koleksiyonlarım — group cards (2+ parça) */}
+                    {/* 2) Seri Koleksiyonlarım — group cards (2+ parça).
+                        R18.2: collapsible. */}
                     {seriesGroupCards.length > 0 && (
                       <section aria-label="Seri Koleksiyonlarım">
                         <SectionHead
                           icon={Layers}
                           title="Seri Koleksiyonlarım"
                           count={seriesGroupCards.length}
+                          collapsible
+                          isOpen={seriesSectionOpen}
+                          onToggle={() => setSeriesSectionOpen((v) => !v)}
                         />
+                        {seriesSectionOpen && (
                         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
                           {seriesGroupCards.map((group) => (
                             <SeriesGroupCard
@@ -1647,6 +1717,7 @@ export default function HomePage() {
                             />
                           ))}
                         </div>
+                        )}
                       </section>
                     )}
 
