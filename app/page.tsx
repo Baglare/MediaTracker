@@ -68,6 +68,7 @@ import {
   Heart,
   ListChecks,
   Star,
+  NotebookPen,
   Search,
   Activity as ActivityIcon,
   Settings as SettingsIcon,
@@ -216,6 +217,8 @@ export default function HomePage() {
   const [watchlistSort, setWatchlistSort] = useState<"recent" | "title" | "rating">("recent");
   const [ratingsSearch, setRatingsSearch] = useState("");
   const [ratingsSort, setRatingsSort] = useState<"ratingDesc" | "ratingAsc" | "title" | "recent">("ratingDesc");
+  const [notesSearch, setNotesSearch] = useState("");
+  const [notesSort, setNotesSort] = useState<"recent" | "title" | "rating">("recent");
 
   // AI Danışman sekmesi dışına çıkıldığında aktif sohbeti sıfırlamak için sinyal
   const [aiResetSignal, setAiResetSignal] = useState(0);
@@ -2384,6 +2387,156 @@ export default function HomePage() {
                             onOpenGroupEdit={handleOpenGroupEdit}
                             onUpdateRating={handleUpdateRating}
                           />
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
+        {/* NOTLARIM SEKMESI (R27)
+            - Yeni not sistemi kurmaz; mevcut personalNotes ve olasi legacy notes
+              alanlarini sadece okur.
+            - Kutuphanem filtre/grup sisteminden bagimsiz, lokal arama/siralama.
+            - Not bosaltilinca item bu local filtreden otomatik duser. */}
+        {activeTab === "notes" && (
+          <div>
+            <PageHeader
+              icon={NotebookPen}
+              title="Notlarım"
+              subtitle="Kişisel not eklediğin medyalar."
+            />
+            {(() => {
+              type LegacyNoteItem = MediaItem & { notes?: unknown };
+              const getNoteText = (item: MediaItem) => {
+                const personal = item.personalNotes?.trim();
+                if (personal) return personal;
+
+                const legacyNotes = (item as LegacyNoteItem).notes;
+                if (typeof legacyNotes === "string") return legacyNotes.trim();
+                if (Array.isArray(legacyNotes)) {
+                  return legacyNotes
+                    .filter((note): note is string => typeof note === "string")
+                    .map((note) => note.trim())
+                    .filter(Boolean)
+                    .join(" ");
+                }
+                return "";
+              };
+
+              const notedItems = mediaList.filter((it) => getNoteText(it).length > 0);
+              const q = notesSearch.trim().toLowerCase();
+              const searched = q
+                ? notedItems.filter((it) => {
+                    const titleHit = it.title.toLowerCase().includes(q);
+                    const noteHit = getNoteText(it).toLowerCase().includes(q);
+                    const tagHit = (it.tags ?? []).some((tag) =>
+                      tag.toLowerCase().includes(q)
+                    );
+                    return titleHit || noteHit || tagHit;
+                  })
+                : notedItems;
+              const sorted = searched.slice().sort((a, b) => {
+                if (notesSort === "title") return a.title.localeCompare(b.title, "tr");
+                if (notesSort === "rating") return (b.userRating ?? -1) - (a.userRating ?? -1);
+                return mediaList.indexOf(b) - mediaList.indexOf(a);
+              });
+
+              if (notedItems.length === 0) {
+                return (
+                  <div className="flex flex-col items-center justify-center py-24 bg-zinc-900/30 rounded-2xl border border-zinc-800/60">
+                    <div className="w-16 h-16 rounded-2xl bg-zinc-900 ring-1 ring-zinc-800/80 grid place-items-center mb-4">
+                      <NotebookPen className="w-7 h-7 text-amber-400/80" />
+                    </div>
+                    <p className="text-zinc-200 text-sm font-medium">
+                      Henüz not eklenmiş medya yok
+                    </p>
+                    <p className="text-zinc-500 text-xs mt-1.5 max-w-xs text-center">
+                      Kartları düzenlerken kişisel not alanını doldurduğun kayıtlar burada görünür.
+                    </p>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="space-y-5">
+                  <div className="flex flex-col sm:flex-row gap-2.5 sm:items-center">
+                    <div className="relative flex-1 min-w-0">
+                      <Search
+                        aria-hidden
+                        className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 pointer-events-none"
+                      />
+                      <input
+                        type="text"
+                        value={notesSearch}
+                        onChange={(e) => setNotesSearch(e.target.value)}
+                        placeholder="Başlık, not veya tag ara..."
+                        className="w-full h-10 pl-9 pr-3 rounded-xl bg-zinc-900/40 border border-zinc-800/70 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500/40"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <label className="text-[11px] uppercase tracking-[0.14em] text-zinc-500 font-semibold">
+                        Sırala
+                      </label>
+                      <select
+                        value={notesSort}
+                        onChange={(e) => setNotesSort(e.target.value as typeof notesSort)}
+                        className="h-10 px-3 rounded-xl bg-zinc-900/40 border border-zinc-800/70 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500/40 cursor-pointer"
+                      >
+                        <option value="recent">Son eklenen</option>
+                        <option value="title">Başlık</option>
+                        <option value="rating">Puan</option>
+                      </select>
+                    </div>
+                    <div className="text-[12px] text-zinc-500 sm:ml-2 shrink-0">
+                      {sorted.length} / {notedItems.length}
+                    </div>
+                  </div>
+
+                  {sorted.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-16 bg-zinc-900/20 rounded-2xl border border-zinc-800/60">
+                      <div className="w-12 h-12 rounded-xl bg-zinc-900 grid place-items-center mb-3">
+                        <Search className="w-5 h-5 text-zinc-500" />
+                      </div>
+                      <p className="text-zinc-300 text-sm">Sonuç bulunamadı</p>
+                      <p className="text-zinc-500 text-xs mt-1">
+                        Başlık, not veya tag aramasını değiştirmeyi deneyebilirsin.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
+                      {sorted.map((item) => {
+                        const relatedAction = getLibraryRelatedAction(item);
+                        const noteText = getNoteText(item);
+                        return (
+                          <div key={item.id} className="space-y-2">
+                            <div className="rounded-2xl border border-zinc-800/60 bg-zinc-900/35 p-3">
+                              <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-[0.14em] text-zinc-500 font-semibold mb-2">
+                                <NotebookPen className="w-3.5 h-3.5 text-amber-400/80" />
+                                Not
+                              </div>
+                              <p className="text-[12.5px] leading-relaxed text-zinc-300 line-clamp-3">
+                                {noteText}
+                              </p>
+                            </div>
+                            <MediaCard
+                              item={item}
+                              onIncrement={handleIncrement}
+                              onComplete={handleComplete}
+                              onEdit={handleOpenEditModal}
+                              onDelete={handleDeleteRequest}
+                              onToggleFavorite={handleToggleFavorite}
+                              onOpenDetail={handleOpenDetailModal}
+                              onAddRelatedParts={handleAddMissingTvmazeParts}
+                              relatedPartsLabel={relatedAction.label}
+                              canAddRelatedParts={relatedAction.canAdd}
+                              onOpenGroupEdit={handleOpenGroupEdit}
+                              onUpdateRating={handleUpdateRating}
+                            />
+                          </div>
                         );
                       })}
                     </div>
