@@ -280,20 +280,27 @@ export default function WorldHero({
         style={{ background: "var(--w-primary)" }}
       />
 
-      <div className="relative flex flex-wrap items-center gap-x-4 gap-y-3 justify-between">
+      {/* R14: İçerik subtree `key={worldKey}` ile dünya değişiminde remount
+          olur, böylece r14-hero-*-enter `forwards` animasyonları sıfırdan
+          oynar. eastSub/typeFilter değişimi worldKey'i etkilemediği için
+          alt pill seçimleri entrance'ı re-trigger ETMEZ — sadece dünya
+          değişiminde 250–500ms aralığında bir kerelik fade/slide. */}
+      <div
+        key={worldKey}
+        className="relative flex flex-wrap items-center gap-x-4 gap-y-3 justify-between"
+      >
         <div className="flex items-center gap-3 min-w-0">
-          {/* Glyph rozeti — kanji / aperture / Æ */}
+          {/* Glyph rozeti — kanji / aperture / Æ + dünya-spesifik karakter */}
           <span
-            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${w.glyphFontClass}`}
+            className={`r14-hero-glyph-enter ${glyphCharacterClass(worldKey)} flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${w.glyphFontClass}`}
             style={{
               background: "var(--w-soft)",
               color: "var(--w-primary-strong)",
-              boxShadow: "inset 0 0 0 1px color-mix(in srgb, var(--w-primary) 32%, transparent)",
             }}
           >
             {w.glyph}
           </span>
-          <div className="min-w-0">
+          <div className="r14-hero-text-enter min-w-0">
             <h2
               className="text-sm font-semibold tracking-wide truncate"
               style={{ color: "var(--w-primary-strong)" }}
@@ -304,10 +311,10 @@ export default function WorldHero({
           </div>
         </div>
 
-        {/* R13.2: Tüm dünyalarda pill'ler artık interaktif. Doğu eastSubFilter
-            üzerinden, Kadraj/Arşiv ise mevcut typeFilter üzerinden çalışır.
-            SubBadge / "soon" sahte etiket KALDIRILDI. */}
-        <div className="flex flex-wrap items-center gap-2">
+        {/* R13.2: Tüm dünyalarda pill'ler interaktif. Doğu eastSubFilter,
+            Kadraj/Arşiv typeFilter üzerinden. R14: pill grubunun entrance'ı
+            text bloğundan sonra (120ms gecikmeli) gelir. */}
+        <div className="r14-hero-pills-enter flex flex-wrap items-center gap-2">
           {w.pills.map((pill) => {
             if (pill.kind === "east-sub") {
               const isActive = eastSub === pill.id;
@@ -333,6 +340,16 @@ export default function WorldHero({
                 active={isActive}
                 onClick={() => onTypeChange(pill.id)}
                 Icon={pill.Icon}
+                // R14: Aktif Kadraj/Arşiv pill'lerine küçük dünya-spesifik
+                // glow. Doğu pill'leri zaten V5A.4 ikon mikro animasyonunu
+                // kullandığı için burada ek dekorasyon almıyor.
+                activeExtraClass={
+                  worldKey === "screen"
+                    ? "r14-pill-screen-active"
+                    : worldKey === "arch"
+                      ? "r14-pill-arch-active"
+                      : undefined
+                }
               />
             );
           })}
@@ -340,6 +357,18 @@ export default function WorldHero({
       </div>
     </div>
   );
+}
+
+// R14: Dünya glyph rozetine karakter veren class adını döner.
+function glyphCharacterClass(world: WorldKey): string {
+  switch (world) {
+    case "east":
+      return "r14-glyph-east";
+    case "screen":
+      return "r14-glyph-screen";
+    case "arch":
+      return "r14-glyph-arch";
+  }
 }
 
 // ----- Pill primitives -----
@@ -350,6 +379,7 @@ function SubButton({
   Icon,
   iconKey,
   iconAnimClass,
+  activeExtraClass,
 }: {
   label: string;
   active: boolean;
@@ -357,6 +387,9 @@ function SubButton({
   Icon?: (props: { className?: string }) => React.ReactElement;
   iconKey?: string;
   iconAnimClass?: string;
+  // R14: Aktif state'e eklenecek ekstra class — dünya-spesifik glow için.
+  // Doğu pill'lerinde verilmez (V5A.4 ikon animasyonu yeterli).
+  activeExtraClass?: string;
 }) {
   return (
     <button
@@ -364,7 +397,7 @@ function SubButton({
       onClick={onClick}
       className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium tracking-wide transition-colors cursor-pointer ${
         active
-          ? "ring-1"
+          ? `ring-1 ${activeExtraClass ?? ""}`
           : "bg-zinc-900/60 text-zinc-400 hover:text-zinc-200 ring-1 ring-zinc-800"
       }`}
       style={
