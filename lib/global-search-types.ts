@@ -32,16 +32,24 @@ export interface GlobalSearchLibraryStatus {
   missingCount?: number;
 }
 
-/** Global Search kategori filtreleri */
+/**
+ * Global Search kategori filtreleri (R23.2 sadeleştirme).
+ *
+ * Kütüphanem'in Dünya taksonomisine paralel olarak chip seti küçültüldü:
+ * `manhwa` ve `manhua` artık ayrı chip değil — "manga" chip'i bu üç kaynak
+ * türünü birden kapsar. "novel" chip'i AniList format=NOVEL ve
+ * light/web/visual novel tiplerini toplar. Fetch katmanı bu chip'lere
+ * görünür bir tek-tek param GEÇMEZ; client-side filtering ile aynı raw
+ * havuz üzerinden ayrıştırılır.
+ */
 export type GlobalSearchCategory =
   | "all"
+  | "movie"
   | "tv"
   | "anime"
   | "manga"
-  | "manhwa"
-  | "manhua"
-  | "book"
-  | "movie";
+  | "novel"
+  | "book";
 
 /** Gruplanmış sonuçlar (Hepsi modunda) */
 export interface GroupedResults {

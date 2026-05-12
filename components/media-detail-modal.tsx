@@ -109,7 +109,7 @@ function getStatusIcon(status: string) {
 function sourceLabelOf(source: MediaItem["externalSource"]): string {
   switch (source) {
     case "tvmaze":
-      return "TVmaze";
+      return "TVMaze";
     case "anilist":
       return "AniList";
     case "openlibrary":

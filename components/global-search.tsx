@@ -23,16 +23,44 @@ interface GlobalSearchProps {
   onAddToLibrary: (item: GlobalSearchResult, options?: { relatedOnly?: boolean }) => void | Promise<void>;
 }
 
+// R23.2: Kategori chip seti Kütüphanem'in Dünya taksonomisine paralel
+// olarak sadeleşti. "manhwa" ve "manhua" artık kendi chip'leri değil —
+// "manga" chip'i bu üç sonuç tipini birden gösterir. "novel" yeni chip:
+// AniList format=NOVEL + light/web/visual novel tiplerini toplar. Fetch
+// katmanına yeni param geçmiyoruz: chip görünüm filtresi `viewCategoryOf`
+// üzerinden client-side yapılır; aynı raw havuz reuse edilir.
 const CATEGORIES: { value: GlobalSearchCategory; label: string }[] = [
   { value: "all", label: "Hepsi" },
+  { value: "movie", label: "Film" },
   { value: "tv", label: "Dizi" },
   { value: "anime", label: "Anime" },
   { value: "manga", label: "Manga" },
-  { value: "manhwa", label: "Manhwa" },
-  { value: "manhua", label: "Manhua" },
+  { value: "novel", label: "Novel" },
   { value: "book", label: "Kitap" },
-  { value: "movie", label: "Film" },
 ];
+
+// Görsel chip / group anahtarı. AniList raw'ındaki format=NOVEL light novel
+// olarak konumlanır; type alanı (manga/manhwa/manhua) tek bir "Manga" grubu
+// altında toplanır. Bu fonksiyon SADECE görünüm için — depolama veya add
+// flow davranışı bu mapping'i etkilemez (MediaItem type alanı orijinal kalır).
+type ViewCategory = "movie" | "tv" | "anime" | "manga" | "novel" | "book";
+
+function viewCategoryOf(r: GlobalSearchResult): ViewCategory {
+  if (r.type === "movie") return "movie";
+  if (r.type === "tv") return "tv";
+  if (r.type === "anime") return "anime";
+  if (r.type === "book") return "book";
+  if (r.type === "light_novel" || r.type === "web_novel" || r.type === "visual_novel") {
+    return "novel";
+  }
+  // manga / manhwa / manhua: AniList raw format=NOVEL → light novel.
+  const fmt =
+    r.raw && typeof r.raw === "object" && "format" in r.raw
+      ? (r.raw as { format?: unknown }).format
+      : undefined;
+  if (typeof fmt === "string" && fmt.toUpperCase() === "NOVEL") return "novel";
+  return "manga";
+}
 
 const DEFAULT_LIBRARY_STATUS: GlobalSearchLibraryStatus = {
   isInLibrary: false,
@@ -202,9 +230,21 @@ export default function GlobalSearch({ getLibraryStatus, onAddToLibrary }: Globa
         );
       }
 
-      if (["all", "anime", "manga", "manhwa", "manhua"].includes(activeCategory)) {
+      // R23.2: AniList fetch'i yeni chip setine göre.
+      //   - anime → category=anime (sadece ANIME bucket)
+      //   - manga / novel / all → category=all (ANIME+MANGA bucket, country
+      //     filter yok → manhwa/manhua dahil; novel için format=NOVEL
+      //     client-side filtre uygulanır).
+      // movie/tv/book chip'lerinde anilist hiç çağrılmaz.
+      if (
+        activeCategory === "all" ||
+        activeCategory === "anime" ||
+        activeCategory === "manga" ||
+        activeCategory === "novel"
+      ) {
+        const anilistParam = activeCategory === "anime" ? "anime" : "all";
         fetchPromises.push(
-          fetch(`/api/anilist/search?q=${encodeURIComponent(query)}&category=${activeCategory}`)
+          fetch(`/api/anilist/search?q=${encodeURIComponent(query)}&category=${anilistParam}`)
             .then(async (res) => {
               const data = (await res.json().catch(() => ({}))) as {
                 results?: AniListNormalizedResult[];
@@ -366,21 +406,34 @@ export default function GlobalSearch({ getLibraryStatus, onAddToLibrary }: Globa
   // Kategori başına gösterilen maksimum sonuç sayısı.
   // Backend tarafları: AniList 12, OpenLibrary 12, TVmaze/OMDb default — 9 hepsiyle uyumlu.
   const PER_CATEGORY_LIMIT = 9;
-  const groupedResults = {
-    movie: results.filter((r) => r.type === "movie").slice(0, PER_CATEGORY_LIMIT),
-    tv: results.filter((r) => r.type === "tv").slice(0, PER_CATEGORY_LIMIT),
-    anime: results.filter((r) => r.type === "anime").slice(0, PER_CATEGORY_LIMIT),
-    manga: results.filter((r) => r.type === "manga").slice(0, PER_CATEGORY_LIMIT),
-    manhwa: results.filter((r) => r.type === "manhwa").slice(0, PER_CATEGORY_LIMIT),
-    manhua: results.filter((r) => r.type === "manhua").slice(0, PER_CATEGORY_LIMIT),
-    book: results.filter((r) => r.type === "book").slice(0, PER_CATEGORY_LIMIT),
+  // R23.2: Görsel gruplama `viewCategoryOf` üzerinden. Manga grubu
+  // manga+manhwa+manhua'yı; novel grubu light/web/visual novel'i ve
+  // AniList format=NOVEL kayıtlarını toplar.
+  const byView = (target: ViewCategory) =>
+    results.filter((r) => viewCategoryOf(r) === target).slice(0, PER_CATEGORY_LIMIT);
+  const groupedResults: Record<ViewCategory, GlobalSearchResult[]> = {
+    movie: byView("movie"),
+    tv: byView("tv"),
+    anime: byView("anime"),
+    manga: byView("manga"),
+    novel: byView("novel"),
+    book: byView("book"),
   };
 
   const renderGroup = (title: string, items: GlobalSearchResult[]) => {
     if (items.length === 0) return null;
     return (
       <div className="mb-6">
-        <h3 className="text-sm font-semibold text-zinc-300 mb-3 uppercase tracking-wider">{title}</h3>
+        {/* R23: Section başlığı + sayım rozeti — Kütüphanem SectionHead diliyle uyumlu */}
+        <div className="flex items-center gap-2 mb-3">
+          <h3 className="text-[12px] font-semibold text-zinc-300 uppercase tracking-[0.14em]">
+            {title}
+          </h3>
+          <span className="text-[10.5px] font-mono tabular-nums text-zinc-500 px-1.5 py-0.5 rounded-md bg-zinc-900/60 border border-zinc-800/60">
+            {items.length}
+          </span>
+          <div className="flex-1 h-px bg-zinc-800/60" />
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
           {items.map((res) => {
             const key = `${res.source}-${res.externalId}`;
@@ -400,60 +453,86 @@ export default function GlobalSearch({ getLibraryStatus, onAddToLibrary }: Globa
   };
 
   return (
-    <div className="bg-zinc-900/50 rounded-2xl border border-zinc-800/50 p-5 mb-8">
-      <div className="mb-5">
-        <h2 className="text-xl font-bold text-zinc-100 flex items-center gap-2">
-          <Search className="w-5 h-5 text-violet-400" />
-          Kesfet
+    // R23: Yüzey dili rafine — `rounded-2xl border-zinc-800/60 bg-zinc-900/30`
+    // (page-surface dialect). Section başlığı kompakt; arama formu mobilde
+    // dikey, sm+ yatay; kategori pill'leri yatay scroll'a uygun.
+    <div className="rounded-2xl border border-zinc-800/60 bg-zinc-900/30 p-4 sm:p-5 mb-6">
+      {/* R23.2: PageHeader zaten "Keşfet" diyor; bu panelin başlığı içerik
+          niyetini taşısın. "Global Arama" tek satır, alt açıklama kategori
+          niyetini özetler. */}
+      <div className="mb-4">
+        <h2 className="text-[15px] font-semibold text-zinc-100 flex items-center gap-2 tracking-tight">
+          <Search className="w-4 h-4 text-[var(--w-primary-strong)]" />
+          Global Arama
         </h2>
-        <p className="text-sm text-zinc-400 mt-1">
-          Film, dizi, anime, manga, manhwa, manhua ve kitaplari tek yerden ara.
+        <p className="text-[12px] text-zinc-500 mt-0.5">
+          Tüm aktif kaynakları aynı sorguda tara — film, dizi, anime, manga, novel ve kitap.
         </p>
       </div>
 
-      <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-3 mb-5">
-        <div className="flex-1 relative">
+      <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-2.5 mb-4">
+        <div className="flex-1 relative min-w-0">
+          <Search className="w-4 h-4 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Breaking Bad, Naruto, Mistborn, Solo Leveling..."
-            className="w-full pl-10 pr-4 py-3 bg-zinc-950/50 border border-zinc-800/80 rounded-xl text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-violet-500/50 transition-all"
+            className="w-full pl-9 pr-3 h-10 bg-zinc-950/60 border border-zinc-800 rounded-lg text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-[color-mix(in_srgb,var(--w-primary)_45%,transparent)] focus:border-[color-mix(in_srgb,var(--w-primary)_45%,transparent)] transition-colors"
           />
-          <Search className="w-4 h-4 text-zinc-500 absolute left-3.5 top-3.5" />
         </div>
         <button
           type="submit"
           disabled={!query.trim() || isSearching}
-          className="px-6 py-3 rounded-xl text-sm font-medium bg-violet-600 text-white hover:bg-violet-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          className="inline-flex items-center justify-center gap-2 w-full sm:w-auto h-10 px-5 rounded-lg text-sm font-semibold text-zinc-50 ring-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+          style={{
+            background:
+              "linear-gradient(135deg, color-mix(in srgb, var(--w-primary) 30%, transparent), color-mix(in srgb, var(--w-secondary) 22%, transparent))",
+            boxShadow:
+              "inset 0 0 0 1px color-mix(in srgb, var(--w-primary) 48%, transparent)",
+          }}
         >
           {isSearching ? <Loader2 className="w-4 h-4 animate-spin" /> : "Ara"}
         </button>
       </form>
 
-      <div className="flex flex-wrap gap-2 mb-6">
-        {CATEGORIES.map((cat) => (
-          <button
-            key={cat.value}
-            type="button"
-            onClick={() => {
-              setCategory(cat.value);
-              if (query.trim() && hasSearched) {
-                // Yeni kategoriyi handleSearch'e EXPLICIT geçiyoruz; aksi halde
-                // closure içindeki `category` state daha commit olmadığı için
-                // eski kategoriyle search yapılır ve kullanıcıya alakasız sonuç döner.
-                setTimeout(() => handleSearch(null, cat.value), 0);
+      {/* R23: Kategori pill'leri mobilde yatay scroll, sm+ wrap.
+          Aktif state dünya tonunda; eski sabit violet kaldırıldı. */}
+      <div className="-mx-1 flex sm:flex-wrap items-center gap-1.5 overflow-x-auto sm:overflow-visible scrollbar-hide px-1 touch-pan-x mb-5">
+        {CATEGORIES.map((cat) => {
+          const active = category === cat.value;
+          return (
+            <button
+              key={cat.value}
+              type="button"
+              onClick={() => {
+                setCategory(cat.value);
+                if (query.trim() && hasSearched) {
+                  // Kategori değişiminde closure'daki `category` state daha commit
+                  // olmadığı için EXPLICIT override geçiyoruz (eski not korundu).
+                  setTimeout(() => handleSearch(null, cat.value), 0);
+                }
+              }}
+              aria-pressed={active}
+              className={`shrink-0 inline-flex items-center h-8 px-3 rounded-lg text-[12px] font-medium ring-1 transition-colors cursor-pointer ${
+                active
+                  ? "text-[var(--w-primary-strong)]"
+                  : "bg-zinc-900/50 text-zinc-400 ring-zinc-800 hover:bg-zinc-800/60 hover:text-zinc-200"
+              }`}
+              style={
+                active
+                  ? {
+                      background: "var(--w-soft)",
+                      boxShadow:
+                        "inset 0 0 0 1px color-mix(in srgb, var(--w-primary) 40%, transparent)",
+                    }
+                  : undefined
               }
-            }}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-              category === cat.value
-                ? "bg-violet-500/20 text-violet-300 ring-1 ring-violet-500/40"
-                : "bg-zinc-800/50 text-zinc-400 hover:text-zinc-300 hover:bg-zinc-800"
-            }`}
-          >
-            {cat.label}
-          </button>
-        ))}
+            >
+              {cat.label}
+            </button>
+          );
+        })}
       </div>
 
       <div className="mt-4">
@@ -509,24 +588,31 @@ export default function GlobalSearch({ getLibraryStatus, onAddToLibrary }: Globa
                 {renderGroup("Diziler", groupedResults.tv)}
                 {renderGroup("Animeler", groupedResults.anime)}
                 {renderGroup("Mangalar", groupedResults.manga)}
-                {renderGroup("Manhwalar", groupedResults.manhwa)}
-                {renderGroup("Manhualar", groupedResults.manhua)}
+                {renderGroup("Novel", groupedResults.novel)}
                 {renderGroup("Kitaplar", groupedResults.book)}
               </div>
             ) : (
+              // R23.2: Tek-kategori görünümünde sonuçları seçili chip'in
+              // ViewCategory'sine göre filtrele. AniList "all" çağrısından
+              // gelen MANGA + format=NOVEL kayıtları "manga" chip'inde
+              // görünmez, "novel" chip'inde görünür.
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-                {results.map((res) => {
-                  const key = `${res.source}-${res.externalId}`;
-                  return (
-                    <GlobalSearchResultCard
-                      key={key}
-                      result={res}
-                      libraryStatus={libraryStatuses[key] ?? DEFAULT_LIBRARY_STATUS}
-                      isAdding={addingIds.has(key)}
-                      onAdd={handleAdd}
-                    />
-                  );
-                })}
+                {results
+                  // category burada "all" değil — render üst seviyesinde
+                  // ternary ile narrowed; doğrudan ViewCategory karşılaştırması.
+                  .filter((r) => viewCategoryOf(r) === (category as ViewCategory))
+                  .map((res) => {
+                    const key = `${res.source}-${res.externalId}`;
+                    return (
+                      <GlobalSearchResultCard
+                        key={key}
+                        result={res}
+                        libraryStatus={libraryStatuses[key] ?? DEFAULT_LIBRARY_STATUS}
+                        isAdding={addingIds.has(key)}
+                        onAdd={handleAdd}
+                      />
+                    );
+                  })}
               </div>
             )
           ) : (

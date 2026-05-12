@@ -157,7 +157,7 @@ export default function TvmazeSearch({
               Dizi Ara
             </span>
             <p className="text-[11px] text-zinc-500">
-              TVmaze üzerinden dizi arayın ve listenize ekleyin
+              TVMaze üzerinden dizi arayın ve listenize ekleyin
             </p>
           </div>
         </div>

@@ -37,7 +37,6 @@ import ConfirmDialog from "@/components/confirm-dialog";
 import TvmazeSearch from "@/components/tvmaze-search";
 import AniListSearch from "@/components/anilist-search";
 import OpenLibrarySearch from "@/components/openlibrary-search";
-import OnlineSearch from "@/components/online-search";
 import GlobalSearch from "@/components/global-search";
 import DataManagementPanel from "@/components/data-management-panel";
 import CloudSyncStatusCard from "@/components/cloud-sync-status-card";
@@ -1914,7 +1913,10 @@ export default function HomePage() {
             <PageHeader
               icon={Compass}
               title="Keşfet"
-              subtitle="TVMaze, AniList, Open Library ve OMDb üzerinden global arama"
+              // R23.1: TMDB birincil kaynak olduğundan açıklama güncellendi;
+              // tek-tek kaynak adlarını saymak yerine kullanıcı niyetini
+              // anlatan kısa cümle.
+              subtitle="Film, dizi, anime, manga ve kitapları kaynaklar arasında ara."
             />
             <div className="space-y-6">
               <GlobalSearch
@@ -1922,12 +1924,31 @@ export default function HomePage() {
                 onAddToLibrary={handleAddFromGlobalSearch}
               />
               <div>
+                {/* R23.1: Eski "Eski Paneller" başlığı debug hissi veriyordu;
+                    "Kaynak Bazlı Arama" daha temiz ve niyet odaklı.
+                    Alt satır kısa bir hatırlatma — burada her kaynağa
+                    doğrudan sorgu atılır, global birleşik akış aktif değildir. */}
+                {/* R23.2: Açıklama sadeleştirildi. TMDB ile Ara devre-dışı
+                    panel kaldırıldı; TMDB artık Global Arama'da birincil
+                    film kaynağı. OMDb fallback aynı yerden tüketildiği
+                    için ayrı bir source-bazlı panel gerektirmiyor. Sadece
+                    gerçekten aktif olan üç panel kalır: TVMaze, AniList,
+                    Open Library. */}
                 <button
+                  type="button"
                   onClick={() => setShowAdvancedSearches(!showAdvancedSearches)}
-                  className="w-full flex items-center justify-between px-4 py-3 bg-zinc-900/30 border border-zinc-800/60 rounded-xl text-sm font-medium text-zinc-300 hover:bg-zinc-900/50 transition-colors cursor-pointer"
+                  className="w-full flex items-center justify-between gap-3 px-4 py-3 bg-zinc-900/30 border border-zinc-800/60 rounded-xl text-sm font-medium text-zinc-300 hover:bg-zinc-900/50 transition-colors cursor-pointer"
+                  aria-expanded={showAdvancedSearches}
                 >
-                  Gelişmiş Kaynak Aramaları (Eski Paneller)
-                  {showAdvancedSearches ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                  <span className="flex flex-col text-left min-w-0">
+                    <span className="text-[13.5px] font-semibold tracking-tight text-zinc-200">
+                      Kaynak Bazlı Arama
+                    </span>
+                    <span className="text-[11.5px] font-normal text-zinc-500 truncate">
+                      Belirli bir kaynağı doğrudan aramak için kullan.
+                    </span>
+                  </span>
+                  {showAdvancedSearches ? <ChevronUp className="w-4 h-4 shrink-0" /> : <ChevronDown className="w-4 h-4 shrink-0" />}
                 </button>
 
                 {showAdvancedSearches && (
@@ -1944,7 +1965,6 @@ export default function HomePage() {
                       isInLibrary={isInLibrary}
                       onAddToLibrary={handleAddFromOpenLibrary}
                     />
-                    <OnlineSearch />
                   </div>
                 )}
               </div>
