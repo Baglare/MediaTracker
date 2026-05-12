@@ -47,7 +47,7 @@ const SECTIONS: { label: string; items: NavItem[] }[] = [
       { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
       { id: "library", label: "Kütüphanem", icon: Library },
       { id: "discover", label: "Keşfet", icon: Compass },
-      { id: "calendar", label: "Takvim", icon: Calendar, ghost: true, badge: "Yakında", badgeTone: "soon" },
+      { id: "calendar", label: "Takvim", icon: Calendar },
     ],
   },
   {
@@ -76,6 +76,7 @@ const REAL_TABS = new Set<TabType>([
   "dashboard",
   "library",
   "discover",
+  "calendar",
   "watchlist",
   "favorites",
   "ratings",

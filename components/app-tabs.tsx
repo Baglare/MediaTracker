@@ -1,11 +1,12 @@
 "use client";
 
-import { LayoutDashboard, Library, Compass, Activity, Settings, Sparkles, Heart, ListChecks, Star, NotebookPen, BarChart3 } from "lucide-react";
+import { LayoutDashboard, Library, Compass, Activity, Settings, Sparkles, Heart, ListChecks, Star, NotebookPen, BarChart3, Calendar } from "lucide-react";
 
 export type TabType =
   | "dashboard"
   | "library"
   | "discover"
+  | "calendar"
   | "watchlist"
   | "favorites"
   | "ratings"
@@ -25,6 +26,7 @@ export default function AppTabs({ activeTab, onChange }: AppTabsProps) {
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "library", label: "Kütüphanem", icon: Library },
     { id: "discover", label: "Keşfet", icon: Compass },
+    { id: "calendar", label: "Takvim", icon: Calendar },
     { id: "watchlist", label: "İzleme Listem", icon: ListChecks },
     { id: "favorites", label: "Favorilerim", icon: Heart },
     { id: "ratings", label: "Puanlamalarım", icon: Star },

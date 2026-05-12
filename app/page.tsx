@@ -64,6 +64,7 @@ import {
   Library as LibraryIcon,
   LayoutDashboard,
   Compass,
+  Calendar,
   Sparkles,
   Heart,
   ListChecks,
@@ -2121,6 +2122,205 @@ export default function HomePage() {
                 )}
               </div>
             </div>
+          </div>
+        )}
+
+        {/* TAKVIM SEKMESI (R30)
+            - Sahte yayin tarihi veya uydurma event yok.
+            - Sadece progressLogs, planning ve watching/reading status'lari kullanilir. */}
+        {activeTab === "calendar" && (
+          <div>
+            <PageHeader
+              icon={Calendar}
+              title="Takvim"
+              subtitle="Kütüphanendeki gerçek aktivite ve takip durumlarını ajanda olarak gör."
+            />
+            {(() => {
+              const sortedLogs = progressLogs
+                .slice()
+                .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+              const recentLogs = sortedLogs.slice(0, 12);
+              const plannedItems = mediaList
+                .filter((it) => it.status === "planning")
+                .slice()
+                .sort((a, b) => mediaList.indexOf(b) - mediaList.indexOf(a));
+              const activeItems = mediaList
+                .filter((it) => it.status === "watching" || it.status === "reading")
+                .slice()
+                .sort((a, b) => mediaList.indexOf(b) - mediaList.indexOf(a));
+              const hasCalendarData =
+                recentLogs.length > 0 || plannedItems.length > 0 || activeItems.length > 0;
+              const todayKey = new Date().toLocaleDateString("tr-TR");
+              const groupedLogs = recentLogs.reduce<Record<string, ProgressLog[]>>((acc, log) => {
+                const key = new Date(log.createdAt).toLocaleDateString("tr-TR");
+                acc[key] = acc[key] ?? [];
+                acc[key].push(log);
+                return acc;
+              }, {});
+              const logActionLabel = (action: ProgressLog["action"]) => {
+                switch (action) {
+                  case "increment":
+                    return "İlerleme";
+                  case "complete":
+                    return "Tamamlandı";
+                  case "manual_adjust":
+                    return "Düzenleme";
+                  case "added":
+                    return "Eklendi";
+                  default:
+                    return action;
+                }
+              };
+              const CalendarSection = ({
+                title,
+                count,
+                children,
+              }: {
+                title: string;
+                count?: number;
+                children: React.ReactNode;
+              }) => (
+                <section className="rounded-2xl border border-zinc-800/60 bg-zinc-900/30 p-4 min-w-0">
+                  <div className="flex items-center justify-between gap-3 mb-4">
+                    <h2 className="text-sm font-semibold text-zinc-100 truncate">{title}</h2>
+                    {typeof count === "number" && (
+                      <span className="text-[11px] font-mono tabular-nums text-zinc-500 px-1.5 py-0.5 rounded-md bg-zinc-950/50 border border-zinc-800/60 shrink-0">
+                        {count}
+                      </span>
+                    )}
+                  </div>
+                  {children}
+                </section>
+              );
+
+              if (!hasCalendarData) {
+                return (
+                  <div className="space-y-5 min-w-0">
+                    <PersonalEmptyState
+                      icon={Calendar}
+                      title="Takvimde gösterilecek veri yok"
+                      description="İlerleme kaydı oluştuğunda, planlanan veya devam eden medyalar eklendiğinde ajanda burada görünür."
+                    />
+                    <CalendarSection title="Yaklaşan bölümler">
+                      <p className="text-sm text-zinc-500 leading-relaxed">
+                        Yayın takibi henüz bağlı değil. Sahte tarih üretmeden, ileride gerçek kaynak verisi bağlanınca bu alan kullanılacak.
+                      </p>
+                    </CalendarSection>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="space-y-5 min-w-0">
+                  <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-4 items-start">
+                    <CalendarSection title="Bugünkü / son aktiviteler" count={recentLogs.length}>
+                      {recentLogs.length === 0 ? (
+                        <p className="text-sm text-zinc-500">Henüz aktivite kaydı yok.</p>
+                      ) : (
+                        <div className="space-y-4">
+                          {Object.entries(groupedLogs).map(([dateLabel, logs]) => (
+                            <div key={dateLabel} className="min-w-0">
+                              <div className="mb-2 text-[11px] uppercase tracking-[0.14em] text-zinc-500 font-semibold">
+                                {dateLabel === todayKey ? "Bugün" : dateLabel}
+                              </div>
+                              <div className="space-y-2">
+                                {logs.map((log) => (
+                                  <div key={log.id} className="rounded-xl border border-zinc-800/55 bg-zinc-950/25 p-3 min-w-0">
+                                    <div className="flex items-center justify-between gap-3">
+                                      <span className="text-[12.5px] font-medium text-zinc-200 truncate">
+                                        {log.mediaTitle}
+                                      </span>
+                                      <span className="text-[11px] text-amber-300/80 shrink-0">
+                                        {logActionLabel(log.action)}
+                                      </span>
+                                    </div>
+                                    <p className="mt-1 text-[11px] text-zinc-500 truncate">
+                                      {new Date(log.createdAt).toLocaleTimeString("tr-TR", {
+                                        hour: "2-digit",
+                                        minute: "2-digit",
+                                      })}
+                                      {log.detail ? ` · ${log.detail}` : ""}
+                                    </p>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </CalendarSection>
+
+                    <CalendarSection title="Yaklaşan bölümler">
+                      <div className="rounded-xl border border-dashed border-zinc-700/70 bg-zinc-950/20 p-4 min-w-0">
+                        <p className="text-sm font-medium text-zinc-300">Gerçek yayın verisi bekleniyor</p>
+                        <p className="mt-1.5 text-xs leading-relaxed text-zinc-500">
+                          Bu sürüm TVMaze/AniList yayın takibi çekmez ve sahte bölüm günü üretmez.
+                          Gerçek tarih verisi bağlandığında bu alan ajanda görünümüne dönüşebilir.
+                        </p>
+                      </div>
+                    </CalendarSection>
+                  </div>
+
+                  <CalendarSection title="Planlanan içerikler" count={plannedItems.length}>
+                    {plannedItems.length === 0 ? (
+                      <p className="text-sm text-zinc-500">Planlanan içerik yok.</p>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
+                        {plannedItems.map((item) => {
+                          const relatedAction = getLibraryRelatedAction(item);
+                          return (
+                            <MediaCard
+                              key={item.id}
+                              item={item}
+                              onIncrement={handleIncrement}
+                              onComplete={handleComplete}
+                              onEdit={handleOpenEditModal}
+                              onDelete={handleDeleteRequest}
+                              onToggleFavorite={handleToggleFavorite}
+                              onOpenDetail={handleOpenDetailModal}
+                              onAddRelatedParts={handleAddMissingTvmazeParts}
+                              relatedPartsLabel={relatedAction.label}
+                              canAddRelatedParts={relatedAction.canAdd}
+                              onOpenGroupEdit={handleOpenGroupEdit}
+                              onUpdateRating={handleUpdateRating}
+                            />
+                          );
+                        })}
+                      </div>
+                    )}
+                  </CalendarSection>
+
+                  <CalendarSection title="Devam eden içerikler" count={activeItems.length}>
+                    {activeItems.length === 0 ? (
+                      <p className="text-sm text-zinc-500">Devam eden içerik yok.</p>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
+                        {activeItems.map((item) => {
+                          const relatedAction = getLibraryRelatedAction(item);
+                          return (
+                            <MediaCard
+                              key={item.id}
+                              item={item}
+                              onIncrement={handleIncrement}
+                              onComplete={handleComplete}
+                              onEdit={handleOpenEditModal}
+                              onDelete={handleDeleteRequest}
+                              onToggleFavorite={handleToggleFavorite}
+                              onOpenDetail={handleOpenDetailModal}
+                              onAddRelatedParts={handleAddMissingTvmazeParts}
+                              relatedPartsLabel={relatedAction.label}
+                              canAddRelatedParts={relatedAction.canAdd}
+                              onOpenGroupEdit={handleOpenGroupEdit}
+                              onUpdateRating={handleUpdateRating}
+                            />
+                          );
+                        })}
+                      </div>
+                    )}
+                  </CalendarSection>
+                </div>
+              );
+            })()}
           </div>
         )}
 
