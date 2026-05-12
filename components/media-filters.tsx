@@ -25,8 +25,9 @@ export type ThemeFilter = "all" | "east" | "screen" | "library";
 export type EastSubFilter = "all" | "anime" | "manga" | "novel";
 
 // Filtre bileşeninin dışarıdan aldığı değerler
-// V5A.2: Doğu alt filtresi artık EastThemeHeader içinde yönetiliyor;
-// MediaFilters yalnızca üst seviye theme + tür + durum filtrelerinden sorumlu.
+// V5A.2 / R16: Doğu alt filtresi WorldHero (R11) içinde yönetiliyor (eski
+// EastThemeHeader yerini aldı, R16'da silindi). MediaFilters yalnızca üst
+// seviye theme + tür + durum filtrelerinden sorumlu.
 interface MediaFiltersProps {
   activeTheme: ThemeFilter;                              // Seçili theme mode
   activeType: MediaType | "all";                        // Seçili medya türü
@@ -59,7 +60,7 @@ const typeFilters: { label: string; value: MediaType | "all"; icon: string }[] =
 ];
 
 // V5A.2: Aktif theme mode'a göre Medya Türü bloğunda hangi türler görünür?
-// "east" → blok tamamen gizleniyor (alt ayrım EastThemeHeader'ın işi).
+// "east" → blok tamamen gizleniyor (alt ayrım WorldHero'nun Doğu pill'leri).
 // "screen" → Film / Dizi
 // "library" → Kitap
 // "all" → tüm türler

@@ -144,12 +144,11 @@
   --w-soft: rgba(184, 149, 106, 0.14);
 }
 
-/* Hafif utility'ler — sadece CSS variable'ı tüketenler.
-   Tailwind class'larıyla yarışmasınlar; tüketim ileri turlarda. */
-.text-world-primary { color: var(--w-primary); }
-.bg-world-soft { background-color: var(--w-soft); }
-.border-world { border-color: var(--w-primary); }
-.ring-world { --tw-ring-color: var(--w-primary); }
+/* R16 cleanup: R10'da tanımlanan .text-world-primary / .bg-world-soft /
+   .border-world / .ring-world utility'leri dashboard genelinde tüketici
+   bulamadı (R12 inline arbitrary-value class'larıyla beslendi). Ölü class
+   olarak silindi. İhtiyaç doğarsa Tailwind 4 arbitrary-value
+   (`bg-[var(--w-soft)]` vb.) zaten yeterli. */
 
 /* ============================================ */
 /* Global Stiller                               */

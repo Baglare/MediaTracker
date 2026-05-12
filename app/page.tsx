@@ -20,9 +20,8 @@ import ActivityLogPanel from "@/components/activity-log-panel";
 // MediaFilters artık LibraryControlBar tarafından sarmalanıyor; burada
 // yalnızca type re-export'lar gerekli.
 import { type ThemeFilter, type EastSubFilter } from "@/components/media-filters";
-// R11: EastThemeHeader yerini WorldHero alıyor (üç dünya için genelleştirilmiş).
-// Eski component dosyası şimdilik silinmedi — yedek/diff için kalıyor;
-// hiçbir yerden import edilmediği için runtime'da yükü yok.
+// R11: WorldHero — Doğu/Kadraj/Arşiv için genelleştirilmiş hero
+// (eski EastThemeHeader R16'da silindi).
 import WorldHero from "@/components/world-hero";
 // R13: Dünya değişiminde tek seferlik macro overlay. Sadece worldAttr prop'una
 // bakar; search/status/type/sort'a duyarlı değil. Ayarlar'da neutral olduğu
