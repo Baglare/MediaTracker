@@ -4,6 +4,7 @@
 
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import {
   Plus,
@@ -47,6 +48,9 @@ interface MediaCardProps {
   relatedPartsLabel?: string;
   canAddRelatedParts?: boolean;
   onOpenGroupEdit?: (item: MediaItem) => void;
+  // R18.3: Hızlı puanlama. Sağlanmazsa rating chip yine görünür ama tıklanmaz
+  // (geriye dönük uyum: eski çağrılar kırılmaz).
+  onUpdateRating?: (id: string, rating: number | null) => void;
 }
 
 function getStatusIcon(status: string) {
@@ -118,7 +122,29 @@ export default function MediaCard({
   relatedPartsLabel = "Parca Ekle",
   canAddRelatedParts = false,
   onOpenGroupEdit,
+  onUpdateRating,
 }: MediaCardProps) {
+  // R18.3: Hızlı puanlama popover state'i. Component-local; kart-bazlı.
+  const [ratingOpen, setRatingOpen] = useState(false);
+  const ratingWrapRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!ratingOpen) return;
+    const onPointer = (e: MouseEvent) => {
+      if (ratingWrapRef.current && !ratingWrapRef.current.contains(e.target as Node)) {
+        setRatingOpen(false);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setRatingOpen(false);
+    };
+    document.addEventListener("mousedown", onPointer);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onPointer);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [ratingOpen]);
+  const canRate = !!onUpdateRating;
   const hasKnownTotal = item.totalProgress > 0;
   const percent = hasKnownTotal
     ? getProgressPercent(item.currentProgress, item.totalProgress)
@@ -252,11 +278,88 @@ export default function MediaCard({
                 {getStatusLabel(item.status)}
               </span>
 
-              {hasRating && (
-                <span className="inline-flex items-center gap-0.5 text-[11px] font-medium px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-400 ring-1 ring-amber-500/20">
-                  <Star className="w-2.5 h-2.5 fill-amber-400" />
-                  {item.userRating}/10
-                </span>
+              {/* R18.3: Hızlı puanlama. canRate true ise chip tıklanabilir
+                  trigger; popover içinde 1–10 + "Temizle". canRate yoksa
+                  (eski çağrı yolu) chip salt-görsel olarak eski davranışta
+                  kalır. */}
+              {(hasRating || canRate) && (
+                <div ref={ratingWrapRef} className="relative inline-flex">
+                  {canRate ? (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setRatingOpen((v) => !v);
+                      }}
+                      aria-haspopup="menu"
+                      aria-expanded={ratingOpen}
+                      title={hasRating ? "Puanı değiştir" : "Puan ver"}
+                      className={`inline-flex items-center gap-0.5 text-[11px] font-medium px-2 py-0.5 rounded-md ring-1 transition-colors cursor-pointer ${
+                        hasRating
+                          ? "bg-amber-500/10 text-amber-400 ring-amber-500/20 hover:bg-amber-500/15"
+                          : "bg-zinc-800/40 text-zinc-500 ring-zinc-700/40 hover:text-amber-300 hover:bg-amber-500/10 hover:ring-amber-500/20 opacity-0 group-hover:opacity-100 focus:opacity-100"
+                      }`}
+                    >
+                      <Star
+                        className={`w-2.5 h-2.5 ${hasRating ? "fill-amber-400" : ""}`}
+                      />
+                      {hasRating ? `${item.userRating}/10` : "Puanla"}
+                    </button>
+                  ) : (
+                    <span className="inline-flex items-center gap-0.5 text-[11px] font-medium px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-400 ring-1 ring-amber-500/20">
+                      <Star className="w-2.5 h-2.5 fill-amber-400" />
+                      {item.userRating}/10
+                    </span>
+                  )}
+
+                  {canRate && ratingOpen && (
+                    <div
+                      role="menu"
+                      aria-label="Hızlı puanlama"
+                      className="absolute top-full left-0 mt-1 z-40 rounded-lg border border-zinc-800 bg-zinc-950/95 backdrop-blur p-2 shadow-xl shadow-black/40 w-[10.5rem]"
+                    >
+                      <div className="grid grid-cols-5 gap-1">
+                        {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => {
+                          const isCurrent = item.userRating === n;
+                          return (
+                            <button
+                              key={n}
+                              type="button"
+                              role="menuitemradio"
+                              aria-checked={isCurrent}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onUpdateRating?.(item.id, n);
+                                setRatingOpen(false);
+                              }}
+                              className={`h-7 rounded-md text-[11px] font-mono tabular-nums font-medium transition-colors cursor-pointer ${
+                                isCurrent
+                                  ? "bg-amber-500/20 text-amber-200 ring-1 ring-amber-500/40"
+                                  : "text-zinc-300 hover:bg-zinc-800/80 hover:text-amber-300"
+                              }`}
+                            >
+                              {n}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {hasRating && (
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onUpdateRating?.(item.id, null);
+                            setRatingOpen(false);
+                          }}
+                          className="mt-2 w-full inline-flex items-center justify-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-zinc-400 hover:text-rose-300 hover:bg-rose-500/10 ring-1 ring-zinc-800 hover:ring-rose-500/30 transition-colors cursor-pointer"
+                        >
+                          Puanı Temizle
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
               )}
 
               {hasNotes && (

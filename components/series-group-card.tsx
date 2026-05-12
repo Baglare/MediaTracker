@@ -30,6 +30,8 @@ interface SeriesGroupCardProps {
   onAddRelatedParts?: (item: MediaItem) => void;
   resolveRelatedAction?: (item: MediaItem) => { canAdd: boolean; label: string };
   onOpenGroupEdit?: (item: MediaItem) => void;
+  // R18.3: Child MediaCard'lara hızlı puanlama prop'unu geçirmek için passthrough.
+  onUpdateRating?: (id: string, rating: number | null) => void;
 }
 
 function isItemCompleted(item: MediaItem): boolean {
@@ -149,6 +151,7 @@ export default function SeriesGroupCard({
   onAddRelatedParts,
   resolveRelatedAction,
   onOpenGroupEdit,
+  onUpdateRating,
 }: SeriesGroupCardProps) {
   const [open, setOpen] = useState(false);
 
@@ -446,6 +449,7 @@ export default function SeriesGroupCard({
                     relatedPartsLabel={related?.label}
                     canAddRelatedParts={related?.canAdd ?? false}
                     onOpenGroupEdit={onOpenGroupEdit}
+                    onUpdateRating={onUpdateRating}
                   />
                 </div>
               );

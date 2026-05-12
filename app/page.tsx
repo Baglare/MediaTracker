@@ -776,6 +776,25 @@ export default function HomePage() {
   }, [mediaList]);
 
   /**
+   * R18.3: Hızlı puanlama. `rating === null` → kullanıcı puanı temizler.
+   * 0–10 integer aralığı validate edilir; aralık dışı değer no-op.
+   * `handleToggleFavorite` ile aynı render-phase güvenli kalıbı: değer ile
+   * commit + handler bağlamında enqueue.
+   */
+  const handleUpdateRating = useCallback((id: string, rating: number | null) => {
+    if (rating !== null) {
+      if (!Number.isInteger(rating) || rating < 0 || rating > 10) return;
+    }
+    const current = mediaList.find((m) => m.id === id);
+    if (!current) return;
+    const next: number | null = rating;
+    if ((current.userRating ?? null) === next) return;
+    const updated: MediaItem = { ...current, userRating: next };
+    setMediaList((prev) => prev.map((m) => (m.id === id ? updated : m)));
+    enqueueMediaUpsert(updated);
+  }, [mediaList]);
+
+  /**
    * Onay penceresi açan yardımcı fonksiyon (DataManagementPanel için)
    */
   function openConfirmDialog(title: string, message: string, onOk: () => void) {
@@ -1434,6 +1453,7 @@ export default function HomePage() {
               onEdit={handleOpenEditModal}
               onToggleFavorite={handleToggleFavorite}
               onDeleteMedia={handleDeleteRequest}
+              onUpdateRating={handleUpdateRating}
             />
           </div>
         )}
@@ -1679,6 +1699,7 @@ export default function HomePage() {
                                 relatedPartsLabel={relatedAction.label}
                                 canAddRelatedParts={relatedAction.canAdd}
                                 onOpenGroupEdit={handleOpenGroupEdit}
+                                onUpdateRating={handleUpdateRating}
                               />
                             );
                           })}
@@ -1714,6 +1735,7 @@ export default function HomePage() {
                               onAddRelatedParts={handleAddMissingTvmazeParts}
                               resolveRelatedAction={getLibraryRelatedAction}
                               onOpenGroupEdit={handleOpenGroupEdit}
+                              onUpdateRating={handleUpdateRating}
                             />
                           ))}
                         </div>
@@ -1754,6 +1776,7 @@ export default function HomePage() {
                                 relatedPartsLabel={relatedAction.label}
                                 canAddRelatedParts={relatedAction.canAdd}
                                 onOpenGroupEdit={handleOpenGroupEdit}
+                                onUpdateRating={handleUpdateRating}
                               />
                             );
                           })}

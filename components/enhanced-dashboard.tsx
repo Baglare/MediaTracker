@@ -26,6 +26,8 @@ interface EnhancedDashboardProps {
   onEdit: (item: MediaItem) => void;
   onToggleFavorite: (id: string) => void;
   onDeleteMedia: (id: string) => void;
+  // R18.3: Bitirmeye Yakın / Dormant kartlarına da hızlı puanlama eklensin.
+  onUpdateRating?: (id: string, rating: number | null) => void;
 }
 
 export default function EnhancedDashboard({
@@ -36,6 +38,7 @@ export default function EnhancedDashboard({
   onEdit,
   onToggleFavorite,
   onDeleteMedia,
+  onUpdateRating,
 }: EnhancedDashboardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -128,6 +131,7 @@ export default function EnhancedDashboard({
                     onDelete={onDeleteMedia}
                     onToggleFavorite={onToggleFavorite}
                     onOpenDetail={onSelectMedia}
+                    onUpdateRating={onUpdateRating}
                   />
                 ))}
               </div>
@@ -152,6 +156,7 @@ export default function EnhancedDashboard({
                     onDelete={onDeleteMedia}
                     onToggleFavorite={onToggleFavorite}
                     onOpenDetail={onSelectMedia}
+                    onUpdateRating={onUpdateRating}
                   />
                 ))}
               </div>
