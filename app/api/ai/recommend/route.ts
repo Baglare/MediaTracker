@@ -43,8 +43,9 @@ const PROVIDER_RATE_LIMIT_MESSAGE =
 const ALL_PROVIDERS_MOCK_MESSAGE =
   "AI sağlayıcıları şu an yanıt veremiyor. Daha sonra tekrar dene veya mock moda geç.";
 
-const PROVIDER_PLAN_FAILED_MESSAGE =
-  "AI sağlayıcıları sağlıklı plan üretemediği için güvenilir öneri hazırlayamadım.";
+// R19: `PROVIDER_PLAN_FAILED_MESSAGE` artık tüketilmiyor — bir önceki
+// fallback yolunda kullanılıyordu, akış değişince çağrı düştü. Davranış
+// etkisi yok; ölü kod kaldırıldı.
 const PROVIDER_TIMEOUT_MS = 25000;
 
 type ProviderErrorCode =
@@ -152,45 +153,9 @@ function buildLibraryDeterministicRecs(candidates: AiCandidate[]): AiRecommendat
     }));
 }
 
-function localOnlyCandidates(
-  mediaItems: AiRecommendRequest["mediaItems"],
-  progressLogs: AiRecommendRequest["progressLogs"]
-): AiCandidate[] {
-  const lastByMedia = new Map<string, string>();
-  for (const log of progressLogs) {
-    const prev = lastByMedia.get(log.mediaId);
-    if (!prev || new Date(log.createdAt).getTime() > new Date(prev).getTime()) {
-      lastByMedia.set(log.mediaId, log.createdAt);
-    }
-  }
-  return mediaItems
-    .filter((m) => m.status !== "completed" && m.status !== "dropped")
-    .map<AiCandidate>((m) => ({
-      source: "library",
-      externalId: m.id,
-      type: m.type,
-      title: m.title,
-      overview: m.overview,
-      releaseYear: m.releaseYear,
-      coverUrl: m.coverImage,
-      genres: m.genres,
-      totalProgress: m.totalProgress,
-      status: m.status,
-      currentProgress: m.currentProgress,
-      userRating: m.userRating ?? m.rating ?? null,
-      favorite: Boolean(m.favorite),
-      lastActivityAt: lastByMedia.get(m.id),
-      libraryItemId: m.id,
-    }))
-    .sort((a, b) => {
-      const score = (c: AiCandidate) =>
-        (c.favorite ? 30 : 0) +
-        (typeof c.userRating === "number" ? c.userRating * 3 : 0) +
-        (c.status === "watching" || c.status === "reading" ? 20 : 0) +
-        (c.lastActivityAt ? 10 : 0);
-      return score(b) - score(a);
-    });
-}
+// R19: `localOnlyCandidates` artık çağrılmıyordu — sessizce ölü kod kalmıştı.
+// Library puanlı/aktif sıralaması başka bir yolda yapılıyor. Davranış etkisi
+// yok; sadece unused-vars uyarısı temizlendi.
 
 interface DeterministicTaste {
   highRatedSourceCount: number;

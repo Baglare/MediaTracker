@@ -1008,6 +1008,13 @@ export default function HomePage() {
     return detail as TvmazeNormalizedDetail;
   }, [tvmazeDetailsCache]);
 
+  // R19 NOT: Bu iki yardımcıyı `useCallback` ile sarmaya çalışmak hem TDZ
+  // hatası (yukarıda tüketen `openTvmazeSeasonPicker` dep listesi)
+  // hem de `react-hooks/preserve-manual-memoization` (React Compiler) hatası
+  // doğurdu. `function` declaration formu hoisted olduğu için TDZ riski yok;
+  // dezavantajı sadece `exhaustive-deps` uyarısı — davranış doğru, render
+  // sayısı pratikte fark etmiyor. Spec'in "davranış değiştirme riski varsa
+  // çok küçük çöz" kuralı gereği bu iki uyarı bırakıldı.
   function getTvmazeItemsForShow(showId: string) {
     return mediaList.filter((item) => getTvmazeShowExternalId(item) === showId);
   }

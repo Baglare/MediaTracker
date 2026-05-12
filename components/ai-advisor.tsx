@@ -351,22 +351,37 @@ export default function AiAdvisor({
     }
   }, [settings]);
 
+  // R19: AI sekmesi dışına çıkıldığında parent `resetSignal`'ı artırır;
+  // bu effect tüm aktif sohbet state'ini ve refs'i temizliyordu. React 19'da
+  // `react-hooks/set-state-in-effect` kuralı bu kalıba hata düşürüyor.
+  // CLAUDE.md'deki "modal-style prev-prop karşılaştırması" kalıbına geçtik:
+  //   - setState çağrıları render fazında, `lastResetSignal` izleme state'i
+  //     üzerinden guard'lanmış olarak yapılır (cascading render'ı önler;
+  //     `react-hooks/set-state-in-effect` tetiklemez).
+  //   - Side-effect mutasyonları (timer/refs) ayrı bir useEffect içinde —
+  //     render içinde ref.current yazmıyoruz (`react-hooks/refs` da temiz).
+  const [lastResetSignal, setLastResetSignal] = useState(0);
+  if (resetSignal !== lastResetSignal) {
+    setLastResetSignal(resetSignal);
+    if (resetSignal !== 0) {
+      setMessages([]);
+      setRecommendations([]);
+      setRejected([]);
+      setInput("");
+      setViewingSessionId(null);
+      setAddedIds({});
+      setDebugInfo(null);
+      setShowDebug(false);
+      setPendingClarification(null);
+      setLoadingStep(-1);
+    }
+  }
   useEffect(() => {
     if (resetSignal === 0) return;
-    setMessages([]);
-    setRecommendations([]);
-    setRejected([]);
-    setInput("");
-    setViewingSessionId(null);
-    setAddedIds({});
-    setDebugInfo(null);
-    setShowDebug(false);
-    setPendingClarification(null);
     if (stepTimer.current) clearTimeout(stepTimer.current);
     inFlightRequestId.current = null;
     inFlightPromptKey.current = null;
     activeContextRef.current = null;
-    setLoadingStep(-1);
   }, [resetSignal]);
 
   const isLoading = loadingStep >= 0 && loadingStep < LOADING_STEPS.length;

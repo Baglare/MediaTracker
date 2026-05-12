@@ -251,7 +251,16 @@ export default function GlobalSearch({ getLibraryStatus, onAddToLibrary }: Globa
     }
   }
 
+  // R19: results boş olduğunda libraryStatuses'i temizleme kısmı effect'in
+  // içinde *senkron* setState çağrısıydı → `react-hooks/set-state-in-effect`
+  // hatası. Render-phase guard'a taşındı (yalnızca harita doluyken bir kez
+  // setlenir, sonra koşul false olur → loop yok). Async upsert kısmı effect
+  // içinde — bu hâlâ async callback olduğu için kuralı tetiklemiyor.
+  if (results.length === 0 && Object.keys(libraryStatuses).length > 0) {
+    setLibraryStatuses({});
+  }
   useEffect(() => {
+    if (results.length === 0) return;
     let cancelled = false;
 
     async function resolveStatuses() {
@@ -271,11 +280,7 @@ export default function GlobalSearch({ getLibraryStatus, onAddToLibrary }: Globa
       setLibraryStatuses(Object.fromEntries(entries));
     }
 
-    if (results.length > 0) {
-      void resolveStatuses();
-    } else {
-      setLibraryStatuses({});
-    }
+    void resolveStatuses();
 
     return () => {
       cancelled = true;

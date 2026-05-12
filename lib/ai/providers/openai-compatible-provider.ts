@@ -150,9 +150,9 @@ function extractJsonRich<T>(rawText: string): ExtractResult<T> {
   return { data: null, repairUsed: false };
 }
 
-function extractJson<T>(text: string): T | null {
-  return extractJsonRich<T>(text).data;
-}
+// R19: `extractJson` (data-only wrapper) artık çağrılmıyor — call site'lar
+// doğrudan `extractJsonRich` kullanıyor ve `repairUsed` bilgisini de
+// tüketiyor. Wrapper'ı kaldırarak unused-vars uyarısını temizliyoruz.
 
 function isRateLimit(status: number, text: string) {
   return status === 429 || /rate.?limit|quota|too many requests/i.test(text);
