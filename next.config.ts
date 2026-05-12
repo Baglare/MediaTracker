@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+	allowedDevOrigins: ["172.26.192.1", "192.168.1.196"],
   // TMDB poster URL'lerinin Next.js Image bileşeniyle kullanılabilmesi için
   images: {
     remotePatterns: [

@@ -273,19 +273,24 @@ export default function MediaCard({
                   }}
                   aria-haspopup="menu"
                   aria-expanded={ratingOpen}
+                  aria-label={hasRating ? "Puanı değiştir" : "Puan ver"}
                   title={hasRating ? "Puanı değiştir" : "Puan ver"}
-                  className={`inline-flex items-center gap-1 pl-1.5 pr-2 h-[22px] rounded-full text-[11px] font-semibold tabular-nums backdrop-blur-md ring-1 transition-all cursor-pointer ${
+                  // R18.6: Unrated trigger artık icon-only — "Puanla" yazısı
+                  // cover'da ekstra gürültü yaratıyordu. Hover'da yumuşak
+                  // amber halka ile davet sinyali kalır; aria-label tooltip
+                  // erişilebilirliği koruyor.
+                  className={`inline-flex items-center gap-1 h-[22px] rounded-full text-[11px] font-semibold tabular-nums backdrop-blur-md ring-1 transition-all cursor-pointer ${
                     hasRating
-                      ? "bg-zinc-950/70 text-amber-200 ring-amber-300/35 shadow-sm shadow-black/40 hover:bg-zinc-950/85"
-                      : "bg-zinc-950/55 text-zinc-300 ring-white/10 hover:text-amber-200 hover:ring-amber-400/35 opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+                      ? "pl-1.5 pr-2 bg-zinc-950/70 text-amber-200 ring-amber-300/35 shadow-sm shadow-black/40 hover:bg-zinc-950/85"
+                      : "w-[22px] justify-center bg-zinc-950/55 text-zinc-300 ring-white/10 hover:text-amber-200 hover:ring-amber-400/35 opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
                   }`}
                 >
                   <Star
                     className={`w-3 h-3 ${hasRating ? "fill-amber-300 text-amber-300" : ""}`}
                   />
-                  <span className="leading-none">
-                    {hasRating ? item.userRating : "Puanla"}
-                  </span>
+                  {hasRating && (
+                    <span className="leading-none">{item.userRating}</span>
+                  )}
                 </button>
               ) : (
                 <span className="inline-flex items-center gap-1 pl-1.5 pr-2 h-[22px] rounded-full text-[11px] font-semibold tabular-nums backdrop-blur-md bg-zinc-950/70 text-amber-200 ring-1 ring-amber-300/35 shadow-sm shadow-black/40">
@@ -300,7 +305,11 @@ export default function MediaCard({
                 <div
                   role="menu"
                   aria-label="Hızlı puanlama"
-                  className="absolute top-full left-0 mt-1.5 z-40 rounded-xl border border-zinc-800 bg-zinc-950/95 backdrop-blur p-2 shadow-xl shadow-black/50 w-[11rem]"
+                  // R18.6: z-30 → topbar (z-40), WorldTransition (z-[45]),
+                  // detail modal (z-50) ve confirm/quick-add/media/manual
+                  // modal'larının (z-[100]) altında kalır; kart içinde ribbon
+                  // (z-30) ile aynı seviyede ama DOM sırasıyla onun üstünde.
+                  className="absolute top-full left-0 mt-1.5 z-30 rounded-xl border border-zinc-800 bg-zinc-950/95 backdrop-blur p-2 shadow-xl shadow-black/50 w-[11rem]"
                 >
                   <div className="grid grid-cols-5 gap-1">
                     {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => {
