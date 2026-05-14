@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getProviderSequence, mockProvider } from "@/lib/ai/provider";
 import { buildLibraryProfile } from "@/lib/ai/profile-builder";
 import { analyzeIntent } from "@/lib/ai/intent-analyzer";
+import { scoreCandidates } from "@/lib/ai/candidate-scorer";
 import {
   CandidateSearchResult,
   CandidateVerificationResult,
@@ -1316,12 +1317,24 @@ export async function POST(req: NextRequest) {
       libIndex.set(`${m.externalSource}:${m.externalId}`, true);
     }
   }
-  candidates = candidates.map((c) => {
-    if (c.source !== "library" && libIndex.has(`${c.source}:${c.externalId}`)) {
-      return { ...c };
-    }
-    return c;
+
+  // R36 — Rule-based ön skorlama. Mevcut aday havuzunu kökten değiştirmez;
+  // sadece sıralar, kütüphanede olanları eler, dropped/paused benzerlik
+  // cezalarını uygular ve provider'a `score` + `scoreReasons` bırakır.
+  const scoringResult = scoreCandidates({
+    candidates,
+    profile,
+    intent,
+    message,
+    mediaItems,
+    libIndex,
   });
+  candidates = scoringResult.scored;
+  const scoringRejected = scoringResult.rejected;
+  const scoringStats = scoringResult.stats;
+  debugNotes.push(
+    `r36_scored:n=${candidates.length} avg=${scoringStats.averageScore} max=${scoringStats.maxScore} min=${scoringStats.minScore} inLibReject=${scoringStats.inLibraryRejected} droppedPenalty=${scoringStats.droppedSimilarPenalty} pausedPenalty=${scoringStats.pausedSimilarPenalty}`
+  );
 
   const retrievalDebug = buildRetrievalDebug({
     intent,
@@ -1369,6 +1382,7 @@ export async function POST(req: NextRequest) {
     const empty: AiRecommendResponse = {
       assistantMessage: baseMsg,
       recommendations: [],
+      rejectedCandidates: scoringRejected.length > 0 ? scoringRejected : undefined,
       transparencySummary: buildTransparencySummary(settings),
       intent,
       debug: {
@@ -1436,6 +1450,16 @@ export async function POST(req: NextRequest) {
         r.inLibrary ||
         (!!r.externalSource && !!r.externalId && libIndex.has(`${r.externalSource}:${r.externalId}`)),
     }));
+    // R36 — sistem tarafından hard-reject edilen adayları LLM'in
+    // rejectedCandidates listesine ekle (deduplicate by title).
+    if (scoringRejected.length > 0) {
+      const existing = new Set((response.rejectedCandidates || []).map((r) => r.title));
+      const merged = [
+        ...(response.rejectedCandidates || []),
+        ...scoringRejected.filter((r) => !existing.has(r.title)),
+      ];
+      response.rejectedCandidates = merged;
+    }
     return NextResponse.json(response satisfies AiRecommendResponse);
   } catch (err) {
     applyProviderError(providerState, err, undefined, "ranking");

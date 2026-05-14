@@ -12,6 +12,11 @@ export interface AiSettings {
   useWebResearch: boolean;
   deepResearch: boolean;
   useOpenAIProvider: boolean;
+  // R35 — granular data toggles (optional; treated as true when undefined for
+  // backward compat). Client mirror'ı `components/ai-advisor.tsx` içinde de var.
+  includeRatings?: boolean;
+  includeFavorites?: boolean;
+  includeProgress?: boolean;
 }
 
 export type IntentKind =
@@ -47,6 +52,13 @@ export interface LibraryProfile {
   dropped: { title: string; type: MediaType }[];
   recentActivity: { title: string; type: MediaType; action: string; at: string }[];
   notes?: { title: string; note: string }[];
+  // R35 — yeni gruplar. Toggle kapalıysa boş array / undefined.
+  inProgress: { title: string; type: MediaType; currentProgress?: number; totalProgress?: number }[];
+  completed: { title: string; type: MediaType }[];
+  planned: { title: string; type: MediaType }[];
+  paused: { title: string; type: MediaType }[];
+  averageRating?: { value: number; count: number };
+  worldDistribution: { east: number; screen: number; arch: number };
 }
 
 export type RetrievalSource = "anilist" | "tvmaze" | "openlibrary" | "omdb" | "tmdb" | "library";
@@ -143,6 +155,10 @@ export interface AiCandidate {
   globalSearch?: GlobalSearchResult;
   // Local kütüphane adayı için item id
   libraryItemId?: string;
+  // R36 — Rule-based ön skorlama. Provider sıralama prompt'unda görür ve
+  // explanation üretirken bu nedenleri tutarlı şekilde kullanır.
+  score?: number;
+  scoreReasons?: string[];
 }
 
 export interface AiRecommendation {

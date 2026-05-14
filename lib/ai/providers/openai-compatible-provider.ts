@@ -304,7 +304,12 @@ function describeCandidates(candidates: AiCandidate[]) {
         .filter(Boolean)
         .join(" · ");
       const overview = (c.overview || "").replace(/\s+/g, " ").slice(0, 220);
-      return `${i + 1}. [${c.source}:${c.externalId}] ${c.title} (${c.type}${meta ? " · " + meta : ""})${overview ? " - " + overview : ""}`;
+      // R36 — sistem ön skoru + nedenleri prompt'a koy
+      const sysScore = typeof c.score === "number" ? ` · ön-skor:${c.score}` : "";
+      const reasons = c.scoreReasons && c.scoreReasons.length > 0
+        ? `\n   nedenler: ${c.scoreReasons.slice(0, 4).join("; ")}`
+        : "";
+      return `${i + 1}. [${c.source}:${c.externalId}] ${c.title} (${c.type}${meta ? " · " + meta : ""}${sysScore})${overview ? " - " + overview : ""}${reasons}`;
     })
     .join("\n");
 }
@@ -328,6 +333,7 @@ function buildRankingPrompt(args: {
     profileBlock,
     `Retrieval plan: ${JSON.stringify(args.retrievalPlan || null)}`,
     "ADAY HAVUZU: yalnızca buradan seç, asla başka başlık uydurma.",
+    "Adaylar sistem tarafından kurallı (rule-based) olarak ön-skorlandı; daha yüksek ön-skor genelde daha iyi uyumdur. 'nedenler' satırı sana hangi profil sinyalinin tetiklendiğini söyler — açıklarken bu nedenlerle tutarlı kal ve gerçek bir gerekçeyi kendinden uydurmak yerine bu sinyalleri somut biçimde ifade et.",
     describeCandidates(args.candidates),
     "Her öneride externalSource ve externalId havuzdaki köşeli parantezle birebir aynı olmalı. reason somut olsun; risk gerçek uyumsuzluğu yazsın.",
     `Şema:

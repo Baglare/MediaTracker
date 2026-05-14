@@ -53,7 +53,12 @@ function describeCandidates(candidates: AiCandidate[]): string {
         .filter(Boolean)
         .join(" · ");
       const overview = (c.overview || "").replace(/\s+/g, " ").slice(0, 220);
-      return `${i + 1}. [${c.source}:${c.externalId}] ${c.title} (${c.type}${meta ? " · " + meta : ""})${overview ? " — " + overview : ""}`;
+      // R36 — sistem ön skoru + nedenleri prompt'a göm
+      const sysScore = typeof c.score === "number" ? ` · ön-skor:${c.score}` : "";
+      const reasons = c.scoreReasons && c.scoreReasons.length > 0
+        ? `\n   nedenler: ${c.scoreReasons.slice(0, 4).join("; ")}`
+        : "";
+      return `${i + 1}. [${c.source}:${c.externalId}] ${c.title} (${c.type}${meta ? " · " + meta : ""}${sysScore})${overview ? " — " + overview : ""}${reasons}`;
     })
     .join("\n");
 }
@@ -96,6 +101,7 @@ function buildRankingPrompt(args: {
       : "Retrieval plan yok.",
     "",
     "ADAY HAVUZU (yalnızca buradan seç, asla başka başlık uydurma):",
+    "Adaylar sistem tarafından kurallı şekilde ön-skorlandı; daha yüksek ön-skor genelde daha iyi uyumdur. 'nedenler' satırı tetiklenen profil sinyallerini söyler — reason'ı bu sinyallere bağla, kendinden gerekçe uydurma.",
     describeCandidates(candidates) || "(boş)",
     "",
     "Görev: Aday havuzundan en uygun 3-5 öneriyi seç. Her öneri için 'externalSource' ve 'externalId' alanlarını listedeki köşeli parantez değerleriyle birebir döndür.",

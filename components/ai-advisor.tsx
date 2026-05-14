@@ -34,6 +34,10 @@ export interface AiSettings {
   useWebResearch: boolean;
   deepResearch: boolean;
   useOpenAIProvider: boolean;
+  // R35 — granular data toggles (default true on server side via flag())
+  includeRatings?: boolean;
+  includeFavorites?: boolean;
+  includeProgress?: boolean;
 }
 
 interface AiCandidate {
@@ -623,6 +627,21 @@ export default function AiAdvisor({
   } | null> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), AI_REQUEST_TIMEOUT_MS);
+    // R35 — Veri toggle'larını sunucuya iletilecek AiSettings'e yansıt.
+    // Notlar/Son aktiviteler de toggle ile gerçekten kapatılır (server tarafı
+    // zaten useRecentActivity / usePersonalNotes'a saygı duyuyor).
+    const effectiveSettings: AiSettings = {
+      ...settings,
+      useRecentActivity: settings.useRecentActivity && dataToggles.recentActivity,
+      usePersonalNotes: settings.usePersonalNotes && dataToggles.notes,
+      includeRatings: dataToggles.ratings,
+      includeFavorites: dataToggles.favorites,
+      includeProgress: dataToggles.progress,
+    };
+    // R35 — Boş kütüphane: güvenli payload (server zaten boş kütüphaneyi
+    // tolere ediyor ama mediaItems'in array olduğundan emin oluyoruz).
+    const safeMediaItems = Array.isArray(mediaList) ? mediaList : [];
+    const safeProgressLogs = Array.isArray(progressLogs) ? progressLogs : [];
     try {
       const res = await fetch("/api/ai/recommend", {
         method: "POST",
@@ -630,9 +649,9 @@ export default function AiAdvisor({
         signal: controller.signal,
         body: JSON.stringify({
           message: prompt,
-          mediaItems: mediaList,
-          progressLogs,
-          settings,
+          mediaItems: safeMediaItems,
+          progressLogs: safeProgressLogs,
+          settings: effectiveSettings,
           recentContext: messages.slice(-6).map((m) => ({ role: m.role, content: m.content })),
           activeContext: activeContext || undefined,
         }),
@@ -915,15 +934,22 @@ export default function AiAdvisor({
   }
 
   const transparencyText = useMemo(() => {
-    const parts = [
-      settings.useProfile ? "kütüphane profil özeti" : null,
-      settings.useRecentActivity ? "son aktivite özeti" : null,
-      `AI bilgi sinyali ${settings.useWebResearch ? "açık" : "kapalı"}`,
-      `kişisel notlar ${settings.usePersonalNotes ? "dahil" : "değil"}`,
-      settings.deepResearch ? "derin araştırma modu" : null,
-    ].filter(Boolean);
-    return `Bu istekte kullanılacaklar: ${parts.join(", ")}.`;
-  }, [settings]);
+    const data: string[] = [];
+    if (dataToggles.ratings) data.push("puanlar");
+    if (dataToggles.favorites) data.push("favoriler");
+    if (dataToggles.progress) data.push("ilerleme grupları");
+    if (settings.useRecentActivity && dataToggles.recentActivity) data.push("son aktiviteler");
+    if (settings.usePersonalNotes && dataToggles.notes) data.push("kişisel notlar");
+    const dataLabel = data.length > 0 ? data.join(", ") : "yalnızca istek metni";
+    const research =
+      researchMode === "library-only"
+        ? "yalnızca kütüphane"
+        : researchMode === "source-apis"
+        ? "kaynak API'leri (yakında)"
+        : "AI bilgi sinyali açık";
+    const deep = settings.deepResearch ? ", derin araştırma" : "";
+    return `Bu istekte kullanılacaklar: ${dataLabel}; araştırma modu: ${research}${deep}.`;
+  }, [settings, dataToggles, researchMode]);
 
   const profileSummary = useMemo(() => {
     return `${mediaList.length} medya · ${progressLogs.length} aktivite kaydı`;
