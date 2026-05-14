@@ -104,6 +104,7 @@ import {
   withInferredSeriesGroup,
 } from "@/lib/series-group";
 import { calculateDashboardStats } from "@/lib/dashboard-stats";
+import { calculateUserProgression } from "@/lib/user-progression";
 import { TvmazeNormalizedDetail } from "@/lib/tvmaze-types";
 import { OpenLibraryNormalizedResult } from "@/lib/openlibrary-types";
 import { AniListNormalizedResult } from "@/lib/anilist-types";
@@ -1518,6 +1519,17 @@ export default function HomePage() {
     return calculateDashboardStats(mediaList, progressLogs);
   }, [mediaList, progressLogs]);
 
+  const userProgression = useMemo(() => {
+    return calculateUserProgression(mediaList, progressLogs);
+  }, [mediaList, progressLogs]);
+
+  const profileName = useMemo(() => {
+    const email = authUser?.email?.trim();
+    if (!email) return "Yerel Profil";
+    const localPart = email.split("@")[0]?.trim();
+    return localPart || email;
+  }, [authUser?.email]);
+
   type PersonalPageIcon = typeof Heart;
 
   const PersonalEmptyState = ({
@@ -1696,7 +1708,13 @@ export default function HomePage() {
           Artık worldAttr otomatik izlenmiyor; sadece handleThemeFilterChange
           içinde bumplanan worldTransition token'ına tepki veriyor. */}
       <WorldTransition trigger={worldTransition} />
-      <AppSidebar activeTab={activeTab} onChange={handleTabChange} />
+      <AppSidebar
+        activeTab={activeTab}
+        onChange={handleTabChange}
+        onOpenSettings={() => handleTabChange("settings")}
+        profileName={profileName}
+        progression={userProgression}
+      />
 
       <div className="flex-1 min-w-0 flex flex-col">
         <AppTopbar activeTab={activeTab} onChangeTab={handleTabChange} />

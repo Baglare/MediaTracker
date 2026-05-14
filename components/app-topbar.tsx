@@ -8,7 +8,7 @@
 // Mobil/tablet altında (lg<) sidebar gizli; bunun yerine yatay scroll'lu
 // `AppTabs` döndürürüz ki TabType erişimi kaybolmasın.
 
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Settings } from "lucide-react";
 import CloudModeBadge from "./cloud-mode-badge";
 import AppTabs, { type TabType } from "./app-tabs";
 
@@ -59,6 +59,19 @@ export default function AppTopbar({ activeTab, onChangeTab }: AppTopbarProps) {
 
         <div className="ml-auto flex items-center gap-2">
           <CloudModeBadge />
+          <button
+            type="button"
+            onClick={() => onChangeTab("settings")}
+            className={`lg:hidden grid h-8 w-8 place-items-center rounded-lg border transition-colors cursor-pointer ${
+              activeTab === "settings"
+                ? "border-amber-500/35 bg-amber-500/15 text-amber-200"
+                : "border-zinc-800/70 bg-zinc-900/35 text-zinc-400 hover:border-amber-500/35 hover:bg-amber-500/10 hover:text-amber-200"
+            }`}
+            aria-label="Ayarları aç"
+            title="Ayarları aç"
+          >
+            <Settings className="h-4 w-4" aria-hidden="true" />
+          </button>
         </div>
       </div>
 

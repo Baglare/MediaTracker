@@ -1,40 +1,28 @@
 "use client";
 
-// ============================================
-// App Sidebar (R1: Layout Redesign)
-// ============================================
-// Sol dikey navigasyon. Mevcut TabType'ların hepsini koruyor; ek olarak
-// henüz implement edilmemiş sayfalar (Takvim, İlerlemem, İzleme Listem,
-// Puanlamalarım, Notlarım, İstatistikler) "ghost / Yakında" olarak görünüyor
-// — tıklanabilir değiller, mevcut sekmeyi değiştirmiyorlar. R24'te Favorilerim
-// ghost listesinden çıkarıldı; gerçek bir sekme oldu.
-//
-// Aktif/ghost stilleri Tailwind ile zinc + amber accent paletinde kurulu.
-// Referans: design_references/layout-redesign-v1/sidebar.jsx + styles.css.
-
 import {
+  Activity,
+  BarChart3,
+  Calendar,
+  Compass,
+  Heart,
   LayoutDashboard,
   Library,
-  Compass,
-  Calendar,
-  TrendingUp,
   ListChecks,
-  Heart,
-  Star,
   NotebookPen,
-  BarChart3,
   Sparkles,
-  Activity,
-  Settings,
+  Star,
+  TrendingUp,
   type LucideIcon,
 } from "lucide-react";
+import type { UserProgression, UserProgressionWorld } from "@/lib/user-progression";
 import type { TabType } from "./app-tabs";
+import SidebarProfileCard from "./sidebar-profile-card";
 
 type NavItem = {
   id: TabType | string;
   label: string;
   icon: LucideIcon;
-  // Ghost: ileride gelecek sayfalar — disabled görünüm, tıklanamaz.
   ghost?: boolean;
   badge?: string;
   badgeTone?: "soon" | "accent" | "default";
@@ -70,8 +58,6 @@ const SECTIONS: { label: string; items: NavItem[] }[] = [
   },
 ];
 
-const FOOT: NavItem[] = [{ id: "settings", label: "Ayarlar", icon: Settings }];
-
 const REAL_TABS = new Set<TabType>([
   "dashboard",
   "library",
@@ -91,7 +77,40 @@ const REAL_TABS = new Set<TabType>([
 interface AppSidebarProps {
   activeTab: TabType;
   onChange: (tab: TabType) => void;
+  onOpenSettings: () => void;
+  profileName: string;
+  progression: UserProgression;
 }
+
+const JOURNEY_ACCENTS: Record<
+  UserProgressionWorld,
+  { panel: string; text: string; fill: string; glow: string }
+> = {
+  east: {
+    panel: "border-amber-500/20 bg-amber-500/[0.06]",
+    text: "text-amber-200",
+    fill: "from-amber-300 to-yellow-500",
+    glow: "shadow-amber-950/20",
+  },
+  screen: {
+    panel: "border-cyan-500/20 bg-cyan-500/[0.06]",
+    text: "text-cyan-200",
+    fill: "from-cyan-300 to-blue-500",
+    glow: "shadow-cyan-950/20",
+  },
+  arch: {
+    panel: "border-red-400/20 bg-red-400/[0.05]",
+    text: "text-orange-200",
+    fill: "from-orange-300 to-red-500",
+    glow: "shadow-red-950/20",
+  },
+  mixed: {
+    panel: "border-violet-500/20 bg-violet-500/[0.06]",
+    text: "text-violet-200",
+    fill: "from-violet-300 to-zinc-300",
+    glow: "shadow-violet-950/20",
+  },
+};
 
 function NavRow({
   item,
@@ -104,16 +123,13 @@ function NavRow({
 }) {
   const Icon = item.icon;
   const ghost = !!item.ghost;
-
-  // Active item: subtle zinc panel + gold left bar.
-  // Ghost: faded text, no hover state, cursor disabled.
   const base =
     "group relative w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-[13px] font-medium transition-colors text-left";
   const stateClass = ghost
     ? "text-zinc-600 cursor-not-allowed"
     : isActive
-    ? "bg-zinc-800/60 text-zinc-50 cursor-pointer"
-    : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/30 cursor-pointer";
+      ? "bg-zinc-800/60 text-zinc-50 cursor-pointer"
+      : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/30 cursor-pointer";
 
   let badgeClass = "ml-auto text-[10px] font-mono px-1.5 py-0.5 rounded-full ";
   if (item.badgeTone === "soon") {
@@ -132,7 +148,7 @@ function NavRow({
       disabled={ghost}
       aria-disabled={ghost || undefined}
       aria-current={isActive ? "page" : undefined}
-      title={ghost ? `${item.label} — yakında` : item.label}
+      title={ghost ? `${item.label} - yakında` : item.label}
     >
       {isActive && !ghost && (
         <span
@@ -147,7 +163,69 @@ function NavRow({
   );
 }
 
-export default function AppSidebar({ activeTab, onChange }: AppSidebarProps) {
+function JourneyCard({
+  progression,
+  active,
+  onClick,
+}: {
+  progression: UserProgression;
+  active: boolean;
+  onClick: () => void;
+}) {
+  const accent = JOURNEY_ACCENTS[progression.dominantWorld];
+  const progressWidth = `${Math.round(progression.progressPercent * 100)}%`;
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`w-full rounded-xl border p-3 text-left shadow-sm transition-colors cursor-pointer hover:bg-zinc-900/65 ${accent.panel} ${accent.glow} ${
+        active ? "ring-1 ring-amber-400/35" : ""
+      }`}
+      aria-current={active ? "page" : undefined}
+      title="İstatistiklere git"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-500">
+            Yolculuk
+          </p>
+          <p className="mt-1 truncate text-[13px] font-semibold text-zinc-50">
+            Seviye {progression.level}
+          </p>
+          <p className={`mt-0.5 truncate text-[11px] font-medium ${accent.text}`}>
+            {progression.title}
+          </p>
+        </div>
+        <span
+          className={`shrink-0 rounded-lg bg-zinc-950/35 px-2 py-1 text-[11px] font-mono tabular-nums ${accent.text}`}
+        >
+          LV {progression.level}
+        </span>
+      </div>
+
+      <div className="mt-3">
+        <div className="h-1.5 overflow-hidden rounded-full bg-zinc-800/80">
+          <div
+            className={`h-full rounded-full bg-gradient-to-r ${accent.fill}`}
+            style={{ width: progressWidth }}
+          />
+        </div>
+        <div className="mt-1.5 text-[10px] font-mono tabular-nums text-zinc-500">
+          {progression.currentLevelXp} / {progression.nextLevelXp} XP
+        </div>
+      </div>
+    </button>
+  );
+}
+
+export default function AppSidebar({
+  activeTab,
+  onChange,
+  onOpenSettings,
+  profileName,
+  progression,
+}: AppSidebarProps) {
   const handleClick = (id: string) => {
     if (REAL_TABS.has(id as TabType)) onChange(id as TabType);
   };
@@ -157,22 +235,8 @@ export default function AppSidebar({ activeTab, onChange }: AppSidebarProps) {
       className="hidden lg:flex sticky top-0 h-screen w-64 shrink-0 flex-col gap-4 border-r border-zinc-800/60 bg-zinc-950/40 px-4 py-5"
       aria-label="Birincil navigasyon"
     >
-      {/* Brand */}
-      <div className="flex items-center gap-2.5 px-1.5 pb-4 border-b border-zinc-800/60">
-        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-400 to-amber-600 grid place-items-center text-zinc-950 font-bold text-sm shadow-sm shadow-amber-900/30">
-          M
-        </div>
-        <div className="min-w-0">
-          <div className="text-[13px] font-semibold text-zinc-50 tracking-tight leading-tight">
-            MediaTracker
-          </div>
-          <div className="text-[10.5px] text-zinc-500 leading-tight mt-0.5">
-            izle · oku · takip et
-          </div>
-        </div>
-      </div>
+      <SidebarProfileCard profileName={profileName} onOpenSettings={onOpenSettings} />
 
-      {/* Sections */}
       <nav className="flex-1 min-h-0 overflow-y-auto -mx-1 px-1 flex flex-col gap-3">
         {SECTIONS.map((section) => (
           <div key={section.label} className="flex flex-col gap-px">
@@ -191,19 +255,12 @@ export default function AppSidebar({ activeTab, onChange }: AppSidebarProps) {
         ))}
       </nav>
 
-      {/* Foot — Settings.
-          R7.1: Foot bölümüne hafif breathing room ve eyebrow benzeri ayrım
-          eklendi; nav listesiyle aynı density'de ama görsel olarak
-          ayrıştırılmış görünüyor. */}
-      <div className="mt-1 pt-3 border-t border-zinc-800/60">
-        {FOOT.map((item) => (
-          <NavRow
-            key={item.id}
-            item={item}
-            isActive={activeTab === item.id}
-            onClick={() => handleClick(item.id)}
-          />
-        ))}
+      <div className="mt-1 border-t border-zinc-800/60 pt-3">
+        <JourneyCard
+          progression={progression}
+          active={activeTab === "stats"}
+          onClick={() => handleClick("stats")}
+        />
       </div>
     </aside>
   );
