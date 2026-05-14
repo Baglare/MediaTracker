@@ -818,6 +818,9 @@ export default function AiAdvisor({
       }
       localStorage.setItem(DISMISSED_FEEDBACK_KEY, JSON.stringify(limited));
       if (Object.keys(limited).length !== Object.keys(dismissedSignals).length) {
+        // Cap'i aşan kayıtlar localStorage'a yazıldıktan sonra state'i normalize ediyoruz;
+        // bu nadir bir trim olduğu için cascading render maliyeti kabul edilebilir.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setDismissedSignals(limited);
       }
     } catch {
@@ -1840,7 +1843,7 @@ export default function AiAdvisor({
                 disabled={dismissedFeedbackCount === 0}
                 className="px-2.5 py-1.5 rounded-lg text-[11px] font-medium bg-zinc-900/60 text-zinc-400 border border-zinc-800 hover:text-zinc-200 hover:bg-zinc-800/70 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
               >
-                Feedback'i sıfırla
+                Feedback&apos;i sıfırla
               </button>
             </div>
           </div>

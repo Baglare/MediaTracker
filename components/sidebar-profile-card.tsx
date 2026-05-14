@@ -58,6 +58,9 @@ export function ProfileAvatar({
 
   if (preferences.avatarMode === "image" && preferences.avatarImageDataUrl) {
     return (
+      // next/image data URL avatar için anlamlı bir kazanç sağlamıyor (boyut tipi olarak runtime'da değişken,
+      // remote pattern yok). Klasik <img> bilinçli tercih.
+      // eslint-disable-next-line @next/next/no-img-element
       <img
         src={preferences.avatarImageDataUrl}
         alt=""

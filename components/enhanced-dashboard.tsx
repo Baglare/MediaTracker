@@ -10,7 +10,6 @@ import {
   LayoutGrid,
   PlayCircle,
   Star,
-  TrendingUp,
 } from "lucide-react";
 import MediaCard from "./media-card";
 import { DashboardStats } from "@/lib/dashboard-stats";

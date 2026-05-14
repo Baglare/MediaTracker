@@ -1123,11 +1123,13 @@ export default function HomePage() {
   // doğurdu. `function` declaration formu hoisted olduğu için TDZ riski yok;
   // dezavantajı sadece `exhaustive-deps` uyarısı — davranış doğru, render
   // sayısı pratikte fark etmiyor. Spec'in "davranış değiştirme riski varsa
-  // çok küçük çöz" kuralı gereği bu iki uyarı bırakıldı.
+  // çok küçük çöz" kuralı gereği bu iki uyarı bilinçli susturuldu.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   function getTvmazeItemsForShow(showId: string) {
     return mediaList.filter((item) => getTvmazeShowExternalId(item) === showId);
   }
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   function getMissingTvmazeSeasonItems(detail: TvmazeNormalizedDetail) {
     const allSeasonItems = buildTvmazeLibraryItems(detail);
     if (allSeasonItems.length <= 1) {
@@ -3515,6 +3517,7 @@ export default function HomePage() {
                           title={item.title}
                         >
                           <div className="aspect-[2/3] overflow-hidden rounded-xl border border-zinc-800/70 bg-zinc-950/45 shadow-sm shadow-black/20 transition-colors group-hover:border-amber-400/35">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
                               src={item.coverImage || "/placeholders/book.svg"}
                               alt=""
