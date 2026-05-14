@@ -94,7 +94,7 @@ export default function SidebarProfileCard({
         <button
           type="button"
           onClick={onOpenProfile}
-          className="shrink-0 cursor-pointer rounded-xl text-left focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+          className="shrink-0 cursor-pointer rounded-xl text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/30"
           aria-label="Profili aç"
           title="Profili aç"
         >
@@ -106,7 +106,7 @@ export default function SidebarProfileCard({
             <button
               type="button"
               onClick={onOpenProfile}
-              className="min-w-0 cursor-pointer rounded-md text-left focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+              className="min-w-0 cursor-pointer rounded-md text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/30"
               aria-label="Profili aç"
               title="Profili aç"
             >

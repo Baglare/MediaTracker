@@ -61,6 +61,7 @@ import AiAdvisor from "@/components/ai-advisor";
 import {
   ChevronDown,
   ChevronUp,
+  ArrowLeft,
   PlayCircle,
   Layers,
   Library as LibraryIcon,
@@ -78,6 +79,7 @@ import {
   Activity as ActivityIcon,
   Settings as SettingsIcon,
   UserRound,
+  Pencil,
 } from "lucide-react";
 import LibraryControlBar, {
   LibrarySectionControls,
@@ -253,6 +255,7 @@ export default function HomePage() {
     category: GlobalSearchCategory;
     token: number;
   } | null>(null);
+  const [profileMode, setProfileMode] = useState<"view" | "edit">("view");
 
   // Modal durumları
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -375,6 +378,9 @@ export default function HomePage() {
   const handleTabChange = useCallback((tab: TabType) => {
     // R40 — AI sekmesi terkedildiğinde otomatik reset KALDIRILDI; oturum
     // kullanıcı "Konuyu kapat" diyene kadar yaşamaya devam eder.
+    if (tab === "profile") {
+      setProfileMode("view");
+    }
     setActiveTab(tab);
     setDetailMediaId(null);
     setEditingItem(null);
@@ -3257,15 +3263,15 @@ export default function HomePage() {
               subtitle="Görünen ad, avatar, ünvan ve yolculuk kimliği"
             />
 
-            <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.25fr)_minmax(22rem,0.75fr)] gap-5 items-start">
+            {profileMode === "view" ? (
               <section className="relative overflow-hidden rounded-2xl border border-zinc-800/60 bg-[linear-gradient(135deg,rgba(39,39,42,0.58),rgba(9,9,11,0.72))] p-5 sm:p-6 lg:p-7 min-w-0 shadow-lg shadow-black/20">
                 <div
                   aria-hidden
                   className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-amber-300/70 to-transparent"
                 />
 
-                <div className="relative flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
-                  <div className="flex min-w-0 flex-col sm:flex-row sm:items-center gap-4">
+                <div className="relative flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="flex min-w-0 flex-col sm:flex-row sm:items-center gap-5">
                     <div className="rounded-3xl bg-zinc-950/45 p-2 ring-1 ring-zinc-800/70 shadow-inner shadow-black/30">
                       <ProfileAvatar profileName={profileName} preferences={profilePreferences} size="lg" />
                     </div>
@@ -3299,7 +3305,16 @@ export default function HomePage() {
                     </div>
                   </div>
 
-                  <div className="w-full shrink-0 border-t border-zinc-800/60 pt-4 md:w-64 md:border-l md:border-t-0 md:pl-5 md:pt-0">
+                  <div className="flex w-full shrink-0 flex-col gap-4 border-t border-zinc-800/60 pt-4 lg:w-72 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
+                    <button
+                      type="button"
+                      onClick={() => setProfileMode("edit")}
+                      className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-amber-500/15 px-4 text-sm font-semibold text-amber-200 ring-1 ring-amber-500/30 transition-colors hover:bg-amber-500/20 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/50"
+                    >
+                      <Pencil className="h-4 w-4" aria-hidden="true" />
+                      Profili Düzenle
+                    </button>
+
                     <div className="flex items-end justify-between gap-3">
                       <div>
                         <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
@@ -3344,14 +3359,35 @@ export default function HomePage() {
                   </div>
                 </div>
               </section>
-
+            ) : (
+              <div className="space-y-4">
+                <div className="flex flex-col gap-3 rounded-2xl border border-zinc-800/60 bg-zinc-900/30 p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-300/80">
+                      Düzenleme
+                    </p>
+                    <h2 className="mt-1 text-lg font-semibold text-zinc-100">Profil kimliğini düzenle</h2>
+                    <p className="mt-1 text-sm text-zinc-500">
+                      Değişiklikler bu tarayıcıdaki yerel profil tercihine anlık kaydedilir.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setProfileMode("view")}
+                    className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-zinc-800/80 bg-zinc-950/35 px-4 text-sm font-medium text-zinc-300 transition-colors hover:border-amber-500/35 hover:bg-amber-500/10 hover:text-amber-200 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/40"
+                  >
+                    <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+                    Vitrine dön
+                  </button>
+                </div>
               <ProfileSettingsCard
                 preferences={profilePreferences}
                 profileName={profileName}
                 automaticTitle={userProgression.title}
                 onChange={setProfilePreferences}
               />
-            </div>
+              </div>
+            )}
           </div>
         )}
 

@@ -56,7 +56,7 @@ export default function AppTopbar({
         <button
           type="button"
           onClick={onOpenProfile}
-          className="flex min-w-0 items-center gap-2 rounded-lg text-left lg:hidden cursor-pointer focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+          className="flex min-w-0 items-center gap-2 rounded-lg text-left lg:hidden cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/30"
           aria-label="Profili aç"
           title="Profili aç"
         >
