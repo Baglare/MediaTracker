@@ -14,6 +14,7 @@ import { useState, useMemo, useEffect, useCallback } from "react";
 import AppSidebar from "@/components/app-sidebar";
 import AppTopbar from "@/components/app-topbar";
 import ProfileSettingsCard from "@/components/profile-settings-card";
+import RightRailSettingsCard from "@/components/right-rail-settings-card";
 import { ProfileAvatar } from "@/components/sidebar-profile-card";
 import RightRail from "@/components/right-rail";
 import PageHeader from "@/components/page-header";
@@ -98,6 +99,12 @@ import {
   type ProfilePreferences,
 } from "@/lib/profile-preferences";
 import {
+  DEFAULT_RIGHT_RAIL_PREFERENCES,
+  loadRightRailPreferences,
+  saveRightRailPreferences,
+  type RightRailPreferences,
+} from "@/lib/right-rail-preferences";
+import {
   loadMediaList,
   saveMediaList,
   clearMediaList,
@@ -148,6 +155,10 @@ export default function HomePage() {
   const [profilePrefsLoaded, setProfilePrefsLoaded] = useState(false);
   const [profilePreferences, setProfilePreferences] = useState<ProfilePreferences>(
     DEFAULT_PROFILE_PREFERENCES
+  );
+  const [rightRailPrefsLoaded, setRightRailPrefsLoaded] = useState(false);
+  const [rightRailPreferences, setRightRailPreferences] = useState<RightRailPreferences>(
+    DEFAULT_RIGHT_RAIL_PREFERENCES
   );
   // Arama çubuğundaki metin (R18: kasıtlı olarak persist edilmiyor)
   const [searchQuery, setSearchQuery] = useState("");
@@ -341,6 +352,12 @@ export default function HomePage() {
     setProfilePrefsLoaded(true);
   }, []);
 
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-only hydration from localStorage
+    setRightRailPreferences(loadRightRailPreferences());
+    setRightRailPrefsLoaded(true);
+  }, []);
+
   // ---- R18: UI tercihlerini her değişimde kaydet ----
   // `uiPrefsLoaded` bayrağı, hidrasyon tamamlanmadan default değerlerin
   // localStorage'a yazılıp gerçek snapshot'ı ezmesini engeller.
@@ -372,6 +389,11 @@ export default function HomePage() {
     if (!profilePrefsLoaded) return;
     saveProfilePreferences(profilePreferences);
   }, [profilePrefsLoaded, profilePreferences]);
+
+  useEffect(() => {
+    if (!rightRailPrefsLoaded) return;
+    saveRightRailPreferences(rightRailPreferences);
+  }, [rightRailPrefsLoaded, rightRailPreferences]);
 
   // ---- EYLEMLER (Actions) ----
 
@@ -3648,6 +3670,10 @@ export default function HomePage() {
               <div className="space-y-4 lg:space-y-5">
                 <AuthPanel />
                 <CloudSyncStatusCard />
+                <RightRailSettingsCard
+                  preferences={rightRailPreferences}
+                  onChange={setRightRailPreferences}
+                />
               </div>
 
               {/* Sağ kolon: cloud veri + veri yönetimi */}
@@ -3711,6 +3737,8 @@ export default function HomePage() {
           mediaList={mediaList}
           progressLogs={progressLogs}
           stats={dashboardStats}
+          preferences={rightRailPreferences}
+          progression={userProgression}
           // R15: RightRail dünya bazlı çalışsın diye themeFilter geçiyoruz.
           // Search/status/type/eastSubFilter'a kasıtlı olarak duyarsız.
           themeFilter={themeFilter}

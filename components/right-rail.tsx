@@ -29,14 +29,27 @@ import {
   Sparkles,
   ListTodo,
   TrendingUp,
+  Heart,
+  Star,
+  BarChart3,
+  Compass,
+  PauseCircle,
+  NotebookPen,
+  Trophy,
 } from "lucide-react";
-import { MediaItem, ProgressLog, ProgressLogAction } from "@/lib/types";
+import { MediaItem, ProgressLog, ProgressLogAction, withMediaClassification } from "@/lib/types";
 import { DashboardStats } from "@/lib/dashboard-stats";
+import type { UserProgression } from "@/lib/user-progression";
 import {
   scopeMediaListByWorld,
   scopeProgressLogsByWorld,
   type WorldScope,
 } from "@/lib/world-scope";
+import {
+  RIGHT_RAIL_WIDGET_IDS,
+  type RightRailPreferences,
+  type RightRailWidgetId,
+} from "@/lib/right-rail-preferences";
 import {
   formatProgressLogAction,
   formatProgressLogDetail,
@@ -48,6 +61,8 @@ interface RightRailProps {
   mediaList: MediaItem[];
   progressLogs: ProgressLog[];
   stats: DashboardStats;
+  preferences: RightRailPreferences;
+  progression: UserProgression;
   // R15: Aktif Dünya. Bu component için tek scope sinyali; type/status/search
   // filtrelerine bilinçli olarak duyarsızız.
   themeFilter: WorldScope;
@@ -795,6 +810,283 @@ function ActivityWidget({ logs }: { logs: ProgressLog[] }) {
   );
 }
 
+type LegacyNoteItem = MediaItem & { notes?: unknown };
+
+function hasNote(item: MediaItem): boolean {
+  const personal = item.personalNotes?.trim();
+  if (personal) return true;
+
+  const legacyNotes = (item as LegacyNoteItem).notes;
+  if (typeof legacyNotes === "string") return legacyNotes.trim().length > 0;
+  if (Array.isArray(legacyNotes)) {
+    return legacyNotes.some((note) => typeof note === "string" && note.trim().length > 0);
+  }
+  return false;
+}
+
+function ItemListWidget({
+  title,
+  icon,
+  eyebrow,
+  items,
+  emptyText,
+  onOpenDetail,
+}: {
+  title: string;
+  icon: typeof Target;
+  eyebrow?: string;
+  items: MediaItem[];
+  emptyText: string;
+  onOpenDetail?: (item: MediaItem) => void;
+}) {
+  return (
+    <Widget title={title} icon={icon} eyebrow={eyebrow}>
+      {items.length === 0 ? (
+        <p className="text-[11px] text-zinc-500">{emptyText}</p>
+      ) : (
+        <div className="space-y-1.5">
+          {items.slice(0, 5).map((item) => {
+            const total = item.totalProgress ?? 0;
+            const current = item.currentProgress ?? 0;
+            const pct =
+              total > 0 ? Math.min(100, Math.round((current / total) * 100)) : null;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => onOpenDetail?.(item)}
+                className="group w-full rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-zinc-800/40 cursor-pointer"
+                title={item.title}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="truncate text-xs font-medium text-zinc-200 group-hover:text-zinc-50">
+                    {item.title}
+                  </span>
+                  {pct !== null && (
+                    <span className="shrink-0 font-mono text-[10px] tabular-nums text-zinc-500">
+                      {pct}%
+                    </span>
+                  )}
+                </div>
+                {total > 0 && (
+                  <div className="mt-1 h-1 overflow-hidden rounded-full bg-zinc-800">
+                    <div
+                      className="h-full rounded-full bg-[var(--w-primary)]"
+                      style={{ width: `${pct ?? 0}%` }}
+                    />
+                  </div>
+                )}
+              </button>
+            );
+          })}
+          {items.length > 5 && (
+            <p className="px-2 text-[10px] text-zinc-600">+ {items.length - 5} diğer</p>
+          )}
+        </div>
+      )}
+    </Widget>
+  );
+}
+
+function NearCompletionWidget({
+  items,
+  onOpenDetail,
+}: {
+  items: MediaItem[];
+  onOpenDetail?: (item: MediaItem) => void;
+}) {
+  const nearCompletion = items
+    .filter((item) => {
+      if (item.status === "completed") return false;
+      if ((item.totalProgress ?? 0) <= 0) return false;
+      return (item.currentProgress ?? 0) / item.totalProgress >= 0.75;
+    })
+    .sort(
+      (a, b) =>
+        (b.currentProgress ?? 0) / (b.totalProgress || 1) -
+        (a.currentProgress ?? 0) / (a.totalProgress || 1),
+    );
+
+  return (
+    <ItemListWidget
+      title="Bitişe Yakın"
+      icon={Trophy}
+      eyebrow="%75+"
+      items={nearCompletion}
+      emptyText="Bitişe yaklaşan içerik yok."
+      onOpenDetail={onOpenDetail}
+    />
+  );
+}
+
+function FavoriteShowcaseWidget({
+  items,
+  onOpenDetail,
+}: {
+  items: MediaItem[];
+  onOpenDetail?: (item: MediaItem) => void;
+}) {
+  const favorites = items.filter((item) => item.favorite).slice(0, 6);
+  return (
+    <Widget title="Favori Vitrini" icon={Heart} iconTone="emerald">
+      {favorites.length === 0 ? (
+        <p className="text-[11px] text-zinc-500">Favori işaretlenmiş içerik yok.</p>
+      ) : (
+        <div className="grid grid-cols-3 gap-2">
+          {favorites.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => onOpenDetail?.(item)}
+              className="group min-w-0 text-left cursor-pointer"
+              title={item.title}
+            >
+              <div className="aspect-[2/3] overflow-hidden rounded-lg border border-zinc-800/70 bg-zinc-950/45">
+                {/* eslint-disable-next-line @next/next/no-img-element -- RightRail mevcut kart posterleriyle aynı dış kaynak URL'lerini kullanır. */}
+                <img
+                  src={item.coverImage || "/placeholders/book.svg"}
+                  alt=""
+                  className="h-full w-full object-cover transition-transform group-hover:scale-[1.03]"
+                  loading="lazy"
+                />
+              </div>
+              <p className="mt-1 truncate text-[10px] text-zinc-400 group-hover:text-zinc-200">
+                {item.title}
+              </p>
+            </button>
+          ))}
+        </div>
+      )}
+    </Widget>
+  );
+}
+
+function RatingSummaryWidget({ items }: { items: MediaItem[] }) {
+  const rated = items.filter((item) => typeof item.userRating === "number" || typeof item.rating === "number");
+  const ratings = rated.map((item) => item.userRating ?? item.rating ?? 0);
+  const average = ratings.length > 0 ? ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length : 0;
+  const highest = ratings.length > 0 ? Math.max(...ratings) : 0;
+
+  return (
+    <Widget title="Puan Özeti" icon={Star}>
+      {rated.length === 0 ? (
+        <p className="text-[11px] text-zinc-500">Henüz puanlanmış içerik yok.</p>
+      ) : (
+        <div className="grid grid-cols-3 gap-2 text-center">
+          <div className="rounded-lg bg-zinc-950/35 px-2 py-2 ring-1 ring-zinc-800/60">
+            <p className="text-[10px] text-zinc-500">Ortalama</p>
+            <p className="mt-1 text-sm font-semibold text-zinc-100">{average.toFixed(1)}</p>
+          </div>
+          <div className="rounded-lg bg-zinc-950/35 px-2 py-2 ring-1 ring-zinc-800/60">
+            <p className="text-[10px] text-zinc-500">Puanlı</p>
+            <p className="mt-1 text-sm font-semibold text-zinc-100">{rated.length}</p>
+          </div>
+          <div className="rounded-lg bg-zinc-950/35 px-2 py-2 ring-1 ring-zinc-800/60">
+            <p className="text-[10px] text-zinc-500">En yüksek</p>
+            <p className="mt-1 text-sm font-semibold text-zinc-100">{highest}</p>
+          </div>
+        </div>
+      )}
+    </Widget>
+  );
+}
+
+function MiniBarRows({
+  rows,
+}: {
+  rows: { label: string; value: number; className: string }[];
+}) {
+  const max = Math.max(1, ...rows.map((row) => row.value));
+  return (
+    <div className="space-y-2.5">
+      {rows.map((row) => {
+        const width = row.value > 0 ? Math.max(4, Math.round((row.value / max) * 100)) : 0;
+        return (
+          <div key={row.label}>
+            <div className="mb-1 flex items-center justify-between gap-2">
+              <span className="truncate text-[11px] text-zinc-400">{row.label}</span>
+              <span className="shrink-0 font-mono text-[10px] tabular-nums text-zinc-500">
+                {row.value}
+              </span>
+            </div>
+            <div className="h-1.5 overflow-hidden rounded-full bg-zinc-800/80">
+              <div className={`h-full rounded-full ${row.className}`} style={{ width: `${width}%` }} />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function WorldDistributionWidget({ items }: { items: MediaItem[] }) {
+  const counts = { east: 0, screen: 0, library: 0 };
+  for (const item of items) {
+    const cls = withMediaClassification(item);
+    if (cls.mediaType === "tv" || cls.mediaType === "movie") counts.screen += 1;
+    else if (cls.mediaType === "book") counts.library += 1;
+    else counts.east += 1;
+  }
+
+  return (
+    <Widget title="Dünya Dağılımı" icon={Compass}>
+      <MiniBarRows
+        rows={[
+          { label: "Doğu", value: counts.east, className: "bg-amber-300" },
+          { label: "Kadraj", value: counts.screen, className: "bg-cyan-300" },
+          { label: "Arşiv", value: counts.library, className: "bg-orange-300" },
+        ]}
+      />
+    </Widget>
+  );
+}
+
+function StatusDistributionWidget({ items }: { items: MediaItem[] }) {
+  const counts = {
+    completed: items.filter((item) => item.status === "completed").length,
+    active: items.filter((item) => item.status === "watching" || item.status === "reading").length,
+    planning: items.filter((item) => item.status === "planning").length,
+    paused: items.filter((item) => item.status === "paused").length,
+    dropped: items.filter((item) => item.status === "dropped").length,
+  };
+
+  return (
+    <Widget title="Durum Dağılımı" icon={BarChart3}>
+      <MiniBarRows
+        rows={[
+          { label: "Tamamlanan", value: counts.completed, className: "bg-emerald-400" },
+          { label: "Devam", value: counts.active, className: "bg-violet-400" },
+          { label: "Planlanan", value: counts.planning, className: "bg-sky-400" },
+          { label: "Duraklatılan", value: counts.paused, className: "bg-orange-400" },
+          { label: "Bırakılan", value: counts.dropped, className: "bg-rose-400" },
+        ]}
+      />
+    </Widget>
+  );
+}
+
+function JourneyMiniWidget({ progression }: { progression: UserProgression }) {
+  const pct = Math.round(progression.progressPercent * 100);
+  return (
+    <Widget title="Yolculuk Mini" icon={Trophy} eyebrow={`Lv ${progression.level}`}>
+      <div className="rounded-lg bg-zinc-950/35 px-3 py-3 ring-1 ring-zinc-800/60">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-zinc-100">{progression.title}</p>
+            <p className="mt-1 text-[11px] text-zinc-500">{progression.currentLevelXp}/{progression.nextLevelXp} XP</p>
+          </div>
+          <span className="shrink-0 font-mono text-[11px] tabular-nums text-[var(--w-primary-strong)]">
+            {pct}%
+          </span>
+        </div>
+        <div className="mt-3 h-2 overflow-hidden rounded-full bg-zinc-800">
+          <div className="h-full rounded-full bg-[var(--w-primary)]" style={{ width: `${pct}%` }} />
+        </div>
+      </div>
+    </Widget>
+  );
+}
+
 // ===========================================================================
 // RightRail container
 // ===========================================================================
@@ -810,6 +1102,8 @@ export default function RightRail({
   mediaList,
   progressLogs,
   stats,
+  preferences,
+  progression,
   themeFilter,
   onOpenDetail,
 }: RightRailProps) {
@@ -862,6 +1156,68 @@ export default function RightRail({
     [scopedLogs],
   );
 
+  const widgetRenderers: Record<RightRailWidgetId, () => React.ReactNode> = {
+    overallProgress: () => (
+      <OverallWidget
+        scopedItems={scopedItems}
+        worldLabel={WORLD_LABEL[themeFilter]}
+      />
+    ),
+    dailyGoal: () => (
+      <DailyGoalWidget
+        progressLogs={progressLogs}
+        thisWeekTotal={stats.logsThisWeek}
+      />
+    ),
+    suggestedContinue: () => (
+      <SuggestionWidget entries={suggestions} onOpenDetail={onOpenDetail} />
+    ),
+    recentActivities: () => <ActivityWidget logs={recentLogs} />,
+    upcomingEpisodes: () => <UpcomingWidget />,
+    nearCompletion: () => (
+      <NearCompletionWidget items={scopedItems} onOpenDetail={onOpenDetail} />
+    ),
+    favoriteShowcase: () => (
+      <FavoriteShowcaseWidget items={scopedItems} onOpenDetail={onOpenDetail} />
+    ),
+    ratingSummary: () => <RatingSummaryWidget items={scopedItems} />,
+    worldDistribution: () => <WorldDistributionWidget items={mediaList} />,
+    statusDistribution: () => <StatusDistributionWidget items={scopedItems} />,
+    journeyMini: () => <JourneyMiniWidget progression={progression} />,
+    plannedItems: () => (
+      <ItemListWidget
+        title="Planlananlar"
+        icon={ListTodo}
+        items={scopedItems.filter((item) => item.status === "planning")}
+        emptyText="Planlanan içerik yok."
+        onOpenDetail={onOpenDetail}
+      />
+    ),
+    pausedItems: () => (
+      <ItemListWidget
+        title="Duraklatılanlar"
+        icon={PauseCircle}
+        items={scopedItems.filter((item) => item.status === "paused")}
+        emptyText="Duraklatılmış içerik yok."
+        onOpenDetail={onOpenDetail}
+      />
+    ),
+    notedItems: () => (
+      <ItemListWidget
+        title="Notlular"
+        icon={NotebookPen}
+        items={scopedItems.filter(hasNote)}
+        emptyText="Not eklenmiş içerik yok."
+        onOpenDetail={onOpenDetail}
+      />
+    ),
+  };
+
+  const visibleWidgetIds = preferences.order.filter(
+    (id): id is RightRailWidgetId =>
+      RIGHT_RAIL_WIDGET_IDS.includes(id) && preferences.enabled[id],
+  );
+
   return (
     <aside
       className="hidden xl:flex sticky top-0 h-screen w-[18rem] shrink-0 flex-col gap-3 border-l border-zinc-800/60 bg-zinc-950/40 px-4 py-5 overflow-y-auto"
@@ -871,18 +1227,9 @@ export default function RightRail({
         Bakış · {WORLD_LABEL[themeFilter]}
       </div>
 
-      <OverallWidget
-        scopedItems={scopedItems}
-        worldLabel={WORLD_LABEL[themeFilter]}
-      />
-      {/* DailyGoal kasıtlı global — tüm aktiviteyi gösterir, dünya scope dışı. */}
-      <DailyGoalWidget
-        progressLogs={progressLogs}
-        thisWeekTotal={stats.logsThisWeek}
-      />
-      <SuggestionWidget entries={suggestions} onOpenDetail={onOpenDetail} />
-      <ActivityWidget logs={recentLogs} />
-      <UpcomingWidget />
+      {visibleWidgetIds.map((id) => (
+        <div key={id}>{widgetRenderers[id]()}</div>
+      ))}
     </aside>
   );
 }
