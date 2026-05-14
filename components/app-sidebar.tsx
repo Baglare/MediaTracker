@@ -70,6 +70,7 @@ const REAL_TABS = new Set<TabType>([
   "ratings",
   "notes",
   "stats",
+  "profile",
   "ai",
   "activity",
   "settings",
@@ -78,6 +79,7 @@ const REAL_TABS = new Set<TabType>([
 interface AppSidebarProps {
   activeTab: TabType;
   onChange: (tab: TabType) => void;
+  onOpenProfile: () => void;
   onOpenSettings: () => void;
   profileName: string;
   profileTagline: string;
@@ -233,6 +235,7 @@ function JourneyCard({
 export default function AppSidebar({
   activeTab,
   onChange,
+  onOpenProfile,
   onOpenSettings,
   profileName,
   profileTagline,
@@ -253,6 +256,7 @@ export default function AppSidebar({
         profileName={profileName}
         tagline={profileTagline}
         preferences={profilePreferences}
+        onOpenProfile={onOpenProfile}
         onOpenSettings={onOpenSettings}
       />
 

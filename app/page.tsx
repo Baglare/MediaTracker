@@ -76,6 +76,7 @@ import {
   Search,
   Activity as ActivityIcon,
   Settings as SettingsIcon,
+  UserRound,
 } from "lucide-react";
 import LibraryControlBar, {
   LibrarySectionControls,
@@ -1710,7 +1711,7 @@ export default function HomePage() {
   // ekranı dünya bağlamından bağımsız (R8'deki RightRail gizleme kararıyla
   // tutarlı). Bu tur sadece CSS variable plumbing — tüketici bileşen yok.
   const worldAttr: "east" | "screen" | "arch" | "neutral" =
-    activeTab === "settings"
+    activeTab === "settings" || activeTab === "profile"
       ? "neutral"
       : themeFilter === "east"
         ? "east"
@@ -1719,7 +1720,7 @@ export default function HomePage() {
         : themeFilter === "library"
           ? "arch"
           : "neutral";
-  const shouldShowRightRail = !["dashboard", "ai", "settings"].includes(activeTab);
+  const shouldShowRightRail = !["dashboard", "ai", "settings", "profile"].includes(activeTab);
 
   return (
     // R1 App Shell: sol sidebar (lg+) + main column + opsiyonel sağ rail (xl+).
@@ -1741,6 +1742,7 @@ export default function HomePage() {
       <AppSidebar
         activeTab={activeTab}
         onChange={handleTabChange}
+        onOpenProfile={() => handleTabChange("profile")}
         onOpenSettings={() => handleTabChange("settings")}
         profileName={profileName}
         profileTagline={profileTagline}
@@ -1753,6 +1755,7 @@ export default function HomePage() {
         <AppTopbar
           activeTab={activeTab}
           onChangeTab={handleTabChange}
+          onOpenProfile={() => handleTabChange("profile")}
           profileName={profileName}
           profilePreferences={profilePreferences}
         />
@@ -3244,6 +3247,57 @@ export default function HomePage() {
           </div>
         )}
 
+        {/* PROFIL SEKMESI */}
+        {activeTab === "profile" && (
+          <div className="space-y-5">
+            <PageHeader
+              icon={UserRound}
+              title="Profil"
+              subtitle="Görünen ad, avatar, ünvan ve yolculuk kimliği"
+            />
+
+            <section className="rounded-2xl border border-zinc-800/60 bg-zinc-900/30 p-5 sm:p-6 min-w-0">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                <PersonalMetricCard label="Seviye" value={userProgression.level} accent />
+                <PersonalMetricCard label="Ünvan" value={journeyTitle} />
+                <PersonalMetricCard
+                  label="XP"
+                  value={`${userProgression.currentLevelXp}/${userProgression.nextLevelXp}`}
+                  hint={`Toplam ${userProgression.totalXp} XP`}
+                />
+                <PersonalMetricCard
+                  label="Dominant dünya"
+                  value={
+                    userProgression.dominantWorld === "east"
+                      ? "Doğu"
+                      : userProgression.dominantWorld === "screen"
+                        ? "Kadraj"
+                        : userProgression.dominantWorld === "arch"
+                          ? "Arşiv"
+                          : "Karma"
+                  }
+                />
+              </div>
+              <div className="mt-4 h-2 overflow-hidden rounded-full bg-zinc-950/60 ring-1 ring-zinc-800/80">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-amber-300 via-violet-400 to-cyan-300"
+                  style={{ width: `${Math.round(userProgression.progressPercent * 100)}%` }}
+                />
+              </div>
+              <p className="mt-2 text-xs text-zinc-500">
+                Sonraki seviyeye {Math.max(0, userProgression.nextLevelXp - userProgression.currentLevelXp)} XP
+              </p>
+            </section>
+
+            <ProfileSettingsCard
+              preferences={profilePreferences}
+              profileName={profileName}
+              automaticTitle={userProgression.title}
+              onChange={setProfilePreferences}
+            />
+          </div>
+        )}
+
         {/* AYARLAR SEKMESI */}
         {activeTab === "settings" && (
           // R7.1: RightRail bu sekmede gizli; main column tüm genişliği alır.
@@ -3258,12 +3312,6 @@ export default function HomePage() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-5 items-start">
               {/* Sol kolon: hesap + cloud sync durumu */}
               <div className="space-y-4 lg:space-y-5">
-                <ProfileSettingsCard
-                  preferences={profilePreferences}
-                  profileName={profileName}
-                  automaticTitle={userProgression.title}
-                  onChange={setProfilePreferences}
-                />
                 <AuthPanel />
                 <CloudSyncStatusCard />
               </div>

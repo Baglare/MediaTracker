@@ -8,6 +8,7 @@ interface SidebarProfileCardProps {
   profileName: string;
   tagline: string;
   preferences: ProfilePreferences;
+  onOpenProfile: () => void;
   onOpenSettings: () => void;
 }
 
@@ -84,21 +85,36 @@ export default function SidebarProfileCard({
   profileName,
   tagline,
   preferences,
+  onOpenProfile,
   onOpenSettings,
 }: SidebarProfileCardProps) {
   return (
     <div className="rounded-xl border border-zinc-800/70 bg-zinc-900/35 p-3 shadow-sm shadow-black/20">
       <div className="flex items-start gap-3">
-        <ProfileAvatar profileName={profileName} preferences={preferences} />
+        <button
+          type="button"
+          onClick={onOpenProfile}
+          className="shrink-0 cursor-pointer rounded-xl text-left focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+          aria-label="Profili aç"
+          title="Profili aç"
+        >
+          <ProfileAvatar profileName={profileName} preferences={preferences} />
+        </button>
 
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <div className="min-w-0">
+            <button
+              type="button"
+              onClick={onOpenProfile}
+              className="min-w-0 cursor-pointer rounded-md text-left focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+              aria-label="Profili aç"
+              title="Profili aç"
+            >
               <p className="truncate text-[13px] font-semibold leading-tight text-zinc-50">
                 {profileName}
               </p>
               <p className="mt-0.5 truncate text-[10.5px] text-zinc-500">{tagline}</p>
-            </div>
+            </button>
             <button
               type="button"
               onClick={onOpenSettings}

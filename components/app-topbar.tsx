@@ -25,6 +25,7 @@ const TAB_LABELS: Record<TabType, string> = {
   ratings: "Puanlamalarım",
   notes: "Notlarım",
   stats: "İstatistikler",
+  profile: "Profil",
   ai: "AI Danışman",
   activity: "Aktivite",
   settings: "Ayarlar",
@@ -33,6 +34,7 @@ const TAB_LABELS: Record<TabType, string> = {
 interface AppTopbarProps {
   activeTab: TabType;
   onChangeTab: (tab: TabType) => void;
+  onOpenProfile: () => void;
   profileName: string;
   profilePreferences: ProfilePreferences;
 }
@@ -40,6 +42,7 @@ interface AppTopbarProps {
 export default function AppTopbar({
   activeTab,
   onChangeTab,
+  onOpenProfile,
   profileName,
   profilePreferences,
 }: AppTopbarProps) {
@@ -50,7 +53,13 @@ export default function AppTopbar({
     >
       <div className="flex items-center gap-4 px-4 sm:px-6 lg:px-6 h-14">
         {/* Mobil marka (sidebar gizliyken yerine geçer) */}
-        <div className="flex min-w-0 items-center gap-2 lg:hidden">
+        <button
+          type="button"
+          onClick={onOpenProfile}
+          className="flex min-w-0 items-center gap-2 rounded-lg text-left lg:hidden cursor-pointer focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+          aria-label="Profili aç"
+          title="Profili aç"
+        >
           <ProfileAvatar profileName={profileName} preferences={profilePreferences} size="sm" />
           <div className="min-w-0">
             <span className="block truncate text-sm font-semibold text-zinc-100 tracking-tight">
@@ -60,7 +69,7 @@ export default function AppTopbar({
               {profileName}
             </span>
           </div>
-        </div>
+        </button>
 
         {/* Breadcrumb — lg+ sidebar var, marka tekrar etmeyelim */}
         <div className="hidden lg:flex items-center gap-1.5 text-[13px] text-zinc-500 min-w-0">

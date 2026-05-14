@@ -1,6 +1,6 @@
 "use client";
 
-import { LayoutDashboard, Library, Compass, Activity, Settings, Sparkles, Heart, ListChecks, Star, NotebookPen, BarChart3, Calendar, TrendingUp } from "lucide-react";
+import { LayoutDashboard, Library, Compass, Activity, Settings, Sparkles, Heart, ListChecks, Star, NotebookPen, BarChart3, Calendar, TrendingUp, UserRound } from "lucide-react";
 
 export type TabType =
   | "dashboard"
@@ -13,6 +13,7 @@ export type TabType =
   | "ratings"
   | "notes"
   | "stats"
+  | "profile"
   | "ai"
   | "activity"
   | "settings";
@@ -34,6 +35,7 @@ export default function AppTabs({ activeTab, onChange }: AppTabsProps) {
     { id: "ratings", label: "Puanlamalarım", icon: Star },
     { id: "notes", label: "Notlarım", icon: NotebookPen },
     { id: "stats", label: "İstatistikler", icon: BarChart3 },
+    { id: "profile", label: "Profil", icon: UserRound },
     { id: "ai", label: "AI Danışman", icon: Sparkles },
     { id: "activity", label: "Aktivite", icon: Activity },
     { id: "settings", label: "Ayarlar", icon: Settings },
