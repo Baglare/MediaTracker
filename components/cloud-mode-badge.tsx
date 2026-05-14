@@ -7,7 +7,7 @@ import { Cloud, CloudOff, Loader2, WifiOff, AlertTriangle } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useSyncStatus } from "@/hooks/use-sync-status";
 
-export default function CloudModeBadge() {
+export default function CloudModeBadge({ compact = false }: { compact?: boolean }) {
   const { configured, user } = useAuth();
   const sync = useSyncStatus();
   const isCloudReady = configured && !!user;
@@ -52,12 +52,17 @@ export default function CloudModeBadge() {
     title = "Tüm değişiklikler senkronize";
   }
 
+  const sizeClass = compact
+    ? "gap-1 px-2 py-0.5 rounded text-[10px]"
+    : "gap-1.5 px-2.5 py-1 rounded-md text-[11px]";
+  const iconClass = compact ? "w-3 h-3" : "w-3 h-3";
+
   return (
     <span
-      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium ring-1 ${cls}`}
+      className={`inline-flex items-center ${sizeClass} font-medium ring-1 ${cls}`}
       title={title}
     >
-      <Icon className={`w-3 h-3 ${spin ? "animate-spin" : ""}`} />
+      <Icon className={`${iconClass} ${spin ? "animate-spin" : ""}`} />
       {label}
     </span>
   );

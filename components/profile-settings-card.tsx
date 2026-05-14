@@ -1,0 +1,315 @@
+"use client";
+
+import { useRef, useState } from "react";
+import { ImagePlus, Trash2 } from "lucide-react";
+import type {
+  AvatarAccent,
+  AvatarMode,
+  PresetAvatar,
+  ProfilePreferences,
+  SelectedTitleMode,
+} from "@/lib/profile-preferences";
+import { ProfileAvatar } from "./sidebar-profile-card";
+
+interface ProfileSettingsCardProps {
+  preferences: ProfilePreferences;
+  profileName: string;
+  automaticTitle: string;
+  onChange: (preferences: ProfilePreferences) => void;
+}
+
+const ACCENT_OPTIONS: { value: AvatarAccent; label: string; className: string }[] = [
+  { value: "amber", label: "Amber", className: "bg-amber-400" },
+  { value: "violet", label: "Violet", className: "bg-violet-400" },
+  { value: "cyan", label: "Cyan", className: "bg-cyan-400" },
+  { value: "rose", label: "Rose", className: "bg-rose-400" },
+  { value: "emerald", label: "Emerald", className: "bg-emerald-400" },
+  { value: "zinc", label: "Zinc", className: "bg-zinc-400" },
+];
+
+const AVATAR_MODE_OPTIONS: { value: AvatarMode; label: string }[] = [
+  { value: "initials", label: "Baş harf avatarı" },
+  { value: "preset", label: "Hazır ikon" },
+  { value: "image", label: "Resim avatarı" },
+];
+
+const PRESET_OPTIONS: { value: PresetAvatar; label: string }[] = [
+  { value: "default", label: "Default" },
+  { value: "east", label: "Doğu" },
+  { value: "screen", label: "Kadraj" },
+  { value: "arch", label: "Arşiv" },
+  { value: "mixed", label: "Karma" },
+];
+
+const TITLE_MODE_OPTIONS: { value: SelectedTitleMode; label: string }[] = [
+  { value: "auto", label: "Otomatik ünvan" },
+  { value: "manual", label: "Manuel ünvan" },
+];
+
+const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
+const AVATAR_SIZE = 256;
+
+function updatePreference<K extends keyof ProfilePreferences>(
+  preferences: ProfilePreferences,
+  key: K,
+  value: ProfilePreferences[K]
+): ProfilePreferences {
+  return { ...preferences, [key]: value };
+}
+
+async function resizeAvatarImage(file: File): Promise<string> {
+  if (!file.type.startsWith("image/")) {
+    throw new Error("Sadece resim dosyası seçebilirsin.");
+  }
+  if (file.size > MAX_IMAGE_BYTES) {
+    throw new Error("Resim 4 MB üstünde olmamalı.");
+  }
+
+  const bitmap = await createImageBitmap(file);
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = AVATAR_SIZE;
+    canvas.height = AVATAR_SIZE;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Resim işlenemedi.");
+
+    const sourceSize = Math.min(bitmap.width, bitmap.height);
+    const sx = Math.max(0, (bitmap.width - sourceSize) / 2);
+    const sy = Math.max(0, (bitmap.height - sourceSize) / 2);
+
+    ctx.drawImage(bitmap, sx, sy, sourceSize, sourceSize, 0, 0, AVATAR_SIZE, AVATAR_SIZE);
+    return canvas.toDataURL("image/jpeg", 0.85);
+  } finally {
+    bitmap.close();
+  }
+}
+
+export default function ProfileSettingsCard({
+  preferences,
+  profileName,
+  automaticTitle,
+  onChange,
+}: ProfileSettingsCardProps) {
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [imageError, setImageError] = useState<string | null>(null);
+  const [imageBusy, setImageBusy] = useState(false);
+
+  const setPreference = <K extends keyof ProfilePreferences>(
+    key: K,
+    value: ProfilePreferences[K]
+  ) => {
+    onChange(updatePreference(preferences, key, value));
+  };
+
+  const handleImageFile = async (file: File | undefined) => {
+    if (!file) return;
+    setImageBusy(true);
+    setImageError(null);
+    try {
+      const avatarImageDataUrl = await resizeAvatarImage(file);
+      onChange({
+        ...preferences,
+        avatarMode: "image",
+        avatarImageDataUrl,
+      });
+    } catch (err) {
+      setImageError(err instanceof Error ? err.message : "Resim yüklenemedi.");
+    } finally {
+      setImageBusy(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  return (
+    <section className="bg-zinc-900/30 rounded-2xl border border-zinc-800/60 p-5 sm:p-6 min-w-0">
+      <div className="flex flex-col sm:flex-row sm:items-start gap-4 sm:gap-5">
+        <ProfileAvatar profileName={profileName} preferences={preferences} size="lg" />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+            <div>
+              <h3 className="text-base font-semibold text-zinc-100 tracking-tight">Profil</h3>
+              <p className="mt-1 text-xs text-zinc-500">
+                Sidebar ve mobil üst çubukta görünen yerel profil kimliği.
+              </p>
+            </div>
+            <span className="inline-flex w-fit rounded-full bg-zinc-950/45 px-2.5 py-1 text-[11px] text-zinc-500 ring-1 ring-zinc-800/70">
+              Local-only
+            </span>
+          </div>
+
+          <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <label className="min-w-0">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
+                Görünen ad
+              </span>
+              <input
+                type="text"
+                value={preferences.displayName}
+                onChange={(e) => setPreference("displayName", e.target.value.slice(0, 48))}
+                placeholder={profileName}
+                className="mt-1.5 w-full h-10 rounded-xl bg-zinc-950/45 border border-zinc-800/70 px-3 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-amber-500/25 focus:border-amber-500/35"
+              />
+            </label>
+
+            <label className="min-w-0">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
+                Profil alt yazısı
+              </span>
+              <input
+                type="text"
+                value={preferences.profileTagline}
+                onChange={(e) => setPreference("profileTagline", e.target.value.slice(0, 80))}
+                placeholder="Kendi medya yolculuğum"
+                className="mt-1.5 w-full h-10 rounded-xl bg-zinc-950/45 border border-zinc-800/70 px-3 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-amber-500/25 focus:border-amber-500/35"
+              />
+            </label>
+          </div>
+
+          <div className="mt-5 grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
+                Avatar türü
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {AVATAR_MODE_OPTIONS.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setPreference("avatarMode", option.value)}
+                    className={`rounded-lg px-3 py-2 text-xs font-medium ring-1 transition-colors cursor-pointer ${
+                      preferences.avatarMode === option.value
+                        ? "bg-amber-500/15 text-amber-200 ring-amber-500/35"
+                        : "bg-zinc-950/35 text-zinc-400 ring-zinc-800/70 hover:text-zinc-200"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
+                Accent
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {ACCENT_OPTIONS.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setPreference("avatarAccent", option.value)}
+                    className={`inline-flex h-8 items-center gap-2 rounded-lg px-2.5 text-xs font-medium ring-1 transition-colors cursor-pointer ${
+                      preferences.avatarAccent === option.value
+                        ? "bg-zinc-800/80 text-zinc-100 ring-zinc-600"
+                        : "bg-zinc-950/35 text-zinc-500 ring-zinc-800/70 hover:text-zinc-200"
+                    }`}
+                  >
+                    <span className={`h-3 w-3 rounded-full ${option.className}`} />
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
+                Hazır avatar
+              </p>
+              <select
+                value={preferences.presetAvatar}
+                onChange={(e) => setPreference("presetAvatar", e.target.value as PresetAvatar)}
+                className="mt-2 h-10 w-full rounded-xl bg-zinc-950/45 border border-zinc-800/70 px-3 text-sm text-zinc-100 focus:outline-none focus:ring-2 focus:ring-amber-500/25 focus:border-amber-500/35 cursor-pointer"
+              >
+                {PRESET_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="mt-5 rounded-xl border border-zinc-800/60 bg-zinc-950/25 p-4">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-zinc-200">Resim avatarı</p>
+                <p className="mt-1 text-xs text-zinc-500">
+                  Seçilen görsel 256x256 boyuta küçültülüp sadece bu tarayıcıda saklanır.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => handleImageFile(e.target.files?.[0])}
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={imageBusy}
+                  className="inline-flex h-9 items-center gap-2 rounded-lg bg-zinc-800 px-3 text-xs font-medium text-zinc-200 transition-colors hover:bg-zinc-700 disabled:opacity-50 cursor-pointer"
+                >
+                  <ImagePlus className="h-4 w-4" aria-hidden="true" />
+                  {imageBusy ? "İşleniyor" : "Resim seç"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onChange({ ...preferences, avatarImageDataUrl: undefined, avatarMode: "initials" })}
+                  className="inline-flex h-9 items-center gap-2 rounded-lg border border-zinc-800/80 px-3 text-xs font-medium text-zinc-400 transition-colors hover:border-rose-500/35 hover:bg-rose-500/10 hover:text-rose-200 cursor-pointer"
+                >
+                  <Trash2 className="h-4 w-4" aria-hidden="true" />
+                  Resmi kaldır
+                </button>
+              </div>
+            </div>
+            {imageError && (
+              <p className="mt-3 rounded-lg bg-rose-500/10 px-3 py-2 text-xs text-rose-300 ring-1 ring-rose-500/25">
+                {imageError}
+              </p>
+            )}
+          </div>
+
+          <div className="mt-5 grid grid-cols-1 md:grid-cols-[minmax(0,16rem)_minmax(0,1fr)] gap-4">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
+                Ünvan
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {TITLE_MODE_OPTIONS.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setPreference("selectedTitleMode", option.value)}
+                    className={`rounded-lg px-3 py-2 text-xs font-medium ring-1 transition-colors cursor-pointer ${
+                      preferences.selectedTitleMode === option.value
+                        ? "bg-violet-500/15 text-violet-200 ring-violet-500/35"
+                        : "bg-zinc-950/35 text-zinc-400 ring-zinc-800/70 hover:text-zinc-200"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <label className="min-w-0">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
+                Manuel ünvan
+              </span>
+              <input
+                type="text"
+                value={preferences.manualTitle}
+                onChange={(e) => setPreference("manualTitle", e.target.value.slice(0, 48))}
+                disabled={preferences.selectedTitleMode !== "manual"}
+                placeholder={automaticTitle}
+                className="mt-1.5 w-full h-10 rounded-xl bg-zinc-950/45 border border-zinc-800/70 px-3 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-violet-500/25 focus:border-violet-500/35 disabled:opacity-50"
+              />
+            </label>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}

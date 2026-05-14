@@ -9,8 +9,10 @@
 // `AppTabs` döndürürüz ki TabType erişimi kaybolmasın.
 
 import { ChevronRight, Settings } from "lucide-react";
+import type { ProfilePreferences } from "@/lib/profile-preferences";
 import CloudModeBadge from "./cloud-mode-badge";
 import AppTabs, { type TabType } from "./app-tabs";
+import { ProfileAvatar } from "./sidebar-profile-card";
 
 const TAB_LABELS: Record<TabType, string> = {
   dashboard: "Dashboard",
@@ -31,9 +33,16 @@ const TAB_LABELS: Record<TabType, string> = {
 interface AppTopbarProps {
   activeTab: TabType;
   onChangeTab: (tab: TabType) => void;
+  profileName: string;
+  profilePreferences: ProfilePreferences;
 }
 
-export default function AppTopbar({ activeTab, onChangeTab }: AppTopbarProps) {
+export default function AppTopbar({
+  activeTab,
+  onChangeTab,
+  profileName,
+  profilePreferences,
+}: AppTopbarProps) {
   return (
     <header
       className="sticky top-0 z-40 border-b border-zinc-800/60 bg-zinc-950/70 backdrop-blur-md"
@@ -41,11 +50,16 @@ export default function AppTopbar({ activeTab, onChangeTab }: AppTopbarProps) {
     >
       <div className="flex items-center gap-4 px-4 sm:px-6 lg:px-6 h-14">
         {/* Mobil marka (sidebar gizliyken yerine geçer) */}
-        <div className="flex items-center gap-2 lg:hidden">
-          <div className="w-7 h-7 rounded-md bg-gradient-to-br from-amber-400 to-amber-600 grid place-items-center text-zinc-950 font-bold text-xs">
-            M
+        <div className="flex min-w-0 items-center gap-2 lg:hidden">
+          <ProfileAvatar profileName={profileName} preferences={profilePreferences} size="sm" />
+          <div className="min-w-0">
+            <span className="block truncate text-sm font-semibold text-zinc-100 tracking-tight">
+              MediaTracker
+            </span>
+            <span className="block max-w-[8rem] truncate text-[10px] text-zinc-500 sm:max-w-[12rem]">
+              {profileName}
+            </span>
           </div>
-          <span className="text-sm font-semibold text-zinc-100 tracking-tight">MediaTracker</span>
         </div>
 
         {/* Breadcrumb — lg+ sidebar var, marka tekrar etmeyelim */}
@@ -58,7 +72,9 @@ export default function AppTopbar({ activeTab, onChangeTab }: AppTopbarProps) {
         </div>
 
         <div className="ml-auto flex items-center gap-2">
-          <CloudModeBadge />
+          <div className="hidden sm:block">
+            <CloudModeBadge />
+          </div>
           <button
             type="button"
             onClick={() => onChangeTab("settings")}

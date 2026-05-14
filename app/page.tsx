@@ -13,6 +13,7 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 import AppSidebar from "@/components/app-sidebar";
 import AppTopbar from "@/components/app-topbar";
+import ProfileSettingsCard from "@/components/profile-settings-card";
 import RightRail from "@/components/right-rail";
 import PageHeader from "@/components/page-header";
 import { TabType } from "@/components/app-tabs";
@@ -84,6 +85,15 @@ import LibraryControlBar, {
 import { GlobalSearchCategory, GlobalSearchLibraryStatus, GlobalSearchResult } from "@/lib/global-search-types";
 import { mockMediaList } from "@/lib/mock-media";
 import {
+  DEFAULT_PROFILE_PREFERENCES,
+  loadProfilePreferences,
+  resolveProfileDisplayName,
+  resolveProfileTagline,
+  resolveSelectedTitle,
+  saveProfilePreferences,
+  type ProfilePreferences,
+} from "@/lib/profile-preferences";
+import {
   loadMediaList,
   saveMediaList,
   clearMediaList,
@@ -131,6 +141,10 @@ export default function HomePage() {
   // effect'ini bekletiyoruz. Hidrasyon hem SSR/build, hem `mediaList`
   // hidrasyonu ile aynı pattern'i izler.
   const [uiPrefsLoaded, setUiPrefsLoaded] = useState(false);
+  const [profilePrefsLoaded, setProfilePrefsLoaded] = useState(false);
+  const [profilePreferences, setProfilePreferences] = useState<ProfilePreferences>(
+    DEFAULT_PROFILE_PREFERENCES
+  );
   // Arama çubuğundaki metin (R18: kasıtlı olarak persist edilmiyor)
   const [searchQuery, setSearchQuery] = useState("");
   // Seçili medya türü filtresi (R18: persist)
@@ -316,6 +330,12 @@ export default function HomePage() {
     setUiPrefsLoaded(true);
   }, []);
 
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-only hydration from localStorage
+    setProfilePreferences(loadProfilePreferences());
+    setProfilePrefsLoaded(true);
+  }, []);
+
   // ---- R18: UI tercihlerini her değişimde kaydet ----
   // `uiPrefsLoaded` bayrağı, hidrasyon tamamlanmadan default değerlerin
   // localStorage'a yazılıp gerçek snapshot'ı ezmesini engeller.
@@ -342,6 +362,11 @@ export default function HomePage() {
     continueSectionOpen,
     seriesSectionOpen,
   ]);
+
+  useEffect(() => {
+    if (!profilePrefsLoaded) return;
+    saveProfilePreferences(profilePreferences);
+  }, [profilePrefsLoaded, profilePreferences]);
 
   // ---- EYLEMLER (Actions) ----
 
@@ -1524,11 +1549,16 @@ export default function HomePage() {
   }, [mediaList, progressLogs]);
 
   const profileName = useMemo(() => {
-    const email = authUser?.email?.trim();
-    if (!email) return "Yerel Profil";
-    const localPart = email.split("@")[0]?.trim();
-    return localPart || email;
-  }, [authUser?.email]);
+    return resolveProfileDisplayName(profilePreferences, authUser);
+  }, [profilePreferences, authUser]);
+
+  const profileTagline = useMemo(() => {
+    return resolveProfileTagline(profilePreferences);
+  }, [profilePreferences]);
+
+  const journeyTitle = useMemo(() => {
+    return resolveSelectedTitle(profilePreferences, userProgression.title);
+  }, [profilePreferences, userProgression.title]);
 
   type PersonalPageIcon = typeof Heart;
 
@@ -1713,11 +1743,19 @@ export default function HomePage() {
         onChange={handleTabChange}
         onOpenSettings={() => handleTabChange("settings")}
         profileName={profileName}
+        profileTagline={profileTagline}
+        profilePreferences={profilePreferences}
         progression={userProgression}
+        journeyTitle={journeyTitle}
       />
 
       <div className="flex-1 min-w-0 flex flex-col">
-        <AppTopbar activeTab={activeTab} onChangeTab={handleTabChange} />
+        <AppTopbar
+          activeTab={activeTab}
+          onChangeTab={handleTabChange}
+          profileName={profileName}
+          profilePreferences={profilePreferences}
+        />
 
         {/* Ana içerik alanı.
             R6: Shell zaten sidebar+rail ile column genişliğini kontrol ettiği
@@ -3220,6 +3258,12 @@ export default function HomePage() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-5 items-start">
               {/* Sol kolon: hesap + cloud sync durumu */}
               <div className="space-y-4 lg:space-y-5">
+                <ProfileSettingsCard
+                  preferences={profilePreferences}
+                  profileName={profileName}
+                  automaticTitle={userProgression.title}
+                  onChange={setProfilePreferences}
+                />
                 <AuthPanel />
                 <CloudSyncStatusCard />
               </div>

@@ -15,6 +15,7 @@ import {
   TrendingUp,
   type LucideIcon,
 } from "lucide-react";
+import type { ProfilePreferences } from "@/lib/profile-preferences";
 import type { UserProgression, UserProgressionWorld } from "@/lib/user-progression";
 import type { TabType } from "./app-tabs";
 import SidebarProfileCard from "./sidebar-profile-card";
@@ -79,7 +80,10 @@ interface AppSidebarProps {
   onChange: (tab: TabType) => void;
   onOpenSettings: () => void;
   profileName: string;
+  profileTagline: string;
+  profilePreferences: ProfilePreferences;
   progression: UserProgression;
+  journeyTitle: string;
 }
 
 const JOURNEY_ACCENTS: Record<
@@ -165,15 +169,18 @@ function NavRow({
 
 function JourneyCard({
   progression,
+  journeyTitle,
   active,
   onClick,
 }: {
   progression: UserProgression;
+  journeyTitle: string;
   active: boolean;
   onClick: () => void;
 }) {
   const accent = JOURNEY_ACCENTS[progression.dominantWorld];
   const progressWidth = `${Math.round(progression.progressPercent * 100)}%`;
+  const remainingXp = Math.max(0, progression.nextLevelXp - progression.currentLevelXp);
 
   return (
     <button
@@ -194,26 +201,30 @@ function JourneyCard({
             Seviye {progression.level}
           </p>
           <p className={`mt-0.5 truncate text-[11px] font-medium ${accent.text}`}>
-            {progression.title}
+            {journeyTitle}
           </p>
         </div>
         <span
-          className={`shrink-0 rounded-lg bg-zinc-950/35 px-2 py-1 text-[11px] font-mono tabular-nums ${accent.text}`}
+          className={`shrink-0 rounded-full bg-zinc-950/45 px-2.5 py-1 text-[11px] font-semibold tabular-nums ring-1 ring-zinc-800/70 ${accent.text}`}
         >
-          LV {progression.level}
+          Level {progression.level}
         </span>
       </div>
 
       <div className="mt-3">
-        <div className="h-1.5 overflow-hidden rounded-full bg-zinc-800/80">
+        <div className="h-2 overflow-hidden rounded-full bg-zinc-950/60 ring-1 ring-zinc-800/80">
           <div
             className={`h-full rounded-full bg-gradient-to-r ${accent.fill}`}
             style={{ width: progressWidth }}
           />
         </div>
-        <div className="mt-1.5 text-[10px] font-mono tabular-nums text-zinc-500">
-          {progression.currentLevelXp} / {progression.nextLevelXp} XP
+        <div className="mt-2 flex items-center justify-between gap-3 text-[10px] font-mono tabular-nums text-zinc-500">
+          <span>{progression.currentLevelXp} / {progression.nextLevelXp} XP</span>
+          <span>{Math.round(progression.progressPercent * 100)}%</span>
         </div>
+        <p className="mt-1 text-[10.5px] text-zinc-500">
+          Sonraki seviyeye {remainingXp} XP
+        </p>
       </div>
     </button>
   );
@@ -224,7 +235,10 @@ export default function AppSidebar({
   onChange,
   onOpenSettings,
   profileName,
+  profileTagline,
+  profilePreferences,
   progression,
+  journeyTitle,
 }: AppSidebarProps) {
   const handleClick = (id: string) => {
     if (REAL_TABS.has(id as TabType)) onChange(id as TabType);
@@ -235,7 +249,12 @@ export default function AppSidebar({
       className="hidden lg:flex sticky top-0 h-screen w-64 shrink-0 flex-col gap-4 border-r border-zinc-800/60 bg-zinc-950/40 px-4 py-5"
       aria-label="Birincil navigasyon"
     >
-      <SidebarProfileCard profileName={profileName} onOpenSettings={onOpenSettings} />
+      <SidebarProfileCard
+        profileName={profileName}
+        tagline={profileTagline}
+        preferences={profilePreferences}
+        onOpenSettings={onOpenSettings}
+      />
 
       <nav className="flex-1 min-h-0 overflow-y-auto -mx-1 px-1 flex flex-col gap-3">
         {SECTIONS.map((section) => (
@@ -258,6 +277,7 @@ export default function AppSidebar({
       <div className="mt-1 border-t border-zinc-800/60 pt-3">
         <JourneyCard
           progression={progression}
+          journeyTitle={journeyTitle}
           active={activeTab === "stats"}
           onClick={() => handleClick("stats")}
         />
