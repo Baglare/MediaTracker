@@ -401,7 +401,7 @@ function buildTransparencySummary(s: AiSettings): string {
   const parts = [
     s.useProfile ? "kütüphane profil özeti" : null,
     s.useRecentActivity ? "son aktivite özeti" : null,
-    `AI bilgi sinyali ${s.useWebResearch ? "açık" : "kapalı"}`,
+    `web araştırması ${s.useWebResearch ? "açık" : "kapalı"}`,
     `kişisel notlar ${s.usePersonalNotes ? "dahil" : "değil"}`,
     s.deepResearch ? "derin araştırma modu" : null,
   ].filter(Boolean);

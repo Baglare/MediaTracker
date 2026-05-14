@@ -606,7 +606,7 @@ function buildAssistantMessage(prompt: string, settings: AiSettings, count: numb
     settings.useProfile && "kütüphane profili",
     settings.useRecentActivity && "son aktiviteler",
     settings.usePersonalNotes && "kişisel notlar",
-    settings.useWebResearch && "AI bilgi sinyali",
+    settings.useWebResearch && "web araştırması",
     settings.deepResearch && "derin araştırma",
   ]
     .filter(Boolean)
@@ -617,8 +617,9 @@ function buildAssistantMessage(prompt: string, settings: AiSettings, count: numb
   return `İsteğini "${prompt.trim()}" olarak yorumladım. ${used || "Yalnızca istek metni"} ile ${count} öneri hazırladım.`;
 }
 
-function buildSourceApisClientEmptyMessage(prompt: string): string {
-  return `İsteğini "${prompt.trim()}" olarak yorumladım. Kaynaklardan bu kapsamda uygun yeni aday bulamadım. Kapsamı genişletmeyi veya farklı bir mood/tür denemeyi deneyebilirsin.`;
+function buildExternalClientEmptyMessage(prompt: string, researchMode: ResearchMode): string {
+  const sourceLabel = researchMode === "web" ? "Web araştırması ve kaynak doğrulamasıyla" : "Kaynaklardan";
+  return `İsteğini "${prompt.trim()}" olarak yorumladım. ${sourceLabel} bu kapsamda uygun yeni aday bulamadım. Kapsamı genişletmeyi veya farklı bir mood/tür denemeyi deneyebilirsin.`;
 }
 
 function formatList(values?: string[]) {
@@ -1052,8 +1053,8 @@ export default function AiAdvisor({
     if (inFlightRequestId.current !== requestId) return;
     if (step >= LOADING_STEPS.length) {
       const finishWithClientFallback = () => {
-        if (researchMode === "source-apis") {
-          finishWith(prompt, [], buildSourceApisClientEmptyMessage(prompt), [], undefined, requestId);
+        if (researchMode === "source-apis" || researchMode === "web") {
+          finishWith(prompt, [], buildExternalClientEmptyMessage(prompt, researchMode), [], undefined, requestId);
           return;
         }
         const recs = buildLocalFallbackRecs(prompt, mediaList);

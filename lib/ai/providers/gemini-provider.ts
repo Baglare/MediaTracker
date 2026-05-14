@@ -80,7 +80,7 @@ function buildRankingPrompt(args: {
     : "Kişisel notlar dahil değil.";
   const webBlock = settings.useWebResearch
     ? "Web araştırması açık: aday havuzu web araştırmasıyla genişletilmiş olabilir. Cevapta bunu doğal söyleyebilirsin; teknik query/debug detayı yazma."
-    : "AI bilgi sinyali kapalı: communitySignal alanını boş bırak.";
+    : "Web araştırması kapalı: communitySignal alanını boş bırak.";
 
   return [
     "Sen bir medya tavsiye danışmanısın. Türkçe, kısa ve ürün arayüzüne uygun cevap ver.",
@@ -431,7 +431,7 @@ function buildTransparency(settings: AiSettings): string {
   const parts = [
     settings.useProfile ? "kütüphane profil özeti" : null,
     settings.useRecentActivity ? "son aktivite özeti" : null,
-    `AI bilgi sinyali ${settings.useWebResearch ? "açık" : "kapalı"}`,
+    `web araştırması ${settings.useWebResearch ? "açık" : "kapalı"}`,
     `kişisel notlar ${settings.usePersonalNotes ? "dahil" : "değil"}`,
     settings.deepResearch ? "derin araştırma modu" : null,
   ].filter(Boolean);

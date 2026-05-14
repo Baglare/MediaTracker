@@ -220,9 +220,9 @@ export interface AiActiveContext {
 }
 
 // R37 — Advisor UI'dan gelen araştırma modu ve kapsam seçimi.
-// "library-only" → mevcut akış (sadece kütüphane + retrieval plan).
-// "source-apis"  → harici kaynak API'lerinden ek aday çek.
-// "web"          → ileride gerçek web search (şu an UI-only).
+// "library-only" → yalnızca kütüphane içi adaylar.
+// "source-apis"  → harici kaynak API adayları.
+// "web"          → web araştırması + kaynak API doğrulaması.
 export type AdvisorResearchMode = "library-only" | "source-apis" | "web";
 export type AdvisorScopeMode = "mixed" | "east" | "screen" | "arch" | "one-per-world";
 
