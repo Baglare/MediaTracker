@@ -79,7 +79,7 @@ function buildRankingPrompt(args: {
     ? `Kişisel notlar: ${profile.notes.map((n) => `${n.title}: ${n.note}`).join(" | ")}`
     : "Kişisel notlar dahil değil.";
   const webBlock = settings.useWebResearch
-    ? "AI bilgi sinyali açık: genel model bilgini kısa communitySignal için kullanabilirsin; gerçek web/grounding yaptığını iddia etme."
+    ? "Web araştırması açık: aday havuzu web araştırmasıyla genişletilmiş olabilir. Cevapta bunu doğal söyleyebilirsin; teknik query/debug detayı yazma."
     : "AI bilgi sinyali kapalı: communitySignal alanını boş bırak.";
 
   return [

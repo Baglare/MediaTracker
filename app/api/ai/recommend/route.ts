@@ -15,6 +15,7 @@ import {
   CandidateVerificationResult,
   searchCandidatesWithDebug,
   searchSourceApiCandidates,
+  searchWebResearchCandidates,
   dedupeCandidates,
 } from "@/lib/ai/candidate-search";
 import { expandTargetFamily, familyLabel } from "@/lib/ai/target-family";
@@ -836,6 +837,9 @@ function buildPolishedAssistantMessage(args: {
   if (args.researchMode === "source-apis") {
     return `İsteğini "${prompt}" olarak yorumladım. Kaynaklardan doğrulanmış ${args.count} öneri buldum.`;
   }
+  if (args.researchMode === "web") {
+    return `İsteğini "${prompt}" olarak yorumladım. Web araştırması ve kaynak doğrulamasıyla ${args.count} öneri buldum.`;
+  }
   if (args.researchMode === "library-only") {
     return `İsteğini "${prompt}" olarak yorumladım. Sadece kütüphanen içinden ${args.count} öneri seçtim.`;
   }
@@ -978,6 +982,22 @@ function isWeakTvMoodDiscovery(intent: AiIntent, plan: AiRetrievalPlan | null, r
   const moodBased = intent.kind === "mood_based" || (plan?.preferenceSignals.length || 0) > 0;
   const hasConcreteAnchor = intent.references.length > 0 || (plan?.sourceTypes.length || 0) > 0;
   return targetTvOnly && moodBased && !hasConcreteAnchor && result.candidates.length < 6;
+}
+
+function mergeCandidateSearchTelemetry(
+  searchResult: CandidateSearchResult,
+  external: {
+    executedQueries?: CandidateSearchResult["debug"]["executedQueries"];
+    sourceCandidateCounts?: Record<string, number>;
+  }
+) {
+  if (external.executedQueries?.length) {
+    searchResult.debug.executedQueries.push(...external.executedQueries);
+  }
+  for (const [source, count] of Object.entries(external.sourceCandidateCounts || {})) {
+    searchResult.debug.sourceCandidateCounts[source] =
+      (searchResult.debug.sourceCandidateCounts[source] || 0) + count;
+  }
 }
 
 function emptyVerificationResult(): CandidateVerificationResult {
@@ -1384,6 +1404,56 @@ export async function POST(req: NextRequest) {
       );
     }
   }
+  if (researchMode === "web") {
+    let webAdded = false;
+    try {
+      const webResearch = await searchWebResearchCandidates({
+        intent,
+        profile,
+        message,
+        scopeMode,
+      });
+      mergeCandidateSearchTelemetry(searchResult, webResearch);
+      for (const note of webResearch.notes) debugNotes.push(`r44_${note}`);
+      if (webResearch.candidates.length > 0) {
+        const before = candidates.length;
+        candidates = dedupeCandidates([...candidates, ...webResearch.candidates]);
+        const merged = candidates.length - before;
+        webAdded = merged > 0;
+        debugNotes.push(`r44_web_research:fetched=${webResearch.candidates.length} merged=${merged}`);
+      } else {
+        debugNotes.push("r44_web_research_empty");
+      }
+    } catch (error) {
+      debugNotes.push(
+        `r44_web_research_error:${error instanceof Error ? error.message.slice(0, 80) : "unknown"}`
+      );
+    }
+
+    if (!webAdded) {
+      try {
+        const sourceApi = await searchSourceApiCandidates({
+          intent,
+          profile,
+          message,
+          scopeMode,
+        });
+        mergeCandidateSearchTelemetry(searchResult, sourceApi);
+        for (const note of sourceApi.notes) debugNotes.push(`r44_source_api_fallback_${note}`);
+        if (sourceApi.candidates.length > 0) {
+          const before = candidates.length;
+          candidates = dedupeCandidates([...candidates, ...sourceApi.candidates]);
+          debugNotes.push(`r44_source_api_fallback:fetched=${sourceApi.candidates.length} merged=${candidates.length - before}`);
+        } else {
+          debugNotes.push("r44_source_api_fallback_empty");
+        }
+      } catch (error) {
+        debugNotes.push(
+          `r44_source_api_fallback_error:${error instanceof Error ? error.message.slice(0, 80) : "unknown"}`
+        );
+      }
+    }
+  }
 
   // R39 — Session-level feedback suppression. Client "İlgilenmiyorum" dediği
   // önerilerin sinyallerini gönderir; aday havuzundan eşleşenler elenir.
@@ -1441,7 +1511,7 @@ export async function POST(req: NextRequest) {
   let targetFamilyRejected = 0;
   candidates = candidates.filter((c) => {
     // source-apis modunda library kaynaklı adayları havuza alma
-    if (researchMode === "source-apis" && c.source === "library") {
+    if ((researchMode === "source-apis" || researchMode === "web") && c.source === "library") {
       policyRejected.push({ title: c.title, reason: "Kütüphanende zaten var (kaynak modu)" });
       return false;
     }
@@ -1474,8 +1544,8 @@ export async function POST(req: NextRequest) {
       `ai_target_filter:before=${beforePolicy} after=${candidates.length} target=${familyLabel(intent.targetTypes, message)} rejected=${targetFamilyRejected}`
     );
   }
-  if (researchMode === "source-apis" && candidates.length === 0) {
-    debugNotes.push("source_api_candidates_empty");
+  if ((researchMode === "source-apis" || researchMode === "web") && candidates.length === 0) {
+    debugNotes.push(researchMode === "web" ? "web_research_candidates_empty" : "source_api_candidates_empty");
   }
 
   const libIndex = new Map<string, true>();

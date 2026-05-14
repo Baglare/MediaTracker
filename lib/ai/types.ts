@@ -61,7 +61,7 @@ export interface LibraryProfile {
   worldDistribution: { east: number; screen: number; arch: number };
 }
 
-export type RetrievalSource = "anilist" | "tvmaze" | "openlibrary" | "omdb" | "tmdb" | "library";
+export type RetrievalSource = "anilist" | "tvmaze" | "openlibrary" | "omdb" | "tmdb" | "library" | "web";
 
 export interface AiSearchPlan {
   source: RetrievalSource;

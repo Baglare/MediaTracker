@@ -325,12 +325,16 @@ function buildRankingPrompt(args: {
   const profileBlock = args.settings.useProfile && args.profile
     ? `Kütüphane profili: ${summarizeProfile(args.profile)}`
     : "Kütüphane profili kullanılmıyor.";
+  const webBlock = args.settings.useWebResearch
+    ? "Web araştırması açık: aday havuzu web araştırmasıyla genişletilmiş olabilir. Cevapta bunu doğal söyleyebilirsin; teknik query/debug detayı yazma."
+    : "Web araştırması kapalı.";
 
   return [
     "Türkçe cevap veren medya tavsiye danışmanısın. Kısa, ürün arayüzüne uygun ve sadece geçerli JSON döndür.",
     `Kullanıcı isteği: """${args.message}"""`,
     `Intent: ${JSON.stringify(args.intent)}`,
     profileBlock,
+    webBlock,
     `Retrieval plan: ${JSON.stringify(args.retrievalPlan || null)}`,
     "ADAY HAVUZU: yalnızca buradan seç, asla başka başlık uydurma.",
     "Adaylar sistem tarafından ön-skorlandı; bunu sadece seçim için kullan. Kullanıcıya ön-skor, debug, fallback, provider, retrieval, parse veya teknik plan terimleri yazma.",
@@ -372,7 +376,7 @@ function buildTransparency(settings: AiSettings) {
   const parts = [
     settings.useProfile ? "kütüphane profil özeti" : null,
     settings.useRecentActivity ? "son aktivite özeti" : null,
-    `AI bilgi sinyali ${settings.useWebResearch ? "açık" : "kapalı"}`,
+    `web araştırması ${settings.useWebResearch ? "açık" : "kapalı"}`,
     `kişisel notlar ${settings.usePersonalNotes ? "dahil" : "değil"}`,
     settings.deepResearch ? "derin araştırma modu" : null,
   ].filter(Boolean);

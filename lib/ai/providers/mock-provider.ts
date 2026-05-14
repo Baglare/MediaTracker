@@ -72,7 +72,7 @@ function buildAssistantMessage(message: string, settings: AiSettings, count: num
     settings.useProfile && "kütüphane profili",
     settings.useRecentActivity && "son aktiviteler",
     settings.usePersonalNotes && "kişisel notlar",
-    settings.useWebResearch && "AI bilgi sinyali",
+    settings.useWebResearch && "web araştırması",
     settings.deepResearch && "derin araştırma",
   ]
     .filter(Boolean)
@@ -84,7 +84,7 @@ function buildTransparency(settings: AiSettings): string {
   const parts = [
     settings.useProfile ? "kütüphane profil özeti" : null,
     settings.useRecentActivity ? "son aktivite özeti" : null,
-    `AI bilgi sinyali ${settings.useWebResearch ? "açık" : "kapalı"}`,
+    `web araştırması ${settings.useWebResearch ? "açık" : "kapalı"}`,
     `kişisel notlar ${settings.usePersonalNotes ? "dahil" : "değil"}`,
     settings.deepResearch ? "derin araştırma modu" : null,
   ].filter(Boolean);

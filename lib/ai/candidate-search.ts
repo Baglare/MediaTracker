@@ -36,6 +36,12 @@ interface SearchContext {
   debug?: CandidateSearchDebug;
 }
 
+interface WebSearchHit {
+  title: string;
+  url?: string;
+  snippet?: string;
+}
+
 interface CandidateSearchDebug {
   executedQueries: AiRetrievalDebug["executedQueries"];
   sourceCandidateCounts: Record<string, number>;
@@ -90,6 +96,17 @@ function recordQuery(
   if (!debug) return;
   debug.executedQueries.push({ source, mediaType, query, resultCount });
   addSourceCount(debug, source, resultCount);
+}
+
+function stripHtml(value: string): string {
+  return value
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function getBaseUrl(): string {
@@ -295,6 +312,107 @@ function sourceQueriesFor(
 
   queries.push(...baseQueries.filter((q) => !/^short$|^movie$|^OVA$/i.test(q)));
   return { queries: dedupeQueries(queries, 3), signals };
+}
+
+function targetLabelForWeb(type: MediaType): string {
+  switch (type) {
+    case "movie": return "movies";
+    case "tv": return "tv shows";
+    case "anime": return "anime";
+    case "manga": return "manga";
+    case "manhwa": return "manhwa";
+    case "manhua": return "manhua";
+    case "book":
+    case "light_novel":
+    case "web_novel":
+    case "visual_novel":
+      return "books";
+  }
+}
+
+function buildWebResearchQueries(intent: AiIntent, profile: LibraryProfile | null, message: string): string[] {
+  const year = new Date().getFullYear();
+  const targets = intent.targetTypes.length > 0 ? intent.targetTypes : resolveTargetTypes(intent, profile);
+  const target = targetLabelForWeb(targets[0] || "anime");
+  const text = `${message} ${intent.mood.join(" ")}`.toLowerCase();
+  const terms = expandQueries(intent, profile, message).filter((q) => !/^popular$/i.test(q)).slice(0, 2);
+  const base = terms.length > 0 ? terms.join(" ") : message.replace(/[^\p{L}\p{N}\s]/gu, " ").split(/\s+/).slice(0, 5).join(" ");
+  const queries: string[] = [];
+
+  if (/güncel|guncel|yeni|new|latest|popüler|popular|trend/i.test(text)) {
+    queries.push(`best new ${base} ${target} ${year}`);
+    queries.push(`popular ${base} ${target} ${year}`);
+  }
+  if (/yaklaşan|yaklasan|upcoming|gelecek|çıkacak|cikacak/i.test(text)) {
+    queries.push(`upcoming ${base} ${target} ${year}`);
+  }
+  if (/okuma sırası|okuma sirasi|watch order|reading order|sıra|sirasi/i.test(text)) {
+    const ref = intent.references[0] || base;
+    queries.push(`${ref} reading order ${target}`);
+    queries.push(`${ref} watch order ${target}`);
+  }
+  queries.push(`${base} ${target} recommendations ${year}`);
+
+  return dedupeQueries(queries, 3);
+}
+
+function extractWebCandidateQueries(hits: WebSearchHit[], fallbackQueries: string[]): string[] {
+  const out: string[] = [];
+  for (const hit of hits) {
+    const title = hit.title
+      .replace(/\b(Top|Best|New|Upcoming|Popular|Latest)\s+\d*\b/gi, " ")
+      .replace(/\b(Anime|Manga|Movies?|TV Shows?|Books?)\b/gi, " ")
+      .split(/\s[-|:]\s/)[0]
+      .replace(/\b\d{4}\b/g, " ")
+      .replace(/\b(to watch|to read|ranked|list|guide|recommendations?)\b/gi, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    const words = title.split(/\s+/).filter((w) => w.length > 2);
+    if (words.length >= 2 && words.length <= 8) out.push(words.join(" "));
+  }
+  out.push(...fallbackQueries);
+  return dedupeQueries(out, 4);
+}
+
+async function searchWeb(ctx: SearchContext, query: string, mediaType: MediaType): Promise<WebSearchHit[]> {
+  if (!query.trim()) return [];
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 7000);
+    const url = `https://duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
+    const res = await fetch(url, {
+      cache: "no-store",
+      signal: controller.signal,
+      headers: { "user-agent": "Mozilla/5.0 MediaTracker AI Advisor" },
+    }).finally(() => clearTimeout(timeout));
+    if (!res.ok) {
+      recordQuery(ctx.debug, "web", mediaType, query, 0);
+      return [];
+    }
+    const html = await res.text();
+    const hits: WebSearchHit[] = [];
+    const re = /<a[^>]+class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?<a[^>]+class="result__snippet"[^>]*>([\s\S]*?)<\/a>/gi;
+    for (const m of html.matchAll(re)) {
+      hits.push({
+        url: stripHtml(m[1] || ""),
+        title: stripHtml(m[2] || ""),
+        snippet: stripHtml(m[3] || ""),
+      });
+      if (hits.length >= 5) break;
+    }
+    if (hits.length === 0) {
+      const titleOnly = /<a[^>]+class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;
+      for (const m of html.matchAll(titleOnly)) {
+        hits.push({ url: stripHtml(m[1] || ""), title: stripHtml(m[2] || "") });
+        if (hits.length >= 5) break;
+      }
+    }
+    recordQuery(ctx.debug, "web", mediaType, query, hits.length);
+    return hits;
+  } catch {
+    recordQuery(ctx.debug, "web", mediaType, query, 0);
+    return [];
+  }
 }
 
 // ============================================
@@ -869,6 +987,8 @@ function sourceMatchesMediaType(plan: AiSearchPlan): boolean {
       return plan.mediaType === "movie";
     case "library":
       return true;
+    case "web":
+      return false;
   }
 }
 
@@ -1282,6 +1402,8 @@ function dispatchSearch(
       return searchTmdb(ctx, query);
     case "omdb":
       return searchOmdb(ctx, query);
+    case "web":
+      return Promise.resolve([]);
     case "library":
       return Promise.resolve([]);
   }
@@ -1292,6 +1414,86 @@ export interface SourceApiCandidatesResult {
   executedQueries: AiRetrievalDebug["executedQueries"];
   sourceCandidateCounts: Record<string, number>;
   notes: string[];
+}
+
+export async function searchWebResearchCandidates(args: {
+  intent: AiIntent;
+  profile: LibraryProfile | null;
+  message: string;
+  scopeMode?: AdvisorScopeMode;
+  sharedDebug?: CandidateSearchDebug;
+}): Promise<SourceApiCandidatesResult> {
+  const { intent, profile, message, scopeMode } = args;
+  const notes: string[] = [];
+  const localDebug: CandidateSearchDebug = args.sharedDebug || createSearchDebug();
+  const ctx: SearchContext = { baseUrl: getBaseUrl(), debug: localDebug };
+  const scope = scopeMode || "mixed";
+  const plan = planForScope(scope);
+  let pairs = plan.pairs;
+  if (intent.targetTypes.length > 0) {
+    const targetSet = new Set(intent.targetTypes);
+    const filtered = pairs.filter((p) => targetSet.has(p.mediaType));
+    if (filtered.length > 0) pairs = filtered;
+  }
+
+  const webQueries = buildWebResearchQueries(intent, profile, message);
+  if (webQueries.length === 0) {
+    notes.push("web_research_no_query");
+    return { candidates: [], executedQueries: localDebug.executedQueries, sourceCandidateCounts: localDebug.sourceCandidateCounts, notes };
+  }
+
+  const targetForDebug = pairs[0]?.mediaType || intent.targetTypes[0] || "anime";
+  const webHits: WebSearchHit[] = [];
+  for (const query of webQueries) {
+    const hits = await searchWeb(ctx, query, targetForDebug);
+    webHits.push(...hits);
+  }
+  notes.push(`web_research_queries:${webQueries.join("|")}`);
+  notes.push(`web_research_hits:${webHits.length}`);
+  if (webHits.length === 0) {
+    notes.push("web_research_empty");
+    return { candidates: [], executedQueries: localDebug.executedQueries, sourceCandidateCounts: localDebug.sourceCandidateCounts, notes };
+  }
+
+  const baseQueries = expandQueries(intent, profile, message);
+  const webCandidateQueries = extractWebCandidateQueries(webHits, baseQueries);
+  notes.push(`web_research_candidate_queries:${webCandidateQueries.join("|") || "-"}`);
+
+  const tasks: Promise<AiCandidate[]>[] = [];
+  for (const pair of pairs) {
+    if (pair.source === "anilist") {
+      const structured = extractAniListStructuredFilters(intent, message);
+      const cat = aniListCategoryFor(pair.mediaType);
+      if (cat && structured.strict) {
+        tasks.push(searchAniListDiscover(ctx, cat, structured.strict));
+      }
+    }
+    for (const q of webCandidateQueries.slice(0, 3)) {
+      tasks.push(dispatchSearch(ctx, pair.source, pair.mediaType, q));
+    }
+  }
+
+  const settled = await Promise.allSettled(tasks);
+  const collected: AiCandidate[] = [];
+  for (const s of settled) {
+    if (s.status === "fulfilled") collected.push(...s.value);
+  }
+
+  const deduped = dedupeCandidates(collected).map((c) => ({
+    ...c,
+    scoreReasons: [
+      "Web araştırmasıyla bulunan güncel/popüler kaynak sinyallerinden doğrulandı.",
+      ...(c.scoreReasons || []),
+    ],
+  }));
+  notes.push(`web_research_verified_candidates:${deduped.length}`);
+
+  return {
+    candidates: deduped.slice(0, MAX_TOTAL),
+    executedQueries: localDebug.executedQueries,
+    sourceCandidateCounts: localDebug.sourceCandidateCounts,
+    notes,
+  };
 }
 
 export async function searchSourceApiCandidates(args: {
