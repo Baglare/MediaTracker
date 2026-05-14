@@ -198,9 +198,117 @@ API route'ları proxy görevi görür:
 
 `next.config.ts` bu kaynakların image hostname'lerini `remotePatterns` olarak whitelist'ler — yeni bir görsel kaynağı eklendiğinde buraya da eklenmeli.
 
-## AI Danışman
+## AI Danışman (R34–R40)
 
-[components/ai-advisor.tsx](components/ai-advisor.tsx) UI + [lib/ai/](lib/ai/) provider abstraction (`openai-compatible-provider`, settings, types). [app/api/ai/recommend/route.ts](app/api/ai/recommend/route.ts) proxy. AI sekmesi dışına çıkıldığında `aiResetSignal` artırılır → component aktif sohbeti sıfırlar; R19'da bu mantık modal-style prev-prop karşılaştırması + ayrı ref-cleanup effect şeklinde refactor edildi.
+[components/ai-advisor.tsx](components/ai-advisor.tsx) UI + [lib/ai/](lib/ai/) (provider abstraction, profile builder, intent analyzer, candidate search, rule-based scorer) + [app/api/ai/recommend/route.ts](app/api/ai/recommend/route.ts) proxy. V2 mimarisi single chat panel'den **öneri ve analiz merkezi**ne çevrildi.
+
+### İstek payload akışı (request shape)
+
+`AiRecommendRequest` ([lib/ai/types.ts](lib/ai/types.ts)) alanları:
+
+- `message` — kullanıcı prompt'u (R34 mod kartları `buildModePrompt` ile zenginleştirir; "neden somut veriyle açıkla" cümlesi sabit eklenir).
+- `mediaItems` / `progressLogs` — ham kütüphane payload'u.
+- `settings: AiSettings` — `useProfile`, `useRecentActivity`, `usePersonalNotes`, `useWebResearch`, `deepResearch`, `useOpenAIProvider` ve R35'te eklenen opsiyonel `includeRatings` / `includeFavorites` / `includeProgress`. Default-true semantiği (`flag()` helper) eski payload'larla geriye uyumlu.
+- `researchMode?: "library-only" | "source-apis" | "web"` — R37. Sadece `source-apis` gerçek aday çekme tetikler; `web` şu an `useWebResearch` flag'ine mapping (gerçek web search yok).
+- `scopeMode?: "mixed" | "east" | "screen" | "arch" | "one-per-world"` — R37. AI Danışman UI chip'leri ile kaynak seçimi daraltılır.
+- `dismissed?: { title, externalSource?, externalId?, mediaType? }[]` — R39 session-level feedback. Backend aday havuzundan eşleşenleri eler; kalıcı değil, sadece request bağlamında.
+- `activeContext` / `recentContext` — follow-up merge için (R19).
+
+### Aday havuzu pipeline'ı (kritik sıra)
+
+Route'un (`recommend/route.ts`) candidate işleme sırası:
+
+1. `searchCandidatesWithDebug` — mevcut planner/refine/deterministic-taste yolu (değişmedi).
+2. **R37 source-api merge** — `researchMode === "source-apis"` ise [lib/ai/candidate-search.ts](lib/ai/candidate-search.ts)'in `searchSourceApiCandidates` aggregator'ı tetiklenir. Scope → kaynak haritası: `east` → AniList (anime/manga/manhwa/manhua), `screen` → TMDB (movie) + TVMaze (tv), `arch` → OpenLibrary. TMDB → OMDb otomatik fallback (TMDB boş dönerse). Aggregator çıktısı dedupe ile mevcut havuza eklenir.
+3. **R39 feedback suppression** — `dismissedKeys` (`source:id`) ve `dismissedTitles` (normalize) setleriyle filtre; debug satırı `r39_feedback_suppressed:n=K`.
+4. **R37.2 policy filter** — üç katmanlı hard-reject:
+   - `source-apis` modunda `source === "library"` adaylar elenir (library_based intent zaten erken çıkış yaptığı için çakışma yok).
+   - `intent.targetTypes` non-empty ise farklı türler elenir.
+   - `scopeMode` east/screen/arch ise kapsam dışı türler elenir.
+   - Reddedilenler `policyRejected` listesine somut gerekçe ile ("Kütüphanende zaten var", "İstenen tür ile uyuşmuyor", "Doğu kapsamına uymuyor") yazılır; final response'a merge edilir.
+5. `libIndex` build + **R36 rule-based scorer** ([lib/ai/candidate-scorer.ts](lib/ai/candidate-scorer.ts)) — yüksek puanlılara/favorilere benzerlik, scope/world uyumu, dropped/paused cezası, mood keyword eşleşmeleri, AniList community score tiebreaker. Her aday `score: number` + `scoreReasons: string[]` alır; library-dışı kaynak adayı libIndex'te varsa hard-reject ("Zaten listende olduğu için elendi").
+6. Provider ranking (`runRankingWithProviders`) — `describeCandidates` her aday satırına `· ön-skor:N` ve `nedenler: ...` ekler; sistem prompt'u "Adaylar kurallı şekilde ön-skorlandı; reason'ı bu nedenlere bağla" talimatını içerir.
+
+Source-apis modunda toplam aday 0 kalırsa: `r37_source_candidates_empty` debug satırı, library fallback'e **düşülmez**, kullanıcıya "Kaynak API'lerinden <scope> kapsamı için uygun yeni aday bulamadım" mesajı.
+
+### LibraryProfile yapısı (R35)
+
+[lib/ai/profile-builder.ts](lib/ai/profile-builder.ts) ham kütüphaneyi modele boca etmez; sinyal odaklı özet üretir. Gruplar ve top-N limitleri:
+
+- `highRated` (8) — `userRating >= 7`, descending.
+- `favorites` (8), `dropped` (5), `paused` (5), `planned` (5), `completed` (5).
+- `inProgress` (8) — watching/reading veya `currentProgress > 0` (completed/dropped/planning/paused dışı).
+- `recentActivity` (10) — `progressLogs`'tan timestamp-desc.
+- `notes` (5) — `personalNotes.slice(0, 240)`.
+- `topGenres` (8), `topTags` (8) — count-desc.
+- `averageRating: { value, count }` — `userRating` set edilmiş eserlerden 0.1 hassasiyetli.
+- `worldDistribution: { east, screen, arch }` — type'tan dünya haritalaması.
+
+**Toggle gating**: `includeRatings === false` → `highRated = []`, `averageRating = undefined`. `includeFavorites === false` → `favorites = []`. `includeProgress === false` → `inProgress`/`completed`/`planned`/`paused`/`dropped` hepsi `[]`. `useRecentActivity === false` → `recentActivity = []`. `usePersonalNotes === false` → `notes = undefined`.
+
+`summarizeProfile(profile)` her grubu **yalnızca doluysa** prompt'a yazar (yokluğun özellik gibi algılanmasını engeller); boş kütüphanede "Kütüphane boş..." güvenli özet.
+
+### AniList structured discover (R37.1)
+
+[app/api/anilist/search/route.ts](app/api/anilist/search/route.ts) `q` yoksa **discover modu**na geçer: `genres`, `tags`, `episodesLte`, `sort` CSV paramları → GraphQL `media(genre_in, tag_in, episodes_lesser, sort)`. Mevcut `q + category` davranışı bire bir korundu.
+
+Candidate-search'ün `extractAniListStructuredFilters(intent, message)` helper'ı mood/length intentlerini AniList sözlüğüne haritalar (chill → `Slice of Life, Comedy` + `Iyashikei, Heartwarming`; karanlık → `Psychological, Thriller` + `Dark Fantasy`; "kısa/short" → `episodesLesser=14`; "13 bölüm altı" → `episodesLesser=14` vb). İki pass:
+- **Strict** — tüm signals + tags + ep cap.
+- **Relaxed** — sadece ilk genre, tag yok, ep cap yok.
+
+`searchSourceApiCandidates` AniList pair'leri için mood/length sinyali varsa strict çağırır; 0 sonuç ise relaxed otomatik. Hiç sinyal yoksa eski title-search davranışı.
+
+Debug satırları: `r37_anilist_discover_strict:filters=... hits=N` / `r37_anilist_discover_relaxed:...` / `r37_anilist_title_search:queries=K`.
+
+### AiCandidate.source / AiRecommendation.externalSource
+
+R37'de **`"tmdb"`** literal'ı union'a eklendi (eski union: `tvmaze | anilist | openlibrary | omdb | library`). Providers' JSON schema'sı + planner whitelist'i (`normalizePlanShape`) + label helper'ları (`TMDB`) + client mirror — hepsi senkronize. Yeni bir kaynak eklerken bu beş yere de yansıt.
+
+### Öneri kartı (R38)
+
+Kart yapısı:
+- Üst row: cover (yoksa `Sparkles` ikon fallback) + başlık + `mediaType · source · year` + fit chip.
+- **"Neden önerildi"** kutucuğu — `rec.candidate?.scoreReasons` (R36) varsa 3 maddeye kadar bullet; yoksa `rec.reason` cümle sınırlarında bölünüp 110 karakterde `…` ile kırpılır. Ham debug görünümü yok.
+- Risk satırı (`AlertTriangle` ikon, amber) + community signal.
+- Meta footer: `score X.X  ·  source:externalId` mono font.
+- Aksiyon satırı `flex flex-wrap`:
+  - **Listeye Ekle** (canAdd) / **Listede** / **Keşfet'te Ara** (canAdd=false → `onOpenDiscover` callback).
+  - **Buna benzer** — `buildSimilarPrompt(rec)` ile chat'e send (dismissed state'i bypass eder).
+  - **İlgilenmiyorum** / **Geri al** — `dismissedSignals` state'i toggle; R39'a yansır.
+
+### Session feedback suppression (R39)
+
+`dismissedSignals: Record<recId, DismissedSignal>` — local feedback. `handleDismissRec` tam sinyali (title/externalSource/externalId/mediaType) saklar; `runApi` payload'a `dismissed: Object.values(...)` olarak geçer. Backend filtre (yukarıda akış #3) bu adayları eler ve hiç LLM'e gönderilmez. **"Buna benzer öner" dismissed bypass etmez** — kaynak rec backend'de zaten elenir, benzer adaylar farklı id/title ile döner; UI'da dismissed karta da basılabilir.
+
+### Oturum kalıcılığı (R40) — kritik davranış
+
+**AI sekmesinden çıkıp dönmek oturumu kapatmaz.** `handleTabChange` artık `aiResetSignal` artırmıyor (state'in kendisi kaldırıldı; advisor'a `resetSignal={0}` sabit gider, modal-style reset koluna asla girmez). Oturum yalnızca **"Konuyu kapat"** butonuyla temizlenir (eski `"Yeni konu"` etiketi birleşik tek-davranışa standartlaştı).
+
+LocalStorage key'leri (AI tarafı):
+- `media-tracker-ai-settings` — AiSettings.
+- `media-tracker-ai-sessions` — Geçmiş oturumlar (max 8, R19).
+- `media-tracker-ai-data-toggles` — R34/R35 veri toggle'ları.
+- `media-tracker-ai-advisor-prefs` — `scopeMode` + `researchMode`.
+- **`media-tracker-ai-active-session`** — R40 snapshot (`v: 1`). İçerik: `messages`, `recommendations`, `rejected`, `addedIds`, `dismissedSignals`, `pendingClarification`, `debugInfo`, `activeContext`. Boş state save effect'i `removeItem` çağırır; "Konuyu kapat" tüm state'i sıfırlayınca snapshot otomatik silinir.
+
+### Keşfet prefill (R40)
+
+`onOpenDiscover(rec)` AiAdvisor → app/page.tsx → `discoverPrefill: { query, category, token }` state'i + `handleTabChange("discover")`. GlobalSearch monoton-artan `token` ile prev-prop guard çalıştırır → `setQuery`/`setCategory` render fazında, `setTimeout(handleSearch, 0)` ile defer auto-search (set-state-in-effect ihlalinden kaçınma). `mediaType → GlobalSearchCategory`: movie→movie, tv→tv, anime→anime, manga/manhwa/manhua→manga, light_novel/web_novel/visual_novel→novel, book→book. Manuel Keşfet kullanımı (prop verilmediğinde) bozulmaz.
+
+### UI elemanları
+
+- **Mod kartları** (R34): 6 sabit kart (Öneri Al · Kütüphane Analizi · Puanlarıma Göre · Favorilerime Göre · Yarım Kalanlar · Her Dünyadan Öner). Karta basınca `buildModePrompt(mode, scope, research, toggles)` → mevcut `handleSend` akışı.
+- **Scope chip'leri** (5): Karışık · Doğu · Kadraj · Arşiv · Her dünyadan bir öneri.
+- **Araştırma modu** (3): Sadece kütüphanem · Kaynak API'leriyle öner · Web araştırması.
+- **Sağ panel**: "Kullanılacak veriler" (Puanlar/Favoriler/İlerleme/Notlar/Son aktiviteler) + "Gelişmiş" (kişisel notlar, derin araştırma, OpenAI provider).
+
+### Yeni bir mod / kaynak / scope eklerken kontrol listesi
+
+- `MODE_CARDS` / `SCOPE_OPTIONS` / `RESEARCH_OPTIONS` array'lerine ekle.
+- Yeni media kaynağı (örn. başka bir API): `AiCandidate.source` + `AiRecommendation.externalSource` union'larını client + server'da senkronla; providers' JSON schema enum'larını + `normalizePlanShape` whitelist'lerini + `sourceLabel` switch'lerini güncelle; `searchSourceApiCandidates` `planForScope`'una pair ekle.
+- Yeni scope: `eastTypes`/`screenTypes`/`archTypes` set'lerini route'ta güncelle; `searchSourceApiCandidates`'in scope filtresini ve UI haritalamalarını (`onOpenDiscover` switch) eşle.
+- Yeni AniList mood/length sözlüğü: `extractAniListStructuredFilters` koşullarına ekle; relaxed fallback'in tetiklenebileceğini test et.
+
 
 ## UI Shell ve Layout (R1–R8 redesign + R17/R18.5.1 polish)
 
@@ -383,7 +491,10 @@ hooks/           — useAuth, useSyncStatus
 lib/             — storage (UI prefs dahil), types, progress, dashboard-stats,
                    mock-media, sync-manager, sync-queue, backup, series-group,
                    global-search-types, {anilist,omdb,openlibrary,tmdb,tvmaze}{-types}.ts
-lib/ai/          — AI provider (openai-compatible) + settings/types
+lib/ai/          — provider (openai-compatible / gemini / mock) + settings/types +
+                   profile-builder (R35) + intent-analyzer + candidate-search
+                   (title + R37.1 AniList structured discover + R37 source-api
+                   aggregator) + candidate-scorer (R36 rule-based)
 lib/supabase/    — client, server, status, types, mapping, cloud-repository
 supabase/        — schema.sql (RLS + index + trigger)
 docs/            — supabase-offline-sync-plan.md
@@ -403,3 +514,7 @@ design_references/ — sadece görsel/layout referans; runtime'da kullanılmaz; 
 - Sahte `totalProgress = 1` fallback'i AniList normalizer'da yok (V3.2). Yeni bir kaynak normalizer'ı yazarken "bilinmiyorsa 0" semantiğine uy.
 - WorldTransition macro overlay **sadece `handleThemeFilterChange` token bumpı ile** oynar; başka tetikleyici eklenmez. Sayfa açılışında hidrasyon setter'ları doğrudan kullanılır, handler üzerinden değil.
 - Title benzerliği ile favorit/rating türetme yok — kullanıcı eylemiyle değişir.
+- AI Danışman'da gerçek web search yok (R37 `web` modu UI-only, sadece `useWebResearch` flag'i provider'a iletilir).
+- AI feedback **kalıcı değil** (R39) — sadece session-level suppression; "Konuyu kapat" veya sayfa yenilenip "Konuyu kapat" sonrası temizlenir. Supabase tarafı dokunulmadı.
+- AI sekme değişiminde **otomatik reset yok** (R40). Aktif oturum localStorage'a (`media-tracker-ai-active-session`) yazılır; yalnızca "Konuyu kapat" / `handleNewTopic` temizler. Yeni bir sekme ekleyip AI state'i reset etmek isterseniz açıkça `handleNewTopic()` çağırın — eski `aiResetSignal` mekanizması yok.
+- AI source-apis modunda **library fallback'e düşülmez** (R37.2) — 0 aday → kullanıcıya net mesaj + `r37_source_candidates_empty` debug satırı; library-based intent ise zaten erken çıkış yapar (farklı kod yolu).
