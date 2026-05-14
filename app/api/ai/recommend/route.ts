@@ -1356,6 +1356,52 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // R37.2 — Aday havuzu politikası: source-apis modunda library kaynağını
+  // havuza sokma; intent.targetTypes ve scope filtresini final aday havuzuna
+  // uygula. Elenenler rejectedCandidates'a gerekçeyle yazılır.
+  const policyRejected: { title: string; reason: string }[] = [];
+  const eastTypes = new Set(["anime", "manga", "manhwa", "manhua", "light_novel", "web_novel", "visual_novel"]);
+  const screenTypes = new Set(["tv", "movie"]);
+  const archTypes = new Set(["book"]);
+
+  const targetTypeSet = intent.targetTypes.length > 0 ? new Set(intent.targetTypes) : null;
+  const scopeAllow: Set<string> | null =
+    scopeMode === "east" ? eastTypes :
+    scopeMode === "screen" ? screenTypes :
+    scopeMode === "arch" ? archTypes : null;
+
+  const beforePolicy = candidates.length;
+  candidates = candidates.filter((c) => {
+    // source-apis modunda library kaynaklı adayları havuza alma
+    if (researchMode === "source-apis" && c.source === "library") {
+      policyRejected.push({ title: c.title, reason: "Kütüphanende zaten var (kaynak modu)" });
+      return false;
+    }
+    // intent target type uyuşmazlığı
+    if (targetTypeSet && !targetTypeSet.has(c.type)) {
+      policyRejected.push({
+        title: c.title,
+        reason: `İstenen tür ile uyuşmuyor (${c.type})`,
+      });
+      return false;
+    }
+    // scope filtresi
+    if (scopeAllow && !scopeAllow.has(c.type)) {
+      const scopeLabel = scopeMode === "east" ? "Doğu" : scopeMode === "screen" ? "Kadraj" : "Arşiv";
+      policyRejected.push({ title: c.title, reason: `${scopeLabel} kapsamına uymuyor (${c.type})` });
+      return false;
+    }
+    return true;
+  });
+  if (policyRejected.length > 0 || beforePolicy !== candidates.length) {
+    debugNotes.push(
+      `r37_2_policy:before=${beforePolicy} after=${candidates.length} rejected=${policyRejected.length} mode=${researchMode || "library-only"} scope=${scopeMode || "-"} target=${intent.targetTypes.join("/") || "-"}`
+    );
+  }
+  if (researchMode === "source-apis" && candidates.length === 0) {
+    debugNotes.push("source_api_candidates_empty");
+  }
+
   const libIndex = new Map<string, true>();
   for (const m of mediaItems) {
     if (m.externalSource && m.externalId) {
@@ -1424,10 +1470,26 @@ export async function POST(req: NextRequest) {
     if (ideationFailedReason && ideationFailedReason !== "skipped_library_based") {
       baseMsg = `${baseMsg} (AI plan üretilemedi: ${ideationFailedReason}. Daha net bir tür/mood verirsen yeniden deneyebilirim.)`;
     }
+    // R37.2 — source-apis modu: library fallback'e DÜŞME; net mesaj döndür.
+    if (researchMode === "source-apis") {
+      const scopeLabel =
+        scopeMode === "east" ? "Doğu" :
+        scopeMode === "screen" ? "Kadraj" :
+        scopeMode === "arch" ? "Arşiv" :
+        scopeMode === "one-per-world" ? "her dünya" : "karışık";
+      baseMsg = `Kaynak API'lerinden ${scopeLabel} kapsamı için uygun yeni aday bulamadım. Daha geniş bir kapsam dene, farklı bir mod seç ya da daha net bir tür/mood ipucu ekle.`;
+    }
+    const mergedRejectedEmpty: { title: string; reason: string }[] = [];
+    const seenEmpty = new Set<string>();
+    for (const r of [...scoringRejected, ...policyRejected]) {
+      if (seenEmpty.has(r.title)) continue;
+      seenEmpty.add(r.title);
+      mergedRejectedEmpty.push(r);
+    }
     const empty: AiRecommendResponse = {
       assistantMessage: baseMsg,
       recommendations: [],
-      rejectedCandidates: scoringRejected.length > 0 ? scoringRejected : undefined,
+      rejectedCandidates: mergedRejectedEmpty.length > 0 ? mergedRejectedEmpty : undefined,
       transparencySummary: buildTransparencySummary(settings),
       intent,
       debug: {
@@ -1495,14 +1557,17 @@ export async function POST(req: NextRequest) {
         r.inLibrary ||
         (!!r.externalSource && !!r.externalId && libIndex.has(`${r.externalSource}:${r.externalId}`)),
     }));
-    // R36 — sistem tarafından hard-reject edilen adayları LLM'in
-    // rejectedCandidates listesine ekle (deduplicate by title).
-    if (scoringRejected.length > 0) {
+    // R36 + R37.2 — sistem tarafından hard-reject edilen adayları (skorlayıcı
+    // + politika filtresi) LLM'in rejectedCandidates listesine ekle.
+    const systemRejected = [...scoringRejected, ...policyRejected];
+    if (systemRejected.length > 0) {
       const existing = new Set((response.rejectedCandidates || []).map((r) => r.title));
-      const merged = [
-        ...(response.rejectedCandidates || []),
-        ...scoringRejected.filter((r) => !existing.has(r.title)),
-      ];
+      const merged = [...(response.rejectedCandidates || [])];
+      for (const r of systemRejected) {
+        if (existing.has(r.title)) continue;
+        existing.add(r.title);
+        merged.push(r);
+      }
       response.rejectedCandidates = merged;
     }
     return NextResponse.json(response satisfies AiRecommendResponse);

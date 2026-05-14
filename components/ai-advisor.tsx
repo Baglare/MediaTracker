@@ -1052,7 +1052,6 @@ export default function AiAdvisor({
             {RESEARCH_OPTIONS.map((opt) => {
               const Icon = opt.icon;
               const active = researchMode === opt.key;
-              const soon = false;
               return (
                 <button
                   key={opt.key}
@@ -1067,9 +1066,6 @@ export default function AiAdvisor({
                   <div className="min-w-0">
                     <p className={`text-xs font-medium truncate ${active ? "text-violet-100" : "text-zinc-300"}`}>
                       {opt.label}
-                      {soon && (
-                        <span className="ml-1.5 text-[9px] text-zinc-500 uppercase tracking-wider">yakında</span>
-                      )}
                     </p>
                     <p className="text-[10px] text-zinc-500 leading-snug line-clamp-2">{opt.desc}</p>
                   </div>
