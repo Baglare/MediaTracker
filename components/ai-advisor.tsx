@@ -12,6 +12,16 @@ import {
   History,
   ChevronRight,
   ShieldCheck,
+  Wand2,
+  Library,
+  Star,
+  Heart,
+  PlayCircle,
+  Globe2,
+  Database,
+  Cloud,
+  Search,
+  Compass,
 } from "lucide-react";
 import { MediaItem, MediaType, ProgressLog } from "@/lib/types";
 import { GlobalSearchResult } from "@/lib/global-search-types";
@@ -185,6 +195,120 @@ const SAMPLE_PROMPTS = [
   "Chill ve kısa bir şey öner.",
 ];
 
+// R34 — Mod kartları / kapsam / araştırma seçimleri
+type AdvisorMode =
+  | "recommend"
+  | "library-analysis"
+  | "by-ratings"
+  | "by-favorites"
+  | "unfinished"
+  | "one-per-world";
+
+interface ModeCard {
+  key: AdvisorMode;
+  label: string;
+  hint: string;
+  icon: typeof Sparkles;
+}
+
+const MODE_CARDS: ModeCard[] = [
+  { key: "recommend", label: "Öneri Al", hint: "Profilime göre yeni öneriler", icon: Wand2 },
+  { key: "library-analysis", label: "Kütüphane Analizi", hint: "Zevkim ve eksiklerim", icon: Library },
+  { key: "by-ratings", label: "Puanlarıma Göre", hint: "Yüksek puan verdiklerime benzer", icon: Star },
+  { key: "by-favorites", label: "Favorilerime Göre", hint: "Favori imzalarımla", icon: Heart },
+  { key: "unfinished", label: "Yarım Kalanlar", hint: "Bugün neye devam etsem", icon: PlayCircle },
+  { key: "one-per-world", label: "Her Dünyadan Öner", hint: "Doğu · Kadraj · Arşiv", icon: Globe2 },
+];
+
+type ScopeMode = "mixed" | "east" | "screen" | "arch" | "one-per-world";
+
+const SCOPE_OPTIONS: { key: ScopeMode; label: string }[] = [
+  { key: "mixed", label: "Karışık" },
+  { key: "east", label: "Doğu" },
+  { key: "screen", label: "Kadraj" },
+  { key: "arch", label: "Arşiv" },
+  { key: "one-per-world", label: "Her dünyadan bir öneri" },
+];
+
+const SCOPE_PROMPT_HINT: Record<ScopeMode, string> = {
+  "mixed": "Kapsam: kütüphanemdeki tüm dünyalardan karışık olsun.",
+  "east": "Kapsam: Doğu dünyası (anime, manga, manhwa, manhua, novel) odaklı olsun.",
+  "screen": "Kapsam: Kadraj dünyası (film, dizi) odaklı olsun.",
+  "arch": "Kapsam: Arşiv dünyası (kitap) odaklı olsun.",
+  "one-per-world": "Kapsam: Doğu, Kadraj ve Arşiv dünyalarının her birinden birer öneri ver.",
+};
+
+type ResearchMode = "library-only" | "source-apis" | "web";
+
+const RESEARCH_OPTIONS: { key: ResearchMode; label: string; desc: string; icon: typeof Database }[] = [
+  { key: "library-only", label: "Sadece kütüphanem", desc: "Yalnızca eklediklerim üstünden", icon: Database },
+  { key: "source-apis", label: "Kaynak API'leriyle öner", desc: "TVmaze · AniList · OL · OMDb (yakında)", icon: Search },
+  { key: "web", label: "Web araştırması", desc: "AI bilgi sinyali ile genişletilmiş", icon: Cloud },
+];
+
+interface DataToggles {
+  ratings: boolean;
+  favorites: boolean;
+  progress: boolean;
+  notes: boolean;
+  recentActivity: boolean;
+}
+
+const DEFAULT_DATA_TOGGLES: DataToggles = {
+  ratings: true,
+  favorites: true,
+  progress: true,
+  notes: false,
+  recentActivity: true,
+};
+
+const DATA_TOGGLE_META: { key: keyof DataToggles; label: string }[] = [
+  { key: "ratings", label: "Puanlar" },
+  { key: "favorites", label: "Favoriler" },
+  { key: "progress", label: "İlerleme" },
+  { key: "notes", label: "Notlar" },
+  { key: "recentActivity", label: "Son aktiviteler" },
+];
+
+const DATA_TOGGLES_KEY = "media-tracker-ai-data-toggles";
+const ADVISOR_PREFS_KEY = "media-tracker-ai-advisor-prefs";
+
+function buildModePrompt(
+  mode: AdvisorMode,
+  scope: ScopeMode,
+  research: ResearchMode,
+  toggles: DataToggles
+): string {
+  const base: Record<AdvisorMode, string> = {
+    "recommend": "Bana göre yeni bir şey öner.",
+    "library-analysis": "Kütüphanemi analiz et: zevk profilim, baskın türler, eksik kalan alanlar ve dağılım hakkında kısa bir analiz çıkar.",
+    "by-ratings": "7+ puan verdiğim eserlere benzer yeni öneriler ver.",
+    "by-favorites": "Favori olarak işaretlediğim eserlerin ortak imzalarına uygun yeni öneriler ver.",
+    "unfinished": "Yarım bıraktığım ya da devam ettiğim eserlerden bugün hangisine devam etmem gerektiğini söyle ve gerekçelendir.",
+    "one-per-world": "Doğu (anime/manga/manhwa/manhua/novel), Kadraj (film/dizi) ve Arşiv (kitap) dünyalarının her birinden birer öneri ver.",
+  };
+
+  const scopeLine = mode === "one-per-world" ? SCOPE_PROMPT_HINT["one-per-world"] : SCOPE_PROMPT_HINT[scope];
+
+  const researchLine =
+    research === "library-only"
+      ? "Araştırma modu: yalnızca kütüphanemden öner, dış kaynak kullanma."
+      : research === "source-apis"
+      ? "Araştırma modu: kaynak API verileri (TVmaze/AniList/OpenLibrary/OMDb) ile destekle."
+      : "Araştırma modu: web bilgi sinyali ile genişletilmiş öneri ver.";
+
+  const activeData = DATA_TOGGLE_META
+    .filter((m) => toggles[m.key])
+    .map((m) => m.label.toLowerCase());
+  const dataLine = activeData.length
+    ? `Kullanılabilecek verilerim: ${activeData.join(", ")}.`
+    : "Profil verilerimi kullanma, sadece istek metnine göre cevap ver.";
+
+  const whyLine = "Her öneri için neden bana uyduğunu kısa ama somut biçimde açıkla.";
+
+  return [base[mode], scopeLine, researchLine, dataLine, whyLine].filter(Boolean).join(" ");
+}
+
 const LOADING_STEPS = [
   "İstek analiz ediliyor",
   "Kütüphane profili hazırlanıyor",
@@ -325,6 +449,10 @@ export default function AiAdvisor({
     originalPrompt: string;
     question: string;
   } | null>(null);
+  // R34 — yeni UI state'leri
+  const [scopeMode, setScopeMode] = useState<ScopeMode>("mixed");
+  const [researchMode, setResearchMode] = useState<ResearchMode>("library-only");
+  const [dataToggles, setDataToggles] = useState<DataToggles>(DEFAULT_DATA_TOGGLES);
   const stepTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inFlightRequestId = useRef<string | null>(null);
   const inFlightPromptKey = useRef<string | null>(null);
@@ -338,10 +466,44 @@ export default function AiAdvisor({
       if (s) setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(s) });
       const list = localStorage.getItem(SESSIONS_KEY);
       if (list) setSessions(JSON.parse(list));
+      const dt = localStorage.getItem(DATA_TOGGLES_KEY);
+      if (dt) setDataToggles({ ...DEFAULT_DATA_TOGGLES, ...JSON.parse(dt) });
+      const prefs = localStorage.getItem(ADVISOR_PREFS_KEY);
+      if (prefs) {
+        const parsed = JSON.parse(prefs) as { scopeMode?: ScopeMode; researchMode?: ResearchMode };
+        if (parsed.scopeMode) setScopeMode(parsed.scopeMode);
+        if (parsed.researchMode) setResearchMode(parsed.researchMode);
+      }
     } catch {
       // ignore
     }
   }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(DATA_TOGGLES_KEY, JSON.stringify(dataToggles));
+    } catch {
+      // ignore
+    }
+  }, [dataToggles]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(ADVISOR_PREFS_KEY, JSON.stringify({ scopeMode, researchMode }));
+    } catch {
+      // ignore
+    }
+  }, [scopeMode, researchMode]);
+
+  // R34 — araştırma modu mevcut AiSettings.useWebResearch'e haritalanır
+  // (provider/route logic'i değişmesin diye). "source-apis" şimdilik UI-only.
+  // CLAUDE.md modal-style prev-prop kalıbı: render fazında karşılaştır, effect kullanma.
+  const expectedUseWebResearch = researchMode === "web";
+  if (settings.useWebResearch !== expectedUseWebResearch) {
+    setSettings((prev) =>
+      prev.useWebResearch === expectedUseWebResearch ? prev : { ...prev, useWebResearch: expectedUseWebResearch }
+    );
+  }
 
   useEffect(() => {
     try {
@@ -698,6 +860,13 @@ export default function AiAdvisor({
     runStep(0, prompt, requestId, apiPromise);
   }
 
+  function handleModeClick(mode: AdvisorMode) {
+    if (isLoading || inFlightRequestId.current) return;
+    const effectiveScope: ScopeMode = mode === "one-per-world" ? "one-per-world" : scopeMode;
+    const prompt = buildModePrompt(mode, effectiveScope, researchMode, dataToggles);
+    handleSend(prompt);
+  }
+
   function handleNewTopic() {
     if (stepTimer.current) clearTimeout(stepTimer.current);
     inFlightRequestId.current = null;
@@ -787,6 +956,99 @@ export default function AiAdvisor({
           )}
         </div>
 
+        {/* R34 — Mod kartları */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs text-zinc-500 uppercase tracking-wide">Ne yapmak istersin?</p>
+            <span className="text-[10px] text-zinc-600">Kartlara basınca öneri akışı tetiklenir</span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {MODE_CARDS.map((m) => {
+              const Icon = m.icon;
+              const disabled = isLoading;
+              return (
+                <button
+                  key={m.key}
+                  onClick={() => handleModeClick(m.key)}
+                  disabled={disabled}
+                  className="group text-left p-3 rounded-xl bg-zinc-900/50 border border-zinc-800/70 hover:border-violet-500/40 hover:bg-zinc-900/80 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed min-w-0"
+                >
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <div className="w-7 h-7 rounded-lg bg-violet-500/15 border border-violet-500/30 flex items-center justify-center shrink-0">
+                      <Icon className="w-3.5 h-3.5 text-violet-300" />
+                    </div>
+                    <span className="text-sm font-medium text-zinc-100 truncate">{m.label}</span>
+                  </div>
+                  <p className="text-[11px] text-zinc-500 leading-relaxed line-clamp-2">{m.hint}</p>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* R34 — Öneri kapsamı */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Compass className="w-3.5 h-3.5 text-zinc-500" />
+            <p className="text-xs text-zinc-500 uppercase tracking-wide">Öneri kapsamı</p>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {SCOPE_OPTIONS.map((opt) => {
+              const active = scopeMode === opt.key;
+              return (
+                <button
+                  key={opt.key}
+                  onClick={() => setScopeMode(opt.key)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors cursor-pointer ${
+                    active
+                      ? "bg-violet-500/20 text-violet-200 border-violet-500/50"
+                      : "bg-zinc-900/40 text-zinc-400 border-zinc-800 hover:border-zinc-700 hover:text-zinc-200"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* R34 — Araştırma modu */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Search className="w-3.5 h-3.5 text-zinc-500" />
+            <p className="text-xs text-zinc-500 uppercase tracking-wide">Araştırma modu</p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
+            {RESEARCH_OPTIONS.map((opt) => {
+              const Icon = opt.icon;
+              const active = researchMode === opt.key;
+              const soon = opt.key === "source-apis";
+              return (
+                <button
+                  key={opt.key}
+                  onClick={() => setResearchMode(opt.key)}
+                  className={`flex items-start gap-2 px-3 py-2 rounded-xl border text-left transition-colors cursor-pointer min-w-0 ${
+                    active
+                      ? "bg-violet-500/15 border-violet-500/40"
+                      : "bg-zinc-900/40 border-zinc-800 hover:border-zinc-700"
+                  }`}
+                >
+                  <Icon className={`w-3.5 h-3.5 mt-0.5 shrink-0 ${active ? "text-violet-300" : "text-zinc-500"}`} />
+                  <div className="min-w-0">
+                    <p className={`text-xs font-medium truncate ${active ? "text-violet-100" : "text-zinc-300"}`}>
+                      {opt.label}
+                      {soon && (
+                        <span className="ml-1.5 text-[9px] text-zinc-500 uppercase tracking-wider">yakında</span>
+                      )}
+                    </p>
+                    <p className="text-[10px] text-zinc-500 leading-snug line-clamp-2">{opt.desc}</p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {/* Şeffaflık */}
         <div className="flex items-start gap-3 p-3 rounded-xl bg-zinc-900/40 border border-zinc-800/60">
           <ShieldCheck className="w-4 h-4 text-violet-400 mt-0.5 shrink-0" />
@@ -796,7 +1058,18 @@ export default function AiAdvisor({
         {/* Boş durum */}
         {messages.length === 0 && recommendations.length === 0 && !viewingSessionId && (
           <div className="space-y-3">
-            <p className="text-xs text-zinc-500 uppercase tracking-wide">Örnek istekler</p>
+            {mediaList.length === 0 ? (
+              <div className="p-4 rounded-xl bg-zinc-900/40 border border-zinc-800/60 text-center">
+                <Sparkles className="w-5 h-5 text-violet-400 mx-auto mb-2" />
+                <p className="text-sm text-zinc-200 mb-1">Kütüphanen boş görünüyor.</p>
+                <p className="text-xs text-zinc-500 leading-relaxed">
+                  AI Danışman en iyi sonucu birkaç eklediğin eserle verir. Önce <span className="text-zinc-300">Keşfet</span> sekmesinden birkaç şey ekle, sonra burada
+                  &ldquo;Öneri Al&rdquo; veya &ldquo;Yarım Kalanlar&rdquo; modlarını dene. İstersen yine de aşağıdaki örnek istekleri sorabilirsin.
+                </p>
+              </div>
+            ) : (
+              <p className="text-xs text-zinc-500 uppercase tracking-wide">Örnek istekler</p>
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {SAMPLE_PROMPTS.map((p) => (
                 <button
@@ -996,15 +1269,39 @@ export default function AiAdvisor({
       </div>
 
       <aside className="space-y-4">
+        {/* R34 — Kullanılacak veriler */}
         <div className="p-4 rounded-2xl bg-zinc-900/40 border border-zinc-800/60">
-          <h3 className="text-sm font-semibold text-zinc-200 mb-3">Gizlilik / Araştırma</h3>
+          <h3 className="text-sm font-semibold text-zinc-200 mb-1">Kullanılacak veriler</h3>
+          <p className="text-[10px] text-zinc-500 mb-3 leading-relaxed">
+            AI Danışman önerileri hazırlarken hangi profil bilgilerinden besleneceğini seç.
+          </p>
+          <div className="space-y-1">
+            {DATA_TOGGLE_META.map(({ key, label }) => (
+              <label
+                key={key}
+                className="flex items-center justify-between gap-3 px-2 py-1.5 rounded-lg hover:bg-zinc-800/40 cursor-pointer"
+              >
+                <span className="text-xs text-zinc-300">{label}</span>
+                <input
+                  type="checkbox"
+                  checked={dataToggles[key]}
+                  onChange={(e) =>
+                    setDataToggles((prev) => ({ ...prev, [key]: e.target.checked }))
+                  }
+                  className="accent-violet-500 cursor-pointer"
+                />
+              </label>
+            ))}
+          </div>
+        </div>
+
+        {/* Gelişmiş / sağlayıcı */}
+        <div className="p-4 rounded-2xl bg-zinc-900/40 border border-zinc-800/60">
+          <h3 className="text-sm font-semibold text-zinc-200 mb-3">Gelişmiş</h3>
           <div className="space-y-2">
             {(
               [
-                ["useProfile", "Kütüphane profilimi kullan"],
-                ["useRecentActivity", "Son aktivitelerimi kullan"],
                 ["usePersonalNotes", "Kişisel notlarımı dahil et"],
-                ["useWebResearch", "AI bilgi sinyali kullan"],
                 ["deepResearch", "Derin araştırma modu"],
                 ["useOpenAIProvider", "OpenAI API kullan"],
               ] as const
@@ -1013,7 +1310,14 @@ export default function AiAdvisor({
                 key={key}
                 className="flex items-center justify-between gap-3 px-2 py-1.5 rounded-lg hover:bg-zinc-800/40 cursor-pointer"
               >
-                <span className="text-xs text-zinc-300">{label}{key === "useOpenAIProvider" ? (<span className="block text-[10px] text-zinc-500 mt-0.5">Açıksa OpenAI API öncelikli kullanılır; ücretli olabilir.</span>) : null}</span>
+                <span className="text-xs text-zinc-300">
+                  {label}
+                  {key === "useOpenAIProvider" ? (
+                    <span className="block text-[10px] text-zinc-500 mt-0.5">
+                      Açıksa OpenAI API öncelikli kullanılır; ücretli olabilir.
+                    </span>
+                  ) : null}
+                </span>
                 <input
                   type="checkbox"
                   checked={settings[key]}
