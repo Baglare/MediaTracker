@@ -165,6 +165,138 @@ export function expandQueries(intent: AiIntent, profile: LibraryProfile | null, 
   });
 }
 
+type SourceQuerySource = "tmdb" | "tvmaze" | "openlibrary";
+
+const SOURCE_QUERY_SIGNALS: {
+  key: string;
+  keys: RegExp;
+  tmdb: string[];
+  tvmaze: string[];
+  openlibrary: string[];
+}[] = [
+  {
+    key: "fantasy",
+    keys: /fantasy|fantastik|fantazi|buyu|büyü|magic|dragon/i,
+    tmdb: ["fantasy adventure", "fantasy"],
+    tvmaze: ["fantasy", "supernatural"],
+    openlibrary: ["subject:fantasy", "fantasy fiction"],
+  },
+  {
+    key: "sci-fi",
+    keys: /sci-?fi|science fiction|bilim ?kurgu|uzay|space|cyberpunk/i,
+    tmdb: ["science fiction", "sci fi"],
+    tvmaze: ["science fiction", "sci fi"],
+    openlibrary: ["subject:science fiction", "science fiction"],
+  },
+  {
+    key: "comedy",
+    keys: /komedi|komik|comedy|gulmek|gülmek|funny/i,
+    tmdb: ["comedy", "romantic comedy"],
+    tvmaze: ["comedy", "sitcom"],
+    openlibrary: ["subject:humor", "comic fiction"],
+  },
+  {
+    key: "romance",
+    keys: /romantik|romance|ask|aşk|love/i,
+    tmdb: ["romance", "romantic drama"],
+    tvmaze: ["romance", "romantic drama"],
+    openlibrary: ["subject:romance", "romance fiction"],
+  },
+  {
+    key: "thriller",
+    keys: /thriller|gerilim|gergin|suspense/i,
+    tmdb: ["thriller", "suspense thriller"],
+    tvmaze: ["thriller", "suspense"],
+    openlibrary: ["subject:thriller", "suspense fiction"],
+  },
+  {
+    key: "horror",
+    keys: /horror|korku|paranormal/i,
+    tmdb: ["horror", "supernatural horror"],
+    tvmaze: ["horror", "supernatural"],
+    openlibrary: ["subject:horror", "horror fiction"],
+  },
+  {
+    key: "mystery",
+    keys: /mystery|gizem|detektif|detective|crime/i,
+    tmdb: ["mystery", "detective mystery"],
+    tvmaze: ["mystery", "crime mystery"],
+    openlibrary: ["subject:mystery", "detective fiction"],
+  },
+  {
+    key: "drama",
+    keys: /\bdrama\b|\bdram\b|huzun|hüzün|sad/i,
+    tmdb: ["drama", "character drama"],
+    tvmaze: ["drama", "family drama"],
+    openlibrary: ["subject:drama", "literary fiction"],
+  },
+  {
+    key: "action",
+    keys: /action|aksiyon|macera|adventure|dovus|dövüş/i,
+    tmdb: ["action adventure", "action"],
+    tvmaze: ["action", "adventure"],
+    openlibrary: ["subject:adventure", "action adventure fiction"],
+  },
+  {
+    key: "chill",
+    keys: /chill|rahat|hafif|cozy|feel-?good|huzur|sakin/i,
+    tmdb: ["feel good", "light comedy"],
+    tvmaze: ["feel good", "comedy drama"],
+    openlibrary: ["subject:comfort reading", "cozy fiction"],
+  },
+];
+
+function dedupeQueries(queries: string[], limit: number): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const q of queries) {
+    const clean = q.replace(/\s+/g, " ").trim();
+    const key = clean.toLowerCase();
+    if (!clean || seen.has(key)) continue;
+    seen.add(key);
+    out.push(clean);
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
+function hasShortRequest(message: string, intent: AiIntent): boolean {
+  const text = `${message} ${intent.mood.join(" ")}`;
+  return /\b(kısa|kisa|short|tek otur|tek otür|az bölüm|az bolum|cabuk|çabuk)\b/i.test(text);
+}
+
+function sourceQueriesFor(
+  source: SourceQuerySource,
+  intent: AiIntent,
+  profile: LibraryProfile | null,
+  message: string,
+  baseQueries: string[]
+): { queries: string[]; signals: string[] } {
+  const text = `${message} ${intent.mood.join(" ")}`.toLowerCase();
+  const queries: string[] = [];
+  const signals: string[] = [];
+
+  for (const signal of SOURCE_QUERY_SIGNALS) {
+    if (!signal.keys.test(text)) continue;
+    signals.push(signal.key);
+    queries.push(...signal[source]);
+  }
+
+  if (profile) {
+    for (const genre of profile.topGenres.slice(0, 2)) {
+      if (source === "openlibrary") queries.push(`subject:${genre}`);
+      queries.push(genre);
+    }
+    for (const tag of profile.topTags.slice(0, 1)) {
+      if (source === "openlibrary") queries.push(`subject:${tag}`);
+      else queries.push(tag);
+    }
+  }
+
+  queries.push(...baseQueries.filter((q) => !/^short$|^movie$|^OVA$/i.test(q)));
+  return { queries: dedupeQueries(queries, 3), signals };
+}
+
 // ============================================
 // R37.1 — AniList structured discover
 // ============================================
@@ -1184,11 +1316,10 @@ export async function searchSourceApiCandidates(args: {
     if (filtered.length > 0) pairs = filtered;
   }
 
-  // Çok az pair varsa (scope=arch gibi) tek sorgu yeterli; aksi halde ilk 2 sorgu.
   const expanded = expandQueries(intent, profile, message);
-  const queryCount = pairs.length <= 2 ? 2 : 1;
-  const queries = expanded.slice(0, queryCount);
-  if (queries.length === 0) {
+  const anilistQueryCount = pairs.length <= 2 ? 2 : 1;
+  const anilistQueries = expanded.slice(0, anilistQueryCount);
+  if (expanded.length === 0) {
     notes.push("source_apis_no_query");
     return { candidates: [], executedQueries: [], sourceCandidateCounts: {}, notes };
   }
@@ -1245,7 +1376,7 @@ export async function searchSourceApiCandidates(args: {
     // Structured sinyal yok → mevcut title-search davranışı.
     const titleTasks: Promise<AiCandidate[]>[] = [];
     for (const pair of anilistPairs) {
-      for (const q of queries) {
+      for (const q of anilistQueries) {
         titleTasks.push(dispatchSearch(ctx, pair.source, pair.mediaType, q));
       }
     }
@@ -1253,13 +1384,23 @@ export async function searchSourceApiCandidates(args: {
     for (const s of settled) {
       if (s.status === "fulfilled") collected.push(...s.value);
     }
-    notes.push(`anilist_title_search:queries=${queries.length} pairs=${anilistPairs.length}`);
+    notes.push(`anilist_title_search:queries=${anilistQueries.length} pairs=${anilistPairs.length}`);
   }
 
-  // AniList dışı kaynaklar: title-search hâlâ geçerli.
+  // AniList dışı kaynaklar: source-specific mood/genre/subject query stratejisi.
   const otherTasks: Promise<AiCandidate[]>[] = [];
+  const shortRequested = hasShortRequest(message, intent);
   for (const pair of otherPairs) {
-    for (const q of queries) {
+    if (pair.source !== "tmdb" && pair.source !== "tvmaze" && pair.source !== "openlibrary") continue;
+    const sourcePlan = sourceQueriesFor(pair.source, intent, profile, message, expanded);
+    if (sourcePlan.queries.length === 0) continue;
+    notes.push(
+      `${pair.source}_query_strategy:signals=${sourcePlan.signals.join("/") || "base"} queries=${sourcePlan.queries.join("|")}`
+    );
+    if (shortRequested) {
+      notes.push(`${pair.source}_short_signal_unsupported:no_length_filter_applied`);
+    }
+    for (const q of sourcePlan.queries) {
       otherTasks.push(dispatchSearch(ctx, pair.source, pair.mediaType, q));
     }
   }
@@ -1275,7 +1416,9 @@ export async function searchSourceApiCandidates(args: {
       const tmdbCount = collected.filter((c) => c.source === "tmdb").length;
       if (tmdbCount === 0) {
         notes.push("tmdb_empty_omdb_fallback");
-        for (const q of queries) {
+        const omdbPlan = sourceQueriesFor("tmdb", intent, profile, message, expanded);
+        notes.push(`omdb_query_strategy:source=tmdb_fallback queries=${omdbPlan.queries.join("|") || "-"}`);
+        for (const q of omdbPlan.queries) {
           try {
             const fb = await searchOmdb(ctx, q);
             collected.push(...fb);

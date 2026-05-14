@@ -1392,21 +1392,21 @@ export async function POST(req: NextRequest) {
   const normalizeTitle = (s: string) =>
     s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
   const dismissedKeys = new Set<string>();
-  const dismissedTitles = new Set<string>();
+  const dismissedTitleTypes = new Set<string>();
   for (const d of dismissedRaw) {
     if (d && typeof d === "object") {
       if (d.externalSource && d.externalId) {
         dismissedKeys.add(`${d.externalSource}:${d.externalId}`);
       }
-      if (d.title) dismissedTitles.add(normalizeTitle(String(d.title)));
+      if (d.title && d.mediaType) dismissedTitleTypes.add(`${normalizeTitle(String(d.title))}:${String(d.mediaType)}`);
     }
   }
   let feedbackSuppressed = 0;
-  if (dismissedKeys.size > 0 || dismissedTitles.size > 0) {
+  if (dismissedKeys.size > 0 || dismissedTitleTypes.size > 0) {
     const beforeFb = candidates.length;
     candidates = candidates.filter((c) => {
       const keyHit = dismissedKeys.has(`${c.source}:${c.externalId}`);
-      const titleHit = dismissedTitles.has(normalizeTitle(c.title));
+      const titleHit = dismissedTitleTypes.has(`${normalizeTitle(c.title)}:${c.type}`);
       if (keyHit || titleHit) {
         feedbackSuppressed++;
         return false;
@@ -1414,7 +1414,7 @@ export async function POST(req: NextRequest) {
       return true;
     });
     debugNotes.push(
-      `r39_feedback_suppressed:n=${feedbackSuppressed} keys=${dismissedKeys.size} titles=${dismissedTitles.size} before=${beforeFb} after=${candidates.length}`
+      `r39_feedback_suppressed:n=${feedbackSuppressed} keys=${dismissedKeys.size} titleTypes=${dismissedTitleTypes.size} before=${beforeFb} after=${candidates.length}`
     );
   }
 

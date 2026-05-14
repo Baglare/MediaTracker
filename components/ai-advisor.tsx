@@ -165,6 +165,7 @@ interface DismissedSignal {
   externalSource?: string;
   externalId?: string;
   mediaType: MediaType;
+  dismissedAt?: string;
 }
 
 interface AiMessage {
@@ -206,9 +207,12 @@ interface AiAdvisorProps {
 
 const SETTINGS_KEY = "media-tracker-ai-settings";
 const SESSIONS_KEY = "media-tracker-ai-sessions";
+const DISMISSED_FEEDBACK_KEY = "media-tracker-ai-dismissed-feedback";
+const MAX_DISMISSED_FEEDBACK = 100;
 // R40 — Aktif AI oturumu (chat + öneri kartları + local feedback) sayfa
 // yenilenmesinde geri yüklenebilmesi için bu key'e yazılır. handleNewTopic
-// veya boş state durumunda silinir. Konu Kapat → temizler.
+// veya boş state durumunda silinir. Konu Kapat → sohbeti temizler; kalıcı
+// feedback ayrı key'de tutulur.
 const ACTIVE_SESSION_KEY = "media-tracker-ai-active-session";
 const ACTIVE_SESSION_VERSION = 1;
 const MAX_SESSIONS = 8;
@@ -221,6 +225,70 @@ const DEFAULT_SETTINGS: AiSettings = {
   deepResearch: false,
   useOpenAIProvider: false,
 };
+
+const VALID_MEDIA_TYPES = new Set<MediaType>([
+  "tv",
+  "anime",
+  "manga",
+  "manhwa",
+  "manhua",
+  "book",
+  "movie",
+  "light_novel",
+  "web_novel",
+  "visual_novel",
+]);
+
+function normalizeFeedbackTitle(title: string): string {
+  return title.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+}
+
+function feedbackKeyFromSignal(signal: DismissedSignal): string {
+  if (signal.externalSource && signal.externalId) {
+    return `external:${signal.externalSource}:${signal.externalId}`;
+  }
+  return `title:${normalizeFeedbackTitle(signal.title)}:${signal.mediaType}`;
+}
+
+function feedbackSignalFromRec(rec: AiRecommendation): DismissedSignal {
+  return {
+    title: rec.title,
+    externalSource: rec.externalSource,
+    externalId: rec.externalId,
+    mediaType: rec.mediaType,
+    dismissedAt: new Date().toISOString(),
+  };
+}
+
+function feedbackKeyFromRec(rec: AiRecommendation): string {
+  return feedbackKeyFromSignal(feedbackSignalFromRec(rec));
+}
+
+function limitDismissedSignals(signals: Record<string, DismissedSignal>): Record<string, DismissedSignal> {
+  const entries = Object.entries(signals);
+  if (entries.length <= MAX_DISMISSED_FEEDBACK) return signals;
+  return Object.fromEntries(entries.slice(-MAX_DISMISSED_FEEDBACK));
+}
+
+function parseDismissedSignals(raw: unknown): Record<string, DismissedSignal> {
+  if (!raw || typeof raw !== "object") return {};
+  const out: Record<string, DismissedSignal> = {};
+  for (const value of Object.values(raw as Record<string, unknown>)) {
+    if (!value || typeof value !== "object") continue;
+    const item = value as Partial<DismissedSignal>;
+    if (typeof item.title !== "string" || !item.title.trim()) continue;
+    if (!item.mediaType || !VALID_MEDIA_TYPES.has(item.mediaType)) continue;
+    const signal: DismissedSignal = {
+      title: item.title,
+      mediaType: item.mediaType,
+      externalSource: typeof item.externalSource === "string" ? item.externalSource : undefined,
+      externalId: typeof item.externalId === "string" ? item.externalId : undefined,
+      dismissedAt: typeof item.dismissedAt === "string" ? item.dismissedAt : undefined,
+    };
+    out[feedbackKeyFromSignal(signal)] = signal;
+  }
+  return limitDismissedSignals(out);
+}
 
 const SAMPLE_PROMPTS = [
   "Solo Leveling gibi ama daha romantik anime öner.",
@@ -636,9 +704,8 @@ export default function AiAdvisor({
   const [sessions, setSessions] = useState<AiSession[]>([]);
   const [viewingSessionId, setViewingSessionId] = useState<string | null>(null);
   const [addedIds, setAddedIds] = useState<Record<string, boolean>>({});
-  // R38/R39 — "İlgilenmiyorum" sadece o oturum içinde geçerli local feedback;
-  // localStorage'a yazılmaz. R39: artık sinyal (title/externalSource/externalId/
-  // mediaType) saklıyoruz çünkü backend aday havuzunu bunlarla filtreliyor.
+  // R42 — "İlgilenmiyorum" feedback'i localStorage'da kalıcı tutulur.
+  // Backend aday havuzunu title/externalSource/externalId/mediaType ile filtreler.
   const [dismissedSignals, setDismissedSignals] = useState<Record<string, DismissedSignal>>({});
   const [debugInfo, setDebugInfo] = useState<AiDebugInfo | null>(null);
   const [showDebug, setShowDebug] = useState(false);
@@ -655,6 +722,7 @@ export default function AiAdvisor({
   const inFlightPromptKey = useRef<string | null>(null);
   const lastPersistedSessionKey = useRef<string | null>(null);
   const activeContextRef = useRef<AiActiveContext | null>(null);
+  const feedbackLoadedRef = useRef(false);
 
   useEffect(() => {
     try {
@@ -663,6 +731,10 @@ export default function AiAdvisor({
       if (s) setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(s) });
       const list = localStorage.getItem(SESSIONS_KEY);
       if (list) setSessions(JSON.parse(list));
+      const persistedFeedback = localStorage.getItem(DISMISSED_FEEDBACK_KEY);
+      if (persistedFeedback) {
+        setDismissedSignals(parseDismissedSignals(JSON.parse(persistedFeedback)));
+      }
       const dt = localStorage.getItem(DATA_TOGGLES_KEY);
       if (dt) setDataToggles({ ...DEFAULT_DATA_TOGGLES, ...JSON.parse(dt) });
       const prefs = localStorage.getItem(ADVISOR_PREFS_KEY);
@@ -691,7 +763,8 @@ export default function AiAdvisor({
           if (Array.isArray(snap.rejected)) setRejected(snap.rejected);
           if (snap.addedIds && typeof snap.addedIds === "object") setAddedIds(snap.addedIds);
           if (snap.dismissedSignals && typeof snap.dismissedSignals === "object") {
-            setDismissedSignals(snap.dismissedSignals);
+            const activeDismissed = parseDismissedSignals(snap.dismissedSignals);
+            setDismissedSignals((prev) => limitDismissedSignals({ ...prev, ...activeDismissed }));
           }
           if (snap.pendingClarification) setPendingClarification(snap.pendingClarification);
           if (snap.debugInfo) setDebugInfo(snap.debugInfo);
@@ -700,18 +773,20 @@ export default function AiAdvisor({
       }
     } catch {
       // ignore
+    } finally {
+      feedbackLoadedRef.current = true;
     }
   }, []);
 
   // R40 — Aktif oturumu localStorage'a yaz. Boş state → key silinir.
   useEffect(() => {
+    if (!feedbackLoadedRef.current) return;
     try {
       const isEmpty =
         messages.length === 0 &&
         recommendations.length === 0 &&
         rejected.length === 0 &&
         Object.keys(addedIds).length === 0 &&
-        Object.keys(dismissedSignals).length === 0 &&
         !pendingClarification;
       if (isEmpty) {
         localStorage.removeItem(ACTIVE_SESSION_KEY);
@@ -723,7 +798,6 @@ export default function AiAdvisor({
         recommendations,
         rejected,
         addedIds,
-        dismissedSignals,
         pendingClarification,
         debugInfo,
         activeContext: activeContextRef.current,
@@ -732,7 +806,23 @@ export default function AiAdvisor({
     } catch {
       // ignore (kotanın dolması ya da JSON cycle gibi nadir durumlar)
     }
-  }, [messages, recommendations, rejected, addedIds, dismissedSignals, pendingClarification, debugInfo]);
+  }, [messages, recommendations, rejected, addedIds, pendingClarification, debugInfo]);
+
+  useEffect(() => {
+    try {
+      const limited = limitDismissedSignals(dismissedSignals);
+      if (Object.keys(limited).length === 0) {
+        localStorage.removeItem(DISMISSED_FEEDBACK_KEY);
+        return;
+      }
+      localStorage.setItem(DISMISSED_FEEDBACK_KEY, JSON.stringify(limited));
+      if (Object.keys(limited).length !== Object.keys(dismissedSignals).length) {
+        setDismissedSignals(limited);
+      }
+    } catch {
+      // bozuk veya dolu localStorage app'i düşürmesin
+    }
+  }, [dismissedSignals]);
 
   useEffect(() => {
     try {
@@ -787,7 +877,6 @@ export default function AiAdvisor({
       setInput("");
       setViewingSessionId(null);
       setAddedIds({});
-      setDismissedSignals({});
       setDebugInfo(null);
       setShowDebug(false);
       setPendingClarification(null);
@@ -1161,7 +1250,6 @@ export default function AiAdvisor({
     setInput("");
     setViewingSessionId(null);
     setAddedIds({});
-    setDismissedSignals({});
     setDebugInfo(null);
     setShowDebug(false);
     setPendingClarification(null);
@@ -1201,22 +1289,25 @@ export default function AiAdvisor({
 
   // R38/R39 — local feedback ve chat'e bağlı aksiyonlar.
   function handleDismissRec(rec: AiRecommendation) {
-    setDismissedSignals((prev) => ({
-      ...prev,
-      [rec.id]: {
-        title: rec.title,
-        externalSource: rec.externalSource,
-        externalId: rec.externalId,
-        mediaType: rec.mediaType,
-      },
-    }));
-  }
-  function handleUndoDismissRec(rec: AiRecommendation) {
+    const signal = feedbackSignalFromRec(rec);
+    const key = feedbackKeyFromSignal(signal);
     setDismissedSignals((prev) => {
       const next = { ...prev };
-      delete next[rec.id];
+      delete next[key];
+      next[key] = signal;
+      return limitDismissedSignals(next);
+    });
+  }
+  function handleUndoDismissRec(rec: AiRecommendation) {
+    const key = feedbackKeyFromRec(rec);
+    setDismissedSignals((prev) => {
+      const next = { ...prev };
+      delete next[key];
       return next;
     });
+  }
+  function handleClearDismissedFeedback() {
+    setDismissedSignals({});
   }
   function handleSimilarRec(rec: AiRecommendation) {
     if (isLoading || inFlightRequestId.current) return;
@@ -1249,6 +1340,7 @@ export default function AiAdvisor({
   }, [mediaList.length, progressLogs.length]);
 
   const viewingSession = viewingSessionId ? sessions.find((s) => s.id === viewingSessionId) : null;
+  const dismissedFeedbackCount = Object.keys(dismissedSignals).length;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-6">
@@ -1267,7 +1359,7 @@ export default function AiAdvisor({
           {(messages.length > 0 || recommendations.length > 0 || viewingSessionId) && (
             <button
               onClick={handleNewTopic}
-              title="Aktif AI sohbetini, önerileri ve oturum içi feedback'i sıfırlar"
+              title="Aktif AI sohbetini ve önerileri temizler; ilgilenmiyorum feedback'i kalır"
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-300 bg-zinc-900/60 border border-zinc-800 hover:bg-zinc-800/70 transition-colors cursor-pointer"
             >
               <X className="w-3.5 h-3.5" />
@@ -1479,7 +1571,7 @@ export default function AiAdvisor({
             {recommendations.map((rec) => {
               const added = addedIds[rec.id] || rec.inLibrary;
               const canAdd = !!rec.candidate?.globalSearch;
-              const dismissed = !!dismissedSignals[rec.id];
+              const dismissed = !!dismissedSignals[feedbackKeyFromRec(rec)];
               const reasonBullets = buildReasonBullets(rec);
               const releaseYear = rec.candidate?.releaseYear;
               return (
@@ -1734,6 +1826,22 @@ export default function AiAdvisor({
                 />
               </label>
             ))}
+            <div className="flex items-center justify-between gap-3 px-2 py-1.5 rounded-lg">
+              <span className="text-xs text-zinc-300">
+                Feedback kayıtları
+                <span className="block text-[10px] text-zinc-500 mt-0.5">
+                  {dismissedFeedbackCount} / {MAX_DISMISSED_FEEDBACK} ilgilenmiyorum kaydı
+                </span>
+              </span>
+              <button
+                type="button"
+                onClick={handleClearDismissedFeedback}
+                disabled={dismissedFeedbackCount === 0}
+                className="px-2.5 py-1.5 rounded-lg text-[11px] font-medium bg-zinc-900/60 text-zinc-400 border border-zinc-800 hover:text-zinc-200 hover:bg-zinc-800/70 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+              >
+                Feedback'i sıfırla
+              </button>
+            </div>
           </div>
         </div>
 
