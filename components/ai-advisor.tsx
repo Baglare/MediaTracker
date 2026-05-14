@@ -475,6 +475,10 @@ function buildAssistantMessage(prompt: string, settings: AiSettings, count: numb
   return `İsteğini "${prompt.trim()}" olarak yorumladım. ${used || "Yalnızca istek metni"} kullanılarak ${count} doğrulanmış öneri hazırlandı.`;
 }
 
+function buildSourceApisClientEmptyMessage(prompt: string): string {
+  return `İsteğini "${prompt.trim()}" olarak yorumladım. Kaynak API modunda dış kaynaklardan doğrulanmış aday alınamadı; kütüphane fallback'i kullanılmadı.`;
+}
+
 function formatList(values?: string[]) {
   return values && values.length > 0 ? values.join(", ") : "Yok";
 }
@@ -884,22 +888,28 @@ export default function AiAdvisor({
   ) {
     if (inFlightRequestId.current !== requestId) return;
     if (step >= LOADING_STEPS.length) {
+      const finishWithClientFallback = () => {
+        if (researchMode === "source-apis") {
+          finishWith(prompt, [], buildSourceApisClientEmptyMessage(prompt), [], undefined, requestId);
+          return;
+        }
+        const recs = buildLocalFallbackRecs(prompt, mediaList);
+        const text = buildAssistantMessage(prompt, settings, recs.length);
+        finishWith(prompt, recs, text, [], undefined, requestId);
+      };
+
       apiPromise
         .then((apiResult) => {
           if (inFlightRequestId.current !== requestId) return;
           if (apiResult) {
             finishWith(prompt, apiResult.recs, apiResult.text, apiResult.rejected, apiResult.debug, requestId);
           } else {
-            const recs = buildLocalFallbackRecs(prompt, mediaList);
-            const text = buildAssistantMessage(prompt, settings, recs.length);
-            finishWith(prompt, recs, text, [], undefined, requestId);
+            finishWithClientFallback();
           }
         })
         .catch(() => {
           if (inFlightRequestId.current !== requestId) return;
-          const recs = buildLocalFallbackRecs(prompt, mediaList);
-          const text = buildAssistantMessage(prompt, settings, recs.length);
-          finishWith(prompt, recs, text, [], undefined, requestId);
+          finishWithClientFallback();
         })
         .finally(() => {
           if (inFlightRequestId.current !== requestId) return;
@@ -1700,5 +1710,3 @@ export default function AiAdvisor({
     </div>
   );
 }
-
-
