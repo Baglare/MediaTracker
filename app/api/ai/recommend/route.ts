@@ -43,9 +43,9 @@ import { MediaType } from "@/lib/types";
 export const runtime = "nodejs";
 
 const PROVIDER_RATE_LIMIT_MESSAGE =
-  "AI sağlayıcılarından biri kota/rate limit sınırına takıldı, alternatif sağlayıcı denendi.";
+  "Sağlayıcı yanıt vermedi, teknik detayları panelde görebilirsin.";
 const ALL_PROVIDERS_MOCK_MESSAGE =
-  "AI sağlayıcıları şu an yanıt veremiyor. Daha sonra tekrar dene veya mock moda geç.";
+  "Sağlayıcı yanıt vermedi, teknik detayları panelde görebilirsin.";
 
 // R19: `PROVIDER_PLAN_FAILED_MESSAGE` artık tüketilmiyor — bir önceki
 // fallback yolunda kullanılıyordu, akış değişince çağrı düştü. Davranış
@@ -813,6 +813,35 @@ function targetLabel(type: MediaType): string {
   }
 }
 
+function cleanPromptLabel(message: string): string {
+  const compact = message.replace(/\s+/g, " ").trim();
+  return compact.length > 120 ? `${compact.slice(0, 117)}...` : compact;
+}
+
+function buildPolishedAssistantMessage(args: {
+  message: string;
+  count: number;
+  researchMode?: string;
+  providerIssue?: boolean;
+}): string {
+  const prompt = cleanPromptLabel(args.message);
+  if (args.providerIssue) {
+    return args.count > 0
+      ? `${PROVIDER_RATE_LIMIT_MESSAGE} İsteğini "${prompt}" olarak yorumladım ve ${args.count} öneri hazırladım.`
+      : PROVIDER_RATE_LIMIT_MESSAGE;
+  }
+  if (args.count === 0) {
+    return "Bu kapsamda uygun yeni aday bulamadım. Kapsamı genişletmeyi veya farklı bir mood/tür denemeyi deneyebilirsin.";
+  }
+  if (args.researchMode === "source-apis") {
+    return `İsteğini "${prompt}" olarak yorumladım. Kaynaklardan doğrulanmış ${args.count} öneri buldum.`;
+  }
+  if (args.researchMode === "library-only") {
+    return `İsteğini "${prompt}" olarak yorumladım. Sadece kütüphanen içinden ${args.count} öneri seçtim.`;
+  }
+  return `İsteğini "${prompt}" olarak yorumladım. Kütüphanendeki sinyallere göre ${args.count} öneri hazırladım.`;
+}
+
 function hasProfileSourceData(profile: LibraryProfile | null, sourceTypes: MediaType[]) {
   if (!profile || sourceTypes.length === 0) return true;
   return sourceTypes.some((type) =>
@@ -836,21 +865,20 @@ function buildEmptyPoolMessage(
     plan.targetMediaTypes.length > 0 &&
     plan.targetMediaTypes.every((t) => t === "movie");
   if (hasMovieOnly) {
-    return "Film/TMDB kaynağı şu anda pasif olduğu için doğrulanmış film adayı getiremedim.";
+    return "Bu kapsamda uygun yeni aday bulamadım. Kapsamı genişletmeyi veya farklı bir mood/tür denemeyi deneyebilirsin.";
   }
 
   if (notes.some((n) => n.startsWith("tv_mood_discovery_weak"))) {
-    return "Dizi tarafında güvenilir aday bulamadım; daha spesifik tür/örnek dizi verirsen daha iyi arayabilirim.";
+    return "Bu kapsamda uygun yeni aday bulamadım. Kapsamı genişletmeyi veya farklı bir mood/tür denemeyi deneyebilirsin.";
   }
 
   if (!hasProfileSourceData(profile, plan.sourceTypes)) {
     const sources = plan.sourceTypes.map(targetLabel).join(", ");
-    return `${sources} tarafında yeterli kütüphane sinyali bulamadım; örnek başlık veya puanlı kayıt eklersen daha iyi çevirebilirim.`;
+    return `${sources} tarafında yeterli sinyal bulamadım. Kapsamı genişletmeyi veya farklı bir mood/tür denemeyi deneyebilirsin.`;
   }
 
   const targets = plan.targetMediaTypes.map(targetLabel).join(", ");
-  const theme = plan.preferenceSignals[0] || plan.interpretation || "bu tema";
-  return `${targets} tarafında "${theme}" için doğrulanmış aday bulamadım.`;
+  return `${targets} tarafında uygun yeni aday bulamadım. Kapsamı genişletmeyi veya farklı bir mood/tür denemeyi deneyebilirsin.`;
 }
 
 async function getCandidates(args: {
@@ -1086,8 +1114,8 @@ export async function POST(req: NextRequest) {
     libDebug.ideationFailedReason = "skipped_library_based";
     libDebug.safeFallbackUsed = false;
     const assistantMessage = libRecs.length > 0
-      ? `Kütüphanenden devam etmeye uygun ${libRecs.length} öneri hazırladım. Sıralama yerel sinyallerden (durum, ilerleme, son aktivite, favori, puan) deterministik üretildi.`
-      : "Kütüphanende devam etmeye uygun (dropped/completed dışı) bir aday bulamadım.";
+      ? `Kütüphanenden devam etmeye uygun ${libRecs.length} öneri seçtim.`
+      : "Kütüphanende bugün devam etmeye uygun yeni bir aday bulamadım.";
     return NextResponse.json({
       assistantMessage,
       recommendations: libRecs,
@@ -1509,14 +1537,16 @@ export async function POST(req: NextRequest) {
     let baseMsg = buildEmptyPoolMessage(retrievalPlan, intent, profile, retrievalDebug.notes || []);
     if (deterministicFallbackUsed) {
       baseMsg = providerPlanSucceeded
-        ? "İlk arama aday bulamadığı için zevk sinyallerinden düşük güvenli aday aradım ama doğrulanmış aday bulamadım."
-        : "AI sağlayıcıları sağlıklı plan üretemediği için zevk sinyallerinden düşük güvenli aday aradım ama doğrulanmış aday bulamadım.";
+        ? "İlk arama yeterli aday bulamadı; daha geniş zevk sinyalleriyle de uygun aday çıkmadı."
+        : "Bu kapsamda uygun yeni aday bulamadım. Kapsamı genişletmeyi veya farklı bir mood/tür denemeyi deneyebilirsin.";
     } else if (deterministicTaste.highRatedSourceCount > 0 && /yeterli/i.test(baseMsg)) {
       const targets = (retrievalPlan?.targetMediaTypes || intent.targetTypes).map(targetLabel).join(", ") || "hedef tür";
-      baseMsg = `${targets} tarafında yüksek puanlı kaynak kayıtlarından sinyal çıkardım ama doğrulanmış aday bulamadım.`;
+      baseMsg = `${targets} tarafında uygun yeni aday bulamadım. Kapsamı genişletmeyi veya farklı bir mood/tür denemeyi deneyebilirsin.`;
     }
     if (ideationFailedReason && ideationFailedReason !== "skipped_library_based") {
-      baseMsg = `${baseMsg} (AI plan üretilemedi: ${ideationFailedReason}. Daha net bir tür/mood verirsen yeniden deneyebilirim.)`;
+      baseMsg = providerState.rateLimitHit || providerState.timeoutHit
+        ? PROVIDER_RATE_LIMIT_MESSAGE
+        : baseMsg;
     }
     // R37.2 — source-apis modu: library fallback'e DÜŞME; net mesaj döndür.
     if (researchMode === "source-apis") {
@@ -1525,7 +1555,7 @@ export async function POST(req: NextRequest) {
         scopeMode === "screen" ? "Kadraj" :
         scopeMode === "arch" ? "Arşiv" :
         scopeMode === "one-per-world" ? "her dünya" : "karışık";
-      baseMsg = `Kaynak API'lerinden ${scopeLabel} kapsamı için uygun yeni aday bulamadım. Daha geniş bir kapsam dene, farklı bir mod seç ya da daha net bir tür/mood ipucu ekle.`;
+      baseMsg = `Kaynaklardan ${scopeLabel} kapsamında uygun yeni aday bulamadım. Kapsamı genişletmeyi veya farklı bir mood/tür denemeyi deneyebilirsin.`;
     }
     const mergedRejectedEmpty: { title: string; reason: string }[] = [];
     const seenEmpty = new Set<string>();
@@ -1547,8 +1577,8 @@ export async function POST(req: NextRequest) {
         retrieval: retrievalDebug,
       },
     };
-    if (providerState.rateLimitHit) {
-      empty.assistantMessage = `${empty.assistantMessage} ${PROVIDER_RATE_LIMIT_MESSAGE}`.trim();
+    if (providerState.rateLimitHit || providerState.timeoutHit) {
+      empty.assistantMessage = PROVIDER_RATE_LIMIT_MESSAGE;
     }
     return NextResponse.json(empty);
   }
@@ -1572,26 +1602,6 @@ export async function POST(req: NextRequest) {
     }
     if (parseRepairUsed) retrievalDebug.parseRepairUsed = true;
 
-    if (deterministicFallbackUsed) {
-      const deterministicMsg = providerPlanSucceeded
-        ? "İlk arama aday bulamadığı için zevk sinyallerinden düşük güvenli öneriler hazırladım."
-        : "AI sağlayıcıları sağlıklı plan üretemediği için zevk sinyallerinden düşük güvenli öneriler hazırladım.";
-      response.assistantMessage = `${deterministicMsg} ${response.assistantMessage}`.trim();
-    }
-
-    // Cross-media veya reference-based + zayıf havuz → düşük güven mesajı
-    if (fallbackSearchUsed && !deterministicFallbackUsed) {
-      const lowConfNote =
-        intent.kind === "cross_media_translation"
-          ? " (Düşük güven: kaynak zevkini hedef türe çevirmek için yeterli sinyal yok. Sevdiğin 1-2 örnek başlık verirsen daha iyi öneri çıkartabilirim.)"
-          : intent.kind === "reference_based"
-          ? " (Düşük güven: referansa yakın aday havuzu zayıf — daha geniş eş anlamlı arama kullanıldı.)"
-          : "";
-      if (lowConfNote) {
-        response.assistantMessage = `${response.assistantMessage}${lowConfNote}`.trim();
-      }
-    }
-
     response.debug = {
       ...(response.debug || { provider: providerState.selectedProvider || "mock" }),
       provider: providerState.selectedProvider || response.debug?.provider || "mock",
@@ -1605,6 +1615,12 @@ export async function POST(req: NextRequest) {
         r.inLibrary ||
         (!!r.externalSource && !!r.externalId && libIndex.has(`${r.externalSource}:${r.externalId}`)),
     }));
+    response.assistantMessage = buildPolishedAssistantMessage({
+      message,
+      count: response.recommendations.length,
+      researchMode,
+      providerIssue: providerState.rateLimitHit || providerState.timeoutHit,
+    });
     // R36 + R37.2 — sistem tarafından hard-reject edilen adayları (skorlayıcı
     // + politika filtresi) LLM'in rejectedCandidates listesine ekle.
     const systemRejected = [...scoringRejected, ...policyRejected];
@@ -1640,20 +1656,18 @@ export async function POST(req: NextRequest) {
       note: err instanceof Error ? err.message : "unknown error",
       retrieval: { ...retrievalDebug, providerFallback: true },
     };
-    if (providerState.rateLimitHit) {
-      fallback.assistantMessage = `${PROVIDER_RATE_LIMIT_MESSAGE} ${fallback.assistantMessage}`.trim();
-    }
     fallback.recommendations = fallback.recommendations.map((r) => ({
       ...r,
       inLibrary:
         r.inLibrary ||
         (!!r.externalSource && !!r.externalId && libIndex.has(`${r.externalSource}:${r.externalId}`)),
     }));
+    fallback.assistantMessage = buildPolishedAssistantMessage({
+      message,
+      count: fallback.recommendations.length,
+      researchMode,
+      providerIssue: providerState.rateLimitHit || providerState.timeoutHit,
+    });
     return NextResponse.json(fallback);
   }
 }
-
-
-
-
-

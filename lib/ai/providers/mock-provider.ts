@@ -58,7 +58,7 @@ function candidateToRec(c: AiCandidate, i: number): AiRecommendation {
     fitLabel: pickFitLabel(i, isLib),
     reason: isLib
       ? libraryReason(c)
-      : `Doğrulanmış ${sourceLabel(c)} adayı; ${c.genres?.slice(0, 3).join(", ") || c.type} metadata'sı isteğinle eşleşebilecek sinyal veriyor.`,
+      : `${sourceLabel(c)} kaynağından doğrulanmış; ${c.genres?.slice(0, 3).join(", ") || c.type} tonları isteğine yakın duruyor.`,
     inLibrary: isLib,
     candidate: c,
   };
@@ -66,7 +66,7 @@ function candidateToRec(c: AiCandidate, i: number): AiRecommendation {
 
 function buildAssistantMessage(message: string, settings: AiSettings, count: number): string {
   if (count === 0) {
-    return `İsteğini "${message.trim()}" olarak yorumladım, ancak doğrulanmış aday bulunamadı.`;
+    return `İsteğini "${message.trim()}" olarak yorumladım. Bu kapsamda uygun yeni aday bulamadım. Kapsamı genişletmeyi veya farklı bir mood/tür denemeyi deneyebilirsin.`;
   }
   const used = [
     settings.useProfile && "kütüphane profili",
@@ -77,7 +77,7 @@ function buildAssistantMessage(message: string, settings: AiSettings, count: num
   ]
     .filter(Boolean)
     .join(", ");
-  return `İsteğini "${message.trim()}" olarak yorumladım. ${used || "Yalnızca istek metni"} kullanılarak ${count} doğrulanmış öneri hazırlandı.`;
+  return `İsteğini "${message.trim()}" olarak yorumladım. ${used || "Yalnızca istek metni"} ile ${count} öneri hazırladım.`;
 }
 
 function buildTransparency(settings: AiSettings): string {

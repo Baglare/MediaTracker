@@ -327,15 +327,18 @@ function buildRankingPrompt(args: {
     : "Kütüphane profili kullanılmıyor.";
 
   return [
-    "Türkçe cevap veren medya tavsiye danışmanısın. Sadece geçerli JSON döndür.",
+    "Türkçe cevap veren medya tavsiye danışmanısın. Kısa, ürün arayüzüne uygun ve sadece geçerli JSON döndür.",
     `Kullanıcı isteği: """${args.message}"""`,
     `Intent: ${JSON.stringify(args.intent)}`,
     profileBlock,
     `Retrieval plan: ${JSON.stringify(args.retrievalPlan || null)}`,
     "ADAY HAVUZU: yalnızca buradan seç, asla başka başlık uydurma.",
-    "Adaylar sistem tarafından kurallı (rule-based) olarak ön-skorlandı; daha yüksek ön-skor genelde daha iyi uyumdur. 'nedenler' satırı sana hangi profil sinyalinin tetiklendiğini söyler — açıklarken bu nedenlerle tutarlı kal ve gerçek bir gerekçeyi kendinden uydurmak yerine bu sinyalleri somut biçimde ifade et.",
+    "Adaylar sistem tarafından ön-skorlandı; bunu sadece seçim için kullan. Kullanıcıya ön-skor, debug, fallback, provider, retrieval, parse veya teknik plan terimleri yazma.",
+    "'nedenler' satırı sana hangi profil sinyalinin tetiklendiğini söyler. reason alanını bu sinyallerle tutarlı ama insan diliyle yaz: kısa, somut, en fazla 1 cümle.",
     describeCandidates(args.candidates),
-    "Her öneride externalSource ve externalId havuzdaki köşeli parantezle birebir aynı olmalı. reason somut olsun; risk gerçek uyumsuzluğu yazsın.",
+    "assistantMessage 1-2 kısa cümle olsun: isteği nasıl yorumladığını ve kaç öneri bulduğunu söyle. Aday yoksa şu çizgide kal: Bu kapsamda uygun yeni aday bulamadım; kapsamı genişletmeyi veya farklı bir mood/tür denemeyi öner.",
+    "Her öneride externalSource ve externalId havuzdaki köşeli parantezle birebir aynı olmalı. reason somut olsun; aynı favori/puan sinyalini her kartta kopyala-yapıştır gibi tekrar etme; risk gerçek uyumsuzluğu yazsın.",
+    "fitLabel kısa ürün etiketi olsun; teknik terim veya skor yazma.",
     `Şema:
 {
   "assistantMessage": string,

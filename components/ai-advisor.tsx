@@ -347,19 +347,93 @@ function buildModePrompt(
 // yoksa LLM'in rec.reason'unu kısa maddelere böl. Maddeler 110 karaktere
 // kırpılır; ham debug satırı gibi durmasın diye trailing "ile ortak X, Y"
 // formatı temiz tutuluyor.
+function humanizeReason(raw: string): string {
+  const text = raw.replace(/\s+/g, " ").trim();
+  if (!text) return "";
+
+  const highRated = text.match(/^Yüksek puan verdiğin "([^"]+)"(?: \(([^)]+)\))? ile ortak tür sinyali: (.+)$/);
+  if (highRated) {
+    return `Daha önce yüksek puan verdiğin ${highRated[1]} ile benzer türlere sahip.`;
+  }
+
+  const favorite = text.match(/^Favorilerine benziyor: "([^"]+)" ile ortak (.+)$/);
+  if (favorite) {
+    return `Favorin ${favorite[1]} ile benzer tatlara yakın.`;
+  }
+
+  const targetType = text.match(/^İstenen tür hedefiyle uyumlu \(([^)]+)\)$/);
+  if (targetType) {
+    return `İstediğin ${targetType[1]} türüne uygun.`;
+  }
+
+  const scope = text.match(/^(.+) kapsamına uyuyor$/);
+  if (scope) {
+    return `Seçtiğin ${scope[1]} kapsamına uygun.`;
+  }
+
+  const dropped = text.match(/^Bırakdığın "([^"]+)" ile benzeşiyor/);
+  if (dropped) {
+    return `Daha önce bıraktığın ${dropped[1]} ile benzerlik taşıyor; bu yüzden riskli olabilir.`;
+  }
+
+  const paused = text.match(/^Duraklattığın "([^"]+)" ile benzeşiyor$/);
+  if (paused) {
+    return `Daha önce duraklattığın ${paused[1]} ile benzer bir çizgide.`;
+  }
+
+  const mood = text.match(/^İstediğin "([^"]+)" tonuna uyan tür sinyali var$/);
+  if (mood) {
+    return `İstediğin ${mood[1]} tona yakın.`;
+  }
+
+  if (/^Kısa süreli/.test(text)) {
+    return "Kısa sürede tamamlanabilecek bir seçenek.";
+  }
+
+  return text;
+}
+
+function reasonKey(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/"[^"]+"/g, "")
+    .replace(/\b\d+([.,]\d+)?\b/g, "")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
+}
+
 function buildReasonBullets(rec: AiRecommendation): string[] {
   const scoreReasons = rec.candidate?.scoreReasons;
   if (scoreReasons && scoreReasons.length > 0) {
-    return scoreReasons.slice(0, 3).map(truncateBullet);
+    const seen = new Set<string>();
+    const bullets: string[] = [];
+    for (const raw of scoreReasons) {
+      const human = humanizeReason(raw);
+      const key = reasonKey(human);
+      if (!human || seen.has(key)) continue;
+      seen.add(key);
+      bullets.push(truncateBullet(human));
+      if (bullets.length >= 3) break;
+    }
+    return bullets;
   }
   const raw = (rec.reason || "").trim();
   if (!raw) return [];
   const parts = raw
     .split(/(?<=[.!?;])\s+|\s*\|\s*/)
-    .map((s) => s.replace(/[\s.;]+$/g, "").trim())
+    .map((s) => humanizeReason(s.replace(/[\s.;]+$/g, "").trim()))
     .filter((s) => s.length >= 6);
-  if (parts.length === 0) return [truncateBullet(raw)];
-  return parts.slice(0, 3).map(truncateBullet);
+  if (parts.length === 0) return [truncateBullet(humanizeReason(raw))];
+  const seen = new Set<string>();
+  const bullets: string[] = [];
+  for (const part of parts) {
+    const key = reasonKey(part);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    bullets.push(truncateBullet(part));
+    if (bullets.length >= 3) break;
+  }
+  return bullets;
 }
 
 function truncateBullet(s: string): string {
@@ -470,13 +544,13 @@ function buildAssistantMessage(prompt: string, settings: AiSettings, count: numb
     .filter(Boolean)
     .join(", ");
   if (count === 0) {
-    return `İsteğini "${prompt.trim()}" olarak yorumladım. Doğrulanmış aday bulunamadı.`;
+    return `İsteğini "${prompt.trim()}" olarak yorumladım. Bu kapsamda uygun yeni aday bulamadım. Kapsamı genişletmeyi veya farklı bir mood/tür denemeyi deneyebilirsin.`;
   }
-  return `İsteğini "${prompt.trim()}" olarak yorumladım. ${used || "Yalnızca istek metni"} kullanılarak ${count} doğrulanmış öneri hazırlandı.`;
+  return `İsteğini "${prompt.trim()}" olarak yorumladım. ${used || "Yalnızca istek metni"} ile ${count} öneri hazırladım.`;
 }
 
 function buildSourceApisClientEmptyMessage(prompt: string): string {
-  return `İsteğini "${prompt.trim()}" olarak yorumladım. Kaynak API modunda dış kaynaklardan doğrulanmış aday alınamadı; kütüphane fallback'i kullanılmadı.`;
+  return `İsteğini "${prompt.trim()}" olarak yorumladım. Kaynaklardan bu kapsamda uygun yeni aday bulamadım. Kapsamı genişletmeyi veya farklı bir mood/tür denemeyi deneyebilirsin.`;
 }
 
 function formatList(values?: string[]) {
@@ -1407,9 +1481,6 @@ export default function AiAdvisor({
               const canAdd = !!rec.candidate?.globalSearch;
               const dismissed = !!dismissedSignals[rec.id];
               const reasonBullets = buildReasonBullets(rec);
-              const score = rec.candidate?.score;
-              const externalSource = rec.externalSource;
-              const externalId = rec.externalId;
               const releaseYear = rec.candidate?.releaseYear;
               return (
                 <div
@@ -1453,7 +1524,7 @@ export default function AiAdvisor({
                           ) : null}
                         </p>
                       </div>
-                      <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-violet-500/15 text-violet-300 border border-violet-500/30 shrink-0">
+                      <span className="px-2 py-0.5 rounded-md text-[10px] font-medium leading-tight text-center bg-violet-500/15 text-violet-300 border border-violet-500/30 shrink-0 max-w-[7.5rem] break-words">
                         {rec.fitLabel}
                       </span>
                     </div>
@@ -1477,10 +1548,10 @@ export default function AiAdvisor({
                       {reasonBullets.map((b, i) => (
                         <li
                           key={`${rec.id}-reason-${i}`}
-                          className="text-xs text-zinc-300 leading-relaxed flex gap-1.5"
+                          className="text-xs text-zinc-300 leading-relaxed flex gap-1.5 min-w-0"
                         >
                           <span className="text-violet-300/70 shrink-0">•</span>
-                          <span className="min-w-0">{b}</span>
+                          <span className="min-w-0 break-words">{b}</span>
                         </li>
                       ))}
                     </ul>
@@ -1492,23 +1563,15 @@ export default function AiAdvisor({
                     {rec.risk && (
                       <p className="text-xs text-amber-300/80 flex items-start gap-1.5">
                         <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" />
-                        <span className="min-w-0">{rec.risk}</span>
+                        <span className="min-w-0 break-words">{rec.risk}</span>
                       </p>
                     )}
                     {rec.communitySignal && (
-                      <p className="text-[11px] text-zinc-500 leading-relaxed">
+                      <p className="text-[11px] text-zinc-500 leading-relaxed break-words">
                         {rec.communitySignal}
                       </p>
                     )}
                   </div>
-                )}
-
-                {(typeof score === "number" || externalSource) && (
-                  <p className="mt-2 text-[10px] text-zinc-600 font-mono break-all">
-                    {typeof score === "number" ? `score ${score}` : null}
-                    {typeof score === "number" && externalSource ? "  ·  " : null}
-                    {externalSource ? `${externalSource}${externalId ? ":" + externalId : ""}` : null}
-                  </p>
                 )}
 
                 <div className="mt-3 flex flex-wrap gap-1.5">

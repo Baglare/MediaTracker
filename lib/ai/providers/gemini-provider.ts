@@ -83,7 +83,7 @@ function buildRankingPrompt(args: {
     : "AI bilgi sinyali kapalı: communitySignal alanını boş bırak.";
 
   return [
-    "Sen bir medya tavsiye danışmanısın. Türkçe cevap ver.",
+    "Sen bir medya tavsiye danışmanısın. Türkçe, kısa ve ürün arayüzüne uygun cevap ver.",
     `Kullanıcı isteği: """${message}"""`,
     `Niyet: ${intent.kind}. Hedef türler: ${intent.targetTypes.join(",") || "belirsiz"}. Mood: ${intent.mood.join(",") || "belirsiz"}. Referanslar: ${intent.references.join(",") || "yok"}.`,
     profileBlock,
@@ -101,11 +101,14 @@ function buildRankingPrompt(args: {
       : "Retrieval plan yok.",
     "",
     "ADAY HAVUZU (yalnızca buradan seç, asla başka başlık uydurma):",
-    "Adaylar sistem tarafından kurallı şekilde ön-skorlandı; daha yüksek ön-skor genelde daha iyi uyumdur. 'nedenler' satırı tetiklenen profil sinyallerini söyler — reason'ı bu sinyallere bağla, kendinden gerekçe uydurma.",
+    "Adaylar sistem tarafından ön-skorlandı; bunu sadece seçim için kullan. Kullanıcıya ön-skor, debug, fallback, provider, retrieval, parse veya teknik plan terimleri yazma.",
+    "'nedenler' satırı tetiklenen profil sinyallerini söyler. reason alanını bu sinyallere bağla ama insan diliyle yaz: kısa, somut, en fazla 1 cümle.",
     describeCandidates(candidates) || "(boş)",
     "",
     "Görev: Aday havuzundan en uygun 3-5 öneriyi seç. Her öneri için 'externalSource' ve 'externalId' alanlarını listedeki köşeli parantez değerleriyle birebir döndür.",
-    "reason somut olsun: kullanıcı isteği + aday metadata + profil sinyalini bağla. risk alanına gerçek uyumsuzluk yaz; yoksa null.",
+    "assistantMessage 1-2 kısa cümle olsun: isteği nasıl yorumladığını ve kaç öneri bulduğunu söyle. Aday yoksa şu çizgide kal: Bu kapsamda uygun yeni aday bulamadım; kapsamı genişletmeyi veya farklı bir mood/tür denemeyi öner.",
+    "reason somut olsun: kullanıcı isteği + aday metadata + profil sinyalini bağla. Aynı favori/puan sinyalini her kartta kopyala-yapıştır gibi tekrar etme. risk alanına gerçek uyumsuzluk yaz; yoksa null.",
+    "fitLabel kısa ürün etiketi olsun; teknik terim veya skor yazma.",
     "Cross-media önerilerde tema/ton/deneyim çevirisi yaptığını reason içinde belirt.",
     "Aday havuzu zayıfsa assistantMessage içinde bunu açıkça söyle; yine de yalnızca havuzdan seç.",
     "Uymayan adaylardan 1-3 tanesi için kısa not ver (rejectedCandidates).",
