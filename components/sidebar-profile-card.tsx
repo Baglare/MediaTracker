@@ -118,7 +118,7 @@ export default function SidebarProfileCard({
             <button
               type="button"
               onClick={onOpenSettings}
-              className="ml-auto grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-zinc-800/70 bg-zinc-950/35 text-zinc-500 transition-colors hover:border-amber-500/35 hover:bg-amber-500/10 hover:text-amber-200 cursor-pointer"
+              className="ml-auto grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-zinc-800/70 bg-zinc-950/35 text-zinc-500 transition-colors hover:border-amber-500/35 hover:bg-amber-500/10 hover:text-amber-200 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/35"
               aria-label="Ayarları aç"
               title="Ayarları aç"
             >

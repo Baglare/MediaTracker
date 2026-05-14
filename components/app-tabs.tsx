@@ -65,7 +65,7 @@ export default function AppTabs({ activeTab, onChange }: AppTabsProps) {
             aria-selected={isActive}
             onClick={() => onChange(tab.id as TabType)}
             className={`
-              relative inline-flex items-center gap-2 px-3 sm:px-3.5 h-10 rounded-lg text-[13px] sm:text-sm font-medium whitespace-nowrap transition-colors cursor-pointer shrink-0
+              relative inline-flex items-center gap-2 px-3 sm:px-3.5 h-10 rounded-lg text-[13px] sm:text-sm font-medium whitespace-nowrap transition-colors cursor-pointer shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40
               ${isActive
                 ? "bg-violet-500/20 text-violet-200 border border-violet-500/30 shadow-sm shadow-violet-500/10"
                 : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50 border border-transparent"}

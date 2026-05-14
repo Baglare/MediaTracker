@@ -1347,12 +1347,12 @@ export default function AiAdvisor({
     <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(260px,300px)] 2xl:grid-cols-[minmax(0,1fr)_minmax(320px,360px)] gap-6 2xl:gap-8">
       <div className="space-y-5 min-w-0">
         {/* Başlık */}
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center">
               <Sparkles className="w-5 h-5 text-white" />
             </div>
-            <div>
+            <div className="min-w-0">
               <h2 className="text-lg font-semibold text-zinc-100">AI Danışman</h2>
               <p className="text-xs text-zinc-500">{profileSummary}</p>
             </div>
@@ -1361,7 +1361,7 @@ export default function AiAdvisor({
             <button
               onClick={handleNewTopic}
               title="Aktif AI sohbetini ve önerileri temizler; ilgilenmiyorum feedback'i kalır"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-300 bg-zinc-900/60 border border-zinc-800 hover:bg-zinc-800/70 transition-colors cursor-pointer"
+              className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-300 bg-zinc-900/60 border border-zinc-800 hover:bg-zinc-800/70 transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/35"
             >
               <X className="w-3.5 h-3.5" />
               Konuyu kapat
@@ -1373,9 +1373,9 @@ export default function AiAdvisor({
         <div className="space-y-2">
           <div className="flex items-center justify-between gap-2">
             <p className="text-xs text-zinc-500 uppercase tracking-wide">Ne yapmak istersin?</p>
-            <span className="text-[10px] text-zinc-600">Kartlara basınca öneri akışı tetiklenir</span>
+            <span className="hidden sm:inline text-[10px] text-zinc-600">Kartlara basınca öneri akışı tetiklenir</span>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          <div className="grid grid-cols-1 min-[420px]:grid-cols-2 sm:grid-cols-3 gap-2">
             {MODE_CARDS.map((m) => {
               const Icon = m.icon;
               const disabled = isLoading;
@@ -1384,7 +1384,7 @@ export default function AiAdvisor({
                   key={m.key}
                   onClick={() => handleModeClick(m.key)}
                   disabled={disabled}
-                  className="group text-left p-3 rounded-xl bg-zinc-900/50 border border-zinc-800/70 hover:border-violet-500/40 hover:bg-zinc-900/80 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed min-w-0"
+                  className="group text-left p-3 rounded-xl bg-zinc-900/50 border border-zinc-800/70 hover:border-violet-500/40 hover:bg-zinc-900/80 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed min-w-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/35"
                 >
                   <div className="flex items-center gap-2 mb-1.5">
                     <div className="w-7 h-7 rounded-lg bg-violet-500/15 border border-violet-500/30 flex items-center justify-center shrink-0">
@@ -1753,7 +1753,7 @@ export default function AiAdvisor({
               }}
               rows={1}
               placeholder="AI Danışmana sor: ne izlemek/okumak istersin?"
-              className="flex-1 bg-transparent resize-none px-3 py-2 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none max-h-32"
+              className="min-w-0 flex-1 bg-transparent resize-none px-3 py-2 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none max-h-32"
             />
             <button
               onClick={() => handleSend()}

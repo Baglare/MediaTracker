@@ -155,7 +155,7 @@ function NavRow({
   const Icon = item.icon;
   const ghost = !!item.ghost;
   const base =
-    "group relative w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-[13px] font-medium transition-colors text-left";
+    "group relative w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-[13px] font-medium transition-colors text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/35";
   const stateClass = ghost
     ? "text-zinc-600 cursor-not-allowed"
     : isActive
@@ -214,7 +214,7 @@ function JourneyCard({
     <button
       type="button"
       onClick={onClick}
-      className={`w-full rounded-xl border p-3 text-left shadow-sm transition-colors cursor-pointer hover:bg-zinc-900/65 ${accent.panel} ${accent.glow} ${TIER_CARD_CLASSES[progression.tier]} ${
+      className={`w-full rounded-xl border p-3 text-left shadow-sm transition-colors cursor-pointer hover:bg-zinc-900/65 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/35 ${accent.panel} ${accent.glow} ${TIER_CARD_CLASSES[progression.tier]} ${
         active ? "ring-1 ring-amber-400/35" : ""
       }`}
       aria-current={active ? "page" : undefined}
@@ -278,7 +278,7 @@ export default function AppSidebar({
 
   return (
     <aside
-      className="hidden lg:flex sticky top-0 h-screen w-64 shrink-0 flex-col gap-4 border-r border-zinc-800/60 bg-zinc-950/40 px-4 py-5"
+      className="hidden lg:flex sticky top-0 h-screen w-64 shrink-0 flex-col gap-3 border-r border-zinc-800/60 bg-zinc-950/40 px-4 py-4"
       aria-label="Birincil navigasyon"
     >
       <SidebarProfileCard

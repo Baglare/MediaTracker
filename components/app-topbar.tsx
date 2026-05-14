@@ -91,7 +91,7 @@ export default function AppTopbar({
               activeTab === "settings"
                 ? "border-amber-500/35 bg-amber-500/15 text-amber-200"
                 : "border-zinc-800/70 bg-zinc-900/35 text-zinc-400 hover:border-amber-500/35 hover:bg-amber-500/10 hover:text-amber-200"
-            }`}
+            } focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/40`}
             aria-label="Ayarları aç"
             title="Ayarları aç"
           >
