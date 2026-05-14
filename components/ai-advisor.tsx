@@ -1344,7 +1344,7 @@ export default function AiAdvisor({
   const dismissedFeedbackCount = Object.keys(dismissedSignals).length;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-6">
+    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(260px,300px)] 2xl:grid-cols-[minmax(0,1fr)_minmax(320px,360px)] gap-6 2xl:gap-8">
       <div className="space-y-5 min-w-0">
         {/* Başlık */}
         <div className="flex items-start justify-between gap-3">
@@ -1568,7 +1568,7 @@ export default function AiAdvisor({
 
         {/* R38 — Öneri kartları */}
         {recommendations.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-3">
             {recommendations.map((rec) => {
               const added = addedIds[rec.id] || rec.inLibrary;
               const canAdd = !!rec.candidate?.globalSearch;

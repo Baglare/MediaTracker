@@ -305,7 +305,7 @@ export default function EnhancedDashboard({
         </div>
       </section>
 
-      <div className="grid grid-cols-1 2xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)] gap-8">
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(300px,0.45fr)] 2xl:grid-cols-[minmax(0,1.45fr)_minmax(360px,0.55fr)] gap-8">
         <div className="space-y-8 min-w-0">
           {startedOpenItems.length > 0 && (
             <section className="space-y-3">

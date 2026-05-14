@@ -1674,9 +1674,10 @@ export default function HomePage() {
         ? "east"
         : themeFilter === "screen"
           ? "screen"
-          : themeFilter === "library"
-            ? "arch"
-            : "neutral";
+        : themeFilter === "library"
+          ? "arch"
+          : "neutral";
+  const shouldShowRightRail = !["dashboard", "ai", "settings"].includes(activeTab);
 
   return (
     // R1 App Shell: sol sidebar (lg+) + main column + opsiyonel sağ rail (xl+).
@@ -1704,7 +1705,7 @@ export default function HomePage() {
             R6: Shell zaten sidebar+rail ile column genişliğini kontrol ettiği
             için max-w-7xl + mx-auto kalktı; içerik sütununu boğmuyor.
             xl'de horizontal padding biraz daraltıldı (rail ile nefes alsın). */}
-        <main className="relative w-full px-4 sm:px-6 lg:px-8 xl:px-6 py-6 lg:py-8 flex-1 min-w-0">
+        <main className={`relative w-full px-4 sm:px-6 lg:px-8 py-6 lg:py-8 flex-1 min-w-0 ${shouldShowRightRail ? "xl:px-6" : "xl:px-8 2xl:px-10"}`}>
         
         {/* DASHBOARD SEKMESI */}
         {activeTab === "dashboard" && (
@@ -3259,9 +3260,9 @@ export default function HomePage() {
         </main>
       </div>
 
-      {/* R7.1: Ayarlar bağlam-dışı kalıyor; RightRail bu sekmede gizleniyor.
-          Main column otomatik olarak genişler (xl rail sütunu kaybolur). */}
-      {activeTab !== "settings" && (
+      {/* R47: Dashboard, AI Danışman ve Ayarlar sağ rail olmadan tam genişlik kullanır.
+          Diğer sekmeler mevcut RightRail davranışını korur. */}
+      {shouldShowRightRail && (
         <RightRail
           mediaList={mediaList}
           progressLogs={progressLogs}
