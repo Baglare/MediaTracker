@@ -1000,6 +1000,66 @@ function mergeCandidateSearchTelemetry(
   }
 }
 
+function filterDismissedCandidates(
+  candidates: AiCandidate[],
+  dismissedRaw: unknown[]
+): { candidates: AiCandidate[]; suppressed: number; keyCount: number; titleTypeCount: number } {
+  const normalizeTitle = (s: string) =>
+    s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+  const dismissedKeys = new Set<string>();
+  const dismissedTitleTypes = new Set<string>();
+  for (const d of dismissedRaw) {
+    if (d && typeof d === "object") {
+      const item = d as { externalSource?: unknown; externalId?: unknown; title?: unknown; mediaType?: unknown };
+      if (item.externalSource && item.externalId) {
+        dismissedKeys.add(`${String(item.externalSource)}:${String(item.externalId)}`);
+      }
+      if (item.title && item.mediaType) {
+        dismissedTitleTypes.add(`${normalizeTitle(String(item.title))}:${String(item.mediaType)}`);
+      }
+    }
+  }
+  if (dismissedKeys.size === 0 && dismissedTitleTypes.size === 0) {
+    return { candidates, suppressed: 0, keyCount: 0, titleTypeCount: 0 };
+  }
+  let suppressed = 0;
+  const filtered = candidates.filter((c) => {
+    const keyHit = dismissedKeys.has(`${c.source}:${c.externalId}`);
+    const titleHit = dismissedTitleTypes.has(`${normalizeTitle(c.title)}:${c.type}`);
+    if (keyHit || titleHit) {
+      suppressed++;
+      return false;
+    }
+    return true;
+  });
+  return {
+    candidates: filtered,
+    suppressed,
+    keyCount: dismissedKeys.size,
+    titleTypeCount: dismissedTitleTypes.size,
+  };
+}
+
+function worldForCandidate(c: AiCandidate): "east" | "screen" | "arch" | "other" {
+  if (["anime", "manga", "manhwa", "manhua", "light_novel", "web_novel", "visual_novel"].includes(c.type)) return "east";
+  if (c.type === "tv" || c.type === "movie") return "screen";
+  if (c.type === "book") return "arch";
+  return "other";
+}
+
+function balanceOnePerWorld(candidates: AiCandidate[]): AiCandidate[] {
+  const picked = new Set<string>();
+  const firstPass: AiCandidate[] = [];
+  for (const world of ["east", "screen", "arch"] as const) {
+    const hit = candidates.find((c) => worldForCandidate(c) === world && !picked.has(`${c.source}:${c.externalId}`));
+    if (hit) {
+      picked.add(`${hit.source}:${hit.externalId}`);
+      firstPass.push(hit);
+    }
+  }
+  return [...firstPass, ...candidates.filter((c) => !picked.has(`${c.source}:${c.externalId}`))];
+}
+
 function emptyVerificationResult(): CandidateVerificationResult {
   return {
     candidates: [],
@@ -1072,11 +1132,20 @@ export async function POST(req: NextRequest) {
   const followUpMerged = Boolean(activeContext?.followUpMerged);
   const activeContextSummary = summarizeActiveContext(activeContext);
   const providerMessage = buildProviderMessage(message, activeContext);
+  const dismissedRaw = Array.isArray(body.dismissed) ? body.dismissed : [];
 
   const settings = body.settings;
   const mediaItems = Array.isArray(body.mediaItems) ? body.mediaItems : [];
   const progressLogs = Array.isArray(body.progressLogs) ? body.progressLogs : [];
   const intent = analyzeIntent(message);
+  const researchMode = (body as { researchMode?: string }).researchMode || "library-only";
+  const scopeMode = (body as { scopeMode?: string }).scopeMode as
+    | "mixed"
+    | "east"
+    | "screen"
+    | "arch"
+    | "one-per-world"
+    | undefined;
   const profile = settings?.useProfile
     ? buildLibraryProfile(mediaItems, progressLogs, settings)
     : null;
@@ -1105,24 +1174,29 @@ export async function POST(req: NextRequest) {
   let parseRepairUsed = false;
   let providerPlanSucceeded = false;
 
-  // ---- Library-based: tamamen deterministik. LLM ranking yok. ----
-  if (intent.kind === "library_based") {
+  // ---- Library-only: tamamen deterministik. LLM/dış kaynak yok. ----
+  if (researchMode === "library-only") {
+    const libraryIntent: AiIntent = { ...intent, kind: "library_based" };
     const libSearch = await getCandidates({
-      intent,
+      intent: libraryIntent,
       retrievalPlan: null,
       profile,
       message,
       mediaItems,
       progressLogs,
     });
-    const libRecs = buildLibraryDeterministicRecs(libSearch.candidates);
+    const dismissedLib = filterDismissedCandidates(libSearch.candidates, dismissedRaw);
+    const libRecs = buildLibraryDeterministicRecs(dismissedLib.candidates);
     const libDebug = buildRetrievalDebug({
-      intent,
+      intent: libraryIntent,
       plan: null,
       searchDebug: { ...libSearch.debug, finalCandidateCount: libRecs.length },
       refinedPassUsed: false,
       providerFallback: false,
-      notes: ["library_deterministic"],
+      notes: [
+        "library_only_deterministic",
+        `r45_feedback_suppressed:n=${dismissedLib.suppressed} keys=${dismissedLib.keyCount} titleTypes=${dismissedLib.titleTypeCount}`,
+      ],
       highRatedSourceCount: deterministicTaste.highRatedSourceCount,
       deterministicTasteSignals: deterministicTaste.signals,
       deterministicFallbackUsed,
@@ -1135,12 +1209,12 @@ export async function POST(req: NextRequest) {
     libDebug.safeFallbackUsed = false;
     const assistantMessage = libRecs.length > 0
       ? `Kütüphanenden devam etmeye uygun ${libRecs.length} öneri seçtim.`
-      : "Kütüphanende bugün devam etmeye uygun yeni bir aday bulamadım.";
+      : "Kütüphanende bu isteğe uygun aday bulamadım.";
     return NextResponse.json({
       assistantMessage,
       recommendations: libRecs,
       transparencySummary: buildTransparencySummary(settings),
-      intent,
+      intent: libraryIntent,
       debug: {
         provider: "library_local",
         selectedProvider: "library_local",
@@ -1151,12 +1225,12 @@ export async function POST(req: NextRequest) {
         followUpMerged,
         activeContextSummary,
         retrieval: libDebug,
-        note: "library_based_deterministic",
+        note: "library_only_deterministic",
       },
     } satisfies AiRecommendResponse);
   }
 
-  // library_based zaten yukarıda erken döndü; buraya yalnızca diğer intent'ler düşer.
+  // library-only zaten yukarıda erken döndü; buraya yalnızca dış kaynak/web modları düşer.
   {
     retrievalPlan = await runPlanningWithProviders({
       providers,
@@ -1366,14 +1440,6 @@ export async function POST(req: NextRequest) {
   // Sonuçlar mevcut havuza eklenir; ikisi de R36 scorer'ından geçer. Boş/eksik
   // kaynaklar (TMDB key eksik, OL down vs.) Promise.allSettled ile yutulur,
   // akış durmaz.
-  const researchMode = (body as { researchMode?: string }).researchMode;
-  const scopeMode = (body as { scopeMode?: string }).scopeMode as
-    | "mixed"
-    | "east"
-    | "screen"
-    | "arch"
-    | "one-per-world"
-    | undefined;
   if (researchMode === "source-apis") {
     try {
       const sourceApi = await searchSourceApiCandidates({
@@ -1456,36 +1522,13 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // R39 — Session-level feedback suppression. Client "İlgilenmiyorum" dediği
-  // önerilerin sinyallerini gönderir; aday havuzundan eşleşenler elenir.
-  // Kalıcı feedback yok; sadece bu request bağlamında geçerli.
-  const dismissedRaw = Array.isArray(body.dismissed) ? body.dismissed : [];
-  const normalizeTitle = (s: string) =>
-    s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
-  const dismissedKeys = new Set<string>();
-  const dismissedTitleTypes = new Set<string>();
-  for (const d of dismissedRaw) {
-    if (d && typeof d === "object") {
-      if (d.externalSource && d.externalId) {
-        dismissedKeys.add(`${d.externalSource}:${d.externalId}`);
-      }
-      if (d.title && d.mediaType) dismissedTitleTypes.add(`${normalizeTitle(String(d.title))}:${String(d.mediaType)}`);
-    }
-  }
-  let feedbackSuppressed = 0;
-  if (dismissedKeys.size > 0 || dismissedTitleTypes.size > 0) {
+  // R39/R42 — persistent feedback suppression.
+  const dismissedFiltered = filterDismissedCandidates(candidates, dismissedRaw);
+  if (dismissedFiltered.suppressed > 0 || dismissedFiltered.keyCount > 0 || dismissedFiltered.titleTypeCount > 0) {
     const beforeFb = candidates.length;
-    candidates = candidates.filter((c) => {
-      const keyHit = dismissedKeys.has(`${c.source}:${c.externalId}`);
-      const titleHit = dismissedTitleTypes.has(`${normalizeTitle(c.title)}:${c.type}`);
-      if (keyHit || titleHit) {
-        feedbackSuppressed++;
-        return false;
-      }
-      return true;
-    });
+    candidates = dismissedFiltered.candidates;
     debugNotes.push(
-      `r39_feedback_suppressed:n=${feedbackSuppressed} keys=${dismissedKeys.size} titleTypes=${dismissedTitleTypes.size} before=${beforeFb} after=${candidates.length}`
+      `r39_feedback_suppressed:n=${dismissedFiltered.suppressed} keys=${dismissedFiltered.keyCount} titleTypes=${dismissedFiltered.titleTypeCount} before=${beforeFb} after=${candidates.length}`
     );
   }
 
@@ -1568,6 +1611,10 @@ export async function POST(req: NextRequest) {
     libIndex,
   });
   candidates = scoringResult.scored;
+  if (scopeMode === "one-per-world") {
+    candidates = balanceOnePerWorld(candidates);
+    debugNotes.push("r45_one_per_world_balanced_order");
+  }
   const scoringRejected = scoringResult.rejected;
   const scoringStats = scoringResult.stats;
   debugNotes.push(
@@ -1619,14 +1666,16 @@ export async function POST(req: NextRequest) {
         ? PROVIDER_RATE_LIMIT_MESSAGE
         : baseMsg;
     }
-    // R37.2 — source-apis modu: library fallback'e DÜŞME; net mesaj döndür.
-    if (researchMode === "source-apis") {
+    // R37.2/R44 — dış kaynak/web modları: library fallback'e DÜŞME; net mesaj döndür.
+    if (researchMode === "source-apis" || researchMode === "web") {
       const scopeLabel =
         scopeMode === "east" ? "Doğu" :
         scopeMode === "screen" ? "Kadraj" :
         scopeMode === "arch" ? "Arşiv" :
         scopeMode === "one-per-world" ? "her dünya" : "karışık";
-      baseMsg = `Kaynaklardan ${scopeLabel} kapsamında uygun yeni aday bulamadım. Kapsamı genişletmeyi veya farklı bir mood/tür denemeyi deneyebilirsin.`;
+      baseMsg = researchMode === "web"
+        ? `Web araştırması ve kaynak doğrulamasıyla ${scopeLabel} kapsamında uygun yeni aday bulamadım. Kapsamı genişletmeyi veya farklı bir mood/tür denemeyi deneyebilirsin.`
+        : `Kaynaklardan ${scopeLabel} kapsamında uygun yeni aday bulamadım. Kapsamı genişletmeyi veya farklı bir mood/tür denemeyi deneyebilirsin.`;
     }
     const mergedRejectedEmpty: { title: string; reason: string }[] = [];
     const seenEmpty = new Set<string>();

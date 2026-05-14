@@ -344,8 +344,8 @@ type ResearchMode = "library-only" | "source-apis" | "web";
 
 const RESEARCH_OPTIONS: { key: ResearchMode; label: string; desc: string; icon: typeof Database }[] = [
   { key: "library-only", label: "Sadece kütüphanem", desc: "Yalnızca eklediklerim üstünden", icon: Database },
-  { key: "source-apis", label: "Kaynak API'leriyle öner", desc: "TMDB · TVmaze · AniList · OL · OMDb", icon: Search },
-  { key: "web", label: "Web araştırması", desc: "AI bilgi sinyali ile genişletilmiş", icon: Cloud },
+  { key: "source-apis", label: "Kaynak API'leriyle öner", desc: "AniList · TVmaze · OpenLibrary · TMDB/OMDb", icon: Search },
+  { key: "web", label: "Web araştırması", desc: "Web araması + kaynak doğrulaması", icon: Cloud },
 ];
 
 interface DataToggles {
@@ -396,8 +396,8 @@ function buildModePrompt(
     research === "library-only"
       ? "Araştırma modu: yalnızca kütüphanemden öner, dış kaynak kullanma."
       : research === "source-apis"
-      ? "Araştırma modu: kaynak API verileri (TVmaze/AniList/OpenLibrary/OMDb) ile destekle."
-      : "Araştırma modu: web bilgi sinyali ile genişletilmiş öneri ver.";
+      ? "Araştırma modu: kaynak API verileriyle doğrulanmış dış adaylar öner; kütüphane fallback'i kullanma."
+      : "Araştırma modu: web araştırması yap, sonra adayları kaynak API'lerinde doğrula.";
 
   const activeData = DATA_TOGGLE_META
     .filter((m) => toggles[m.key])
@@ -840,8 +840,8 @@ export default function AiAdvisor({
     }
   }, [scopeMode, researchMode]);
 
-  // R34 — araştırma modu mevcut AiSettings.useWebResearch'e haritalanır
-  // (provider/route logic'i değişmesin diye). "source-apis" şimdilik UI-only.
+  // R34/R44 — araştırma modu route'a ayrıca gönderilir; web modu provider
+  // context'inde de gerçek web araştırması olarak işaretlenir.
   // CLAUDE.md modal-style prev-prop kalıbı: render fazında karşılaştır, effect kullanma.
   const expectedUseWebResearch = researchMode === "web";
   if (settings.useWebResearch !== expectedUseWebResearch) {
@@ -1327,10 +1327,10 @@ export default function AiAdvisor({
     const dataLabel = data.length > 0 ? data.join(", ") : "yalnızca istek metni";
     const research =
       researchMode === "library-only"
-        ? "yalnızca kütüphane"
+        ? "yalnızca kütüphane içi adaylar"
         : researchMode === "source-apis"
-        ? "kaynak API'leri (yakında)"
-        : "AI bilgi sinyali açık";
+        ? "kaynak API adayları"
+        : "web araştırması + kaynak doğrulaması";
     const deep = settings.deepResearch ? ", derin araştırma" : "";
     return `Bu istekte kullanılacaklar: ${dataLabel}; araştırma modu: ${research}${deep}.`;
   }, [settings, dataToggles, researchMode]);
