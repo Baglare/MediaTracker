@@ -25,6 +25,7 @@ import { OmdbNormalizedResult } from "@/lib/omdb-types";
 import { TmdbNormalizedResult } from "@/lib/tmdb-types";
 import { GlobalSearchResult } from "@/lib/global-search-types";
 import type { AdvisorScopeMode } from "./types";
+import { expandTargetFamily } from "./target-family";
 
 const PER_SOURCE_LIMIT = 8;
 const MAX_TOTAL = 24;
@@ -642,7 +643,8 @@ function localCandidates(
   mediaItems: MediaItem[],
   intent: AiIntent,
   progressLogs: ProgressLog[],
-  debug?: CandidateSearchDebug
+  debug?: CandidateSearchDebug,
+  message: string = ""
 ): AiCandidate[] {
   const lastByMedia = new Map<string, ProgressLog>();
   for (const l of progressLogs) {
@@ -650,12 +652,17 @@ function localCandidates(
     if (!prev || prev.createdAt < l.createdAt) lastByMedia.set(l.mediaId, l);
   }
 
+  // R40.1 — Hedef türler doluysa aile filtresini uygula (manga→manga/manhwa/
+  // manhua, "novel" message hint → light/web/visual novel). Hedef yoksa
+  // "kütüphane analizi / yarım kalanlar" gibi açık library-continue intent
+  // sayılır ve tüm türlere izin verilir.
+  const family = intent.targetTypes.length > 0 ? expandTargetFamily(intent.targetTypes, message) : null;
   const filtered = mediaItems.filter((m) => {
     if (m.status === "dropped") {
       addFilterReason(debug, "library_dropped");
       return false;
     }
-    if (intent.targetTypes.length > 0 && !intent.targetTypes.includes(m.type)) {
+    if (family && !family.has(m.type)) {
       addFilterReason(debug, "library_target_type_mismatch");
       return false;
     }
@@ -1020,7 +1027,7 @@ export async function searchCandidatesWithDebug(args: {
   };
 
   if (intent.kind === "library_based") {
-    return finish(localCandidates(mediaItems, intent, progressLogs, debug));
+    return finish(localCandidates(mediaItems, intent, progressLogs, debug, message));
   }
 
   const ctx: SearchContext = { baseUrl: getBaseUrl(), debug };
@@ -1039,9 +1046,12 @@ export async function searchCandidatesWithDebug(args: {
     const plannedTargets = plan.targetMediaTypes.length > 0
       ? plan.targetMediaTypes
       : [...new Set(plan.searchPlans.map((p) => p.mediaType))];
+    // R40.1 — Aile genişletmesi: "manga öner" planı manhwa/manhua adaylarını da
+    // tutsun; "novel" mesajı light/web/visual novel'a yayılsın.
+    const plannedFamily = [...expandTargetFamily(plannedTargets, message)];
     return finish(hygieneFilterCandidates(
       pool,
-      plannedTargets,
+      plannedFamily,
       intent.references,
       debug
     ).slice(0, MAX_TOTAL));
@@ -1070,7 +1080,10 @@ export async function searchCandidatesWithDebug(args: {
     if (pool.length >= 6) break; // yeterli çeşitlilik
   }
 
-  return finish(hygieneFilterCandidates(pool, targets, intent.references, debug).slice(0, MAX_TOTAL));
+  // R40.1 — Aile genişletmesi: target tek MediaType olsa da filtre adımı
+  // (örn. manga → manhwa/manhua) için aile setini geç.
+  const targetsFamily = [...expandTargetFamily(targets, message)];
+  return finish(hygieneFilterCandidates(pool, targetsFamily, intent.references, debug).slice(0, MAX_TOTAL));
 }
 
 // ============================================

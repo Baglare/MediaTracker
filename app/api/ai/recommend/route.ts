@@ -17,6 +17,7 @@ import {
   searchSourceApiCandidates,
   dedupeCandidates,
 } from "@/lib/ai/candidate-search";
+import { expandTargetFamily, familyLabel } from "@/lib/ai/target-family";
 import {
   GeminiProviderError,
   GeminiProviderErrorCode,
@@ -1397,25 +1398,32 @@ export async function POST(req: NextRequest) {
   const screenTypes = new Set(["tv", "movie"]);
   const archTypes = new Set(["book"]);
 
-  const targetTypeSet = intent.targetTypes.length > 0 ? new Set(intent.targetTypes) : null;
+  // R40.1 — Aile genişletmesi: intent.targetTypes "manga" ise manhwa/manhua,
+  // mesaj "novel" içeriyorsa light/web/visual novel'ı da kabul et. Aile ailenin
+  // dışındaki tüm adaylar (TV/film vb.) library-source dahil her yolda elenir.
+  const targetFamily = intent.targetTypes.length > 0
+    ? expandTargetFamily(intent.targetTypes, message)
+    : null;
   const scopeAllow: Set<string> | null =
     scopeMode === "east" ? eastTypes :
     scopeMode === "screen" ? screenTypes :
     scopeMode === "arch" ? archTypes : null;
 
   const beforePolicy = candidates.length;
+  let targetFamilyRejected = 0;
   candidates = candidates.filter((c) => {
     // source-apis modunda library kaynaklı adayları havuza alma
     if (researchMode === "source-apis" && c.source === "library") {
       policyRejected.push({ title: c.title, reason: "Kütüphanende zaten var (kaynak modu)" });
       return false;
     }
-    // intent target type uyuşmazlığı
-    if (targetTypeSet && !targetTypeSet.has(c.type)) {
+    // intent target type / aile uyuşmazlığı — library-source dahil
+    if (targetFamily && !targetFamily.has(c.type)) {
       policyRejected.push({
         title: c.title,
         reason: `İstenen tür ile uyuşmuyor (${c.type})`,
       });
+      targetFamilyRejected++;
       return false;
     }
     // scope filtresi
@@ -1429,6 +1437,13 @@ export async function POST(req: NextRequest) {
   if (policyRejected.length > 0 || beforePolicy !== candidates.length) {
     debugNotes.push(
       `r37_2_policy:before=${beforePolicy} after=${candidates.length} rejected=${policyRejected.length} mode=${researchMode || "library-only"} scope=${scopeMode || "-"} target=${intent.targetTypes.join("/") || "-"}`
+    );
+  }
+  // R40.1 — Açık tür-aile filtresi izlemesi (debug). Library-source yolu dahil
+  // tüm aday yollarında uygulandığını teyit eder.
+  if (targetFamily) {
+    debugNotes.push(
+      `ai_target_filter:before=${beforePolicy} after=${candidates.length} target=${familyLabel(intent.targetTypes, message)} rejected=${targetFamilyRejected}`
     );
   }
   if (researchMode === "source-apis" && candidates.length === 0) {

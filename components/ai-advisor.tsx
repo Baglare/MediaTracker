@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { MediaItem, MediaType, ProgressLog } from "@/lib/types";
 import { GlobalSearchResult } from "@/lib/global-search-types";
+import { expandTargetFamily } from "@/lib/ai/target-family";
 
 // ---- Tipler ----
 export interface AiSettings {
@@ -399,25 +400,63 @@ function generateId(prefix = "id"): string {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 9)}`;
 }
 
+// R40.1 — Prompt'tan hedef tür ailesini çıkar. intent-analyzer'ın azaltılmış
+// türevi: yalnızca client fallback için yeterli. "anime öner"/"manga öner"/
+// "novel öner"/"film"/"dizi"/"kitap" gibi açık tür sinyallerini yakalar.
+function detectFallbackTargetTypes(prompt: string): MediaType[] {
+  const text = prompt.toLowerCase();
+  const out: MediaType[] = [];
+  if (/\banime(ler|leri|den)?\b/.test(text)) out.push("anime");
+  if (/\bmanga(lar|ları)?\b/.test(text)) out.push("manga");
+  if (/\bmanhwa\b/.test(text)) out.push("manhwa");
+  if (/\bmanhua\b/.test(text)) out.push("manhua");
+  if (/\bfilm(ler|leri)?\b|\bmovie\b/.test(text)) out.push("movie");
+  if (/\bdizi(ler|leri|lere|lerden)?\b|\btv\b/.test(text)) out.push("tv");
+  if (/\bkitap(lar|lara|ları)?\b|\bbook\b/.test(text)) out.push("book");
+  return [...new Set(out)];
+}
+
+// R40.1 — Library-analysis / continue niyetleri: tür belirtilmemişse library
+// adayları serbest kalabilir. Tür belirtilmişse filtre yine uygulanır.
+function isLibraryAnalysisOrContinuePrompt(prompt: string): boolean {
+  const text = prompt.toLowerCase();
+  return /(kütüphan|bugün ne|neye devam|yarım kalan|yarım bırakt|analiz et|devam etmem)/.test(text);
+}
+
 function buildLocalFallbackRecs(prompt: string, mediaList: MediaItem[]): AiRecommendation[] {
   const lower = prompt.toLowerCase();
   const isContinue = /devam|bugün|kütüphan|chill/.test(lower);
-  if (isContinue && mediaList.length > 0) {
-    return mediaList.slice(0, 3).map<AiRecommendation>((m, i) => ({
-      id: `rec-${m.id}-${i}`,
-      title: m.title,
-      mediaType: m.type,
-      source: "Kütüphanen",
-      externalSource: "library",
-      externalId: m.id,
-      coverUrl: m.coverImage,
-      overview: m.overview,
-      fitLabel: i === 0 ? "Bugün için ideal" : "Devam etmeye uygun",
-      reason: `${m.currentProgress}/${m.totalProgress} ilerleme.`,
-      inLibrary: true,
-    }));
-  }
-  return [];
+  if (!isContinue || mediaList.length === 0) return [];
+
+  // R40.1 — Tür belirtilmişse library aday havuzuna da aile filtresini uygula.
+  // Sadece açık library-analysis/continue intentlerinde tür belirtilmemişse
+  // tüm türlere izin verilir.
+  const targets = detectFallbackTargetTypes(prompt);
+  const allowAll = targets.length === 0 && isLibraryAnalysisOrContinuePrompt(prompt);
+  const family = targets.length > 0 ? expandTargetFamily(targets, prompt) : null;
+
+  const pool = mediaList.filter((m) => {
+    if (m.status === "dropped") return false;
+    if (family) return family.has(m.type);
+    if (allowAll) return true;
+    // Hedef yok ve library-analysis sinyali de yok → güvenli taraf: aday verme.
+    return false;
+  });
+  if (pool.length === 0) return [];
+
+  return pool.slice(0, 3).map<AiRecommendation>((m, i) => ({
+    id: `rec-${m.id}-${i}`,
+    title: m.title,
+    mediaType: m.type,
+    source: "Kütüphanen",
+    externalSource: "library",
+    externalId: m.id,
+    coverUrl: m.coverImage,
+    overview: m.overview,
+    fitLabel: i === 0 ? "Bugün için ideal" : "Devam etmeye uygun",
+    reason: `${m.currentProgress}/${m.totalProgress} ilerleme.`,
+    inLibrary: true,
+  }));
 }
 
 function buildAssistantMessage(prompt: string, settings: AiSettings, count: number): string {
