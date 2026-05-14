@@ -156,6 +156,16 @@ interface RejectedCandidate {
   reason: string;
 }
 
+// R39 — session-level feedback sinyali. Backend payload'una bu şekilde gider;
+// route.ts aday havuzunu (externalSource:externalId) ve (normalize(title))
+// eşleşmesiyle filtreler.
+interface DismissedSignal {
+  title: string;
+  externalSource?: string;
+  externalId?: string;
+  mediaType: MediaType;
+}
+
 interface AiMessage {
   id: string;
   role: "user" | "assistant";
@@ -504,9 +514,10 @@ export default function AiAdvisor({
   const [sessions, setSessions] = useState<AiSession[]>([]);
   const [viewingSessionId, setViewingSessionId] = useState<string | null>(null);
   const [addedIds, setAddedIds] = useState<Record<string, boolean>>({});
-  // R38 — "İlgilenmiyorum" sadece o oturum içinde geçerli local feedback;
-  // localStorage'a yazılmaz (kalıcı feedback bu turun kapsamı değil).
-  const [dismissedRecIds, setDismissedRecIds] = useState<Record<string, boolean>>({});
+  // R38/R39 — "İlgilenmiyorum" sadece o oturum içinde geçerli local feedback;
+  // localStorage'a yazılmaz. R39: artık sinyal (title/externalSource/externalId/
+  // mediaType) saklıyoruz çünkü backend aday havuzunu bunlarla filtreliyor.
+  const [dismissedSignals, setDismissedSignals] = useState<Record<string, DismissedSignal>>({});
   const [debugInfo, setDebugInfo] = useState<AiDebugInfo | null>(null);
   const [showDebug, setShowDebug] = useState(false);
   const [pendingClarification, setPendingClarification] = useState<{
@@ -596,7 +607,7 @@ export default function AiAdvisor({
       setInput("");
       setViewingSessionId(null);
       setAddedIds({});
-      setDismissedRecIds({});
+      setDismissedSignals({});
       setDebugInfo(null);
       setShowDebug(false);
       setPendingClarification(null);
@@ -719,6 +730,9 @@ export default function AiAdvisor({
           // bu sinyallere göre tetikler.
           researchMode,
           scopeMode,
+          // R39 — Session-level feedback: kullanıcının "İlgilenmiyorum"
+          // dediği önerileri backend aday havuzundan filtrelesin.
+          dismissed: Object.values(dismissedSignals),
         }),
       });
       if (!res.ok) return null;
@@ -961,6 +975,7 @@ export default function AiAdvisor({
     setInput("");
     setViewingSessionId(null);
     setAddedIds({});
+    setDismissedSignals({});
     setDebugInfo(null);
     setShowDebug(false);
     setPendingClarification(null);
@@ -998,12 +1013,20 @@ export default function AiAdvisor({
     }
   }
 
-  // R38 — local feedback ve chat'e bağlı aksiyonlar
+  // R38/R39 — local feedback ve chat'e bağlı aksiyonlar.
   function handleDismissRec(rec: AiRecommendation) {
-    setDismissedRecIds((prev) => ({ ...prev, [rec.id]: true }));
+    setDismissedSignals((prev) => ({
+      ...prev,
+      [rec.id]: {
+        title: rec.title,
+        externalSource: rec.externalSource,
+        externalId: rec.externalId,
+        mediaType: rec.mediaType,
+      },
+    }));
   }
   function handleUndoDismissRec(rec: AiRecommendation) {
-    setDismissedRecIds((prev) => {
+    setDismissedSignals((prev) => {
       const next = { ...prev };
       delete next[rec.id];
       return next;
@@ -1269,7 +1292,7 @@ export default function AiAdvisor({
             {recommendations.map((rec) => {
               const added = addedIds[rec.id] || rec.inLibrary;
               const canAdd = !!rec.candidate?.globalSearch;
-              const dismissed = !!dismissedRecIds[rec.id];
+              const dismissed = !!dismissedSignals[rec.id];
               const reasonBullets = buildReasonBullets(rec);
               const score = rec.candidate?.score;
               const externalSource = rec.externalSource;

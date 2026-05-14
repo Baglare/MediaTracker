@@ -1356,6 +1356,39 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // R39 — Session-level feedback suppression. Client "İlgilenmiyorum" dediği
+  // önerilerin sinyallerini gönderir; aday havuzundan eşleşenler elenir.
+  // Kalıcı feedback yok; sadece bu request bağlamında geçerli.
+  const dismissedRaw = Array.isArray(body.dismissed) ? body.dismissed : [];
+  const normalizeTitle = (s: string) =>
+    s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+  const dismissedKeys = new Set<string>();
+  const dismissedTitles = new Set<string>();
+  for (const d of dismissedRaw) {
+    if (d && typeof d === "object") {
+      if (d.externalSource && d.externalId) {
+        dismissedKeys.add(`${d.externalSource}:${d.externalId}`);
+      }
+      if (d.title) dismissedTitles.add(normalizeTitle(String(d.title)));
+    }
+  }
+  let feedbackSuppressed = 0;
+  if (dismissedKeys.size > 0 || dismissedTitles.size > 0) {
+    const beforeFb = candidates.length;
+    candidates = candidates.filter((c) => {
+      const keyHit = dismissedKeys.has(`${c.source}:${c.externalId}`);
+      const titleHit = dismissedTitles.has(normalizeTitle(c.title));
+      if (keyHit || titleHit) {
+        feedbackSuppressed++;
+        return false;
+      }
+      return true;
+    });
+    debugNotes.push(
+      `r39_feedback_suppressed:n=${feedbackSuppressed} keys=${dismissedKeys.size} titles=${dismissedTitles.size} before=${beforeFb} after=${candidates.length}`
+    );
+  }
+
   // R37.2 — Aday havuzu politikası: source-apis modunda library kaynağını
   // havuza sokma; intent.targetTypes ve scope filtresini final aday havuzuna
   // uygula. Elenenler rejectedCandidates'a gerekçeyle yazılır.

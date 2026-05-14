@@ -235,6 +235,13 @@ export interface AiRecommendRequest {
   activeContext?: AiActiveContext;
   researchMode?: AdvisorResearchMode;
   scopeMode?: AdvisorScopeMode;
+  // R39 — Session-level feedback suppression (kalıcı değil; sadece bu request)
+  dismissed?: {
+    title?: string;
+    externalSource?: string;
+    externalId?: string;
+    mediaType?: string;
+  }[];
 }
 
 export interface AiProvider {
