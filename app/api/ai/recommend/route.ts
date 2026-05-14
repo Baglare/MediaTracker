@@ -1431,6 +1431,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (!webAdded) {
+      debugNotes.push("r44_web_research_fallback_used:source_apis");
       try {
         const sourceApi = await searchSourceApiCandidates({
           intent,

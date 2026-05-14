@@ -30,6 +30,12 @@ import { expandTargetFamily } from "./target-family";
 const PER_SOURCE_LIMIT = 8;
 const MAX_TOTAL = 24;
 const MAX_PLAN_QUERIES = 4;
+const WEB_REQUEST_TIMEOUT_MS = 7000;
+const MAX_WEB_QUERIES = 3;
+const MAX_WEB_HITS_PER_QUERY = 5;
+const MAX_WEB_HITS_TOTAL = 12;
+const MAX_WEB_VERIFICATION_QUERIES = 4;
+const MAX_WEB_VERIFICATION_QUERIES_PER_SOURCE = 3;
 
 interface SearchContext {
   baseUrl: string;
@@ -353,7 +359,7 @@ function buildWebResearchQueries(intent: AiIntent, profile: LibraryProfile | nul
   }
   queries.push(`${base} ${target} recommendations ${year}`);
 
-  return dedupeQueries(queries, 3);
+  return dedupeQueries(queries, MAX_WEB_QUERIES);
 }
 
 function extractWebCandidateQueries(hits: WebSearchHit[], fallbackQueries: string[]): string[] {
@@ -371,14 +377,14 @@ function extractWebCandidateQueries(hits: WebSearchHit[], fallbackQueries: strin
     if (words.length >= 2 && words.length <= 8) out.push(words.join(" "));
   }
   out.push(...fallbackQueries);
-  return dedupeQueries(out, 4);
+  return dedupeQueries(out, MAX_WEB_VERIFICATION_QUERIES);
 }
 
-async function searchWeb(ctx: SearchContext, query: string, mediaType: MediaType): Promise<WebSearchHit[]> {
-  if (!query.trim()) return [];
+async function searchWeb(ctx: SearchContext, query: string, mediaType: MediaType): Promise<{ hits: WebSearchHit[]; note?: string }> {
+  if (!query.trim()) return { hits: [] };
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 7000);
+    const timeout = setTimeout(() => controller.abort(), WEB_REQUEST_TIMEOUT_MS);
     const url = `https://duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
     const res = await fetch(url, {
       cache: "no-store",
@@ -387,7 +393,7 @@ async function searchWeb(ctx: SearchContext, query: string, mediaType: MediaType
     }).finally(() => clearTimeout(timeout));
     if (!res.ok) {
       recordQuery(ctx.debug, "web", mediaType, query, 0);
-      return [];
+      return { hits: [], note: `web_request_http_${res.status}` };
     }
     const html = await res.text();
     const hits: WebSearchHit[] = [];
@@ -398,20 +404,23 @@ async function searchWeb(ctx: SearchContext, query: string, mediaType: MediaType
         title: stripHtml(m[2] || ""),
         snippet: stripHtml(m[3] || ""),
       });
-      if (hits.length >= 5) break;
+      if (hits.length >= MAX_WEB_HITS_PER_QUERY) break;
     }
     if (hits.length === 0) {
       const titleOnly = /<a[^>]+class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;
       for (const m of html.matchAll(titleOnly)) {
         hits.push({ url: stripHtml(m[1] || ""), title: stripHtml(m[2] || "") });
-        if (hits.length >= 5) break;
+        if (hits.length >= MAX_WEB_HITS_PER_QUERY) break;
       }
     }
     recordQuery(ctx.debug, "web", mediaType, query, hits.length);
-    return hits;
-  } catch {
+    return { hits, note: hits.length === 0 ? "web_parse_empty" : undefined };
+  } catch (error) {
     recordQuery(ctx.debug, "web", mediaType, query, 0);
-    return [];
+    return {
+      hits: [],
+      note: error instanceof Error && error.name === "AbortError" ? "web_request_timeout" : "web_request_failed",
+    };
   }
 }
 
@@ -1441,13 +1450,18 @@ export async function searchWebResearchCandidates(args: {
     notes.push("web_research_no_query");
     return { candidates: [], executedQueries: localDebug.executedQueries, sourceCandidateCounts: localDebug.sourceCandidateCounts, notes };
   }
+  notes.push(`web_research_limits:timeoutMs=${WEB_REQUEST_TIMEOUT_MS} maxQueries=${MAX_WEB_QUERIES} maxHitsPerQuery=${MAX_WEB_HITS_PER_QUERY} maxHitsTotal=${MAX_WEB_HITS_TOTAL}`);
 
   const targetForDebug = pairs[0]?.mediaType || intent.targetTypes[0] || "anime";
   const webHits: WebSearchHit[] = [];
   for (const query of webQueries) {
-    const hits = await searchWeb(ctx, query, targetForDebug);
-    webHits.push(...hits);
+    const result = await searchWeb(ctx, query, targetForDebug);
+    if (result.note) notes.push(`web_research_${result.note}:query=${query}`);
+    webHits.push(...result.hits);
+    if (webHits.length >= MAX_WEB_HITS_TOTAL) break;
   }
+  if (webHits.length > MAX_WEB_HITS_TOTAL) webHits.length = MAX_WEB_HITS_TOTAL;
+  notes.push(`web_research_query_count:${webQueries.length}`);
   notes.push(`web_research_queries:${webQueries.join("|")}`);
   notes.push(`web_research_hits:${webHits.length}`);
   if (webHits.length === 0) {
@@ -1468,7 +1482,7 @@ export async function searchWebResearchCandidates(args: {
         tasks.push(searchAniListDiscover(ctx, cat, structured.strict));
       }
     }
-    for (const q of webCandidateQueries.slice(0, 3)) {
+    for (const q of webCandidateQueries.slice(0, MAX_WEB_VERIFICATION_QUERIES_PER_SOURCE)) {
       tasks.push(dispatchSearch(ctx, pair.source, pair.mediaType, q));
     }
   }
