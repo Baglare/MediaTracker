@@ -134,7 +134,7 @@ export interface AiRetrievalDebug {
 }
 
 export interface AiCandidate {
-  source: "tvmaze" | "anilist" | "openlibrary" | "omdb" | "library";
+  source: "tvmaze" | "anilist" | "openlibrary" | "omdb" | "tmdb" | "library";
   externalId: string;
   type: MediaType;
   title: string;
@@ -166,7 +166,7 @@ export interface AiRecommendation {
   title: string;
   mediaType: MediaType;
   source: string;             // "AniList" | "TVmaze" | "Open Library" | "Kütüphanen"
-  externalSource?: "tvmaze" | "anilist" | "openlibrary" | "omdb" | "library";
+  externalSource?: "tvmaze" | "anilist" | "openlibrary" | "omdb" | "tmdb" | "library";
   externalId?: string;
   coverUrl?: string;
   overview?: string;
@@ -219,6 +219,13 @@ export interface AiActiveContext {
   followUpMerged?: boolean;
 }
 
+// R37 — Advisor UI'dan gelen araştırma modu ve kapsam seçimi.
+// "library-only" → mevcut akış (sadece kütüphane + retrieval plan).
+// "source-apis"  → harici kaynak API'lerinden ek aday çek.
+// "web"          → ileride gerçek web search (şu an UI-only).
+export type AdvisorResearchMode = "library-only" | "source-apis" | "web";
+export type AdvisorScopeMode = "mixed" | "east" | "screen" | "arch" | "one-per-world";
+
 export interface AiRecommendRequest {
   message: string;
   mediaItems: MediaItem[];
@@ -226,6 +233,8 @@ export interface AiRecommendRequest {
   settings: AiSettings;
   recentContext?: { role: "user" | "assistant"; content: string }[];
   activeContext?: AiActiveContext;
+  researchMode?: AdvisorResearchMode;
+  scopeMode?: AdvisorScopeMode;
 }
 
 export interface AiProvider {

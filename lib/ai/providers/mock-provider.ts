@@ -23,6 +23,7 @@ function sourceLabel(c: AiCandidate): string {
     case "tvmaze": return "TVmaze";
     case "openlibrary": return "Open Library";
     case "omdb": return "OMDb";
+    case "tmdb": return "TMDB";
     case "library": return "Kütüphanen";
   }
   return "Kaynak";

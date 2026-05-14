@@ -290,7 +290,7 @@ function normalizePlanShape(parsed: Partial<AiRetrievalPlan> | null, intent: AiI
         reason: String(p.reason || ""),
       }))
       .filter((p) =>
-        ["anilist", "tvmaze", "openlibrary", "omdb", "library"].includes(p.source) &&
+        ["anilist", "tvmaze", "openlibrary", "omdb", "tmdb", "library"].includes(p.source) &&
         isMediaType(p.mediaType)
       )
       .slice(0, 6),
@@ -341,7 +341,7 @@ function buildRankingPrompt(args: {
   "assistantMessage": string,
   "recommendations": [
     {
-      "externalSource": "anilist"|"tvmaze"|"openlibrary"|"omdb"|"library",
+      "externalSource": "anilist"|"tvmaze"|"openlibrary"|"omdb"|"tmdb"|"library",
       "externalId": string,
       "fitLabel": string,
       "reason": string,
@@ -360,6 +360,7 @@ function sourceLabel(s: AiCandidate["source"]): string {
     case "tvmaze": return "TVmaze";
     case "openlibrary": return "Open Library";
     case "omdb": return "OMDb";
+    case "tmdb": return "TMDB";
     case "library": return "Kütüphanen";
   }
 }

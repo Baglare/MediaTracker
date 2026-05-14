@@ -41,7 +41,7 @@ export interface AiSettings {
 }
 
 interface AiCandidate {
-  source: "tvmaze" | "anilist" | "openlibrary" | "omdb" | "library";
+  source: "tvmaze" | "anilist" | "openlibrary" | "omdb" | "tmdb" | "library";
   externalId: string;
   type: MediaType;
   title: string;
@@ -129,7 +129,7 @@ interface AiRecommendation {
   title: string;
   mediaType: MediaType;
   source: string;
-  externalSource?: "tvmaze" | "anilist" | "openlibrary" | "omdb" | "library";
+  externalSource?: "tvmaze" | "anilist" | "openlibrary" | "omdb" | "tmdb" | "library";
   externalId?: string;
   coverUrl?: string;
   overview?: string;
@@ -246,7 +246,7 @@ type ResearchMode = "library-only" | "source-apis" | "web";
 
 const RESEARCH_OPTIONS: { key: ResearchMode; label: string; desc: string; icon: typeof Database }[] = [
   { key: "library-only", label: "Sadece kütüphanem", desc: "Yalnızca eklediklerim üstünden", icon: Database },
-  { key: "source-apis", label: "Kaynak API'leriyle öner", desc: "TVmaze · AniList · OL · OMDb (yakında)", icon: Search },
+  { key: "source-apis", label: "Kaynak API'leriyle öner", desc: "TMDB · TVmaze · AniList · OL · OMDb", icon: Search },
   { key: "web", label: "Web araştırması", desc: "AI bilgi sinyali ile genişletilmiş", icon: Cloud },
 ];
 
@@ -654,6 +654,10 @@ export default function AiAdvisor({
           settings: effectiveSettings,
           recentContext: messages.slice(-6).map((m) => ({ role: m.role, content: m.content })),
           activeContext: activeContext || undefined,
+          // R37 — Backend, source-apis modunda harici kaynak aday toplamayı
+          // bu sinyallere göre tetikler.
+          researchMode,
+          scopeMode,
         }),
       });
       if (!res.ok) return null;
@@ -1048,7 +1052,7 @@ export default function AiAdvisor({
             {RESEARCH_OPTIONS.map((opt) => {
               const Icon = opt.icon;
               const active = researchMode === opt.key;
-              const soon = opt.key === "source-apis";
+              const soon = false;
               return (
                 <button
                   key={opt.key}

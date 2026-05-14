@@ -14,6 +14,8 @@ import {
   CandidateSearchResult,
   CandidateVerificationResult,
   searchCandidatesWithDebug,
+  searchSourceApiCandidates,
+  dedupeCandidates,
 } from "@/lib/ai/candidate-search";
 import {
   GeminiProviderError,
@@ -1310,6 +1312,49 @@ export async function POST(req: NextRequest) {
   }
 
   let candidates = searchResult.candidates;
+
+  // R37 — "Kaynak API'leriyle öner" modunda harici kaynaklardan ek aday topla.
+  // Sonuçlar mevcut havuza eklenir; ikisi de R36 scorer'ından geçer. Boş/eksik
+  // kaynaklar (TMDB key eksik, OL down vs.) Promise.allSettled ile yutulur,
+  // akış durmaz.
+  const researchMode = (body as { researchMode?: string }).researchMode;
+  const scopeMode = (body as { scopeMode?: string }).scopeMode as
+    | "mixed"
+    | "east"
+    | "screen"
+    | "arch"
+    | "one-per-world"
+    | undefined;
+  if (researchMode === "source-apis") {
+    try {
+      const sourceApi = await searchSourceApiCandidates({
+        intent,
+        profile,
+        message,
+        scopeMode,
+      });
+      if (sourceApi.candidates.length > 0) {
+        const before = candidates.length;
+        candidates = dedupeCandidates([...candidates, ...sourceApi.candidates]);
+        const merged = candidates.length - before;
+        debugNotes.push(
+          `r37_source_apis:scope=${scopeMode || "mixed"} fetched=${sourceApi.candidates.length} merged=${merged}`
+        );
+        for (const note of sourceApi.notes) debugNotes.push(`r37_${note}`);
+      } else {
+        debugNotes.push(`r37_source_apis:scope=${scopeMode || "mixed"} empty`);
+      }
+      // R37.1 — source-apis modunda total aday hâlâ 0 ise net debug işareti.
+      if (candidates.length === 0) {
+        debugNotes.push("r37_source_candidates_empty");
+      }
+    } catch (error) {
+      // Kaynak API toplaması başarısız olursa mevcut havuzla devam.
+      debugNotes.push(
+        `r37_source_apis_error:${error instanceof Error ? error.message.slice(0, 80) : "unknown"}`
+      );
+    }
+  }
 
   const libIndex = new Map<string, true>();
   for (const m of mediaItems) {

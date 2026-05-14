@@ -22,7 +22,9 @@ import { AniListNormalizedResult, AniListCategory } from "@/lib/anilist-types";
 import { TvmazeNormalizedResult } from "@/lib/tvmaze-types";
 import { OpenLibraryNormalizedResult } from "@/lib/openlibrary-types";
 import { OmdbNormalizedResult } from "@/lib/omdb-types";
+import { TmdbNormalizedResult } from "@/lib/tmdb-types";
 import { GlobalSearchResult } from "@/lib/global-search-types";
+import type { AdvisorScopeMode } from "./types";
 
 const PER_SOURCE_LIMIT = 8;
 const MAX_TOTAL = 24;
@@ -122,7 +124,7 @@ const MOOD_EXPANSIONS: { keys: RegExp; queries: string[] }[] = [
   { keys: /hüzün|sad|drama/i, queries: ["drama", "tragedy"] },
 ];
 
-function expandQueries(intent: AiIntent, profile: LibraryProfile | null, message: string): string[] {
+export function expandQueries(intent: AiIntent, profile: LibraryProfile | null, message: string): string[] {
   const text = message.toLowerCase();
   const queries: string[] = [];
 
@@ -160,6 +162,198 @@ function expandQueries(intent: AiIntent, profile: LibraryProfile | null, message
     seen.add(k);
     return true;
   });
+}
+
+// ============================================
+// R37.1 — AniList structured discover
+// ============================================
+// Doğal dil title-search'in 0 sonuç döndürdüğü mood/length intentlerini
+// AniList'in genre/tag/episodes_lesser filtrelerine çevirir. İki pass:
+//   strict   → tam mood+length+tags
+//   relaxed  → daha az genre, tag yok, ep limiti yok
+// AniList genre adları PascalCase ("Slice of Life" gibi); tag adları AniList
+// tag kataloğu (ör. "Iyashikei", "Heartwarming", "Dark Fantasy").
+
+interface AniListStructuredQuery {
+  genres?: string[];
+  tags?: string[];
+  episodesLesser?: number;
+  sort?: string[];
+  reason: string;
+}
+
+interface AniListStructuredPasses {
+  strict?: AniListStructuredQuery;
+  relaxed?: AniListStructuredQuery;
+}
+
+function extractAniListStructuredFilters(intent: AiIntent, message: string): AniListStructuredPasses {
+  const text = (message + " " + intent.mood.join(" ")).toLowerCase();
+  const genres = new Set<string>();
+  const tags = new Set<string>();
+  let episodesLesser: number | undefined;
+  const reasons: string[] = [];
+
+  if (/chill|sakin|rahat|relax|cozy|heart-?warm|iyileş|huzur|feel-?good/i.test(text)) {
+    genres.add("Slice of Life");
+    genres.add("Comedy");
+    tags.add("Iyashikei");
+    tags.add("Heartwarming");
+    reasons.push("chill→slice_of_life+iyashikei");
+  }
+  if (/romantik|romance|aşk\b/i.test(text)) {
+    genres.add("Romance");
+    reasons.push("romance");
+  }
+  if (/karanlık|karanlik|\bdark\b|psikoloj|psycholog|grim/i.test(text)) {
+    genres.add("Psychological");
+    genres.add("Thriller");
+    tags.add("Dark Fantasy");
+    reasons.push("dark→psychological+dark_fantasy");
+  }
+  if (/fantasy|fantastik|fantazi/i.test(text)) {
+    genres.add("Fantasy");
+    reasons.push("fantasy");
+  }
+  if (/sci-?fi|bilim ?kurgu|uzay/i.test(text)) {
+    genres.add("Sci-Fi");
+    reasons.push("sci-fi");
+  }
+  if (/aksiyon|action|dövüş|dovus/i.test(text)) {
+    genres.add("Action");
+    genres.add("Adventure");
+    reasons.push("action");
+  }
+  if (/komedi|comedy|gülmek|gulmek/i.test(text)) {
+    genres.add("Comedy");
+    reasons.push("comedy");
+  }
+  if (/gerilim|thriller|gergin/i.test(text)) {
+    genres.add("Thriller");
+    reasons.push("thriller");
+  }
+  if (/gizem|mystery|detektif/i.test(text)) {
+    genres.add("Mystery");
+    reasons.push("mystery");
+  }
+  if (/\bhorror\b|korku/i.test(text)) {
+    genres.add("Horror");
+    reasons.push("horror");
+  }
+  if (/\bdram\b|\bdrama\b/i.test(text)) {
+    genres.add("Drama");
+    reasons.push("drama");
+  }
+
+  // Length → episodes_lesser. "13 bölüm altı" / "12 bölüm" / "kısa" / "short".
+  const explicitEp = /(\d+)\s*(?:bölüm|bolum|episode|ep)\b/i.exec(text);
+  if (explicitEp) {
+    const n = parseInt(explicitEp[1], 10);
+    if (n >= 1 && n <= 200) {
+      // "12 bölüm" → <=12 + 1; AniList episodes_lesser strict less-than.
+      episodesLesser = n + 1;
+      reasons.push(`length:<=${n}`);
+    }
+  }
+  if (!episodesLesser && /\b(kısa|kisa|short|tek ot[uü]r)\b/i.test(text)) {
+    episodesLesser = 14;
+    reasons.push("length:short→<14");
+  }
+
+  if (genres.size === 0 && tags.size === 0 && !episodesLesser) {
+    return {};
+  }
+
+  const strict: AniListStructuredQuery = {
+    genres: genres.size > 0 ? Array.from(genres) : undefined,
+    tags: tags.size > 0 ? Array.from(tags) : undefined,
+    episodesLesser,
+    sort: ["POPULARITY_DESC", "SCORE_DESC"],
+    reason: reasons.join("|"),
+  };
+
+  // Relaxed: en güçlü sinyali bırak (ilk genre), tag/ep limitini kaldır.
+  const relaxed: AniListStructuredQuery = {
+    genres: strict.genres ? strict.genres.slice(0, 1) : undefined,
+    tags: undefined,
+    episodesLesser: undefined,
+    sort: ["POPULARITY_DESC"],
+    reason: `${strict.reason}+relaxed`,
+  };
+
+  return { strict, relaxed };
+}
+
+function aniListCategoryFor(type: MediaType): AniListCategory | null {
+  if (type === "anime") return "anime";
+  if (type === "manga") return "manga";
+  if (type === "manhwa") return "manhwa";
+  if (type === "manhua") return "manhua";
+  return null;
+}
+
+async function searchAniListDiscover(
+  ctx: SearchContext,
+  cat: AniListCategory,
+  filters: AniListStructuredQuery
+): Promise<AiCandidate[]> {
+  const url = new URL(`${ctx.baseUrl}/api/anilist/search`);
+  url.searchParams.set("category", cat);
+  if (filters.genres && filters.genres.length > 0) url.searchParams.set("genres", filters.genres.join(","));
+  if (filters.tags && filters.tags.length > 0) url.searchParams.set("tags", filters.tags.join(","));
+  if (typeof filters.episodesLesser === "number") {
+    url.searchParams.set("episodesLte", String(filters.episodesLesser));
+  }
+  if (filters.sort && filters.sort.length > 0) url.searchParams.set("sort", filters.sort.join(","));
+
+  // mediaType debug satırı için temsili tür — gerçek sonuçlar normalize'da
+  // doğru MediaType ile gelir.
+  const debugType: MediaType =
+    cat === "anime" ? "anime" : cat === "manhwa" ? "manhwa" : cat === "manhua" ? "manhua" : "manga";
+  const queryLabel = `[discover:${filters.reason || "structured"}]`;
+
+  try {
+    const res = await fetch(url.toString(), { cache: "no-store" });
+    if (!res.ok) {
+      recordQuery(ctx.debug, "anilist", debugType, queryLabel, 0);
+      return [];
+    }
+    const data = (await res.json()) as { results?: AniListNormalizedResult[] };
+    const results = (data.results || []).slice(0, PER_SOURCE_LIMIT);
+    recordQuery(ctx.debug, "anilist", debugType, queryLabel, results.length);
+    return results.map<AiCandidate>((r) => {
+      const gs: GlobalSearchResult = {
+        source: "anilist",
+        externalId: r.externalId,
+        type: r.type,
+        title: r.title,
+        overview: r.overview,
+        releaseYear: r.releaseYear,
+        coverUrl: r.coverUrl,
+        genres: r.genres,
+        totalProgress: r.totalProgress,
+        raw: r,
+      };
+      return {
+        source: "anilist",
+        externalId: r.externalId,
+        type: r.type,
+        title: r.title,
+        overview: r.overview,
+        releaseYear: r.releaseYear,
+        coverUrl: r.coverUrl,
+        genres: r.genres,
+        totalProgress: r.totalProgress,
+        averageScore: r.averageScore,
+        format: r.format,
+        status: r.anilistStatus,
+        globalSearch: gs,
+      };
+    });
+  } catch {
+    recordQuery(ctx.debug, "anilist", debugType, queryLabel, 0);
+    return [];
+  }
 }
 
 // ---- AniList ----
@@ -498,7 +692,7 @@ function localCandidates(
 }
 
 // ---- Aday havuzunu birleştir & dedupe ----
-function dedupeCandidates(all: AiCandidate[]): AiCandidate[] {
+export function dedupeCandidates(all: AiCandidate[]): AiCandidate[] {
   const seen = new Set<string>();
   return all.filter((c) => {
     const k = `${c.source}:${c.externalId}`;
@@ -612,6 +806,53 @@ async function searchForIdea(ctx: SearchContext, idea: AiCandidateIdea): Promise
       return searchOpenLibrary(ctx, query);
     case "movie":
       return searchOmdb(ctx, query);
+  }
+}
+
+// R37 — TMDB film araması (source-apis modunun birincil film kaynağı).
+// TMDB route'u key eksikse 503 + boş results döndürdüğü için bu fonksiyon
+// boş sonuç durumunda OMDb fallback'in çağrıldığını söyleyen bir sinyal
+// üretmez — orchestrator (searchSourceApiCandidates) zaten ardından OMDb'yi
+// çalıştırır.
+async function searchTmdb(ctx: SearchContext, q: string): Promise<AiCandidate[]> {
+  if (!q.trim()) return [];
+  try {
+    const url = `${ctx.baseUrl}/api/tmdb/search?q=${encodeURIComponent(q)}`;
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) {
+      recordQuery(ctx.debug, "tmdb", "movie", q, 0);
+      return [];
+    }
+    const data = (await res.json()) as { results?: TmdbNormalizedResult[] };
+    const results = (data.results || []).filter((r) => r.type === "movie").slice(0, PER_SOURCE_LIMIT);
+    recordQuery(ctx.debug, "tmdb", "movie", q, results.length);
+    return results.map<AiCandidate>((r) => {
+      const gs: GlobalSearchResult = {
+        source: "tmdb",
+        externalId: r.externalId,
+        type: "movie",
+        title: r.title,
+        overview: r.overview,
+        releaseYear: r.releaseYear,
+        coverUrl: r.coverUrl,
+        totalProgress: r.totalProgress,
+        raw: r,
+      };
+      return {
+        source: "tmdb",
+        externalId: r.externalId,
+        type: "movie",
+        title: r.title,
+        overview: r.overview,
+        releaseYear: r.releaseYear,
+        coverUrl: r.coverUrl,
+        totalProgress: r.totalProgress,
+        globalSearch: gs,
+      };
+    });
+  } catch {
+    recordQuery(ctx.debug, "tmdb", "movie", q, 0);
+    return [];
   }
 }
 
@@ -830,5 +1071,228 @@ export async function searchCandidatesWithDebug(args: {
   }
 
   return finish(hygieneFilterCandidates(pool, targets, intent.references, debug).slice(0, MAX_TOTAL));
+}
+
+// ============================================
+// R37 — Source-API candidate aggregator
+// ============================================
+// "Kaynak API'leriyle öner" modu için: kullanıcının seçtiği kapsama göre
+// uygun harici API'leri paralel sorgular, scope için anlamsız olanları
+// atlar. Hatalar Promise.allSettled ile yutulur — biri patladığında diğer
+// kaynaklar yine sonuç döndürür. Çıktı R36 scorer'ından geçecek; bu
+// fonksiyon kendi başına filtreleme/sıralama yapmaz.
+
+interface ScopePlan {
+  /** Bu kapsam için sorgulanacak (source, mediaType) çiftleri */
+  pairs: { source: RetrievalSource; mediaType: MediaType }[];
+  /** TMDB → OMDb fallback yapılacak mı (sadece movie hedefliyse) */
+  tmdbToOmdbFallback: boolean;
+}
+
+function planForScope(scope: AdvisorScopeMode): ScopePlan {
+  const east: ScopePlan["pairs"] = [
+    { source: "anilist", mediaType: "anime" },
+    { source: "anilist", mediaType: "manga" },
+    { source: "anilist", mediaType: "manhwa" },
+    { source: "anilist", mediaType: "manhua" },
+  ];
+  const screen: ScopePlan["pairs"] = [
+    { source: "tmdb", mediaType: "movie" },
+    { source: "tvmaze", mediaType: "tv" },
+  ];
+  const arch: ScopePlan["pairs"] = [{ source: "openlibrary", mediaType: "book" }];
+
+  switch (scope) {
+    case "east":
+      return { pairs: east, tmdbToOmdbFallback: false };
+    case "screen":
+      return { pairs: screen, tmdbToOmdbFallback: true };
+    case "arch":
+      return { pairs: arch, tmdbToOmdbFallback: false };
+    case "one-per-world":
+    case "mixed":
+    default:
+      return { pairs: [...east, ...screen, ...arch], tmdbToOmdbFallback: true };
+  }
+}
+
+function dispatchSearch(
+  ctx: SearchContext,
+  source: RetrievalSource,
+  mediaType: MediaType,
+  query: string
+): Promise<AiCandidate[]> {
+  switch (source) {
+    case "anilist":
+      // AniList için mediaType halihazırda anime/manga/manhwa/manhua olmalı
+      if (mediaType === "anime" || mediaType === "manga" || mediaType === "manhwa" || mediaType === "manhua") {
+        return searchAniList(ctx, query, mediaType);
+      }
+      return Promise.resolve([]);
+    case "tvmaze":
+      return searchTvmaze(ctx, query);
+    case "openlibrary":
+      return searchOpenLibrary(ctx, query);
+    case "tmdb":
+      return searchTmdb(ctx, query);
+    case "omdb":
+      return searchOmdb(ctx, query);
+    case "library":
+      return Promise.resolve([]);
+  }
+}
+
+export interface SourceApiCandidatesResult {
+  candidates: AiCandidate[];
+  executedQueries: AiRetrievalDebug["executedQueries"];
+  sourceCandidateCounts: Record<string, number>;
+  notes: string[];
+}
+
+export async function searchSourceApiCandidates(args: {
+  intent: AiIntent;
+  profile: LibraryProfile | null;
+  message: string;
+  scopeMode?: AdvisorScopeMode;
+  /** İstenirse caller'ın paylaşılan debug nesnesi (queries/counts buraya da yazılır) */
+  sharedDebug?: CandidateSearchDebug;
+}): Promise<SourceApiCandidatesResult> {
+  const { intent, profile, message, scopeMode } = args;
+  const scope = scopeMode || "mixed";
+  const plan = planForScope(scope);
+  const notes: string[] = [];
+
+  // Hedef tür intent'te belirginse onunla pair'leri filtrele (örn. "kitap öner"
+  // → sadece book pair'i çağrılsın). Boşsa scope'un tüm pair'leri çalışsın.
+  let pairs = plan.pairs;
+  if (intent.targetTypes.length > 0) {
+    const targetSet = new Set(intent.targetTypes);
+    const filtered = pairs.filter((p) => targetSet.has(p.mediaType));
+    if (filtered.length > 0) pairs = filtered;
+  }
+
+  // Çok az pair varsa (scope=arch gibi) tek sorgu yeterli; aksi halde ilk 2 sorgu.
+  const expanded = expandQueries(intent, profile, message);
+  const queryCount = pairs.length <= 2 ? 2 : 1;
+  const queries = expanded.slice(0, queryCount);
+  if (queries.length === 0) {
+    notes.push("source_apis_no_query");
+    return { candidates: [], executedQueries: [], sourceCandidateCounts: {}, notes };
+  }
+
+  const localDebug: CandidateSearchDebug = args.sharedDebug || createSearchDebug();
+  const ctx: SearchContext = { baseUrl: getBaseUrl(), debug: localDebug };
+
+  const collected: AiCandidate[] = [];
+
+  // R37.1 — AniList tarafında doğal dil title-search yerine structured discover
+  // dene. Mood/length intentleri varsa strict pass, 0 dönerse relaxed pass.
+  const anilistPairs = pairs.filter((p) => p.source === "anilist");
+  const otherPairs = pairs.filter((p) => p.source !== "anilist");
+  const structured = extractAniListStructuredFilters(intent, message);
+
+  if (anilistPairs.length > 0 && structured.strict) {
+    const anilistCats = new Set<AniListCategory>();
+    for (const pair of anilistPairs) {
+      const cat = aniListCategoryFor(pair.mediaType);
+      if (cat) anilistCats.add(cat);
+    }
+
+    const strictTasks: Promise<AiCandidate[]>[] = [];
+    for (const cat of anilistCats) {
+      strictTasks.push(searchAniListDiscover(ctx, cat, structured.strict));
+    }
+    const strictSettled = await Promise.allSettled(strictTasks);
+    const strictBatch: AiCandidate[] = [];
+    for (const s of strictSettled) {
+      if (s.status === "fulfilled") strictBatch.push(...s.value);
+    }
+    notes.push(
+      `anilist_discover_strict:filters=${structured.strict.reason} cats=${Array.from(anilistCats).join("/")} hits=${strictBatch.length}`
+    );
+
+    if (strictBatch.length === 0 && structured.relaxed) {
+      const relaxedTasks: Promise<AiCandidate[]>[] = [];
+      for (const cat of anilistCats) {
+        relaxedTasks.push(searchAniListDiscover(ctx, cat, structured.relaxed));
+      }
+      const relaxedSettled = await Promise.allSettled(relaxedTasks);
+      const relaxedBatch: AiCandidate[] = [];
+      for (const s of relaxedSettled) {
+        if (s.status === "fulfilled") relaxedBatch.push(...s.value);
+      }
+      notes.push(
+        `anilist_discover_relaxed:filters=${structured.relaxed.reason} cats=${Array.from(anilistCats).join("/")} hits=${relaxedBatch.length}`
+      );
+      collected.push(...relaxedBatch);
+    } else {
+      collected.push(...strictBatch);
+    }
+  } else if (anilistPairs.length > 0) {
+    // Structured sinyal yok → mevcut title-search davranışı.
+    const titleTasks: Promise<AiCandidate[]>[] = [];
+    for (const pair of anilistPairs) {
+      for (const q of queries) {
+        titleTasks.push(dispatchSearch(ctx, pair.source, pair.mediaType, q));
+      }
+    }
+    const settled = await Promise.allSettled(titleTasks);
+    for (const s of settled) {
+      if (s.status === "fulfilled") collected.push(...s.value);
+    }
+    notes.push(`anilist_title_search:queries=${queries.length} pairs=${anilistPairs.length}`);
+  }
+
+  // AniList dışı kaynaklar: title-search hâlâ geçerli.
+  const otherTasks: Promise<AiCandidate[]>[] = [];
+  for (const pair of otherPairs) {
+    for (const q of queries) {
+      otherTasks.push(dispatchSearch(ctx, pair.source, pair.mediaType, q));
+    }
+  }
+  const otherSettled = await Promise.allSettled(otherTasks);
+  for (const s of otherSettled) {
+    if (s.status === "fulfilled") collected.push(...s.value);
+  }
+
+  // Film için TMDB hiç sonuç döndürmediyse OMDb fallback'i.
+  if (plan.tmdbToOmdbFallback) {
+    const wantsMovie = pairs.some((p) => p.mediaType === "movie");
+    if (wantsMovie) {
+      const tmdbCount = collected.filter((c) => c.source === "tmdb").length;
+      if (tmdbCount === 0) {
+        notes.push("tmdb_empty_omdb_fallback");
+        for (const q of queries) {
+          try {
+            const fb = await searchOmdb(ctx, q);
+            collected.push(...fb);
+          } catch {
+            // yutulur — fallback'in başarısız olması akışı durdurmaz
+          }
+        }
+      }
+    }
+  }
+
+  const deduped = dedupeCandidates(collected);
+
+  // Kapsam sınırlandırması: scope explicit ise diğer dünyaları sızdırma.
+  let finalCandidates = deduped;
+  if (scope === "east") {
+    finalCandidates = deduped.filter((c) =>
+      c.type === "anime" || c.type === "manga" || c.type === "manhwa" || c.type === "manhua"
+    );
+  } else if (scope === "screen") {
+    finalCandidates = deduped.filter((c) => c.type === "tv" || c.type === "movie");
+  } else if (scope === "arch") {
+    finalCandidates = deduped.filter((c) => c.type === "book");
+  }
+
+  return {
+    candidates: finalCandidates.slice(0, MAX_TOTAL),
+    executedQueries: localDebug.executedQueries,
+    sourceCandidateCounts: localDebug.sourceCandidateCounts,
+    notes,
+  };
 }
 
