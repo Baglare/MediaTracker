@@ -4,7 +4,7 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Search, Loader2 } from "lucide-react";
 import {
   GlobalSearchResult,
@@ -21,6 +21,10 @@ import { TmdbNormalizedResult } from "@/lib/tmdb-types";
 interface GlobalSearchProps {
   getLibraryStatus: (item: GlobalSearchResult) => Promise<GlobalSearchLibraryStatus> | GlobalSearchLibraryStatus;
   onAddToLibrary: (item: GlobalSearchResult, options?: { relatedOnly?: boolean }) => void | Promise<void>;
+  // R40 — Dış kaynaklardan (örn. AI Danışman "Keşfet'te Ara") gelen prefill
+  // sinyali. token monoton artar; aynı (query, category) için bile yeni
+  // token ile değişirse prefill yeniden uygulanır.
+  prefill?: { query: string; category?: GlobalSearchCategory; token: number } | null;
 }
 
 // R23.2: Kategori chip seti Kütüphanem'in Dünya taksonomisine paralel
@@ -76,7 +80,7 @@ interface SourceDiag {
   reason?: string;
 }
 
-export default function GlobalSearch({ getLibraryStatus, onAddToLibrary }: GlobalSearchProps) {
+export default function GlobalSearch({ getLibraryStatus, onAddToLibrary, prefill }: GlobalSearchProps) {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<GlobalSearchCategory>("all");
   const [isSearching, setIsSearching] = useState(false);
@@ -89,6 +93,19 @@ export default function GlobalSearch({ getLibraryStatus, onAddToLibrary }: Globa
   // hiç render edilmediği için kullanıcı kaynak çağrılmamış sandı. Artık
   // diag tutup empty/error notunu kullanıcıya gösteriyoruz.
   const [anilistDiag, setAnilistDiag] = useState<SourceDiag | null>(null);
+  // R40 — Prefill: render fazında query/category setter'ları, auto-search
+  // useEffect içinde ref-gate ile bir kez tetiklenir. State setter'ı effect
+  // içinde çağrılmaz (kuralı tetiklemez); handleSearch async olduğundan
+  // setIsSearching gibi iç state'ler effect body'sinin dışında oluşur.
+  const [lastPrefillToken, setLastPrefillToken] = useState<number | null>(null);
+  const consumedPrefillToken = useRef<number | null>(null);
+  if (prefill && prefill.token !== lastPrefillToken) {
+    setLastPrefillToken(prefill.token);
+    const nextQuery = prefill.query || "";
+    const nextCategory: GlobalSearchCategory = prefill.category || "all";
+    setQuery(nextQuery);
+    setCategory(nextCategory);
+  }
 
   async function handleSearch(
     e?: React.FormEvent | null,
@@ -358,6 +375,30 @@ export default function GlobalSearch({ getLibraryStatus, onAddToLibrary }: Globa
   if (results.length === 0 && Object.keys(libraryStatuses).length > 0) {
     setLibraryStatuses({});
   }
+
+  // R40 — Prefill auto-search: lastPrefillToken render fazında ayarlandıktan
+  // sonra (query/category setter'ları commit oldu), bu effect handleSearch'ü
+  // bir defalık çalıştırır. consumedPrefillToken ref'i tekrar tetiklenmeyi
+  // önler.
+  useEffect(() => {
+    if (!prefill) return;
+    if (lastPrefillToken !== prefill.token) return;
+    if (consumedPrefillToken.current === prefill.token) return;
+    if (!prefill.query.trim()) return;
+    consumedPrefillToken.current = prefill.token;
+    // setTimeout ile bir tick defer ediyoruz — handleSearch içinde sync
+    // setState'ler (setIsSearching, setResults, ...) effect body'sinin
+    // doğrudan zincirinde olmasın diye. Bu, react-hooks/set-state-in-effect
+    // ihlalinden kaçınmanın temiz yolu.
+    const handle = setTimeout(() => {
+      void handleSearch(null, prefill.category || "all");
+    }, 0);
+    return () => clearTimeout(handle);
+    // handleSearch closure'da güncel query/category'i okur (render fazında
+    // commit edildi); deps listesi sadece prefill + lastPrefillToken.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefill, lastPrefillToken]);
+
   useEffect(() => {
     if (results.length === 0) return;
     let cancelled = false;

@@ -81,7 +81,7 @@ import LibraryControlBar, {
   type LibrarySort,
   type LibraryView,
 } from "@/components/library-control-bar";
-import { GlobalSearchLibraryStatus, GlobalSearchResult } from "@/lib/global-search-types";
+import { GlobalSearchCategory, GlobalSearchLibraryStatus, GlobalSearchResult } from "@/lib/global-search-types";
 import { mockMediaList } from "@/lib/mock-media";
 import {
   loadMediaList,
@@ -226,7 +226,16 @@ export default function HomePage() {
   const [notesSort, setNotesSort] = useState<"recent" | "title" | "rating">("recent");
 
   // AI Danışman sekmesi dışına çıkıldığında aktif sohbeti sıfırlamak için sinyal
-  const [aiResetSignal, setAiResetSignal] = useState(0);
+  // R40 — auto reset kaldırıldı; reset yalnızca AiAdvisor içindeki "Konuyu
+  // kapat" butonundan tetiklenir. Prop yine 0 ile sabit gider, advisor'ın
+  // modal-style guard'ı bu sabit değerde reset koluna asla girmez.
+  // R40 — Keşfet sekmesi prefill state'i. Token monoton artan sayı; aynı
+  // başlığa iki kez tıklayınca da prev-prop guard'ı tetiklenir.
+  const [discoverPrefill, setDiscoverPrefill] = useState<{
+    query: string;
+    category: GlobalSearchCategory;
+    token: number;
+  } | null>(null);
 
   // Modal durumları
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -336,12 +345,9 @@ export default function HomePage() {
   // ---- EYLEMLER (Actions) ----
 
   const handleTabChange = useCallback((tab: TabType) => {
-    setActiveTab((prev) => {
-      if (prev === "ai" && tab !== "ai") {
-        setAiResetSignal((s) => s + 1);
-      }
-      return tab;
-    });
+    // R40 — AI sekmesi terkedildiğinde otomatik reset KALDIRILDI; oturum
+    // kullanıcı "Konuyu kapat" diyene kadar yaşamaya devam eder.
+    setActiveTab(tab);
     setDetailMediaId(null);
     setEditingItem(null);
     setIsModalOpen(false);
@@ -2080,6 +2086,7 @@ export default function HomePage() {
               <GlobalSearch
                 getLibraryStatus={getGlobalSearchLibraryStatus}
                 onAddToLibrary={handleAddFromGlobalSearch}
+                prefill={discoverPrefill}
               />
               <div>
                 {/* R23.1: Eski "Eski Paneller" başlığı debug hissi veriyordu;
@@ -3144,9 +3151,26 @@ export default function HomePage() {
             <AiAdvisor
               mediaList={mediaList}
               progressLogs={progressLogs}
-              resetSignal={aiResetSignal}
+              resetSignal={0}
               onAddToLibrary={handleAddFromGlobalSearch}
-              onOpenDiscover={() => handleTabChange("discover")}
+              onOpenDiscover={(rec) => {
+                // R40 — Keşfet'e geç + arama kutusunu öneri başlığıyla ve
+                // doğru kategori chip'iyle doldur. Auto-search GlobalSearch
+                // tarafında prefill prop'u algılayınca tetiklenir.
+                const cat: GlobalSearchCategory =
+                  rec.mediaType === "movie" ? "movie" :
+                  rec.mediaType === "tv" ? "tv" :
+                  rec.mediaType === "anime" ? "anime" :
+                  rec.mediaType === "manga" || rec.mediaType === "manhwa" || rec.mediaType === "manhua" ? "manga" :
+                  rec.mediaType === "light_novel" || rec.mediaType === "web_novel" || rec.mediaType === "visual_novel" ? "novel" :
+                  rec.mediaType === "book" ? "book" : "all";
+                setDiscoverPrefill((prev) => ({
+                  query: rec.title,
+                  category: cat,
+                  token: (prev?.token ?? 0) + 1,
+                }));
+                handleTabChange("discover");
+              }}
             />
           </div>
         )}

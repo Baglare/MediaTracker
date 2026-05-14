@@ -205,6 +205,11 @@ interface AiAdvisorProps {
 
 const SETTINGS_KEY = "media-tracker-ai-settings";
 const SESSIONS_KEY = "media-tracker-ai-sessions";
+// R40 — Aktif AI oturumu (chat + öneri kartları + local feedback) sayfa
+// yenilenmesinde geri yüklenebilmesi için bu key'e yazılır. handleNewTopic
+// veya boş state durumunda silinir. Konu Kapat → temizler.
+const ACTIVE_SESSION_KEY = "media-tracker-ai-active-session";
+const ACTIVE_SESSION_VERSION = 1;
 const MAX_SESSIONS = 8;
 
 const DEFAULT_SETTINGS: AiSettings = {
@@ -549,10 +554,68 @@ export default function AiAdvisor({
         if (parsed.scopeMode) setScopeMode(parsed.scopeMode);
         if (parsed.researchMode) setResearchMode(parsed.researchMode);
       }
+      // R40 — Aktif oturum snapshot'ını geri yükle.
+      const active = localStorage.getItem(ACTIVE_SESSION_KEY);
+      if (active) {
+        const snap = JSON.parse(active) as {
+          v?: number;
+          messages?: AiMessage[];
+          recommendations?: AiRecommendation[];
+          rejected?: RejectedCandidate[];
+          addedIds?: Record<string, boolean>;
+          dismissedSignals?: Record<string, DismissedSignal>;
+          pendingClarification?: { originalPrompt: string; question: string } | null;
+          debugInfo?: AiDebugInfo | null;
+          activeContext?: AiActiveContext | null;
+        };
+        if (snap.v === ACTIVE_SESSION_VERSION) {
+          if (Array.isArray(snap.messages)) setMessages(snap.messages);
+          if (Array.isArray(snap.recommendations)) setRecommendations(snap.recommendations);
+          if (Array.isArray(snap.rejected)) setRejected(snap.rejected);
+          if (snap.addedIds && typeof snap.addedIds === "object") setAddedIds(snap.addedIds);
+          if (snap.dismissedSignals && typeof snap.dismissedSignals === "object") {
+            setDismissedSignals(snap.dismissedSignals);
+          }
+          if (snap.pendingClarification) setPendingClarification(snap.pendingClarification);
+          if (snap.debugInfo) setDebugInfo(snap.debugInfo);
+          if (snap.activeContext) activeContextRef.current = snap.activeContext;
+        }
+      }
     } catch {
       // ignore
     }
   }, []);
+
+  // R40 — Aktif oturumu localStorage'a yaz. Boş state → key silinir.
+  useEffect(() => {
+    try {
+      const isEmpty =
+        messages.length === 0 &&
+        recommendations.length === 0 &&
+        rejected.length === 0 &&
+        Object.keys(addedIds).length === 0 &&
+        Object.keys(dismissedSignals).length === 0 &&
+        !pendingClarification;
+      if (isEmpty) {
+        localStorage.removeItem(ACTIVE_SESSION_KEY);
+        return;
+      }
+      const snap = {
+        v: ACTIVE_SESSION_VERSION,
+        messages,
+        recommendations,
+        rejected,
+        addedIds,
+        dismissedSignals,
+        pendingClarification,
+        debugInfo,
+        activeContext: activeContextRef.current,
+      };
+      localStorage.setItem(ACTIVE_SESSION_KEY, JSON.stringify(snap));
+    } catch {
+      // ignore (kotanın dolması ya da JSON cycle gibi nadir durumlar)
+    }
+  }, [messages, recommendations, rejected, addedIds, dismissedSignals, pendingClarification, debugInfo]);
 
   useEffect(() => {
     try {
@@ -1081,10 +1144,11 @@ export default function AiAdvisor({
           {(messages.length > 0 || recommendations.length > 0 || viewingSessionId) && (
             <button
               onClick={handleNewTopic}
+              title="Aktif AI sohbetini, önerileri ve oturum içi feedback'i sıfırlar"
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-300 bg-zinc-900/60 border border-zinc-800 hover:bg-zinc-800/70 transition-colors cursor-pointer"
             >
               <X className="w-3.5 h-3.5" />
-              {viewingSessionId ? "Konuyu kapat" : "Yeni konu"}
+              Konuyu kapat
             </button>
           )}
         </div>
