@@ -121,16 +121,18 @@ export default function ProfileSettingsCard({
   };
 
   return (
-    <section className="bg-zinc-900/30 rounded-2xl border border-zinc-800/60 p-5 sm:p-6 min-w-0">
-      <div className="flex flex-col sm:flex-row sm:items-start gap-4 sm:gap-5">
-        <ProfileAvatar profileName={profileName} preferences={preferences} size="lg" />
+    <section className="bg-zinc-900/25 rounded-2xl border border-zinc-800/60 p-4 sm:p-5 min-w-0">
+      <div className="flex flex-col gap-4">
         <div className="min-w-0 flex-1">
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
-            <div>
-              <h3 className="text-base font-semibold text-zinc-100 tracking-tight">Profil</h3>
-              <p className="mt-1 text-xs text-zinc-500">
-                Sidebar ve mobil üst çubukta görünen yerel profil kimliği.
-              </p>
+            <div className="flex min-w-0 items-center gap-3">
+              <ProfileAvatar profileName={profileName} preferences={preferences} size="sm" />
+              <div className="min-w-0">
+                <h3 className="text-sm font-semibold text-zinc-100 tracking-tight">Kişiselleştirme</h3>
+                <p className="mt-1 text-xs text-zinc-500">
+                  Sidebar ve mobil üst çubukta görünen yerel profil kimliği.
+                </p>
+              </div>
             </div>
             <span className="inline-flex w-fit rounded-full bg-zinc-950/45 px-2.5 py-1 text-[11px] text-zinc-500 ring-1 ring-zinc-800/70">
               Local-only

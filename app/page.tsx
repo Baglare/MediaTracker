@@ -14,6 +14,7 @@ import { useState, useMemo, useEffect, useCallback } from "react";
 import AppSidebar from "@/components/app-sidebar";
 import AppTopbar from "@/components/app-topbar";
 import ProfileSettingsCard from "@/components/profile-settings-card";
+import { ProfileAvatar } from "@/components/sidebar-profile-card";
 import RightRail from "@/components/right-rail";
 import PageHeader from "@/components/page-header";
 import { TabType } from "@/components/app-tabs";
@@ -3256,45 +3257,101 @@ export default function HomePage() {
               subtitle="Görünen ad, avatar, ünvan ve yolculuk kimliği"
             />
 
-            <section className="rounded-2xl border border-zinc-800/60 bg-zinc-900/30 p-5 sm:p-6 min-w-0">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                <PersonalMetricCard label="Seviye" value={userProgression.level} accent />
-                <PersonalMetricCard label="Ünvan" value={journeyTitle} />
-                <PersonalMetricCard
-                  label="XP"
-                  value={`${userProgression.currentLevelXp}/${userProgression.nextLevelXp}`}
-                  hint={`Toplam ${userProgression.totalXp} XP`}
-                />
-                <PersonalMetricCard
-                  label="Dominant dünya"
-                  value={
-                    userProgression.dominantWorld === "east"
-                      ? "Doğu"
-                      : userProgression.dominantWorld === "screen"
-                        ? "Kadraj"
-                        : userProgression.dominantWorld === "arch"
-                          ? "Arşiv"
-                          : "Karma"
-                  }
-                />
-              </div>
-              <div className="mt-4 h-2 overflow-hidden rounded-full bg-zinc-950/60 ring-1 ring-zinc-800/80">
+            <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.25fr)_minmax(22rem,0.75fr)] gap-5 items-start">
+              <section className="relative overflow-hidden rounded-2xl border border-zinc-800/60 bg-[linear-gradient(135deg,rgba(39,39,42,0.58),rgba(9,9,11,0.72))] p-5 sm:p-6 lg:p-7 min-w-0 shadow-lg shadow-black/20">
                 <div
-                  className="h-full rounded-full bg-gradient-to-r from-amber-300 via-violet-400 to-cyan-300"
-                  style={{ width: `${Math.round(userProgression.progressPercent * 100)}%` }}
+                  aria-hidden
+                  className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-amber-300/70 to-transparent"
                 />
-              </div>
-              <p className="mt-2 text-xs text-zinc-500">
-                Sonraki seviyeye {Math.max(0, userProgression.nextLevelXp - userProgression.currentLevelXp)} XP
-              </p>
-            </section>
 
-            <ProfileSettingsCard
-              preferences={profilePreferences}
-              profileName={profileName}
-              automaticTitle={userProgression.title}
-              onChange={setProfilePreferences}
-            />
+                <div className="relative flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+                  <div className="flex min-w-0 flex-col sm:flex-row sm:items-center gap-4">
+                    <div className="rounded-3xl bg-zinc-950/45 p-2 ring-1 ring-zinc-800/70 shadow-inner shadow-black/30">
+                      <ProfileAvatar profileName={profileName} preferences={profilePreferences} size="lg" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-500">
+                        Profil vitrini
+                      </p>
+                      <h2 className="mt-2 truncate text-3xl font-semibold tracking-tight text-zinc-50 sm:text-4xl">
+                        {profileName}
+                      </h2>
+                      <p className="mt-2 max-w-2xl text-sm leading-relaxed text-zinc-400">
+                        {profileTagline}
+                      </p>
+                      <div className="mt-4 flex flex-wrap items-center gap-2">
+                        <span className="rounded-full bg-amber-500/12 px-3 py-1.5 text-xs font-semibold text-amber-200 ring-1 ring-amber-500/25">
+                          Seviye {userProgression.level}
+                        </span>
+                        <span className="rounded-full bg-zinc-950/45 px-3 py-1.5 text-xs font-medium text-zinc-200 ring-1 ring-zinc-800/70">
+                          {journeyTitle}
+                        </span>
+                        <span className="rounded-full bg-zinc-950/45 px-3 py-1.5 text-xs font-medium text-zinc-400 ring-1 ring-zinc-800/70">
+                          {userProgression.dominantWorld === "east"
+                            ? "Doğu"
+                            : userProgression.dominantWorld === "screen"
+                              ? "Kadraj"
+                              : userProgression.dominantWorld === "arch"
+                                ? "Arşiv"
+                                : "Karma"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="w-full shrink-0 border-t border-zinc-800/60 pt-4 md:w-64 md:border-l md:border-t-0 md:pl-5 md:pt-0">
+                    <div className="flex items-end justify-between gap-3">
+                      <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
+                          XP ilerleme
+                        </p>
+                        <p className="mt-1 text-2xl font-semibold tabular-nums text-zinc-50">
+                          {Math.round(userProgression.progressPercent * 100)}%
+                        </p>
+                      </div>
+                      <p className="text-right text-[11px] font-mono tabular-nums text-zinc-500">
+                        {userProgression.currentLevelXp}/{userProgression.nextLevelXp}
+                      </p>
+                    </div>
+                    <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-zinc-900 ring-1 ring-zinc-800/80">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-amber-300 via-violet-400 to-cyan-300 shadow-[0_0_18px_rgba(245,158,11,0.22)]"
+                        style={{ width: `${Math.round(userProgression.progressPercent * 100)}%` }}
+                      />
+                    </div>
+                    <p className="mt-2 text-xs text-zinc-500">
+                      Sonraki seviyeye {Math.max(0, userProgression.nextLevelXp - userProgression.currentLevelXp)} XP
+                    </p>
+                  </div>
+                </div>
+
+                <div className="relative mt-6 grid grid-cols-2 gap-x-5 gap-y-4 border-t border-zinc-800/60 pt-4 lg:grid-cols-4">
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Toplam XP</p>
+                    <p className="mt-1 text-lg font-semibold tabular-nums text-zinc-100">{userProgression.totalXp}</p>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Doğu</p>
+                    <p className="mt-1 text-lg font-semibold tabular-nums text-zinc-100">{userProgression.worldCounts.east}</p>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Kadraj</p>
+                    <p className="mt-1 text-lg font-semibold tabular-nums text-zinc-100">{userProgression.worldCounts.screen}</p>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Arşiv</p>
+                    <p className="mt-1 text-lg font-semibold tabular-nums text-zinc-100">{userProgression.worldCounts.arch}</p>
+                  </div>
+                </div>
+              </section>
+
+              <ProfileSettingsCard
+                preferences={profilePreferences}
+                profileName={profileName}
+                automaticTitle={userProgression.title}
+                onChange={setProfilePreferences}
+              />
+            </div>
           </div>
         )}
 
