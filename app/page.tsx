@@ -3146,6 +3146,7 @@ export default function HomePage() {
               progressLogs={progressLogs}
               resetSignal={aiResetSignal}
               onAddToLibrary={handleAddFromGlobalSearch}
+              onOpenDiscover={() => handleTabChange("discover")}
             />
           </div>
         )}

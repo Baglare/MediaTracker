@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -22,6 +22,12 @@ import {
   Cloud,
   Search,
   Compass,
+  ThumbsDown,
+  RotateCcw,
+  Repeat,
+  AlertTriangle,
+  Lightbulb,
+  ExternalLink,
 } from "lucide-react";
 import { MediaItem, MediaType, ProgressLog } from "@/lib/types";
 import { GlobalSearchResult } from "@/lib/global-search-types";
@@ -41,6 +47,10 @@ export interface AiSettings {
 }
 
 interface AiCandidate {
+  // R36/R38 — server tarafı `score` + `scoreReasons` üretiyor; client kartta
+  // "Neden önerildi" bullet listesi olarak gösteriyor.
+  score?: number;
+  scoreReasons?: string[];
   source: "tvmaze" | "anilist" | "openlibrary" | "omdb" | "tmdb" | "library";
   externalId: string;
   type: MediaType;
@@ -177,6 +187,10 @@ interface AiAdvisorProps {
   progressLogs: ProgressLog[];
   resetSignal: number;
   onAddToLibrary: (gs: GlobalSearchResult) => void | Promise<void>;
+  // R38 — Quick Add'a uygun olmayan (canAdd=false) öneriler için kart aksiyonu:
+  // kullanıcıyı Keşfet sekmesine alıp orada elle aratabilsin. Opsiyonel; prop
+  // verilmezse buton hâlâ render edilir ama no-op.
+  onOpenDiscover?: (rec: AiRecommendation) => void;
 }
 
 const SETTINGS_KEY = "media-tracker-ai-settings";
@@ -313,6 +327,48 @@ function buildModePrompt(
   return [base[mode], scopeLine, researchLine, dataLine, whyLine].filter(Boolean).join(" ");
 }
 
+// R38 — Öneri kartı için "neden önerildi" üretici. Önce R36 scoreReasons,
+// yoksa LLM'in rec.reason'unu kısa maddelere böl. Maddeler 110 karaktere
+// kırpılır; ham debug satırı gibi durmasın diye trailing "ile ortak X, Y"
+// formatı temiz tutuluyor.
+function buildReasonBullets(rec: AiRecommendation): string[] {
+  const scoreReasons = rec.candidate?.scoreReasons;
+  if (scoreReasons && scoreReasons.length > 0) {
+    return scoreReasons.slice(0, 3).map(truncateBullet);
+  }
+  const raw = (rec.reason || "").trim();
+  if (!raw) return [];
+  const parts = raw
+    .split(/(?<=[.!?;])\s+|\s*\|\s*/)
+    .map((s) => s.replace(/[\s.;]+$/g, "").trim())
+    .filter((s) => s.length >= 6);
+  if (parts.length === 0) return [truncateBullet(raw)];
+  return parts.slice(0, 3).map(truncateBullet);
+}
+
+function truncateBullet(s: string): string {
+  const trimmed = s.trim();
+  return trimmed.length > 110 ? trimmed.slice(0, 107).trimEnd() + "…" : trimmed;
+}
+
+// R38 — "Buna benzer öner" promptu. Mevcut chat akışına güvenli bir Türkçe
+// string olarak girer; provider/aday flow'u standart yoldan ilerler.
+function buildSimilarPrompt(rec: AiRecommendation): string {
+  const typeLabel = (() => {
+    switch (rec.mediaType) {
+      case "tv": return "dizi";
+      case "movie": return "film";
+      case "book": return "kitap";
+      case "anime": return "anime";
+      case "manga": return "manga";
+      case "manhwa": return "manhwa";
+      case "manhua": return "manhua";
+      default: return rec.mediaType;
+    }
+  })();
+  return `"${rec.title}" gibi başka bir ${typeLabel} öner. Tonu ve ana türünü koru, neden önerdiğini somut biçimde açıkla.`;
+}
+
 const LOADING_STEPS = [
   "İstek analiz ediliyor",
   "Kütüphane profili hazırlanıyor",
@@ -437,6 +493,7 @@ export default function AiAdvisor({
   progressLogs,
   resetSignal,
   onAddToLibrary,
+  onOpenDiscover,
 }: AiAdvisorProps) {
   const [settings, setSettings] = useState<AiSettings>(DEFAULT_SETTINGS);
   const [input, setInput] = useState("");
@@ -447,6 +504,9 @@ export default function AiAdvisor({
   const [sessions, setSessions] = useState<AiSession[]>([]);
   const [viewingSessionId, setViewingSessionId] = useState<string | null>(null);
   const [addedIds, setAddedIds] = useState<Record<string, boolean>>({});
+  // R38 — "İlgilenmiyorum" sadece o oturum içinde geçerli local feedback;
+  // localStorage'a yazılmaz (kalıcı feedback bu turun kapsamı değil).
+  const [dismissedRecIds, setDismissedRecIds] = useState<Record<string, boolean>>({});
   const [debugInfo, setDebugInfo] = useState<AiDebugInfo | null>(null);
   const [showDebug, setShowDebug] = useState(false);
   const [pendingClarification, setPendingClarification] = useState<{
@@ -536,6 +596,7 @@ export default function AiAdvisor({
       setInput("");
       setViewingSessionId(null);
       setAddedIds({});
+      setDismissedRecIds({});
       setDebugInfo(null);
       setShowDebug(false);
       setPendingClarification(null);
@@ -937,6 +998,25 @@ export default function AiAdvisor({
     }
   }
 
+  // R38 — local feedback ve chat'e bağlı aksiyonlar
+  function handleDismissRec(rec: AiRecommendation) {
+    setDismissedRecIds((prev) => ({ ...prev, [rec.id]: true }));
+  }
+  function handleUndoDismissRec(rec: AiRecommendation) {
+    setDismissedRecIds((prev) => {
+      const next = { ...prev };
+      delete next[rec.id];
+      return next;
+    });
+  }
+  function handleSimilarRec(rec: AiRecommendation) {
+    if (isLoading || inFlightRequestId.current) return;
+    handleSend(buildSimilarPrompt(rec));
+  }
+  function handleOpenDiscoverFor(rec: AiRecommendation) {
+    if (onOpenDiscover) onOpenDiscover(rec);
+  }
+
   const transparencyText = useMemo(() => {
     const data: string[] = [];
     if (dataToggles.ratings) data.push("puanlar");
@@ -1183,17 +1263,28 @@ export default function AiAdvisor({
           </div>
         )}
 
-        {/* Öneri kartları */}
+        {/* R38 — Öneri kartları */}
         {recommendations.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {recommendations.map((rec) => {
               const added = addedIds[rec.id] || rec.inLibrary;
               const canAdd = !!rec.candidate?.globalSearch;
+              const dismissed = !!dismissedRecIds[rec.id];
+              const reasonBullets = buildReasonBullets(rec);
+              const score = rec.candidate?.score;
+              const externalSource = rec.externalSource;
+              const externalId = rec.externalId;
+              const releaseYear = rec.candidate?.releaseYear;
               return (
                 <div
                   key={rec.id}
-                  className="p-4 rounded-xl bg-zinc-900/50 border border-zinc-800/60 flex gap-3"
+                  className={`relative p-4 rounded-2xl border min-w-0 transition-opacity ${
+                    dismissed
+                      ? "bg-zinc-900/20 border-zinc-800/40 opacity-40"
+                      : "bg-zinc-900/50 border-zinc-800/60"
+                  }`}
                 >
+                <div className="flex gap-3 min-w-0">
                   {rec.coverUrl ? (
                     <div className="relative w-14 h-20 shrink-0 rounded-md overflow-hidden bg-zinc-800">
                       <Image
@@ -1206,16 +1297,24 @@ export default function AiAdvisor({
                       />
                     </div>
                   ) : (
-                    <div className="w-14 h-20 shrink-0 rounded-md bg-zinc-800/60 flex items-center justify-center text-zinc-600 text-xl">
-                      {rec.mediaType === "book" ? "ğŸ“–" : "ğŸ¬"}
-                    </div>
+                    <div className="w-14 h-20 shrink-0 rounded-md bg-zinc-800/60 flex items-center justify-center text-zinc-600"><Sparkles className="w-5 h-5" /></div>
                   )}
                   <div className="flex flex-col gap-1.5 min-w-0 flex-1">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <h4 className="text-sm font-semibold text-zinc-100 truncate">{rec.title}</h4>
-                        <p className="text-xs text-zinc-500 truncate">
-                          {rec.mediaType} · {rec.source}
+                        <h4 className="text-sm font-semibold text-zinc-100 break-words">
+                          {rec.title}
+                        </h4>
+                        <p className="text-[11px] text-zinc-500 truncate">
+                          {rec.mediaType}
+                          <span className="mx-1 text-zinc-700">·</span>
+                          {rec.source}
+                          {releaseYear ? (
+                            <>
+                              <span className="mx-1 text-zinc-700">·</span>
+                              {releaseYear}
+                            </>
+                          ) : null}
                         </p>
                       </div>
                       <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-violet-500/15 text-violet-300 border border-violet-500/30 shrink-0">
@@ -1223,29 +1322,111 @@ export default function AiAdvisor({
                       </span>
                     </div>
                     {rec.overview && (
-                      <p className="text-xs text-zinc-500 line-clamp-2">{rec.overview}</p>
+                      <p className="text-xs text-zinc-500 line-clamp-2 leading-relaxed">
+                        {rec.overview}
+                      </p>
                     )}
-                    <p className="text-xs text-zinc-300 leading-relaxed">{rec.reason}</p>
-                    {rec.risk && <p className="text-xs text-amber-300/80">âš  {rec.risk}</p>}
+                                      </div>
+                </div>
+
+                {reasonBullets.length > 0 && (
+                  <div className="mt-3 p-2.5 rounded-lg bg-violet-500/5 border border-violet-500/15">
+                    <div className="flex items-center gap-1.5 mb-1.5">
+                      <Lightbulb className="w-3 h-3 text-violet-300/80" />
+                      <span className="text-[10px] uppercase tracking-wider text-violet-300/80 font-medium">
+                        Neden önerildi
+                      </span>
+                    </div>
+                    <ul className="space-y-1">
+                      {reasonBullets.map((b, i) => (
+                        <li
+                          key={`${rec.id}-reason-${i}`}
+                          className="text-xs text-zinc-300 leading-relaxed flex gap-1.5"
+                        >
+                          <span className="text-violet-300/70 shrink-0">•</span>
+                          <span className="min-w-0">{b}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {(rec.risk || rec.communitySignal) && (
+                  <div className="mt-2 space-y-1">
+                    {rec.risk && (
+                      <p className="text-xs text-amber-300/80 flex items-start gap-1.5">
+                        <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" />
+                        <span className="min-w-0">{rec.risk}</span>
+                      </p>
+                    )}
                     {rec.communitySignal && (
-                      <p className="text-xs text-zinc-500">{rec.communitySignal}</p>
+                      <p className="text-[11px] text-zinc-500 leading-relaxed">
+                        {rec.communitySignal}
+                      </p>
                     )}
+                  </div>
+                )}
+
+                {(typeof score === "number" || externalSource) && (
+                  <p className="mt-2 text-[10px] text-zinc-600 font-mono break-all">
+                    {typeof score === "number" ? `score ${score}` : null}
+                    {typeof score === "number" && externalSource ? "  ·  " : null}
+                    {externalSource ? `${externalSource}${externalId ? ":" + externalId : ""}` : null}
+                  </p>
+                )}
+
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {canAdd ? (
                     <button
-                      disabled={!!added || !canAdd}
+                      disabled={!!added}
                       onClick={() => handleAddRec(rec)}
-                      title={!canAdd && !added ? "Bu öneri Quick Add'a uygun değil" : undefined}
-                      className={`mt-1 self-start flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
                         added
-                          ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 cursor-default"
-                          : canAdd
-                          ? "bg-violet-500/15 text-violet-300 border border-violet-500/30 hover:bg-violet-500/25 cursor-pointer"
-                          : "bg-zinc-800/40 text-zinc-500 border border-zinc-800 cursor-not-allowed"
+                          ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30 cursor-default"
+                          : "bg-violet-500/15 text-violet-300 border-violet-500/30 hover:bg-violet-500/25 cursor-pointer"
                       }`}
                     >
                       {added ? <Check className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
-                      {added ? "Listede" : "Listeme Ekle"}
+                      {added ? "Listede" : "Listeye Ekle"}
                     </button>
-                  </div>
+                  ) : (
+                    <button
+                      onClick={() => handleOpenDiscoverFor(rec)}
+                      title="Keşfet sekmesinde elle ara"
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-zinc-800/60 text-zinc-300 border border-zinc-700 hover:bg-zinc-800 cursor-pointer transition-colors"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      Keşfet&apos;te Ara
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => handleSimilarRec(rec)}
+                    disabled={isLoading}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-zinc-900/60 text-zinc-300 border border-zinc-800 hover:bg-zinc-800/70 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                  >
+                    <Repeat className="w-3.5 h-3.5" />
+                    Buna benzer
+                  </button>
+
+                  {dismissed ? (
+                    <button
+                      onClick={() => handleUndoDismissRec(rec)}
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-zinc-900/60 text-zinc-400 border border-zinc-800 hover:text-zinc-200 hover:bg-zinc-800/70 cursor-pointer transition-colors"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      Geri al
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => handleDismissRec(rec)}
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-zinc-900/40 text-zinc-500 border border-zinc-800 hover:text-zinc-300 hover:bg-zinc-900/70 cursor-pointer transition-colors"
+                    >
+                      <ThumbsDown className="w-3.5 h-3.5" />
+                      İlgilenmiyorum
+                    </button>
+                  )}
+                </div>
                 </div>
               );
             })}
@@ -1259,7 +1440,7 @@ export default function AiAdvisor({
             <ul className="space-y-1.5">
               {rejected.slice(0, 3).map((r, i) => (
                 <li key={`rejected-${i}-${r.title}`} className="text-xs text-zinc-400">
-                  <span className="text-zinc-300">{r.title}</span> â€” {r.reason}
+                  <span className="text-zinc-300">{r.title}</span> — {r.reason}
                 </li>
               ))}
             </ul>
