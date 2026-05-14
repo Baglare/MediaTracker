@@ -16,7 +16,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { ProfilePreferences } from "@/lib/profile-preferences";
-import type { UserProgression, UserProgressionWorld } from "@/lib/user-progression";
+import type { UserProgression, UserProgressionTier, UserProgressionWorld } from "@/lib/user-progression";
 import type { TabType } from "./app-tabs";
 import SidebarProfileCard from "./sidebar-profile-card";
 
@@ -90,32 +90,57 @@ interface AppSidebarProps {
 
 const JOURNEY_ACCENTS: Record<
   UserProgressionWorld,
-  { panel: string; text: string; fill: string; glow: string }
+  { panel: string; text: string; fill: string; glow: string; tierGlow: string }
 > = {
   east: {
     panel: "border-amber-500/20 bg-amber-500/[0.06]",
     text: "text-amber-200",
     fill: "from-amber-300 to-yellow-500",
     glow: "shadow-amber-950/20",
+    tierGlow: "shadow-amber-500/10",
   },
   screen: {
     panel: "border-cyan-500/20 bg-cyan-500/[0.06]",
     text: "text-cyan-200",
     fill: "from-cyan-300 to-blue-500",
     glow: "shadow-cyan-950/20",
+    tierGlow: "shadow-cyan-500/10",
   },
   arch: {
     panel: "border-red-400/20 bg-red-400/[0.05]",
     text: "text-orange-200",
     fill: "from-orange-300 to-red-500",
     glow: "shadow-red-950/20",
+    tierGlow: "shadow-orange-500/10",
   },
   mixed: {
     panel: "border-violet-500/20 bg-violet-500/[0.06]",
     text: "text-violet-200",
     fill: "from-violet-300 to-zinc-300",
     glow: "shadow-violet-950/20",
+    tierGlow: "shadow-violet-500/10",
   },
+};
+
+const TIER_LABELS: Record<UserProgressionTier, string> = {
+  basic: "Basic",
+  refined: "Refined",
+  elite: "Elite",
+  master: "Master",
+};
+
+const TIER_CLASSES: Record<UserProgressionTier, string> = {
+  basic: "ring-zinc-800/70",
+  refined: "ring-zinc-700/90 shadow-md",
+  elite: "ring-zinc-600/90 shadow-md",
+  master: "ring-zinc-500/90 shadow-lg",
+};
+
+const TIER_CARD_CLASSES: Record<UserProgressionTier, string> = {
+  basic: "",
+  refined: "shadow-md",
+  elite: "shadow-md ring-1 ring-zinc-700/60",
+  master: "shadow-lg ring-1 ring-zinc-600/70",
 };
 
 function NavRow({
@@ -183,12 +208,13 @@ function JourneyCard({
   const accent = JOURNEY_ACCENTS[progression.dominantWorld];
   const progressWidth = `${Math.round(progression.progressPercent * 100)}%`;
   const remainingXp = Math.max(0, progression.nextLevelXp - progression.currentLevelXp);
+  const tierLabel = TIER_LABELS[progression.tier];
 
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`w-full rounded-xl border p-3 text-left shadow-sm transition-colors cursor-pointer hover:bg-zinc-900/65 ${accent.panel} ${accent.glow} ${
+      className={`w-full rounded-xl border p-3 text-left shadow-sm transition-colors cursor-pointer hover:bg-zinc-900/65 ${accent.panel} ${accent.glow} ${TIER_CARD_CLASSES[progression.tier]} ${
         active ? "ring-1 ring-amber-400/35" : ""
       }`}
       aria-current={active ? "page" : undefined}
@@ -207,11 +233,14 @@ function JourneyCard({
           </p>
         </div>
         <span
-          className={`shrink-0 rounded-full bg-zinc-950/45 px-2.5 py-1 text-[11px] font-semibold tabular-nums ring-1 ring-zinc-800/70 ${accent.text}`}
+          className={`shrink-0 rounded-full bg-zinc-950/45 px-2.5 py-1 text-[11px] font-semibold tabular-nums ring-1 ${TIER_CLASSES[progression.tier]} ${accent.text} ${accent.tierGlow}`}
         >
           Level {progression.level}
         </span>
       </div>
+      <span className={`mt-2 inline-flex rounded-full bg-zinc-950/35 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] ring-1 ring-zinc-800/70 ${accent.text}`}>
+        {tierLabel}
+      </span>
 
       <div className="mt-3">
         <div className="h-2 overflow-hidden rounded-full bg-zinc-950/60 ring-1 ring-zinc-800/80">

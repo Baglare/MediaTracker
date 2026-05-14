@@ -1,11 +1,13 @@
 import { withMediaClassification, type MediaItem, type ProgressLog } from "./types";
 
 export type UserProgressionWorld = "east" | "screen" | "arch" | "mixed";
+export type UserProgressionTier = "basic" | "refined" | "elite" | "master";
 
 export interface UserProgression {
   totalXp: number;
   level: number;
   title: string;
+  tier: UserProgressionTier;
   dominantWorld: UserProgressionWorld;
   currentLevelStartXp: number;
   nextLevelStartXp: number;
@@ -74,6 +76,13 @@ function titleForLevel(world: UserProgressionWorld, level: number): string {
   return titleSet[0];
 }
 
+export function tierForLevel(level: number): UserProgressionTier {
+  if (level >= 21) return "master";
+  if (level >= 11) return "elite";
+  if (level >= 6) return "refined";
+  return "basic";
+}
+
 export function calculateUserProgression(
   mediaList: MediaItem[],
   progressLogs: ProgressLog[]
@@ -111,6 +120,7 @@ export function calculateUserProgression(
     totalXp,
     level,
     title: titleForLevel(dominantWorld, level),
+    tier: tierForLevel(level),
     dominantWorld,
     currentLevelStartXp,
     nextLevelStartXp,

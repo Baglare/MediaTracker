@@ -3256,18 +3256,118 @@ export default function HomePage() {
 
         {/* PROFIL SEKMESI */}
         {activeTab === "profile" && (
-          <div className="space-y-5">
+          <div className="space-y-5 max-w-[96rem]">
             <PageHeader
               icon={UserRound}
               title="Profil"
               subtitle="Görünen ad, avatar, ünvan ve yolculuk kimliği"
             />
 
-            {profileMode === "view" ? (
-              <section className="relative overflow-hidden rounded-2xl border border-zinc-800/60 bg-[linear-gradient(135deg,rgba(39,39,42,0.58),rgba(9,9,11,0.72))] p-5 sm:p-6 lg:p-7 min-w-0 shadow-lg shadow-black/20">
+            {profileMode === "view" ? (() => {
+              const favoriteShowcase = mediaList
+                .filter((item) => item.favorite === true)
+                .slice()
+                .sort((a, b) => a.title.localeCompare(b.title, "tr"))
+                .slice(0, 10);
+              const recentProfileLogs = progressLogs
+                .slice()
+                .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                .slice(0, 6);
+              const ratedItems = mediaList.filter(
+                (item) => typeof item.userRating === "number" && Number.isFinite(item.userRating)
+              );
+              const averageRating =
+                ratedItems.length > 0
+                  ? ratedItems.reduce((sum, item) => sum + (item.userRating ?? 0), 0) / ratedItems.length
+                  : 0;
+              const maxWorldCount = Math.max(
+                1,
+                userProgression.worldCounts.east,
+                userProgression.worldCounts.screen,
+                userProgression.worldCounts.arch
+              );
+              const worldRows = [
+                { label: "Doğu", value: userProgression.worldCounts.east, bar: "bg-amber-300" },
+                { label: "Kadraj", value: userProgression.worldCounts.screen, bar: "bg-cyan-300" },
+                { label: "Arşiv", value: userProgression.worldCounts.arch, bar: "bg-orange-300" },
+              ];
+              const tierLabels = {
+                basic: "Basic",
+                refined: "Refined",
+                elite: "Elite",
+                master: "Master",
+              } as const;
+              const worldAccent = {
+                east: {
+                  line: "via-amber-300/70",
+                  border: "border-amber-500/30",
+                  borderStrong: "border-amber-400/45",
+                  shadow: "shadow-amber-950/20",
+                  badge: "bg-amber-500/12 text-amber-200 ring-amber-500/25",
+                  mutedBadge: "bg-zinc-950/45 text-amber-100 ring-amber-500/20",
+                  progress: "from-amber-300 via-yellow-400 to-amber-500",
+                },
+                screen: {
+                  line: "via-cyan-300/70",
+                  border: "border-cyan-500/30",
+                  borderStrong: "border-cyan-300/45",
+                  shadow: "shadow-cyan-950/20",
+                  badge: "bg-cyan-500/12 text-cyan-200 ring-cyan-500/25",
+                  mutedBadge: "bg-zinc-950/45 text-cyan-100 ring-cyan-500/20",
+                  progress: "from-cyan-300 via-sky-400 to-blue-500",
+                },
+                arch: {
+                  line: "via-orange-300/70",
+                  border: "border-orange-500/30",
+                  borderStrong: "border-orange-300/45",
+                  shadow: "shadow-orange-950/20",
+                  badge: "bg-orange-500/12 text-orange-200 ring-orange-500/25",
+                  mutedBadge: "bg-zinc-950/45 text-orange-100 ring-orange-500/20",
+                  progress: "from-orange-300 via-amber-400 to-red-500",
+                },
+                mixed: {
+                  line: "via-violet-300/70",
+                  border: "border-violet-500/25",
+                  borderStrong: "border-violet-300/40",
+                  shadow: "shadow-violet-950/20",
+                  badge: "bg-violet-500/12 text-violet-200 ring-violet-500/25",
+                  mutedBadge: "bg-zinc-950/45 text-violet-100 ring-violet-500/20",
+                  progress: "from-violet-300 via-zinc-300 to-cyan-300",
+                },
+              }[userProgression.dominantWorld];
+              const tierFrame = {
+                basic: "border-zinc-800/60 shadow-black/20",
+                refined: `${worldAccent.border} shadow-lg ${worldAccent.shadow}`,
+                elite: `${worldAccent.border} shadow-lg ${worldAccent.shadow} ring-1 ring-zinc-800/80`,
+                master: `${worldAccent.borderStrong} shadow-xl ${worldAccent.shadow} ring-1 ring-zinc-700/80`,
+              }[userProgression.tier];
+              const tierMotifOpacity = {
+                basic: "opacity-60",
+                refined: "opacity-75",
+                elite: "opacity-90",
+                master: "opacity-100",
+              }[userProgression.tier];
+              const profileActionLabel = (action: ProgressLog["action"]) => {
+                switch (action) {
+                  case "increment":
+                    return "İlerleme";
+                  case "complete":
+                    return "Tamamlandı";
+                  case "manual_adjust":
+                    return "Düzenleme";
+                  case "added":
+                    return "Eklendi";
+                  default:
+                    return action;
+                }
+              };
+
+              return (
+              <>
+              <section className={`relative overflow-hidden rounded-2xl border bg-[linear-gradient(135deg,rgba(39,39,42,0.58),rgba(9,9,11,0.72))] p-5 sm:p-6 lg:p-7 min-w-0 ${tierFrame}`}>
                 <div
                   aria-hidden
-                  className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-amber-300/70 to-transparent"
+                  className={`absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent ${worldAccent.line} to-transparent ${tierMotifOpacity}`}
                 />
 
                 <div className="relative flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
@@ -3286,8 +3386,11 @@ export default function HomePage() {
                         {profileTagline}
                       </p>
                       <div className="mt-4 flex flex-wrap items-center gap-2">
-                        <span className="rounded-full bg-amber-500/12 px-3 py-1.5 text-xs font-semibold text-amber-200 ring-1 ring-amber-500/25">
-                          Seviye {userProgression.level}
+                        <span className={`rounded-full px-3 py-1.5 text-xs font-semibold ring-1 ${worldAccent.badge}`}>
+                          Level {userProgression.level}
+                        </span>
+                        <span className={`rounded-full px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] ring-1 ${worldAccent.mutedBadge}`}>
+                          {tierLabels[userProgression.tier]}
                         </span>
                         <span className="rounded-full bg-zinc-950/45 px-3 py-1.5 text-xs font-medium text-zinc-200 ring-1 ring-zinc-800/70">
                           {journeyTitle}
@@ -3330,7 +3433,7 @@ export default function HomePage() {
                     </div>
                     <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-zinc-900 ring-1 ring-zinc-800/80">
                       <div
-                        className="h-full rounded-full bg-gradient-to-r from-amber-300 via-violet-400 to-cyan-300 shadow-[0_0_18px_rgba(245,158,11,0.22)]"
+                        className={`h-full rounded-full bg-gradient-to-r ${worldAccent.progress}`}
                         style={{ width: `${Math.round(userProgression.progressPercent * 100)}%` }}
                       />
                     </div>
@@ -3359,7 +3462,145 @@ export default function HomePage() {
                   </div>
                 </div>
               </section>
-            ) : (
+              <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.1fr)_minmax(20rem,0.9fr)] gap-5 items-start">
+                <section className="rounded-2xl border border-zinc-800/60 bg-zinc-900/30 p-4 sm:p-5 min-w-0">
+                  <div className="flex items-end justify-between gap-3 mb-4">
+                    <div>
+                      <h2 className="text-sm font-semibold text-zinc-100">Favori Vitrini</h2>
+                      <p className="mt-1 text-xs text-zinc-500">
+                        Öne çıkan favori içerikler
+                      </p>
+                    </div>
+                    <span className="text-[11px] font-mono tabular-nums text-zinc-500">
+                      {favoriteShowcase.length}
+                    </span>
+                  </div>
+                  {favoriteShowcase.length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-zinc-800/80 bg-zinc-950/25 px-4 py-8 text-center">
+                      <p className="text-sm font-medium text-zinc-300">Henüz favori vitrin yok</p>
+                      <p className="mt-1 text-xs text-zinc-500">
+                        Favori işaretlediğin içerikler burada poster vitrini olarak görünür.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-3">
+                      {favoriteShowcase.map((item) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => handleOpenDetailModal(item)}
+                          className="group min-w-0 text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/40 rounded-xl"
+                          title={item.title}
+                        >
+                          <div className="aspect-[2/3] overflow-hidden rounded-xl border border-zinc-800/70 bg-zinc-950/45 shadow-sm shadow-black/20 transition-colors group-hover:border-amber-400/35">
+                            <img
+                              src={item.coverImage || "/placeholders/book.svg"}
+                              alt=""
+                              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+                              loading="lazy"
+                            />
+                          </div>
+                          <p className="mt-2 truncate text-[11px] font-medium text-zinc-300">
+                            {item.title}
+                          </p>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </section>
+
+                <section className="rounded-2xl border border-zinc-800/60 bg-zinc-900/30 p-4 sm:p-5 min-w-0">
+                  <div className="flex items-end justify-between gap-3 mb-4">
+                    <div>
+                      <h2 className="text-sm font-semibold text-zinc-100">Son Aktiviteler</h2>
+                      <p className="mt-1 text-xs text-zinc-500">
+                        En yeni ilerleme kayıtları
+                      </p>
+                    </div>
+                    <span className="text-[11px] font-mono tabular-nums text-zinc-500">
+                      {recentProfileLogs.length}
+                    </span>
+                  </div>
+                  {recentProfileLogs.length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-zinc-800/80 bg-zinc-950/25 px-4 py-8 text-center">
+                      <p className="text-sm font-medium text-zinc-300">Henüz aktivite yok</p>
+                      <p className="mt-1 text-xs text-zinc-500">
+                        İlerleme kaydettikçe son hareketlerin burada görünür.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {recentProfileLogs.map((log) => (
+                        <div key={log.id} className="rounded-xl border border-zinc-800/60 bg-zinc-950/25 p-3 min-w-0">
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="truncate text-[12px] font-medium text-zinc-200">{log.mediaTitle}</p>
+                            <span className="shrink-0 rounded-full bg-zinc-900 px-2 py-0.5 text-[10px] text-zinc-500 ring-1 ring-zinc-800/70">
+                              {profileActionLabel(log.action)}
+                            </span>
+                          </div>
+                          <p className="mt-1 truncate text-[11px] text-zinc-500">
+                            {new Date(log.createdAt).toLocaleDateString("tr-TR")}
+                            {log.detail ? ` · ${log.detail}` : ""}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </section>
+              </div>
+
+              <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] gap-5 items-start">
+                <section className="rounded-2xl border border-zinc-800/60 bg-zinc-900/30 p-4 sm:p-5 min-w-0">
+                  <h2 className="text-sm font-semibold text-zinc-100">Medya Kimliği</h2>
+                  <div className="mt-4 grid grid-cols-2 sm:grid-cols-5 gap-4">
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Toplam</p>
+                      <p className="mt-1 text-xl font-semibold tabular-nums text-zinc-100">{dashboardStats.totalItems}</p>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Tamamlanan</p>
+                      <p className="mt-1 text-xl font-semibold tabular-nums text-zinc-100">{dashboardStats.completedItems}</p>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Devam</p>
+                      <p className="mt-1 text-xl font-semibold tabular-nums text-zinc-100">{dashboardStats.inProgressItems}</p>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Ortalama</p>
+                      <p className="mt-1 text-xl font-semibold tabular-nums text-zinc-100">
+                        {ratedItems.length > 0 ? averageRating.toFixed(1) : "—"}
+                      </p>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Favori</p>
+                      <p className="mt-1 text-xl font-semibold tabular-nums text-zinc-100">{dashboardStats.favoriteItems}</p>
+                    </div>
+                  </div>
+                </section>
+
+                <section className="rounded-2xl border border-zinc-800/60 bg-zinc-900/30 p-4 sm:p-5 min-w-0">
+                  <h2 className="text-sm font-semibold text-zinc-100">Dünya Dağılımı</h2>
+                  <div className="mt-4 space-y-3">
+                    {worldRows.map((row) => {
+                      const width = row.value > 0 ? Math.max(5, Math.round((row.value / maxWorldCount) * 100)) : 0;
+                      return (
+                        <div key={row.label} className="min-w-0">
+                          <div className="mb-1 flex items-center justify-between gap-3">
+                            <span className="text-[12px] text-zinc-300">{row.label}</span>
+                            <span className="text-[12px] font-mono tabular-nums text-zinc-500">{row.value}</span>
+                          </div>
+                          <div className="h-2 overflow-hidden rounded-full bg-zinc-950/60 ring-1 ring-zinc-800/70">
+                            <div className={`h-full rounded-full ${row.bar}`} style={{ width: `${width}%` }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </section>
+              </div>
+              </>
+              );
+            })() : (
               <div className="space-y-4">
                 <div className="flex flex-col gap-3 rounded-2xl border border-zinc-800/60 bg-zinc-900/30 p-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>
@@ -3380,12 +3621,12 @@ export default function HomePage() {
                     Vitrine dön
                   </button>
                 </div>
-              <ProfileSettingsCard
-                preferences={profilePreferences}
-                profileName={profileName}
-                automaticTitle={userProgression.title}
-                onChange={setProfilePreferences}
-              />
+                <ProfileSettingsCard
+                  preferences={profilePreferences}
+                  profileName={profileName}
+                  automaticTitle={userProgression.title}
+                  onChange={setProfilePreferences}
+                />
               </div>
             )}
           </div>
