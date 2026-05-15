@@ -18,6 +18,8 @@ const eslintConfig = defineConfig([
     // (kullanılmayan import'lar, render içinde ref erişimi) gerçek kod
     // kalitesini yansıtmıyor — lint kapsamı dışı.
     "design_references/**",
+    "ml-service/.venv/**",
+    "ml-service/**/__pycache__/**",
   ]),
 ]);
 

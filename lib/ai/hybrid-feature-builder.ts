@@ -145,10 +145,12 @@ export function buildCandidateFeatureVector(args: {
     behaviorScore: behavior.score,
     popularityScore: popularity.score,
     textSimilarityScore: candidate.textSimilarityScore || 0,
+    embeddingScore: candidate.embeddingScore || 0,
     contentReasons: content.reasons,
     behaviorReasons: behavior.reasons,
     popularityReasons: popularity.reasons,
     textSimilarityReasons: candidate.textSimilarityReasons || [],
+    embeddingSimilarityReasons: candidate.embeddingSimilarityReasons || [],
   };
 }
 

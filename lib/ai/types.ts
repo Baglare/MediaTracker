@@ -168,6 +168,8 @@ export interface AiCandidate {
   embeddingSignals?: string[];
   textSimilarityScore?: number;
   textSimilarityReasons?: string[];
+  embeddingScore?: number;
+  embeddingSimilarityReasons?: string[];
 }
 
 export interface EmbeddingTextPayload {
@@ -187,10 +189,12 @@ export interface CandidateFeatureVector {
   behaviorScore: number;
   popularityScore: number;
   textSimilarityScore: number;
+  embeddingScore: number;
   contentReasons: string[];
   behaviorReasons: string[];
   popularityReasons: string[];
   textSimilarityReasons: string[];
+  embeddingSimilarityReasons: string[];
 }
 
 export interface HybridScoreBreakdown {
@@ -200,6 +204,7 @@ export interface HybridScoreBreakdown {
   behaviorScore: number;
   popularityScore: number;
   textSimilarityScore: number;
+  embeddingScore: number;
   finalScore: number;
   reasons: string[];
 }
