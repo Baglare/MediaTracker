@@ -172,12 +172,40 @@ create index if not exists recommendation_feedback_user_external_idx
   on public.recommendation_feedback (user_id, external_source, external_id);
 
 -- ============================================
--- 5. Row Level Security
+-- 5. embedding_cache
+-- ============================================
+-- R61: Teknik embedding cache. Kullanıcıya bağlı veri tutmaz; embedding metninin
+-- tamamı yerine kısa preview ve hash saklanır. Vector jsonb olarak tutulur; bu
+-- turda pgvector similarity query yoktur.
+create table if not exists public.embedding_cache (
+  id text primary key,
+  provider text not null,
+  model text not null,
+  hash text not null,
+  dimensions integer not null,
+  vector jsonb not null,
+  text_preview text,
+  created_at timestamptz not null default now(),
+  last_used_at timestamptz not null default now(),
+
+  constraint embedding_cache_dimensions_positive check (dimensions > 0),
+  constraint embedding_cache_vector_array check (jsonb_typeof(vector) = 'array')
+);
+
+create unique index if not exists embedding_cache_provider_model_hash_dimensions_unique
+  on public.embedding_cache (provider, model, hash, dimensions);
+
+create index if not exists embedding_cache_last_used_idx
+  on public.embedding_cache (last_used_at);
+
+-- ============================================
+-- 6. Row Level Security
 -- ============================================
 alter table public.profiles      enable row level security;
 alter table public.media_items   enable row level security;
 alter table public.progress_logs enable row level security;
 alter table public.recommendation_feedback enable row level security;
+alter table public.embedding_cache enable row level security;
 
 -- ---- profiles ----
 drop policy if exists profiles_select_own on public.profiles;
@@ -261,3 +289,22 @@ drop policy if exists recommendation_feedback_delete_own on public.recommendatio
 create policy recommendation_feedback_delete_own
   on public.recommendation_feedback for delete
   using (auth.uid() = user_id);
+
+-- ---- embedding_cache ----
+-- Global teknik cache: user_id yok. Anon/auth client okuyup yazabilir; veri
+-- kullanıcı kimliği içermez ve app runtime service role gerektirmeden çalışır.
+drop policy if exists embedding_cache_select_global on public.embedding_cache;
+create policy embedding_cache_select_global
+  on public.embedding_cache for select
+  using (true);
+
+drop policy if exists embedding_cache_insert_global on public.embedding_cache;
+create policy embedding_cache_insert_global
+  on public.embedding_cache for insert
+  with check (true);
+
+drop policy if exists embedding_cache_update_global on public.embedding_cache;
+create policy embedding_cache_update_global
+  on public.embedding_cache for update
+  using (true)
+  with check (true);

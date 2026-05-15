@@ -8,6 +8,11 @@ import {
   writeEmbeddingCache,
   type EmbeddingCacheStats,
 } from "@/lib/ai/embedding-cache";
+import {
+  readPersistentEmbeddingCache,
+  writePersistentEmbeddingCache,
+  type PersistentEmbeddingCacheStats,
+} from "@/lib/ai/persistent-embedding-cache";
 
 export interface EmbeddingProviderRunResult {
   provider: string;
@@ -17,6 +22,7 @@ export interface EmbeddingProviderRunResult {
   fallbackUsed: boolean;
   error?: string;
   cache?: EmbeddingCacheStats;
+  persistentCache?: PersistentEmbeddingCacheStats;
   results: EmbeddingVectorResult[];
 }
 
@@ -134,6 +140,7 @@ export async function embedManyWithFallback(
       dimensions: 0,
       fallbackUsed: false,
       cache: { hits: 0, misses: 0, stored: 0, size: 0, enabled: process.env.MEDIA_TRACKER_EMBEDDING_CACHE !== "off" },
+      persistentCache: { hits: 0, misses: 0, stored: 0, disabled: process.env.MEDIA_TRACKER_PERSISTENT_EMBEDDING_CACHE === "off" },
       results: [],
     };
   }
@@ -148,6 +155,7 @@ export async function embedManyWithFallback(
       dimensions: results[0]?.dimensions || 0,
       fallbackUsed: false,
       cache: { hits: 0, misses: 0, stored: 0, size: 0, enabled: process.env.MEDIA_TRACKER_EMBEDDING_CACHE !== "off" },
+      persistentCache: { hits: 0, misses: 0, stored: 0, disabled: true },
       results,
     };
   }
@@ -161,11 +169,24 @@ export async function embedManyWithFallback(
       model,
       dimensions: PYTHON_EMBEDDING_DIMENSIONS,
     });
-    const freshResults = cached.misses.length > 0
-      ? await provider.embedMany(cached.misses, options)
+    const persistent = await readPersistentEmbeddingCache({
+      payloads: cached.misses,
+      provider: provider.name,
+      model,
+      dimensions: PYTHON_EMBEDDING_DIMENSIONS,
+    });
+    const persistentMemoryStore = writeEmbeddingCache({
+      payloads: cached.misses,
+      results: persistent.hits,
+      provider: provider.name,
+      model,
+      dimensions: PYTHON_EMBEDDING_DIMENSIONS,
+    });
+    const freshResults = persistent.misses.length > 0
+      ? await provider.embedMany(persistent.misses, options)
       : [];
     const stored = writeEmbeddingCache({
-      payloads: cached.misses,
+      payloads: persistent.misses,
       results: freshResults.filter((result) => (
         result.provider === provider.name && result.dimensions === PYTHON_EMBEDDING_DIMENSIONS
       )),
@@ -173,7 +194,16 @@ export async function embedManyWithFallback(
       model,
       dimensions: PYTHON_EMBEDDING_DIMENSIONS,
     });
-    const results = [...cached.hits, ...freshResults];
+    const persistentStored = await writePersistentEmbeddingCache({
+      payloads: persistent.misses,
+      results: freshResults.filter((result) => (
+        result.provider === provider.name && result.dimensions === PYTHON_EMBEDDING_DIMENSIONS
+      )),
+      provider: provider.name,
+      model,
+      dimensions: PYTHON_EMBEDDING_DIMENSIONS,
+    });
+    const results = [...cached.hits, ...persistent.hits, ...freshResults];
     return {
       provider: provider.name,
       requested: payloads.length,
@@ -183,9 +213,15 @@ export async function embedManyWithFallback(
       cache: {
         hits: cached.stats.hits,
         misses: cached.stats.misses,
-        stored: stored.stored,
+        stored: stored.stored + persistentMemoryStore.stored,
         size: stored.size,
         enabled: cached.stats.enabled,
+      },
+      persistentCache: {
+        hits: persistent.stats.hits,
+        misses: persistent.stats.misses,
+        stored: persistentStored.stored,
+        disabled: persistent.stats.disabled || persistentStored.disabled,
       },
       results,
     };
@@ -199,6 +235,7 @@ export async function embedManyWithFallback(
       fallbackUsed: true,
       error: errorMessage(error),
       cache: { hits: 0, misses: payloads.length, stored: 0, size: 0, enabled: process.env.MEDIA_TRACKER_EMBEDDING_CACHE !== "off" },
+      persistentCache: { hits: 0, misses: payloads.length, stored: 0, disabled: true },
       results,
     };
   }

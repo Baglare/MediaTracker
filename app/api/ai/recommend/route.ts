@@ -1705,6 +1705,9 @@ export async function POST(req: NextRequest) {
   debugNotes.push(
     `r60_embedding_cache:hits=${embeddingVectorResult.cache?.hits ?? 0},misses=${embeddingVectorResult.cache?.misses ?? 0},stored=${embeddingVectorResult.cache?.stored ?? 0},size=${embeddingVectorResult.cache?.size ?? 0}`
   );
+  debugNotes.push(
+    `r61_persistent_embedding_cache:hits=${embeddingVectorResult.persistentCache?.hits ?? 0},misses=${embeddingVectorResult.persistentCache?.misses ?? 0},stored=${embeddingVectorResult.persistentCache?.stored ?? 0},disabled=${embeddingVectorResult.persistentCache?.disabled ? "yes" : "no"}`
+  );
   debugNotes.push(embeddingScoreDebug);
   debugNotes.push(
     `r56_text_similarity:n=${textSimilarityResult.stats.candidates},avg=${textSimilarityResult.stats.averageScore},pos=${textSimilarityResult.stats.positiveProfileItems},neg=${textSimilarityResult.stats.negativeProfileItems},adjusted=${textSimilarityResult.stats.adjusted},max=${textSimilarityResult.stats.maxScore},min=${textSimilarityResult.stats.minScore}`
