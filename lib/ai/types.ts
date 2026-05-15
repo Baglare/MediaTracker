@@ -166,6 +166,8 @@ export interface AiCandidate {
   embeddingText?: string;
   embeddingHash?: string;
   embeddingSignals?: string[];
+  textSimilarityScore?: number;
+  textSimilarityReasons?: string[];
 }
 
 export interface EmbeddingTextPayload {
@@ -184,9 +186,11 @@ export interface CandidateFeatureVector {
   contentScore: number;
   behaviorScore: number;
   popularityScore: number;
+  textSimilarityScore: number;
   contentReasons: string[];
   behaviorReasons: string[];
   popularityReasons: string[];
+  textSimilarityReasons: string[];
 }
 
 export interface HybridScoreBreakdown {
@@ -195,6 +199,7 @@ export interface HybridScoreBreakdown {
   contentScore: number;
   behaviorScore: number;
   popularityScore: number;
+  textSimilarityScore: number;
   finalScore: number;
   reasons: string[];
 }

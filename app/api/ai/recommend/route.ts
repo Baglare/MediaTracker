@@ -14,6 +14,7 @@ import { applyFeedbackAwareScoring } from "@/lib/ai/feedback-aware-scorer";
 import { buildCandidateFeatureVectors } from "@/lib/ai/hybrid-feature-builder";
 import { applyHybridScoring } from "@/lib/ai/hybrid-scorer";
 import { buildCandidateEmbeddingText } from "@/lib/ai/embedding-text-builder";
+import { applyTextSimilarityScoring } from "@/lib/ai/text-similarity-scorer";
 import {
   CandidateSearchResult,
   CandidateVerificationResult,
@@ -1623,6 +1624,20 @@ export async function POST(req: NextRequest) {
     feedbackEvents: recommendationFeedback,
   });
   candidates = feedbackScoringResult.candidates;
+  candidates = candidates.map((candidate) => {
+    const embedding = buildCandidateEmbeddingText(candidate);
+    return {
+      ...candidate,
+      embeddingText: embedding.text,
+      embeddingHash: embedding.hash,
+      embeddingSignals: embedding.signals,
+    };
+  });
+  const textSimilarityResult = applyTextSimilarityScoring({
+    candidates,
+    mediaItems,
+  });
+  candidates = textSimilarityResult.candidates;
   const hybridFeatures = buildCandidateFeatureVectors({
     candidates,
     intent,
@@ -1638,15 +1653,6 @@ export async function POST(req: NextRequest) {
     candidates = balanceOnePerWorld(candidates);
     debugNotes.push("r45_one_per_world_balanced_order");
   }
-  candidates = candidates.map((candidate) => {
-    const embedding = buildCandidateEmbeddingText(candidate);
-    return {
-      ...candidate,
-      embeddingText: embedding.text,
-      embeddingHash: embedding.hash,
-      embeddingSignals: embedding.signals,
-    };
-  });
   const scoringRejected = [...scoringResult.rejected, ...feedbackScoringResult.rejected];
   const scoringStats = scoringResult.stats;
   debugNotes.push(
@@ -1656,9 +1662,12 @@ export async function POST(req: NextRequest) {
     `r53_feedback_adjusted:events=${feedbackScoringResult.stats.events} adjusted=${feedbackScoringResult.stats.adjusted} rejected=${feedbackScoringResult.stats.rejectedDismissedExact} positives=${feedbackScoringResult.stats.positiveBoosts} penalties=${feedbackScoringResult.stats.dismissedPenalties} avg=${feedbackScoringResult.stats.averageAdjustment} maxBoost=${feedbackScoringResult.stats.maxBoost} maxPenalty=${feedbackScoringResult.stats.maxPenalty}`
   );
   debugNotes.push(
-    `r54_hybrid_score_breakdown:n=${hybridScoringResult.stats.count} avg=${hybridScoringResult.stats.averageFinalScore} max=${hybridScoringResult.stats.maxFinalScore} min=${hybridScoringResult.stats.minFinalScore} content=${hybridScoringResult.stats.contentAdjusted} behavior=${hybridScoringResult.stats.behaviorAdjusted} popularity=${hybridScoringResult.stats.popularityAdjusted}`
+    `r54_hybrid_score_breakdown:n=${hybridScoringResult.stats.count} avg=${hybridScoringResult.stats.averageFinalScore} max=${hybridScoringResult.stats.maxFinalScore} min=${hybridScoringResult.stats.minFinalScore} content=${hybridScoringResult.stats.contentAdjusted} behavior=${hybridScoringResult.stats.behaviorAdjusted} popularity=${hybridScoringResult.stats.popularityAdjusted} textSimilarity=${hybridScoringResult.stats.textSimilarityAdjusted}`
   );
   debugNotes.push(`r55_embedding_text_ready:n=${candidates.filter((candidate) => candidate.embeddingHash).length}`);
+  debugNotes.push(
+    `r56_text_similarity:n=${textSimilarityResult.stats.candidates},avg=${textSimilarityResult.stats.averageScore},pos=${textSimilarityResult.stats.positiveProfileItems},neg=${textSimilarityResult.stats.negativeProfileItems},adjusted=${textSimilarityResult.stats.adjusted},max=${textSimilarityResult.stats.maxScore},min=${textSimilarityResult.stats.minScore}`
+  );
 
   const retrievalDebug = buildRetrievalDebug({
     intent,

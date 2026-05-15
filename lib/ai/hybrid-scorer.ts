@@ -14,6 +14,7 @@ export interface HybridScoringResult {
     contentAdjusted: number;
     behaviorAdjusted: number;
     popularityAdjusted: number;
+    textSimilarityAdjusted: number;
   };
 }
 
@@ -27,7 +28,8 @@ function buildBreakdown(vector: CandidateFeatureVector): HybridScoreBreakdown {
       vector.feedbackScore +
       vector.contentScore +
       vector.behaviorScore +
-      vector.popularityScore
+      vector.popularityScore +
+      vector.textSimilarityScore * 0.6
   );
 
   return {
@@ -36,11 +38,13 @@ function buildBreakdown(vector: CandidateFeatureVector): HybridScoreBreakdown {
     contentScore: vector.contentScore,
     behaviorScore: vector.behaviorScore,
     popularityScore: vector.popularityScore,
+    textSimilarityScore: vector.textSimilarityScore,
     finalScore,
     reasons: [
       ...vector.contentReasons,
       ...vector.behaviorReasons,
       ...vector.popularityReasons,
+      ...vector.textSimilarityReasons,
     ].slice(0, 4),
   };
 }
@@ -53,6 +57,7 @@ export function applyHybridScoring(args: {
   let contentAdjusted = 0;
   let behaviorAdjusted = 0;
   let popularityAdjusted = 0;
+  let textSimilarityAdjusted = 0;
 
   const candidates = args.candidates.map((candidate) => {
     const key = `${candidate.source}:${candidate.externalId}`;
@@ -62,6 +67,7 @@ export function applyHybridScoring(args: {
     if (feature.contentScore !== 0) contentAdjusted++;
     if (feature.behaviorScore !== 0) behaviorAdjusted++;
     if (feature.popularityScore !== 0) popularityAdjusted++;
+    if (feature.textSimilarityScore !== 0) textSimilarityAdjusted++;
 
     const scoreReasons = Array.from(
       new Set([...(candidate.scoreReasons || []), ...breakdown.reasons])
@@ -89,6 +95,7 @@ export function applyHybridScoring(args: {
       contentAdjusted,
       behaviorAdjusted,
       popularityAdjusted,
+      textSimilarityAdjusted,
     },
   };
 }
