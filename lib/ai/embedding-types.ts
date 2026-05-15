@@ -12,6 +12,7 @@ export interface EmbeddingVectorResult {
   vector: number[];
   dimensions: number;
   provider: string;
+  model?: string;
 }
 
 export interface EmbeddingProvider {

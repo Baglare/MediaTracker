@@ -1702,6 +1702,9 @@ export async function POST(req: NextRequest) {
   debugNotes.push(
     `r57_embedding_provider:provider=${embeddingVectorResult.provider} requested=${embeddingVectorResult.requested} embedded=${embeddingVectorResult.embedded} dims=${embeddingVectorResult.dimensions} fallback=${embeddingVectorResult.fallbackUsed ? "yes" : "no"}${embeddingVectorResult.error ? ` error=${embeddingVectorResult.error}` : ""}`
   );
+  debugNotes.push(
+    `r60_embedding_cache:hits=${embeddingVectorResult.cache?.hits ?? 0},misses=${embeddingVectorResult.cache?.misses ?? 0},stored=${embeddingVectorResult.cache?.stored ?? 0},size=${embeddingVectorResult.cache?.size ?? 0}`
+  );
   debugNotes.push(embeddingScoreDebug);
   debugNotes.push(
     `r56_text_similarity:n=${textSimilarityResult.stats.candidates},avg=${textSimilarityResult.stats.averageScore},pos=${textSimilarityResult.stats.positiveProfileItems},neg=${textSimilarityResult.stats.negativeProfileItems},adjusted=${textSimilarityResult.stats.adjusted},max=${textSimilarityResult.stats.maxScore},min=${textSimilarityResult.stats.minScore}`

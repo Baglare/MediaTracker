@@ -3,6 +3,11 @@ import type {
   EmbeddingVectorPayload,
   EmbeddingVectorResult,
 } from "@/lib/ai/embedding-types";
+import {
+  readEmbeddingCache,
+  writeEmbeddingCache,
+  type EmbeddingCacheStats,
+} from "@/lib/ai/embedding-cache";
 
 export interface EmbeddingProviderRunResult {
   provider: string;
@@ -11,11 +16,14 @@ export interface EmbeddingProviderRunResult {
   dimensions: number;
   fallbackUsed: boolean;
   error?: string;
+  cache?: EmbeddingCacheStats;
   results: EmbeddingVectorResult[];
 }
 
 const DEFAULT_TIMEOUT_MS = 2500;
 const MOCK_DIMENSIONS = 8;
+const PYTHON_EMBEDDING_DIMENSIONS = 384;
+const DEFAULT_MODEL = "sentence-transformers/all-MiniLM-L6-v2";
 
 function hashNumber(text: string): number {
   let hash = 0x811c9dc5;
@@ -40,6 +48,10 @@ function serviceUrl(): string | null {
   const raw = process.env.MEDIA_TRACKER_ML_SERVICE_URL;
   if (!raw || !raw.trim()) return null;
   return raw.replace(/\/+$/, "");
+}
+
+function pythonModelName(): string {
+  return process.env.MEDIA_TRACKER_EMBEDDING_MODEL?.trim() || DEFAULT_MODEL;
 }
 
 function errorMessage(error: unknown): string {
@@ -83,8 +95,10 @@ export class PythonServiceEmbeddingProvider implements EmbeddingProvider {
         throw new Error(`embedding_service_http_${res.status}`);
       }
       const data = await res.json() as {
+        model?: unknown;
         results?: { id?: unknown; hash?: unknown; vector?: unknown }[];
       };
+      const model = typeof data.model === "string" && data.model.trim() ? data.model.trim() : pythonModelName();
       const results = Array.isArray(data.results) ? data.results : [];
       return results.flatMap((item) => {
         if (typeof item.id !== "string" || typeof item.hash !== "string" || !Array.isArray(item.vector)) {
@@ -98,6 +112,7 @@ export class PythonServiceEmbeddingProvider implements EmbeddingProvider {
           vector,
           dimensions: vector.length,
           provider: this.name,
+          model,
         }];
       });
     } finally {
@@ -118,6 +133,7 @@ export async function embedManyWithFallback(
       embedded: 0,
       dimensions: 0,
       fallbackUsed: false,
+      cache: { hits: 0, misses: 0, stored: 0, size: 0, enabled: process.env.MEDIA_TRACKER_EMBEDDING_CACHE !== "off" },
       results: [],
     };
   }
@@ -131,19 +147,46 @@ export async function embedManyWithFallback(
       embedded: results.length,
       dimensions: results[0]?.dimensions || 0,
       fallbackUsed: false,
+      cache: { hits: 0, misses: 0, stored: 0, size: 0, enabled: process.env.MEDIA_TRACKER_EMBEDDING_CACHE !== "off" },
       results,
     };
   }
 
   try {
     const provider = new PythonServiceEmbeddingProvider(url);
-    const results = await provider.embedMany(payloads, options);
+    const model = pythonModelName();
+    const cached = readEmbeddingCache({
+      payloads,
+      provider: provider.name,
+      model,
+      dimensions: PYTHON_EMBEDDING_DIMENSIONS,
+    });
+    const freshResults = cached.misses.length > 0
+      ? await provider.embedMany(cached.misses, options)
+      : [];
+    const stored = writeEmbeddingCache({
+      payloads: cached.misses,
+      results: freshResults.filter((result) => (
+        result.provider === provider.name && result.dimensions === PYTHON_EMBEDDING_DIMENSIONS
+      )),
+      provider: provider.name,
+      model,
+      dimensions: PYTHON_EMBEDDING_DIMENSIONS,
+    });
+    const results = [...cached.hits, ...freshResults];
     return {
       provider: provider.name,
       requested: payloads.length,
       embedded: results.length,
       dimensions: results[0]?.dimensions || 0,
       fallbackUsed: false,
+      cache: {
+        hits: cached.stats.hits,
+        misses: cached.stats.misses,
+        stored: stored.stored,
+        size: stored.size,
+        enabled: cached.stats.enabled,
+      },
       results,
     };
   } catch (error) {
@@ -155,6 +198,7 @@ export async function embedManyWithFallback(
       dimensions: results[0]?.dimensions || 0,
       fallbackUsed: true,
       error: errorMessage(error),
+      cache: { hits: 0, misses: payloads.length, stored: 0, size: 0, enabled: process.env.MEDIA_TRACKER_EMBEDDING_CACHE !== "off" },
       results,
     };
   }
