@@ -11,6 +11,8 @@ import { buildLibraryProfile } from "@/lib/ai/profile-builder";
 import { analyzeIntent } from "@/lib/ai/intent-analyzer";
 import { scoreCandidates } from "@/lib/ai/candidate-scorer";
 import { applyFeedbackAwareScoring } from "@/lib/ai/feedback-aware-scorer";
+import { buildCandidateFeatureVectors } from "@/lib/ai/hybrid-feature-builder";
+import { applyHybridScoring } from "@/lib/ai/hybrid-scorer";
 import {
   CandidateSearchResult,
   CandidateVerificationResult,
@@ -1620,6 +1622,17 @@ export async function POST(req: NextRequest) {
     feedbackEvents: recommendationFeedback,
   });
   candidates = feedbackScoringResult.candidates;
+  const hybridFeatures = buildCandidateFeatureVectors({
+    candidates,
+    intent,
+    message,
+    profile,
+  });
+  const hybridScoringResult = applyHybridScoring({
+    candidates,
+    features: hybridFeatures,
+  });
+  candidates = hybridScoringResult.candidates;
   if (scopeMode === "one-per-world") {
     candidates = balanceOnePerWorld(candidates);
     debugNotes.push("r45_one_per_world_balanced_order");
@@ -1631,6 +1644,9 @@ export async function POST(req: NextRequest) {
   );
   debugNotes.push(
     `r53_feedback_adjusted:events=${feedbackScoringResult.stats.events} adjusted=${feedbackScoringResult.stats.adjusted} rejected=${feedbackScoringResult.stats.rejectedDismissedExact} positives=${feedbackScoringResult.stats.positiveBoosts} penalties=${feedbackScoringResult.stats.dismissedPenalties} avg=${feedbackScoringResult.stats.averageAdjustment} maxBoost=${feedbackScoringResult.stats.maxBoost} maxPenalty=${feedbackScoringResult.stats.maxPenalty}`
+  );
+  debugNotes.push(
+    `r54_hybrid_score_breakdown:n=${hybridScoringResult.stats.count} avg=${hybridScoringResult.stats.averageFinalScore} max=${hybridScoringResult.stats.maxFinalScore} min=${hybridScoringResult.stats.minFinalScore} content=${hybridScoringResult.stats.contentAdjusted} behavior=${hybridScoringResult.stats.behaviorAdjusted} popularity=${hybridScoringResult.stats.popularityAdjusted}`
   );
 
   const retrievalDebug = buildRetrievalDebug({

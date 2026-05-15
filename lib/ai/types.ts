@@ -161,6 +161,33 @@ export interface AiCandidate {
   scoreReasons?: string[];
   feedbackScore?: number;
   feedbackReasons?: string[];
+  finalScore?: number;
+  hybridScoreBreakdown?: HybridScoreBreakdown;
+}
+
+export interface CandidateFeatureVector {
+  candidateKey: string;
+  title: string;
+  mediaType: MediaType;
+  source: AiCandidate["source"];
+  ruleScore: number;
+  feedbackScore: number;
+  contentScore: number;
+  behaviorScore: number;
+  popularityScore: number;
+  contentReasons: string[];
+  behaviorReasons: string[];
+  popularityReasons: string[];
+}
+
+export interface HybridScoreBreakdown {
+  ruleScore: number;
+  feedbackScore: number;
+  contentScore: number;
+  behaviorScore: number;
+  popularityScore: number;
+  finalScore: number;
+  reasons: string[];
 }
 
 export interface AiRecommendation {
