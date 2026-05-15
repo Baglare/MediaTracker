@@ -14,6 +14,7 @@ import { applyFeedbackAwareScoring } from "@/lib/ai/feedback-aware-scorer";
 import { buildCandidateFeatureVectors } from "@/lib/ai/hybrid-feature-builder";
 import { applyHybridScoring } from "@/lib/ai/hybrid-scorer";
 import { buildCandidateEmbeddingText } from "@/lib/ai/embedding-text-builder";
+import { embedManyWithFallback } from "@/lib/ai/embedding-provider";
 import { applyTextSimilarityScoring } from "@/lib/ai/text-similarity-scorer";
 import {
   CandidateSearchResult,
@@ -1633,6 +1634,21 @@ export async function POST(req: NextRequest) {
       embeddingSignals: embedding.signals,
     };
   });
+  const embeddingVectorResult = await embedManyWithFallback(
+    candidates
+      .filter((candidate) => candidate.embeddingText && candidate.embeddingHash)
+      .map((candidate) => ({
+        id: `${candidate.source}:${candidate.externalId}`,
+        text: candidate.embeddingText as string,
+        hash: candidate.embeddingHash as string,
+        signals: candidate.embeddingSignals || [],
+        metadata: {
+          source: candidate.source,
+          mediaType: candidate.type,
+          title: candidate.title,
+        },
+      }))
+  );
   const textSimilarityResult = applyTextSimilarityScoring({
     candidates,
     mediaItems,
@@ -1665,6 +1681,9 @@ export async function POST(req: NextRequest) {
     `r54_hybrid_score_breakdown:n=${hybridScoringResult.stats.count} avg=${hybridScoringResult.stats.averageFinalScore} max=${hybridScoringResult.stats.maxFinalScore} min=${hybridScoringResult.stats.minFinalScore} content=${hybridScoringResult.stats.contentAdjusted} behavior=${hybridScoringResult.stats.behaviorAdjusted} popularity=${hybridScoringResult.stats.popularityAdjusted} textSimilarity=${hybridScoringResult.stats.textSimilarityAdjusted}`
   );
   debugNotes.push(`r55_embedding_text_ready:n=${candidates.filter((candidate) => candidate.embeddingHash).length}`);
+  debugNotes.push(
+    `r57_embedding_provider:provider=${embeddingVectorResult.provider} requested=${embeddingVectorResult.requested} embedded=${embeddingVectorResult.embedded} dims=${embeddingVectorResult.dimensions} fallback=${embeddingVectorResult.fallbackUsed ? "yes" : "no"}${embeddingVectorResult.error ? ` error=${embeddingVectorResult.error}` : ""}`
+  );
   debugNotes.push(
     `r56_text_similarity:n=${textSimilarityResult.stats.candidates},avg=${textSimilarityResult.stats.averageScore},pos=${textSimilarityResult.stats.positiveProfileItems},neg=${textSimilarityResult.stats.negativeProfileItems},adjusted=${textSimilarityResult.stats.adjusted},max=${textSimilarityResult.stats.maxScore},min=${textSimilarityResult.stats.minScore}`
   );

@@ -1,0 +1,161 @@
+import type {
+  EmbeddingProvider,
+  EmbeddingVectorPayload,
+  EmbeddingVectorResult,
+} from "@/lib/ai/embedding-types";
+
+export interface EmbeddingProviderRunResult {
+  provider: string;
+  requested: number;
+  embedded: number;
+  dimensions: number;
+  fallbackUsed: boolean;
+  error?: string;
+  results: EmbeddingVectorResult[];
+}
+
+const DEFAULT_TIMEOUT_MS = 2500;
+const MOCK_DIMENSIONS = 8;
+
+function hashNumber(text: string): number {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return hash >>> 0;
+}
+
+function mockVector(payload: EmbeddingVectorPayload): number[] {
+  const seed = `${payload.hash}|${payload.text}|${(payload.signals || []).join("|")}`;
+  const vector: number[] = [];
+  for (let i = 0; i < MOCK_DIMENSIONS; i++) {
+    const n = hashNumber(`${seed}:${i}`);
+    vector.push(Math.round(((n % 2000) / 1000 - 1) * 1000) / 1000);
+  }
+  return vector;
+}
+
+function serviceUrl(): string | null {
+  const raw = process.env.MEDIA_TRACKER_ML_SERVICE_URL;
+  if (!raw || !raw.trim()) return null;
+  return raw.replace(/\/+$/, "");
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message.slice(0, 120) : "unknown";
+}
+
+export class LocalMockEmbeddingProvider implements EmbeddingProvider {
+  name = "local_mock";
+
+  async embedMany(payloads: EmbeddingVectorPayload[], _options?: { timeoutMs?: number }): Promise<EmbeddingVectorResult[]> {
+    void _options;
+    return payloads.map((payload) => ({
+      id: payload.id,
+      hash: payload.hash,
+      vector: mockVector(payload),
+      dimensions: MOCK_DIMENSIONS,
+      provider: this.name,
+    }));
+  }
+}
+
+export class PythonServiceEmbeddingProvider implements EmbeddingProvider {
+  name = "python_service";
+
+  constructor(private readonly baseUrl: string) {}
+
+  async embedMany(
+    payloads: EmbeddingVectorPayload[],
+    options?: { timeoutMs?: number }
+  ): Promise<EmbeddingVectorResult[]> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), options?.timeoutMs || DEFAULT_TIMEOUT_MS);
+    try {
+      const res = await fetch(`${this.baseUrl}/embed`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
+        body: JSON.stringify({ inputs: payloads }),
+      });
+      if (!res.ok) {
+        throw new Error(`embedding_service_http_${res.status}`);
+      }
+      const data = await res.json() as {
+        results?: { id?: unknown; hash?: unknown; vector?: unknown }[];
+      };
+      const results = Array.isArray(data.results) ? data.results : [];
+      return results.flatMap((item) => {
+        if (typeof item.id !== "string" || typeof item.hash !== "string" || !Array.isArray(item.vector)) {
+          return [];
+        }
+        const vector = item.vector.filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+        if (vector.length === 0) return [];
+        return [{
+          id: item.id,
+          hash: item.hash,
+          vector,
+          dimensions: vector.length,
+          provider: this.name,
+        }];
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+}
+
+export async function embedManyWithFallback(
+  payloads: EmbeddingVectorPayload[],
+  options?: { timeoutMs?: number }
+): Promise<EmbeddingProviderRunResult> {
+  const fallback = new LocalMockEmbeddingProvider();
+  if (payloads.length === 0) {
+    return {
+      provider: fallback.name,
+      requested: 0,
+      embedded: 0,
+      dimensions: 0,
+      fallbackUsed: false,
+      results: [],
+    };
+  }
+
+  const url = serviceUrl();
+  if (!url) {
+    const results = await fallback.embedMany(payloads, options);
+    return {
+      provider: fallback.name,
+      requested: payloads.length,
+      embedded: results.length,
+      dimensions: results[0]?.dimensions || 0,
+      fallbackUsed: false,
+      results,
+    };
+  }
+
+  try {
+    const provider = new PythonServiceEmbeddingProvider(url);
+    const results = await provider.embedMany(payloads, options);
+    return {
+      provider: provider.name,
+      requested: payloads.length,
+      embedded: results.length,
+      dimensions: results[0]?.dimensions || 0,
+      fallbackUsed: false,
+      results,
+    };
+  } catch (error) {
+    const results = await fallback.embedMany(payloads, options);
+    return {
+      provider: fallback.name,
+      requested: payloads.length,
+      embedded: results.length,
+      dimensions: results[0]?.dimensions || 0,
+      fallbackUsed: true,
+      error: errorMessage(error),
+      results,
+    };
+  }
+}
