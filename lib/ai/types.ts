@@ -163,6 +163,15 @@ export interface AiCandidate {
   feedbackReasons?: string[];
   finalScore?: number;
   hybridScoreBreakdown?: HybridScoreBreakdown;
+  embeddingText?: string;
+  embeddingHash?: string;
+  embeddingSignals?: string[];
+}
+
+export interface EmbeddingTextPayload {
+  text: string;
+  hash: string;
+  signals: string[];
 }
 
 export interface CandidateFeatureVector {

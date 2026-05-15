@@ -13,6 +13,7 @@ import { scoreCandidates } from "@/lib/ai/candidate-scorer";
 import { applyFeedbackAwareScoring } from "@/lib/ai/feedback-aware-scorer";
 import { buildCandidateFeatureVectors } from "@/lib/ai/hybrid-feature-builder";
 import { applyHybridScoring } from "@/lib/ai/hybrid-scorer";
+import { buildCandidateEmbeddingText } from "@/lib/ai/embedding-text-builder";
 import {
   CandidateSearchResult,
   CandidateVerificationResult,
@@ -1637,6 +1638,15 @@ export async function POST(req: NextRequest) {
     candidates = balanceOnePerWorld(candidates);
     debugNotes.push("r45_one_per_world_balanced_order");
   }
+  candidates = candidates.map((candidate) => {
+    const embedding = buildCandidateEmbeddingText(candidate);
+    return {
+      ...candidate,
+      embeddingText: embedding.text,
+      embeddingHash: embedding.hash,
+      embeddingSignals: embedding.signals,
+    };
+  });
   const scoringRejected = [...scoringResult.rejected, ...feedbackScoringResult.rejected];
   const scoringStats = scoringResult.stats;
   debugNotes.push(
@@ -1648,6 +1658,7 @@ export async function POST(req: NextRequest) {
   debugNotes.push(
     `r54_hybrid_score_breakdown:n=${hybridScoringResult.stats.count} avg=${hybridScoringResult.stats.averageFinalScore} max=${hybridScoringResult.stats.maxFinalScore} min=${hybridScoringResult.stats.minFinalScore} content=${hybridScoringResult.stats.contentAdjusted} behavior=${hybridScoringResult.stats.behaviorAdjusted} popularity=${hybridScoringResult.stats.popularityAdjusted}`
   );
+  debugNotes.push(`r55_embedding_text_ready:n=${candidates.filter((candidate) => candidate.embeddingHash).length}`);
 
   const retrievalDebug = buildRetrievalDebug({
     intent,
