@@ -159,6 +159,8 @@ export interface AiCandidate {
   // explanation üretirken bu nedenleri tutarlı şekilde kullanır.
   score?: number;
   scoreReasons?: string[];
+  feedbackScore?: number;
+  feedbackReasons?: string[];
 }
 
 export interface AiRecommendation {
@@ -176,6 +178,32 @@ export interface AiRecommendation {
   communitySignal?: string;   // Eski "community"
   inLibrary?: boolean;
   candidate?: AiCandidate;    // Quick Add akışı için
+}
+
+export type RecommendationFeedbackAction =
+  | "shown"
+  | "dismissed"
+  | "similar_requested"
+  | "added"
+  | "open_discover";
+
+export interface RecommendationFeedbackEvent {
+  id: string;
+  action: RecommendationFeedbackAction;
+  recommendationId: string;
+  title: string;
+  mediaType: MediaType;
+  source: string;
+  externalSource?: AiRecommendation["externalSource"];
+  externalId?: string;
+  sessionId?: string;
+  prompt?: string;
+  metadata?: {
+    fitLabel?: string;
+    inLibrary?: boolean;
+    canAdd?: boolean;
+  };
+  createdAt: string;
 }
 
 export interface AiRecommendResponse {
@@ -242,6 +270,7 @@ export interface AiRecommendRequest {
     externalId?: string;
     mediaType?: string;
   }[];
+  recommendationFeedback?: RecommendationFeedbackEvent[];
 }
 
 export interface AiProvider {

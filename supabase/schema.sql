@@ -138,11 +138,46 @@ create index if not exists progress_logs_user_media_idx
   on public.progress_logs (user_id, media_id);
 
 -- ============================================
--- 4. Row Level Security
+-- 4. recommendation_feedback
+-- ============================================
+-- R52: AI Danışman öneri kartı etkileşimleri için ileride cloud sync'e hazır
+-- append-only event tablosu. Uygulama şu aşamada localStorage'ı kesin kaynak
+-- olarak kullanır; bu tablo Supabase kurulumları için hazır şemadır.
+create table if not exists public.recommendation_feedback (
+  id text primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  action text not null,
+  recommendation_id text not null,
+  title text not null,
+  media_type text not null,
+  source text not null,
+  external_source text,
+  external_id text,
+  session_id text,
+  prompt text,
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+
+  constraint recommendation_feedback_action_check
+    check (action in ('shown', 'dismissed', 'similar_requested', 'added', 'open_discover'))
+);
+
+create index if not exists recommendation_feedback_user_created_idx
+  on public.recommendation_feedback (user_id, created_at desc);
+
+create index if not exists recommendation_feedback_user_action_idx
+  on public.recommendation_feedback (user_id, action);
+
+create index if not exists recommendation_feedback_user_external_idx
+  on public.recommendation_feedback (user_id, external_source, external_id);
+
+-- ============================================
+-- 5. Row Level Security
 -- ============================================
 alter table public.profiles      enable row level security;
 alter table public.media_items   enable row level security;
 alter table public.progress_logs enable row level security;
+alter table public.recommendation_feedback enable row level security;
 
 -- ---- profiles ----
 drop policy if exists profiles_select_own on public.profiles;
@@ -203,4 +238,26 @@ create policy progress_logs_update_own
 drop policy if exists progress_logs_delete_own on public.progress_logs;
 create policy progress_logs_delete_own
   on public.progress_logs for delete
+  using (auth.uid() = user_id);
+
+-- ---- recommendation_feedback ----
+drop policy if exists recommendation_feedback_select_own on public.recommendation_feedback;
+create policy recommendation_feedback_select_own
+  on public.recommendation_feedback for select
+  using (auth.uid() = user_id);
+
+drop policy if exists recommendation_feedback_insert_own on public.recommendation_feedback;
+create policy recommendation_feedback_insert_own
+  on public.recommendation_feedback for insert
+  with check (auth.uid() = user_id);
+
+drop policy if exists recommendation_feedback_update_own on public.recommendation_feedback;
+create policy recommendation_feedback_update_own
+  on public.recommendation_feedback for update
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+drop policy if exists recommendation_feedback_delete_own on public.recommendation_feedback;
+create policy recommendation_feedback_delete_own
+  on public.recommendation_feedback for delete
   using (auth.uid() = user_id);

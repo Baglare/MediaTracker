@@ -32,6 +32,11 @@ import {
 import { MediaItem, MediaType, ProgressLog } from "@/lib/types";
 import { GlobalSearchResult } from "@/lib/global-search-types";
 import { expandTargetFamily } from "@/lib/ai/target-family";
+import {
+  appendRecommendationFeedbackEvent,
+  readRecommendationFeedbackEvents,
+} from "@/lib/ai/recommendation-feedback";
+import type { RecommendationFeedbackAction } from "@/lib/ai/types";
 
 // ---- Tipler ----
 export interface AiSettings {
@@ -723,6 +728,8 @@ export default function AiAdvisor({
   const inFlightPromptKey = useRef<string | null>(null);
   const lastPersistedSessionKey = useRef<string | null>(null);
   const activeContextRef = useRef<AiActiveContext | null>(null);
+  const feedbackContextRef = useRef<{ sessionId?: string; prompt?: string } | null>(null);
+  const shownFeedbackKeysRef = useRef<Set<string>>(new Set());
   const feedbackLoadedRef = useRef(false);
 
   useEffect(() => {
@@ -829,6 +836,22 @@ export default function AiAdvisor({
   }, [dismissedSignals]);
 
   useEffect(() => {
+    if (recommendations.length === 0) return;
+    for (const rec of recommendations) {
+      const shownKey = `${feedbackContextRef.current?.sessionId || "active"}:${feedbackKeyFromRec(rec)}`;
+      if (shownFeedbackKeysRef.current.has(shownKey)) continue;
+      shownFeedbackKeysRef.current.add(shownKey);
+      recordRecommendationFeedback("shown", rec, {
+        canAdd: !!rec.candidate?.globalSearch,
+        inLibrary: !!rec.inLibrary,
+      });
+    }
+    // recordRecommendationFeedback ref tabanlı bağlam okur; shown event'leri
+    // yalnızca recommendation listesi değiştiğinde yazılmalı.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recommendations]);
+
+  useEffect(() => {
     try {
       localStorage.setItem(DATA_TOGGLES_KEY, JSON.stringify(dataToggles));
     } catch {
@@ -893,6 +916,8 @@ export default function AiAdvisor({
     inFlightRequestId.current = null;
     inFlightPromptKey.current = null;
     activeContextRef.current = null;
+    feedbackContextRef.current = null;
+    shownFeedbackKeysRef.current.clear();
   }, [resetSignal]);
 
   const isLoading = loadingStep >= 0 && loadingStep < LOADING_STEPS.length;
@@ -919,6 +944,8 @@ export default function AiAdvisor({
       inFlightRequestId.current = null;
       inFlightPromptKey.current = null;
     }
+    const sessionId = requestId || generateId("session");
+    feedbackContextRef.current = { sessionId, prompt };
     setRecommendations(recs);
     setRejected(rejectedList);
     setDebugInfo(debug || null);
@@ -949,7 +976,7 @@ export default function AiAdvisor({
     lastPersistedSessionKey.current = sessionKey;
 
     const session: AiSession = {
-      id: requestId || generateId("session"),
+      id: sessionId,
       createdAt: new Date().toISOString(),
       prompt,
       assistantMessage: assistantText,
@@ -1006,6 +1033,7 @@ export default function AiAdvisor({
           // R39 — Session-level feedback: kullanıcının "İlgilenmiyorum"
           // dediği önerileri backend aday havuzundan filtrelesin.
           dismissed: Object.values(dismissedSignals),
+          recommendationFeedback: readRecommendationFeedbackEvents(),
         }),
       });
       if (!res.ok) return null;
@@ -1258,12 +1286,15 @@ export default function AiAdvisor({
     setShowDebug(false);
     setPendingClarification(null);
     setLoadingStep(-1);
+    feedbackContextRef.current = null;
+    shownFeedbackKeysRef.current.clear();
   }
 
   function handleViewSession(id: string) {
     const s = sessions.find((x) => x.id === id);
     if (!s) return;
     setViewingSessionId(id);
+    feedbackContextRef.current = { sessionId: id, prompt: s.prompt };
     setMessages([]);
     setRecommendations(s.recommendations);
     setRejected(s.rejectedCandidates || []);
@@ -1281,6 +1312,10 @@ export default function AiAdvisor({
     setAddedIds((prev) => ({ ...prev, [rec.id]: true }));
     try {
       await onAddToLibrary(gs);
+      recordRecommendationFeedback("added", rec, {
+        canAdd: true,
+        inLibrary: true,
+      });
     } catch {
       // ekleme başarısız olursa state geri al
       setAddedIds((prev) => {
@@ -1292,9 +1327,33 @@ export default function AiAdvisor({
   }
 
   // R38/R39 — local feedback ve chat'e bağlı aksiyonlar.
+  function recordRecommendationFeedback(
+    action: RecommendationFeedbackAction,
+    rec: AiRecommendation,
+    metadata?: { canAdd?: boolean; inLibrary?: boolean }
+  ) {
+    appendRecommendationFeedbackEvent({
+      action,
+      recommendationId: rec.id,
+      title: rec.title,
+      mediaType: rec.mediaType,
+      source: rec.source,
+      externalSource: rec.externalSource,
+      externalId: rec.externalId,
+      sessionId: feedbackContextRef.current?.sessionId || viewingSessionId || undefined,
+      prompt: feedbackContextRef.current?.prompt,
+      metadata: {
+        fitLabel: rec.fitLabel,
+        inLibrary: metadata?.inLibrary ?? !!rec.inLibrary,
+        canAdd: metadata?.canAdd ?? !!rec.candidate?.globalSearch,
+      },
+    });
+  }
+
   function handleDismissRec(rec: AiRecommendation) {
     const signal = feedbackSignalFromRec(rec);
     const key = feedbackKeyFromSignal(signal);
+    recordRecommendationFeedback("dismissed", rec);
     setDismissedSignals((prev) => {
       const next = { ...prev };
       delete next[key];
@@ -1315,9 +1374,11 @@ export default function AiAdvisor({
   }
   function handleSimilarRec(rec: AiRecommendation) {
     if (isLoading || inFlightRequestId.current) return;
+    recordRecommendationFeedback("similar_requested", rec);
     handleSend(buildSimilarPrompt(rec));
   }
   function handleOpenDiscoverFor(rec: AiRecommendation) {
+    recordRecommendationFeedback("open_discover", rec);
     if (onOpenDiscover) onOpenDiscover(rec);
   }
 

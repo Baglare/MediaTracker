@@ -10,6 +10,7 @@ import { getProviderSequence, mockProvider } from "@/lib/ai/provider";
 import { buildLibraryProfile } from "@/lib/ai/profile-builder";
 import { analyzeIntent } from "@/lib/ai/intent-analyzer";
 import { scoreCandidates } from "@/lib/ai/candidate-scorer";
+import { applyFeedbackAwareScoring } from "@/lib/ai/feedback-aware-scorer";
 import {
   CandidateSearchResult,
   CandidateVerificationResult,
@@ -1133,6 +1134,9 @@ export async function POST(req: NextRequest) {
   const activeContextSummary = summarizeActiveContext(activeContext);
   const providerMessage = buildProviderMessage(message, activeContext);
   const dismissedRaw = Array.isArray(body.dismissed) ? body.dismissed : [];
+  const recommendationFeedback = Array.isArray(body.recommendationFeedback)
+    ? body.recommendationFeedback
+    : [];
 
   const settings = body.settings;
   const mediaItems = Array.isArray(body.mediaItems) ? body.mediaItems : [];
@@ -1611,14 +1615,22 @@ export async function POST(req: NextRequest) {
     libIndex,
   });
   candidates = scoringResult.scored;
+  const feedbackScoringResult = applyFeedbackAwareScoring({
+    candidates,
+    feedbackEvents: recommendationFeedback,
+  });
+  candidates = feedbackScoringResult.candidates;
   if (scopeMode === "one-per-world") {
     candidates = balanceOnePerWorld(candidates);
     debugNotes.push("r45_one_per_world_balanced_order");
   }
-  const scoringRejected = scoringResult.rejected;
+  const scoringRejected = [...scoringResult.rejected, ...feedbackScoringResult.rejected];
   const scoringStats = scoringResult.stats;
   debugNotes.push(
     `r36_scored:n=${candidates.length} avg=${scoringStats.averageScore} max=${scoringStats.maxScore} min=${scoringStats.minScore} inLibReject=${scoringStats.inLibraryRejected} droppedPenalty=${scoringStats.droppedSimilarPenalty} pausedPenalty=${scoringStats.pausedSimilarPenalty}`
+  );
+  debugNotes.push(
+    `r53_feedback_adjusted:events=${feedbackScoringResult.stats.events} adjusted=${feedbackScoringResult.stats.adjusted} rejected=${feedbackScoringResult.stats.rejectedDismissedExact} positives=${feedbackScoringResult.stats.positiveBoosts} penalties=${feedbackScoringResult.stats.dismissedPenalties} avg=${feedbackScoringResult.stats.averageAdjustment} maxBoost=${feedbackScoringResult.stats.maxBoost} maxPenalty=${feedbackScoringResult.stats.maxPenalty}`
   );
 
   const retrievalDebug = buildRetrievalDebug({
