@@ -273,10 +273,9 @@ export interface ProgressLog {
 }
 
 // ============================================
-// Cloud / Sync Tipleri (Hazırlık — Supabase entegrasyonu için)
+// Cloud / Sync Tipleri
 // ============================================
-// Bu tipler ileride Supabase + offline-first sync için kullanılacak.
-// Şu an yalnızca taslak olarak tanımlı; aktif veri akışına bağlı değil.
+// Supabase + offline-first sync akışında kullanılan ortak tipler.
 
 export type CloudMode = "local" | "cloud" | "offline-sync";
 

@@ -238,7 +238,7 @@ export default function AuthPanel() {
         </button>
 
         <p className="text-[11px] text-zinc-500 leading-relaxed pt-1">
-          Giriş yapsan bile veriler şu an yerel olarak tutuluyor; cloud sync sonraki aşamada eklenecek.
+          Giriş sonrası yerel veri ana kaynak olarak kalır; cloud aktarım ve sync durumu Ayarlar bölümünden yönetilir.
         </p>
       </form>
     </div>

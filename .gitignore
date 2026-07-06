@@ -36,3 +36,13 @@ Thumbs.db
 
 # Vercel
 .vercel/
+
+# Local AI/tooling notes and temporary prompts
+.claude/
+.codex/
+AGENTS.local.md
+CLAUDE.local.md
+*.prompt.md
+.prompts/
+design_references/generated/
+design_references/dump/

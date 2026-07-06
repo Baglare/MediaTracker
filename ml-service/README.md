@@ -1,6 +1,6 @@
 # MediaTracker ML Service
 
-FastAPI tabanlı embedding servisidir. Next.js tarafındaki R57 provider kontratıyla uyumludur.
+FastAPI tabanlı embedding servisidir. Next.js tarafındaki embedding provider kontratıyla uyumludur.
 
 ## Kurulum
 

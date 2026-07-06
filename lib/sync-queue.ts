@@ -1,9 +1,9 @@
 // ============================================
-// Sync Queue — Offline-first Hazırlık
+// Sync Queue — Offline-first persistence
 // ============================================
 // Çevrimdışı yapılan değişiklikleri kuyruğa alır, internet gelince
-// Supabase'e gönderilmeleri için tutar. Bu aşamada yalnızca tip ve
-// localStorage erişim altyapısı; kuyruğa **hiçbir yerden yazılmıyor**.
+// Supabase'e gönderilmeleri için tutar. Yüksek seviyeli enqueue/flush akışı
+// sync-manager üzerinden yürür; bu dosya localStorage erişimini merkezileştirir.
 
 import type { SyncEntity, SyncOperation, SyncQueueItem } from "./types";
 
@@ -47,7 +47,8 @@ export function saveSyncQueue(queue: SyncQueueItem[]): void {
 
 /**
  * Yeni bir sync işlemini kuyruğa ekler ve güncel kuyruğu döner.
- * Şu anda hiçbir yerden çağrılmıyor; ileride storage kaydetme akışına bağlanacak.
+ * Doğrudan kullanım için düşük seviyeli helper'dır; uygulama akışı sync-manager
+ * helper'larını kullanır.
  */
 export function enqueueSyncOperation(input: {
   entity: SyncEntity;

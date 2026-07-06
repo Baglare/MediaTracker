@@ -4,6 +4,14 @@ MediaTracker; film, dizi, anime, manga, manhwa, manhua, novel ve kitap takibi i�
 
 Uygulamanın ana veri kaynağı tarayıcıdaki `localStorage` alanıdır. Supabase yapılandırılırsa hesap, cloud aktarım ve senkron hazırlıkları devreye girer; yapılandırılmazsa uygulama yerel modda çalışmaya devam eder.
 
+## About
+
+Offline-first media tracker with local-first storage, optional Supabase sync, external media API integrations, and AI-assisted recommendations.
+
+## Portfolio Note
+
+Bu projede AI destekli geliştirme araçları prototipleme, refactor ve hata ayıklama desteği olarak kullanılmıştır. Ürün kapsamı, mimari kararlar, veri modeli, entegrasyon akışları, test süreci ve son uygulama kontrolü geliştirici tarafından yönetilmiştir.
+
 ## Mevcut Durum
 
 - Tek sayfalık, sekmeli Next.js uygulaması.
@@ -11,6 +19,15 @@ Uygulamanın ana veri kaynağı tarayıcıdaki `localStorage` alanıdır. Supaba
 - Supabase opsiyoneldir: auth, manuel cloud upload/download/merge ve sync queue altyapısı vardır.
 - AI Danışman opsiyoneldir: varsayılan mock provider ile çalışır, API anahtarları verilirse gerçek provider kullanılabilir.
 - Python tabanlı ML servisi opsiyoneldir: embedding skoru için kullanılabilir; yoksa yerel mock embedding fallback'i çalışır.
+
+## Teknik Kazanımlar
+
+- Offline-first veri mimarisi ve `localStorage` tabanlı persistence.
+- JSON import/export, merge/replace veri yönetimi ve tarayıcı içi yedekleme akışı.
+- Supabase auth, manuel cloud aktarım ve sync queue hazırlığı.
+- TMDB, OMDb, TVmaze, AniList ve Open Library entegrasyonları için normalize edilmiş medya modeli.
+- AI destekli öneri pipeline'ı, embedding tabanlı benzerlik skoru, provider fallback sistemi ve feedback-aware recommendation flow.
+- React/Next.js state yönetimi, TypeScript tip güvenliği ve responsive dashboard tasarımı.
 
 ## Özellikler
 
@@ -87,7 +104,7 @@ media-tracker/
   public/                 Placeholder ve statik görseller
   supabase/schema.sql     Supabase tablo, index, RLS ve cache şeması
   docs/                   Proje içi plan/dokümantasyon
-  design_references/      Tasarım referansları
+  design_references/      Tasarım referansları; runtime kodu değildir
 ```
 
 ## Hızlı Başlangıç
@@ -210,7 +227,7 @@ Cloud davranışı:
 - Supabase varsa auth paneli aktif olur.
 - Yerel veri yine arayüzün ana kaynağıdır.
 - Cloud upload, download ve merge işlemleri kullanıcı onayıyla yapılır.
-- Giriş yapılmış ve online durumdaysan yerel mutasyonlar sync queue üzerinden cloud'a gönderilebilir.
+- Giriş yapılmış ve online durumdaysan yerel mutasyonlar sync queue üzerinden cloud'a gönderilir; ağ veya oturum yoksa bekleyen işlemler kuyrukta kalır.
 - Cloud'dan otomatik real-time pull yoktur; indirme ve birleştirme manuel aksiyonlarla yapılır.
 
 ## Veri Saklama

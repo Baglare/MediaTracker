@@ -1,5 +1,7 @@
-<!-- BEGIN:nextjs-agent-rules -->
-# This is NOT the Next.js you know
+<!-- This file is for local development tooling and is not part of the product documentation. -->
 
-This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
-<!-- END:nextjs-agent-rules -->
+<!-- BEGIN:local-nextjs-tooling-rules -->
+# Local Next.js Tooling Rules
+
+This project uses a recent Next.js version. APIs, conventions, and file structure can differ across versions. Read the relevant guide in `node_modules/next/dist/docs/` before changing framework-specific code. Heed deprecation notices.
+<!-- END:local-nextjs-tooling-rules -->

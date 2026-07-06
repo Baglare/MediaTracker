@@ -1,10 +1,12 @@
+<!-- This file is for local development tooling and is not part of the product documentation. -->
+
 @AGENTS.md
 
-# CLAUDE.md
+# Local Development Tooling Notes
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file records implementation constraints, maintenance notes, and internal checkpoint labels for developers working in this repository. Public product documentation lives in `README.md` and `docs/`.
 
-> **Önemli:** `AGENTS.md` (yukarıdan import) Next.js'in eğitim verisinden farklı olduğunu söyler. API/dosya yapısı sürprizleri için `node_modules/next/dist/docs/` altındaki ilgili rehbere bak. Üstte verilen `AGENTS.md` notu hâlâ geçerli.
+> **Önemli:** `AGENTS.md` (yukarıdan import) bu projedeki Next.js sürümüne dikkat çeker. API/dosya yapısı sürprizleri için `node_modules/next/dist/docs/` altındaki ilgili rehbere bak. Üstte verilen `AGENTS.md` notu hâlâ geçerli.
 
 ## Komutlar
 

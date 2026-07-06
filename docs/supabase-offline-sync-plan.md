@@ -1,76 +1,87 @@
-# MediaTracker Supabase + Offline-first Sync Plan
+# MediaTracker Supabase + Offline-first Sync Notes
 
-Bu doküman MediaTracker'ın Supabase'e geçişinin yol haritasını özetler. Şu an yalnızca **hazırlık altyapısı** mevcuttur; aktif yazma/okuma akışı henüz devrede değildir.
+Bu doküman güncel Supabase ve offline-first davranışını özetler. MediaTracker'ın ana veri kaynağı hâlâ tarayıcıdaki `localStorage` alanıdır; Supabase opsiyonel cloud aktarım ve senkronizasyon katmanı olarak çalışır.
 
-## Çalışma Modları
+## Ne Yapıyor?
 
-### 1. Local Mode (mevcut, varsayılan)
-- Kullanıcı giriş yapmadan uygulamayı kullanır.
-- Tüm veriler `localStorage` üzerinde tutulur.
-- Supabase env değişkenleri tanımlı olmasa bile uygulama tam çalışır.
+- Supabase env değişkenleri yoksa uygulama yerel modda tam çalışır.
+- Supabase yapılandırılırsa email/password auth paneli aktif olur.
+- Yerel medya listesi ve aktivite logları arayüzün birincil state kaynağıdır.
+- Ayarlar ekranında cloud kayıt sayıları görülebilir.
+- Kullanıcı onayıyla üç manuel cloud işlemi yapılabilir:
+  - Yerel -> Cloud upload
+  - Cloud -> Yerel download
+  - Cloud'dan Yerel'e merge
+- Yerel mutasyonlar `media-tracker-sync-queue` kuyruğuna eklenir.
+- Kullanıcı giriş yapmış ve ağ online ise uygun kuyruk item'ları Supabase'e flush edilir.
+- Bekleyen işlemler Ayarlar ekranındaki cloud sync kartından görülebilir ve "Şimdi Senkronize Et" ile manuel tetiklenebilir.
 
-### 2. Cloud Mode (gelecek)
-- Kullanıcı Supabase üzerinden giriş yapar.
-- Veriler Supabase'e yazılır ve oradan okunur.
-- İlk girişte "Yerel verileri hesabıma aktar" seçeneği sunulur (migration).
+## Nasıl Çalışıyor?
 
-### 3. Offline Sync Mode (gelecek)
-- Kullanıcı giriş yapmış ama internet erişimi yok.
-- Değişiklikler `localStorage`'a yazılmaya devam eder.
-- Aynı zamanda `sync-queue` içine alınır (`media-tracker-sync-queue`).
-- İnternet geri geldiğinde queue Supabase'e flush edilir.
+### Local-first state
 
-## Conflict Policy (V1)
+Uygulama ilk olarak `localStorage` anahtarlarını kullanır:
 
-- **media_items**: `updated_at` daha yeni olan kazanır (last-write-wins).
-- **progress_logs**: append-only; `id` bazlı duplicate engellenir, içerik değişmez.
-- **tags**: V1'de last-write-wins. İleride union/merge stratejisi düşünülebilir.
+- `media-tracker-list`: medya listesi
+- `media-tracker-logs`: aktivite/progress logları
+- `media-tracker-sync-queue`: cloud'a gönderilmeyi bekleyen işlemler
 
-## Sync Queue Yapısı
+Supabase bağlı olsa bile kullanıcı arayüzü yerel state üzerinden çalışır. Cloud işlemleri bu state'i destekleyen ek aktarım ve senkronizasyon akışlarıdır.
 
-`SyncQueueItem` tipi (bkz. `lib/types.ts`):
+### Manuel cloud aktarım
 
-```ts
-{
-  id: string;
-  entity: "media_item" | "progress_log";
-  operation: "upsert" | "delete";
-  payload: unknown;
-  createdAt: string;
-  retryCount: number;
-  lastError?: string;
-}
-```
+`CloudDataStatusCard` cloud ve yerel kayıt sayılarını karşılaştırır. Kullanıcı onayıyla:
 
-Helper'lar (`lib/sync-queue.ts`):
-- `loadSyncQueue()`, `saveSyncQueue()`
-- `enqueueSyncOperation()`, `clearSyncQueue()`, `getPendingSyncCount()`
+- **Yerel -> Cloud**: Yerel medya ve logları Supabase'e upsert eder.
+- **Cloud -> Yerel**: Cloud verisini indirir ve yerel state'in yerine koyar.
+- **Cloud'dan Yerel'e Birleştir**: Cloud'da olup yerelde olmayan kayıtları yerel state'e ekler; yerel veriyi silmez ve cloud'a upload yapmaz.
 
-> Şu anda **hiçbir akıştan kuyruğa yazma yapılmıyor.** Mevcut storage flow korunmuş durumda.
+Bu işlemler otomatik başlamaz; kullanıcı onayı ister.
 
-## Migration Akışı (Planlanan)
+### Sync queue
 
-1. Kullanıcı giriş yapar.
-2. Ayarlar sekmesinde "Yerel verileri hesabıma aktar" butonu görünür.
-3. Onay sonrası `mediaItems` ve `progressLogs` Supabase'e batch upsert edilir.
-4. Başarılı sonrası local mod `cloud` moduna geçer.
-5. localStorage anahtarları korunur (rollback ihtimaline karşı).
+`lib/sync-manager.ts` yerel mutasyonlardan sonra kuyruk item'ı üretir:
 
-## Aşamalı Yol Haritası
+- `media_item` için `upsert` ve `delete`
+- `progress_log` için `upsert`
 
-| Faz | Kapsam | Durum |
-|-----|--------|-------|
-| 0   | Supabase client/types/sync-queue iskeleti, SQL şema, RLS taslakları | ✅ Bu PR |
-| 1   | Auth (Supabase OAuth/magic link) ekranı | ⏳ |
-| 2   | Cloud read/write akışı, repository katmanı | ⏳ |
-| 3   | Local → Cloud migration butonu | ⏳ |
-| 4   | Offline sync queue flush worker | ⏳ |
-| 5   | Conflict resolution UI | ⏳ |
+Kuyruk `localStorage` içinde saklanır. Aynı entity ve aynı payload id için bekleyen kayıtlar coalescing ile sadeleştirilir.
 
-## Şu An Bilinçli Olarak Yapılmayanlar
+Queue item'ları `userId` taşıyabilir:
 
-- Auth UI (login/register) eklenmedi.
-- Supabase'e veri yazma/okuma yapılmıyor.
-- Mevcut localStorage flow değiştirilmedi.
-- Sync queue hiçbir yerden çağrılmıyor.
-- API route'ları değiştirilmedi.
+- `null` / `undefined`: login öncesi anonim item; giriş sonrası mevcut kullanıcıya uygulanabilir.
+- mevcut kullanıcı id'si: flush edilebilir.
+- başka kullanıcı id'si: orphan sayılır ve mevcut kullanıcıyla otomatik gönderilmez.
+
+### Flush davranışı
+
+Flush şu koşullarda çalışır:
+
+- kullanıcı giriş yaptıysa,
+- tarayıcı online ise,
+- mevcut kullanıcıya uygun bekleyen item varsa.
+
+Başarılı item kuyruktan çıkarılır. Başarısız item `retryCount` ve `lastError` ile kuyrukta kalır. Ağ geri geldiğinde veya kullanıcı "Şimdi Senkronize Et" dediğinde tekrar denenebilir.
+
+## Neden Böyle Tasarlandı?
+
+- Uygulama Supabase olmadan da tam kullanılabilir kalır.
+- Yerel veriler cloud işlemlerinden bağımsız korunur.
+- Cloud upload/download/merge kullanıcı onayına bağlıdır.
+- Offline değişiklikler ağ geri gelene kadar kaybolmadan bekleyebilir.
+- Farklı hesaplara ait bekleyen işlemler otomatik karışmaz.
+
+## Sınırlamalar
+
+- Cloud'dan otomatik real-time pull yoktur; download ve merge manuel aksiyonlardır.
+- Conflict resolution UI yoktur.
+- `progress_logs.detail` cloud'a yazılmaz; yerel-only alandır.
+- Başka kullanıcıya ait orphan queue item'ları otomatik flush edilmez.
+- Sync queue yalnızca desteklenen medya ve progress log operasyonlarını kapsar.
+
+## Sonraki İyileştirme Alanları
+
+- Daha ayrıntılı conflict resolution ekranı.
+- Cloud -> local değişiklikleri için kontrollü refresh/pull akışı.
+- Queue hata detayları için daha kapsamlı kullanıcı geri bildirimi.
+- Hesap değişimlerinde orphan queue yönetimini daha görünür hâle getirme.
