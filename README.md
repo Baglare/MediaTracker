@@ -4,14 +4,6 @@ MediaTracker; film, dizi, anime, manga, manhwa, manhua, novel ve kitap takibi i�
 
 Uygulamanın ana veri kaynağı tarayıcıdaki `localStorage` alanıdır. Supabase yapılandırılırsa hesap, cloud aktarım ve senkron hazırlıkları devreye girer; yapılandırılmazsa uygulama yerel modda çalışmaya devam eder.
 
-## About
-
-Offline-first media tracker with local-first storage, optional Supabase sync, external media API integrations, and AI-assisted recommendations.
-
-## Portfolio Note
-
-Bu projede AI destekli geliştirme araçları prototipleme, refactor ve hata ayıklama desteği olarak kullanılmıştır. Ürün kapsamı, mimari kararlar, veri modeli, entegrasyon akışları, test süreci ve son uygulama kontrolü geliştirici tarafından yönetilmiştir.
-
 ## Mevcut Durum
 
 - Tek sayfalık, sekmeli Next.js uygulaması.
