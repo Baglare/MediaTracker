@@ -4,7 +4,7 @@ import type { CSSProperties } from "react";
 import { ConnectionLists } from "@/components/social/connection-lists";
 import type { ProfileModuleKey, SocialProfilePayload } from "@/lib/social/types";
 
-const TITLES: Record<ProfileModuleKey, string> = { favorites: "Favori Vitrini", current: "Şu Anda", stats: "Genel İstatistikler", progression: "Yolculuk Seviyesi", badges: "Rozet Vitrini", follows: "Bağlantılar", shared_lists: "Paylaşılan Listeler", shared_notes: "Paylaşılan Notlar" };
+const TITLES: Record<ProfileModuleKey, string> = { favorites: "Favori Vitrini", current: "Şu Anda", stats: "Genel İstatistikler", progression: "Yolculuk Seviyesi", badges: "Rozet Vitrini", follows: "Bağlantılar", shared_lists: "Paylaşılan Listeler", shared_notes: "Paylaşılan Notlar", activity: "Son Aktiviteler" };
 const SPANS = ["", "md:col-span-1", "md:col-span-2", "md:col-span-3", "md:col-span-4", "md:col-span-5", "md:col-span-6", "md:col-span-7", "md:col-span-8", "md:col-span-9", "md:col-span-10", "md:col-span-11", "md:col-span-12"];
 const STARTS = ["md:col-start-1", "md:col-start-2", "md:col-start-3", "md:col-start-4", "md:col-start-5", "md:col-start-6", "md:col-start-7", "md:col-start-8", "md:col-start-9", "md:col-start-10", "md:col-start-11", "md:col-start-12"];
 
@@ -29,6 +29,7 @@ export function ProfileGrid({ payload }: { payload: SocialProfilePayload }) {
           {module.moduleKey === "progression" && payload.progression && <div><p className="text-2xl font-bold text-violet-300">Seviye {payload.progression.level}</p><p className="text-sm text-zinc-300">{payload.progression.title} · {payload.progression.tier}</p><p className="mt-2 text-xs text-zinc-500">Yerel progression verisinden yayımlanan, doğrulanmamış snapshot.</p></div>}
           {module.moduleKey === "follows" && <ConnectionLists ownerId={profile.id} self={relationship.self} />}
           {module.moduleKey === "shared_notes" && <div className="space-y-3">{payload.sharedNotes.map((note) => <article key={note.id} className="rounded-xl bg-zinc-950/70 p-3"><div className="flex justify-between gap-3"><p className="text-sm font-medium">{note.mediaTitle}</p>{note.containsSpoiler && <span className="text-xs text-amber-400">Spoiler</span>}</div>{note.containsSpoiler ? <details className="mt-2 text-sm text-zinc-400"><summary className="cursor-pointer">Notu göster</summary><p className="mt-2 whitespace-pre-wrap">{note.content}</p></details> : <p className="mt-2 whitespace-pre-wrap text-sm text-zinc-400">{note.content}</p>}</article>)}</div>}
+          {module.moduleKey === "activity" && <div className="space-y-2">{(payload.activity ?? []).map((activity) => <article key={activity.id} className="rounded-xl bg-zinc-950/70 p-3"><p className="text-sm"><strong>{activity.media.title}</strong> · {activity.eventType.replaceAll("_"," ")}</p><p className="mt-1 text-xs text-zinc-500">{new Date(activity.createdAt).toLocaleString("tr-TR")} · {activity.visibility}</p>{activity.text && <p className="mt-2 text-sm text-zinc-400">{activity.text}</p>}</article>)}{(payload.activity ?? []).length===0&&<p className="text-sm text-zinc-500">Görünür aktivite yok.</p>}</div>}
         </section>;
       })}
     </div>

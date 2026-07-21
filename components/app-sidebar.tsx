@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   Activity,
   BarChart3,
+  Bell,
   Calendar,
   Compass,
   Heart,
@@ -14,6 +15,7 @@ import {
   NotebookPen,
   Sparkles,
   Star,
+  Send,
   TrendingUp,
   Users,
   type LucideIcon,
@@ -22,6 +24,7 @@ import type { ProfilePreferences } from "@/lib/profile-preferences";
 import type { UserProgression, UserProgressionTier, UserProgressionWorld } from "@/lib/user-progression";
 import type { TabType } from "./app-tabs";
 import SidebarProfileCard from "./sidebar-profile-card";
+import { NotificationBadge } from "@/components/social/notification-badge";
 
 type NavItem = {
   id: TabType | string;
@@ -31,6 +34,7 @@ type NavItem = {
   badge?: string;
   badgeTone?: "soon" | "accent" | "default";
   href?: string;
+  unread?: boolean;
 };
 
 const SECTIONS: { label: string; items: NavItem[] }[] = [
@@ -41,6 +45,14 @@ const SECTIONS: { label: string; items: NavItem[] }[] = [
       { id: "library", label: "Kütüphanem", icon: Library },
       { id: "discover", label: "Keşfet", icon: Compass },
       { id: "calendar", label: "Takvim", icon: Calendar },
+    ],
+  },
+  {
+    label: "Sosyal",
+    items: [
+      { id: "feed", label: "Akış", icon: Activity, href: "/feed" },
+      { id: "recommendations", label: "Öneriler", icon: Send, href: "/recommendations" },
+      { id: "notifications", label: "Bildirimler", icon: Bell, href: "/notifications", unread: true },
       { id: "people", label: "Kullanıcı Ara", icon: Users, href: "/people" },
     ],
   },
@@ -184,6 +196,7 @@ function NavRow({
       <Icon className={`w-4 h-4 shrink-0 ${ghost ? "opacity-60" : ""}`} />
       <span className="truncate">{item.label}</span>
       {item.badge && <span className={badgeClass}>{item.badge}</span>}
+      {item.unread && <span className="ml-auto"><NotificationBadge /></span>}
     </>;
   if (item.href) return <Link href={item.href} className={`${base} ${stateClass}`} title={item.label}>{content}</Link>;
   return (

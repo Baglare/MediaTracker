@@ -10,11 +10,12 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { ChevronRight, Settings, Users } from "lucide-react";
+import { Bell, ChevronRight, Settings, Users } from "lucide-react";
 import type { ProfilePreferences } from "@/lib/profile-preferences";
 import CloudModeBadge from "./cloud-mode-badge";
 import AppTabs, { type TabType } from "./app-tabs";
 import { ProfileAvatar } from "./sidebar-profile-card";
+import { NotificationBadge } from "@/components/social/notification-badge";
 
 const TAB_LABELS: Record<TabType, string> = {
   dashboard: "Dashboard",
@@ -97,6 +98,7 @@ export default function AppTopbar({
             <CloudModeBadge />
           </div>
           <Link href="/people" className="lg:hidden grid h-8 w-8 place-items-center rounded-lg border border-zinc-800/70 bg-zinc-900/35 text-zinc-400 transition-colors hover:border-violet-500/35 hover:text-violet-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40" aria-label="Kullanıcı ara" title="Kullanıcı ara"><Users className="h-4 w-4" aria-hidden="true" /></Link>
+          <Link href="/notifications" className="relative lg:hidden grid h-8 w-8 place-items-center rounded-lg border border-zinc-800/70 bg-zinc-900/35 text-zinc-400 hover:text-violet-200" aria-label="Bildirimler" title="Bildirimler"><Bell className="h-4 w-4" aria-hidden="true" /><span className="absolute -right-2 -top-2"><NotificationBadge /></span></Link>
           <button
             type="button"
             onClick={() => onChangeTab("settings")}

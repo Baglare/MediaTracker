@@ -6,7 +6,7 @@ import { applyGridPreset, defaultProfileModules, moveModule, reflowModules, type
 import { MODULE_VISIBILITIES, type ProfileModuleKey, type ProfileModuleLayout, type ProfileVisibility, type ViewerPreviewMode } from "@/lib/social/types";
 import { canViewModule, previewContext } from "@/lib/social/visibility";
 
-const NAMES: Record<ProfileModuleKey, string> = { favorites: "Favori vitrini", current: "Şu anda", stats: "İstatistikler", progression: "Yolculuk seviyesi", badges: "Rozet altyapısı", follows: "Takip listeleri", shared_lists: "Paylaşılan liste altyapısı", shared_notes: "Paylaşılan notlar" };
+const NAMES: Record<ProfileModuleKey, string> = { favorites: "Favori vitrini", current: "Şu anda", stats: "İstatistikler", progression: "Yolculuk seviyesi", badges: "Rozet altyapısı", follows: "Takip listeleri", shared_lists: "Paylaşılan liste altyapısı", shared_notes: "Paylaşılan notlar", activity: "Son aktiviteler" };
 
 export function SocialLayoutEditor({ modules, profileVisibility, onChange, onSave }: { modules: ProfileModuleLayout[]; profileVisibility: ProfileVisibility; onChange: (value: ProfileModuleLayout[]) => void; onSave: () => Promise<void> }) {
   const [preview, setPreview] = useState<ViewerPreviewMode>("self");

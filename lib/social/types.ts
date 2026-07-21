@@ -23,6 +23,7 @@ export const PROFILE_MODULE_KEYS = [
   "follows",
   "shared_lists",
   "shared_notes",
+  "activity",
 ] as const;
 
 export type ProfileVisibility = (typeof PROFILE_VISIBILITIES)[number];
@@ -150,6 +151,7 @@ export interface SocialProfilePayload {
   stats?: SocialStatsSnapshot;
   progression?: SocialProgressionSnapshot;
   sharedNotes: Array<Omit<SharedNoteInput, "confirmed"> & { id: string; createdAt: string; updatedAt: string }>;
+  activity?: Array<{ id: string; eventType: string; visibility: ModuleVisibility; media: { title: string; mediaType: MediaType; coverUrl?: string }; rating?: number; text?: string; createdAt: string }>;
   redirectUsername?: string;
 }
 
@@ -189,4 +191,5 @@ export const DEFAULT_PROFILE_MODULES: readonly ProfileModuleLayout[] = [
   { moduleKey: "follows", enabled: true, visibility: "public", gridX: 4, gridY: 4, gridWidth: 4, gridHeight: 2, mobileOrder: 5, config: {} },
   { moduleKey: "shared_lists", enabled: false, visibility: "public", gridX: 8, gridY: 4, gridWidth: 4, gridHeight: 2, mobileOrder: 6, config: {} },
   { moduleKey: "shared_notes", enabled: true, visibility: "self", gridX: 0, gridY: 6, gridWidth: 12, gridHeight: 2, mobileOrder: 7, config: {} },
+  { moduleKey: "activity", enabled: true, visibility: "followers", gridX: 0, gridY: 8, gridWidth: 12, gridHeight: 2, mobileOrder: 8, config: {} },
 ] as const;

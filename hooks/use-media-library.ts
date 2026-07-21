@@ -25,6 +25,15 @@ import {
 import type { MediaItem, MediaType, ProgressLog } from "@/lib/types";
 import { withMediaClassification } from "@/lib/types";
 import { withInferredSeriesGroup } from "@/lib/series-group";
+import {
+  cacheSocialActivityPreferences,
+  flushSocialOutbox,
+  loadRecommendationLinks,
+  queueMediaSocialEvents,
+  queueRecommendationProgress,
+  sendSocialOutboxItem,
+} from "@/lib/social/local-social";
+import { DEFAULT_ACTIVITY_PREFERENCES, type SocialPreferences } from "@/lib/social/interactions";
 
 type ProgressAction = "increment" | "complete" | "manual_adjust" | "added";
 
@@ -35,6 +44,25 @@ export function useMediaLibrary(userId: string | null) {
 
   useEffect(() => {
     setSyncUserId(userId);
+  }, [userId]);
+
+  useEffect(() => {
+    if (!userId) return;
+    let active = true;
+    fetch("/api/social/preferences", { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("social_preferences_unavailable");
+        return response.json() as Promise<SocialPreferences>;
+      })
+      .then((preferences) => {
+        if (!active) return;
+        cacheSocialActivityPreferences(userId, preferences.configured, preferences.activity ?? DEFAULT_ACTIVITY_PREFERENCES);
+        return flushSocialOutbox(userId, sendSocialOutboxItem);
+      })
+      .catch(() => undefined);
+    const flush = () => { void flushSocialOutbox(userId, sendSocialOutboxItem); };
+    window.addEventListener("online", flush);
+    return () => { active = false; window.removeEventListener("online", flush); };
   }, [userId]);
 
   useEffect(() => {
@@ -113,6 +141,18 @@ export function useMediaLibrary(userId: string | null) {
     enqueueProgressLog(newLog);
   }, [progressLogs]);
 
+  const queueSocialMutation = useCallback((previous: MediaItem | undefined, next: MediaItem) => {
+    if (!userId) return;
+    queueMediaSocialEvents(previous, next, userId);
+    const link = loadRecommendationLinks(userId).find((item) => item.localMediaId === next.id);
+    if (link) {
+      const started = next.status === "watching" || next.status === "reading" || next.currentProgress > 0;
+      if (previous && !((previous.status === "watching" || previous.status === "reading") || previous.currentProgress > 0) && started) queueRecommendationProgress(link.recommendationId, "started", userId);
+      if (previous?.status !== "completed" && next.status === "completed") queueRecommendationProgress(link.recommendationId, "completed", userId);
+    }
+    void flushSocialOutbox(userId, sendSocialOutboxItem);
+  }, [userId]);
+
   const buildAddedLogDetail = useCallback((item: MediaItem) => {
     const details = ["Kütüphaneye eklendi"];
     if (item.status !== "planning") details.push(`Durum: ${getStatusLabel(item.status)}`);
@@ -142,6 +182,7 @@ export function useMediaLibrary(userId: string | null) {
     };
     setMediaList((previous) => previous.map((candidate) => candidate.id === id ? updated : candidate));
     enqueueMediaUpsert(updated);
+    queueSocialMutation(item, updated);
     addProgressLog({
       mediaId: item.id,
       mediaTitle: item.title,
@@ -151,7 +192,7 @@ export function useMediaLibrary(userId: string | null) {
       previousProgress: item.currentProgress,
       newProgress,
     });
-  }, [addProgressLog, mediaList]);
+  }, [addProgressLog, mediaList, queueSocialMutation]);
 
   const completeMedia = useCallback((id: string) => {
     const item = mediaList.find((candidate) => candidate.id === id);
@@ -160,6 +201,7 @@ export function useMediaLibrary(userId: string | null) {
     const updated: MediaItem = { ...item, currentProgress: newProgress, status: "completed" };
     setMediaList((previous) => previous.map((candidate) => candidate.id === id ? updated : candidate));
     enqueueMediaUpsert(updated);
+    queueSocialMutation(item, updated);
     if (item.currentProgress >= item.totalProgress) return;
     addProgressLog({
       mediaId: item.id,
@@ -170,7 +212,7 @@ export function useMediaLibrary(userId: string | null) {
       previousProgress: item.currentProgress,
       newProgress,
     });
-  }, [addProgressLog, mediaList]);
+  }, [addProgressLog, mediaList, queueSocialMutation]);
 
   const saveMedia = useCallback((item: MediaItem) => {
     const classified = withMediaClassification(withInferredSeriesGroup(item));
@@ -183,6 +225,7 @@ export function useMediaLibrary(userId: string | null) {
       : [...previous, stored]
     );
     enqueueMediaUpsert(stored);
+    queueSocialMutation(existing, stored);
 
     if (existing && existing.currentProgress !== classified.currentProgress) {
       addProgressLog({
@@ -206,7 +249,7 @@ export function useMediaLibrary(userId: string | null) {
         detail: buildAddedLogDetail(classified),
       });
     }
-  }, [addProgressLog, buildAddedLogDetail, mediaList]);
+  }, [addProgressLog, buildAddedLogDetail, mediaList, queueSocialMutation]);
 
   const deleteMedia = useCallback((id: string) => {
     setMediaList((previous) => previous.filter((item) => item.id !== id));
@@ -219,7 +262,8 @@ export function useMediaLibrary(userId: string | null) {
     const updated = { ...current, favorite: !current.favorite };
     setMediaList((previous) => previous.map((item) => item.id === id ? updated : item));
     enqueueMediaUpsert(updated);
-  }, [mediaList]);
+    queueSocialMutation(current, updated);
+  }, [mediaList, queueSocialMutation]);
 
   const updateRating = useCallback((id: string, rating: number | null) => {
     if (rating !== null && (!Number.isInteger(rating) || rating < 0 || rating > 10)) return;
@@ -228,7 +272,8 @@ export function useMediaLibrary(userId: string | null) {
     const updated = { ...current, userRating: rating };
     setMediaList((previous) => previous.map((item) => item.id === id ? updated : item));
     enqueueMediaUpsert(updated);
-  }, [mediaList]);
+    queueSocialMutation(current, updated);
+  }, [mediaList, queueSocialMutation]);
 
   const commitMediaChanges = useCallback((next: MediaItem[], changed: MediaItem[] = []) => {
     setMediaList(next);

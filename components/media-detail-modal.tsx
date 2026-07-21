@@ -54,6 +54,7 @@ import {
   isMovieLike,
 } from "@/lib/progress";
 import { ThemeSubBadge } from "@/components/theme-accent";
+import { RecommendMediaButton } from "@/components/social/recommendation-composer";
 
 interface MediaDetailModalProps {
   media: MediaItem | null;
@@ -912,6 +913,7 @@ export default function MediaDetailModal({
 
         {/* === FOOTER === */}
         <div className="shrink-0 px-4 sm:px-5 py-3 border-t border-zinc-800/70 bg-zinc-950/60 backdrop-blur-sm flex items-center gap-2">
+          <RecommendMediaButton media={media} />
           <button
             type="button"
             onClick={handleEdit}

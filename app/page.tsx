@@ -3043,6 +3043,7 @@ export default function HomePage() {
                 <SocialProfileEditor
                   authConfigured={authConfigured}
                   authenticated={Boolean(authUser)}
+                  userId={authUser?.id ?? null}
                   localPreferences={profilePreferences}
                   profileName={profileName}
                   selectedTitle={journeyTitle}

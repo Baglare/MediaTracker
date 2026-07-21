@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useState } from "react";
 
 import type { ConnectionState, FollowStatus } from "@/lib/social/types";
@@ -27,6 +28,7 @@ export function SocialActions({ targetId, state, viewerFollowsOwner, ownerFollow
   return (
     <div className="flex flex-wrap items-center gap-2">
       <button type="button" disabled={busy} onClick={() => act(primary[0])} className="rounded-lg bg-violet-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50">{primary[1]}</button>
+      <Link href={`/recommendations?to=${encodeURIComponent(targetId)}`} className="rounded-lg border border-violet-700 px-3 py-2 text-sm text-violet-200">İçerik öner</Link>
       {(ownerFollowsViewer === "pending" || state === "inbound_pending") && <><button type="button" disabled={busy} onClick={() => act("accept")} className="rounded-lg border border-emerald-700 px-3 py-2 text-sm text-emerald-300">Kabul et</button><button type="button" disabled={busy} onClick={() => act("reject")} className="rounded-lg border border-zinc-700 px-3 py-2 text-sm text-zinc-300">Reddet</button></>}
       <button type="button" disabled={busy} onClick={() => act("block")} className="rounded-lg border border-red-950 px-3 py-2 text-xs text-red-400">Engelle</button>
       {message && <span role="status" className="text-xs text-zinc-400">{message}</span>}

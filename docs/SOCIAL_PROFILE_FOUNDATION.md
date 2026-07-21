@@ -2,7 +2,7 @@
 
 ## Amaç ve sınır
 
-Sosyal Faz 1, Supabase hesabına bağlı public/protected/personal profilleri, asimetrik takip ilişkilerini, kullanıcı aramasını ve açıkça yayımlanan profil snapshot’larını sağlar. Aktivite akışı, yorum, tepki, DM, bildirim, ortak liste, zevk uyumu ve XP V2 bu temelin parçası değildir.
+Sosyal Faz 1, Supabase hesabına bağlı public/protected/personal profilleri, asimetrik takip ilişkilerini, kullanıcı aramasını ve açıkça yayımlanan profil snapshot’larını sağlar. Bunun üzerine kurulan feed, yorum/tepki, medya önerisi, notification ve local-first bağlantı sınırları [`SOCIAL_INTERACTIONS_AND_RECOMMENDATIONS.md`](SOCIAL_INTERACTIONS_AND_RECOMMENDATIONS.md) belgesindedir. DM, ortak liste, zevk uyumu ve XP V2 kapsam dışıdır.
 
 ## Local-first / cloud-social ayrımı
 
@@ -54,7 +54,7 @@ Yin/Yang göstergesinde sol Yin profil sahibinin görüntüleyeni takip etmesini
 
 Desktop düzeni doğrulanan 12 sütun koordinatları kullanır. Modüller HTML drag/drop ile yeniden sıralanabilir, küçük/orta/geniş/tam genişlik preset’leriyle boyutlandırılabilir ve sıfırlanabilir. Yukarı/aşağı taşıma ile boyut butonları klavye ve dokunmatik alternatifi sağlar. Düzenleme sonrası kontrollü reflow kartların üst üste binmesini engeller. Mobilde `mobile_order` ile tek sütun akışı kullanılır; desktop koordinatları mobil overflow üretmez. Ziyaretçi önizlemesi backend yetkilendirmesinin yerine geçmez.
 
-Hazır modül anahtarları: favoriler, şu anda, istatistik, progression, rozet altyapısı, takip listeleri, paylaşılan liste altyapısı ve paylaşılan notlar. Rozet ve paylaşılan listeler veri üretmez; boş public placeholder gösterilmez.
+Hazır modül anahtarları: favoriler, şu anda, istatistik, progression, rozet altyapısı, takip listeleri, paylaşılan liste altyapısı, paylaşılan notlar ve son aktiviteler. Aktivite modülü Faz 2’nin güvenli viewer-specific resolver’ından en fazla 8 kayıt alır. Rozet ve paylaşılan listeler veri üretmez; boş public placeholder gösterilmez.
 
 ## Shared note güvenliği
 
@@ -66,7 +66,7 @@ Migration private `profile-assets` bucket’ını oluşturur. Yol düzeni `{user
 
 ## Supabase kurulumu
 
-1. Yeni kurulumda migration’ları sırayla uygula. Social Phase 1 daha önce kurulmuş uzak projede en son `supabase/migrations/20260721_social_profile_protected_visibility_fix_v2.sql` migration’ını uygula.
+1. Yeni kurulumda 14 haneli migration’ları sırayla uygula. Social Phase 1 daha önce kurulmuş uzak projede önce `supabase/migrations/20260721121000_social_profile_protected_visibility_fix_v2.sql`, ardından Faz 2 için `supabase/migrations/20260721130000_social_interactions_recommendations.sql` dosyasını uygula.
 2. Migration’ın tabloları, RPC’leri, RLS politikalarını ve private `profile-assets` bucket/policy’lerini oluşturduğunu doğrula.
 3. `NEXT_PUBLIC_SUPABASE_URL` ve `NEXT_PUBLIC_SUPABASE_ANON_KEY` değerlerini mevcut yöntemle tanımla.
 4. İki test hesabıyla public/protected/personal, follow request, block ve asset erişimini doğrula.
@@ -94,4 +94,4 @@ Bu repository turu migration’ı uzak Supabase’e otomatik uygulamaz. `SUPABAS
 - Storage tarafında sunucu yeniden encode/crop yapmaz; MIME ve boyut doğrular, orijinal JPG/PNG/WebP’yi saklar.
 - Takip listeleri offset pagination kullanır; çok büyük ağlarda cursor pagination’a geçilmelidir.
 - Soft-delete UI bu fazda yoktur; veri modeli ve public filtreler hazırdır.
-- Aktivite feed, yorum/tepki, öneri, bildirim, DM, ortak liste, XP V2 ve yeni rozet sistemi sonraki fazlara bırakılmıştır.
+- DM, ortak liste, XP V2 ve yeni rozet sistemi sonraki fazlara bırakılmıştır. Faz 2 sosyal etkileşim sınırlamaları ayrı belgede tutulur.

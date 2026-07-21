@@ -41,7 +41,8 @@ describe("social profile grid", () => {
 
   it("restores unknown or missing modules from safe defaults", () => {
     const merged = mergeModuleDefaults([{ ...base, gridWidth: 0 }]);
-    expect(merged).toHaveLength(8);
+    expect(merged).toHaveLength(9);
     expect(merged[0].gridWidth).toBe(8);
+    expect(merged.at(-1)?.moduleKey).toBe("activity");
   });
 });

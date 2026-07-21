@@ -1,9 +1,9 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-const migration = readFileSync(new URL("../supabase/migrations/20260721_social_profile_foundation.sql", import.meta.url), "utf8");
-const smokeFixMigration = readFileSync(new URL("../supabase/migrations/20260721_social_profile_live_smoke_fixes.sql", import.meta.url), "utf8");
-const protectedVisibilityV2 = readFileSync(new URL("../supabase/migrations/20260721_social_profile_protected_visibility_fix_v2.sql", import.meta.url), "utf8");
+const migration = readFileSync(new URL("../supabase/migrations/20260721110000_social_profile_foundation.sql", import.meta.url), "utf8");
+const smokeFixMigration = readFileSync(new URL("../supabase/migrations/20260721120000_social_profile_live_smoke_fixes.sql", import.meta.url), "utf8");
+const protectedVisibilityV2 = readFileSync(new URL("../supabase/migrations/20260721121000_social_profile_protected_visibility_fix_v2.sql", import.meta.url), "utf8");
 
 describe("social Supabase migration contract (static, not live RLS integration)", () => {
   it("enforces username uniqueness, cooldown, history reservation and serialized claims", () => {

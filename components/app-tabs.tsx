@@ -1,6 +1,8 @@
 "use client";
 
 import { LayoutDashboard, Library, Compass, Activity, Settings, Sparkles, Heart, ListChecks, Star, NotebookPen, BarChart3, Calendar, TrendingUp, UserRound } from "lucide-react";
+import { Bell, Radio, Send } from "lucide-react";
+import Link from "next/link";
 
 export type TabType =
   | "dashboard"
@@ -54,6 +56,9 @@ export default function AppTabs({ activeTab, onChange }: AppTabsProps) {
       role="tablist"
       aria-label="Sekmeler"
     >
+      <Link href="/feed" className="inline-flex h-10 shrink-0 items-center gap-2 rounded-lg border border-violet-500/20 bg-violet-500/10 px-3 text-[13px] font-medium text-violet-200"><Radio className="h-4 w-4" aria-hidden="true" />Akış</Link>
+      <Link href="/recommendations" className="inline-flex h-10 shrink-0 items-center gap-2 rounded-lg border border-violet-500/20 bg-violet-500/10 px-3 text-[13px] font-medium text-violet-200"><Send className="h-4 w-4" aria-hidden="true" />Öneriler</Link>
+      <Link href="/notifications" className="inline-flex h-10 shrink-0 items-center gap-2 rounded-lg border border-violet-500/20 bg-violet-500/10 px-3 text-[13px] font-medium text-violet-200"><Bell className="h-4 w-4" aria-hidden="true" />Bildirimler</Link>
       {tabs.map((tab) => {
         const Icon = tab.icon;
         const isActive = activeTab === tab.id;

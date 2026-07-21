@@ -33,6 +33,7 @@ export interface Database {
           selected_title: string | null;
           follow_list_visibility: "public" | "followers" | "mutual" | "self";
           layout_mode: string;
+          recommendation_permission: "mutual" | "following" | "followers" | "everyone" | "none";
           joined_at: string;
           deleted_at: string | null;
           username_changed_at: string | null;
@@ -53,6 +54,7 @@ export interface Database {
           selected_title?: string | null;
           follow_list_visibility?: "public" | "followers" | "mutual" | "self";
           layout_mode?: string;
+          recommendation_permission?: "mutual" | "following" | "followers" | "everyone" | "none";
           joined_at?: string;
           deleted_at?: string | null;
           username_changed_at?: string | null;
@@ -73,6 +75,7 @@ export interface Database {
           selected_title?: string | null;
           follow_list_visibility?: "public" | "followers" | "mutual" | "self";
           layout_mode?: string;
+          recommendation_permission?: "mutual" | "following" | "followers" | "everyone" | "none";
           joined_at?: string;
           deleted_at?: string | null;
           username_changed_at?: string | null;
@@ -252,6 +255,24 @@ export interface Database {
       social_share_note: { Args: { p_media_title: string; p_media_type: string; p_external_source: string; p_external_id: string; p_content: string; p_contains_spoiler: boolean; p_visibility: string; p_confirmed: boolean }; Returns: Json };
       social_unshare_note: { Args: { p_note: string }; Returns: Json };
       list_social_blocks: { Args: Record<string, never>; Returns: Json };
+      social_get_preferences: { Args: Record<string, never>; Returns: Json };
+      social_save_preferences: { Args: { p_kind: string; p_values: Json }; Returns: Json };
+      social_publish_activity: { Args: { p_event_type: string; p_visibility: string; p_media: Json; p_rating: number | null; p_short_text: string | null; p_source_event_id: string; p_dedupe_key: string }; Returns: Json };
+      social_delete_activity: { Args: { p_activity: string }; Returns: Json };
+      list_social_feed: { Args: { p_cursor_created_at?: string; p_cursor_id?: string; p_limit?: number }; Returns: Json };
+      list_profile_activity: { Args: { p_owner: string; p_limit?: number }; Returns: Json };
+      social_comment: { Args: { p_activity: string; p_parent: string | null; p_body: string; p_spoiler: boolean; p_dedupe_key: string }; Returns: Json };
+      social_comment_action: { Args: { p_action: string; p_comment: string; p_body?: string | null; p_spoiler?: boolean }; Returns: Json };
+      social_react: { Args: { p_activity: string | null; p_comment: string | null; p_reaction: string }; Returns: Json };
+      social_send_recommendation: { Args: { p_recipient: string; p_media: Json; p_sender_note: string; p_dedupe_key: string }; Returns: Json };
+      social_recommendation_transition: { Args: { p_recommendation: string; p_action: string; p_response_note?: string | null; p_already_in_library?: boolean; p_dedupe_key?: string | null; p_response_message?: string | null }; Returns: Json };
+      social_send_recommendation_message: { Args: { p_recommendation: string; p_body: string; p_dedupe_key: string }; Returns: Json };
+      get_social_recommendation_detail: { Args: { p_recommendation: string }; Returns: Json };
+      get_social_person_summary: { Args: { p_target: string }; Returns: Json };
+      list_social_recommendations: { Args: { p_box?: string; p_status?: string; p_cursor_created_at?: string; p_cursor_id?: string; p_limit?: number }; Returns: Json };
+      list_social_notifications: { Args: { p_cursor_created_at?: string; p_cursor_id?: string; p_limit?: number }; Returns: Json };
+      social_notification_action: { Args: { p_action: string; p_notification?: string | null; p_entity_type?: string | null; p_entity_id?: string | null }; Returns: Json };
+      social_report: { Args: { p_activity: string | null; p_comment: string | null; p_category: string; p_note?: string | null }; Returns: Json };
     };
     Enums: Record<string, never>;
   };

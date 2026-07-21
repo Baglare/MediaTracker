@@ -17,6 +17,8 @@ import {
 import { validateMediaSnapshot, validateModuleLayout, validateProgressionSnapshot, validateStatsSnapshot } from "@/lib/social/validation";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import type { Json } from "@/lib/supabase/types";
+import { socialRecord, validateActivityVisibility, validateSocialMediaSnapshot, validateUuid } from "@/lib/social/interactions-validation";
+import { validateActivityType } from "@/lib/social/interactions-validation";
 
 const BUCKET = "profile-assets";
 
@@ -36,7 +38,7 @@ function followOf(value: unknown): FollowStatus | null {
   return value === "pending" || value === "accepted" ? value : null;
 }
 
-async function signedAssetUrl(path: unknown): Promise<string | undefined> {
+export async function createSignedSocialAssetUrl(path: unknown): Promise<string | undefined> {
   const assetPath = stringOf(path);
   if (!assetPath) return undefined;
   const client = await getSupabaseServerClient();
@@ -115,7 +117,7 @@ export async function loadSocialProfile(username: string): Promise<SocialProfile
   const rawProfile = objectOf(root.profile);
   const profile = profileOf(rawProfile);
   if (!profile) return empty;
-  const [avatarUrl, bannerUrl] = await Promise.all([signedAssetUrl(rawProfile?.avatarPath), signedAssetUrl(rawProfile?.bannerPath)]);
+  const [avatarUrl, bannerUrl] = await Promise.all([createSignedSocialAssetUrl(rawProfile?.avatarPath), createSignedSocialAssetUrl(rawProfile?.bannerPath)]);
   const relationship = relationshipOf(root.relationship, profile.connectionColor);
   const visibilityContext = {
     anonymous: relationship.anonymous,
@@ -127,6 +129,11 @@ export async function loadSocialProfile(username: string): Promise<SocialProfile
   const visibleModules = new Set(modules.map((module) => module.moduleKey));
   const stats = visibleModules.has("stats") ? validateStatsSnapshot(root.stats) : null;
   const progression = visibleModules.has("progression") ? validateProgressionSnapshot(root.progression) : null;
+  const activityResult = visibleModules.has("activity") ? await client.rpc("list_profile_activity", { p_owner: profile.id, p_limit: 8 }) : { data: [], error: null };
+  const activity = !activityResult.error && Array.isArray(activityResult.data) ? activityResult.data.flatMap((entry) => {
+    const item = socialRecord(entry); const id = validateUuid(item?.id); const type = validateActivityType(item?.eventType); const visibility = validateActivityVisibility(item?.visibility); const media = validateSocialMediaSnapshot(item?.media); const createdAt = stringOf(item?.createdAt);
+    return item && id.ok && type.ok && visibility.ok && media.ok && createdAt && !Number.isNaN(Date.parse(createdAt)) ? [{ id: id.value, eventType: type.value, visibility: visibility.value, media: { title: media.value.title, mediaType: media.value.mediaType, coverUrl: media.value.coverUrl }, rating: typeof item.rating === "number" ? item.rating : undefined, text: stringOf(item.text), createdAt }] : [];
+  }) : [];
   return {
     status: "available",
     profile: { ...profile, avatarUrl, bannerUrl },
@@ -137,6 +144,7 @@ export async function loadSocialProfile(username: string): Promise<SocialProfile
     stats: stats?.ok ? stats.value : undefined,
     progression: progression?.ok ? progression.value : undefined,
     sharedNotes: visibleModules.has("shared_notes") && Array.isArray(root.sharedNotes) ? root.sharedNotes as SocialProfilePayload["sharedNotes"] : [],
+    activity,
   };
 }
 
@@ -157,9 +165,28 @@ export async function searchSocialPeople(query: string, offset = 0): Promise<Soc
     bio: profile.bio,
     visibilityMode: profile.visibilityMode,
     connectionColor: profile.connectionColor,
-    avatarUrl: await signedAssetUrl(record.avatarPath),
+    avatarUrl: await createSignedSocialAssetUrl(record.avatarPath),
     relationship: relationshipOf(record, profile.connectionColor),
   })));
+}
+
+export async function loadSocialPersonSummary(targetId: string): Promise<SocialPersonSummary | undefined> {
+  const client = await getSupabaseServerClient();
+  if (!client) return undefined;
+  const { data, error } = await client.rpc("get_social_person_summary", { p_target: targetId });
+  const record = objectOf(data);
+  const profile = profileOf(record);
+  if (error || !record || !profile) return undefined;
+  return {
+    id: profile.id,
+    username: profile.username,
+    displayName: profile.displayName,
+    bio: profile.bio,
+    visibilityMode: profile.visibilityMode,
+    connectionColor: profile.connectionColor,
+    avatarUrl: await createSignedSocialAssetUrl(record.avatarPath),
+    relationship: relationshipOf(record, profile.connectionColor),
+  };
 }
 
 export async function loadOwnSocialEditorData(): Promise<SocialProfileEditorData> {
@@ -188,8 +215,8 @@ export async function loadOwnSocialEditorData(): Promise<SocialProfileEditorData
       visibilityMode: row.visibility_mode,
       connectionColor: colorOf(row.connection_color),
       selectedTitle: row.selected_title ?? undefined,
-      avatarUrl: await signedAssetUrl(row.avatar_path),
-      bannerUrl: await signedAssetUrl(row.banner_path),
+      avatarUrl: await createSignedSocialAssetUrl(row.avatar_path),
+      bannerUrl: await createSignedSocialAssetUrl(row.banner_path),
       usernameChangedAt: row.username_changed_at ?? undefined,
     } : undefined,
     modules: modulesOf((modulesResult.data ?? []).map((item) => ({ moduleKey: item.module_key, enabled: item.enabled, visibility: item.visibility, gridX: item.grid_x, gridY: item.grid_y, gridWidth: item.grid_width, gridHeight: item.grid_height, mobileOrder: item.mobile_order, config: item.config }))),

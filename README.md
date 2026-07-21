@@ -69,6 +69,10 @@ Uygulamanın ana veri kaynağı tarayıcıdaki `localStorage` alanıdır. Supaba
   - Asimetrik takip/istek, karşılıklı Yin/Yang durumu ve engelleme RPC’leri
   - Kontrollü profil grid’i, avatar/banner ve yalnızca açıkça seçilen vitrin/istatistik/progression/not snapshot’ları
   - Kurulum, görünürlük ve manuel test ayrıntıları: [`docs/SOCIAL_PROFILE_FOUNDATION.md`](docs/SOCIAL_PROFILE_FOUNDATION.md)
+  - `/feed` accepted takiplerden kronolojik aktivite, tek seviye yorum, spoiler ve sınırlı tepki
+  - `/recommendations` yapılandırılmış medya önerisi; cevap/ilerleme yaşam döngüsü ve cihaz bazlı local library link’i
+  - `/notifications` tercihli cloud bildirim merkezi, unread badge ve kontrollü polling
+  - Faz 2 veri/RPC/outbox ayrıntıları: [`docs/SOCIAL_INTERACTIONS_AND_RECOMMENDATIONS.md`](docs/SOCIAL_INTERACTIONS_AND_RECOMMENDATIONS.md)
 - AI Danışman:
   - Kütüphane profiline göre öneri
   - Puanlara, favorilere, ilerlemeye ve notlara göre öneri
@@ -213,7 +217,7 @@ Güvenlik notu: `SUPABASE_SERVICE_ROLE_KEY` yalnızca server-side kullanılmalı
 Cloud özelliklerini kullanmak istiyorsan:
 
 1. Supabase projesi oluştur.
-2. Yeni kurulumda `supabase/schema.sql` dosyasındaki SQL'i Supabase SQL Editor içinde çalıştır. Mevcut projede Sosyal Faz 1 için `supabase/migrations/20260721_social_profile_foundation.sql` migration’ını uygula; bu adım private `profile-assets` bucket ve politikalarını da oluşturur.
+2. Yeni kurulumda `supabase/schema.sql` dosyasındaki SQL'i Supabase SQL Editor içinde çalıştır. Mevcut projede 14 haneli migration’ları sırayla uygula; Sosyal Faz 2 için son dosya `supabase/migrations/20260721130000_social_interactions_recommendations.sql` olur. Bu tur migration’ı uzak projeye otomatik uygulamaz.
 3. Supabase Project Settings -> API bölümünden URL ve anon key değerlerini al.
 4. `.env.local` içine şunları ekle:
 
