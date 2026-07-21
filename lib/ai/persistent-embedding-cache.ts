@@ -1,3 +1,5 @@
+import "server-only";
+
 import { createClient } from "@supabase/supabase-js";
 import type { EmbeddingVectorPayload, EmbeddingVectorResult } from "@/lib/ai/embedding-types";
 
@@ -20,14 +22,14 @@ interface EmbeddingCacheRow {
 function isPersistentCacheEnabled(): boolean {
   if (process.env.MEDIA_TRACKER_EMBEDDING_CACHE === "off") return false;
   if (process.env.MEDIA_TRACKER_PERSISTENT_EMBEDDING_CACHE === "off") return false;
-  return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+  return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
 }
 
 function getClient() {
   if (!isPersistentCacheEnabled()) return null;
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL as string,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string,
+    process.env.SUPABASE_SERVICE_ROLE_KEY as string,
     { auth: { persistSession: false } }
   );
 }
@@ -80,7 +82,7 @@ export async function readPersistentEmbeddingCache(args: {
       const key = cacheId({ provider: args.provider, model: args.model, hash: payload.hash, dimensions: args.dimensions });
       const row = rowByKey.get(key);
       const vector = row ? vectorFromJson(row.vector) : null;
-      if (!row || !vector) {
+      if (!row || !vector || vector.length !== args.dimensions) {
         misses.push(payload);
         continue;
       }
@@ -132,15 +134,17 @@ export async function writePersistentEmbeddingCache(args: {
   const now = new Date().toISOString();
   const rows = args.results.flatMap((result) => {
     const payload = payloadById.get(result.id);
+    const vector = vectorFromJson(result.vector);
     if (!payload) return [];
     if (result.provider !== args.provider || result.dimensions !== args.dimensions) return [];
+    if (result.hash !== payload.hash || !vector || vector.length !== args.dimensions) return [];
     return [{
       id: cacheId({ provider: args.provider, model: result.model || args.model, hash: result.hash, dimensions: result.dimensions }),
       provider: args.provider,
       model: result.model || args.model,
       hash: result.hash,
       dimensions: result.dimensions,
-      vector: result.vector,
+      vector,
       text_preview: payload.text.slice(0, 240),
       last_used_at: now,
     }];

@@ -57,3 +57,40 @@ export function appendRecommendationFeedbackEvent(input: FeedbackEventInput): Re
     return null;
   }
 }
+
+function sameRecommendation(
+  event: RecommendationFeedbackEvent,
+  target: { title: string; mediaType: RecommendationFeedbackEvent["mediaType"]; externalSource?: string; externalId?: string }
+): boolean {
+  if (target.externalSource && target.externalId) {
+    return event.externalSource === target.externalSource && event.externalId === target.externalId;
+  }
+  return event.mediaType === target.mediaType && event.title.trim().toLowerCase() === target.title.trim().toLowerCase();
+}
+
+export function removeDismissedRecommendationFeedback(target: {
+  title: string;
+  mediaType: RecommendationFeedbackEvent["mediaType"];
+  externalSource?: string;
+  externalId?: string;
+}): void {
+  if (typeof window === "undefined") return;
+  try {
+    const next = readRecommendationFeedbackEvents().filter(
+      (event) => event.action !== "dismissed" || !sameRecommendation(event, target)
+    );
+    window.localStorage.setItem(RECOMMENDATION_FEEDBACK_KEY, JSON.stringify(next));
+  } catch {
+    // localStorage erişimi yoksa aktif oturum state'i çalışmaya devam eder.
+  }
+}
+
+export function clearDismissedRecommendationFeedback(): void {
+  if (typeof window === "undefined") return;
+  try {
+    const next = readRecommendationFeedbackEvents().filter((event) => event.action !== "dismissed");
+    window.localStorage.setItem(RECOMMENDATION_FEEDBACK_KEY, JSON.stringify(next));
+  } catch {
+    // localStorage erişimi yoksa aktif oturum state'i çalışmaya devam eder.
+  }
+}

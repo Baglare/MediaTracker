@@ -17,6 +17,20 @@ function generateId(): string {
   return `sq-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 }
 
+function isSyncQueueItem(value: unknown): value is SyncQueueItem {
+  if (!value || typeof value !== "object") return false;
+  const item = value as Record<string, unknown>;
+  if (typeof item.id !== "string" || item.id.length === 0) return false;
+  if (item.entity !== "media_item" && item.entity !== "progress_log") return false;
+  if (item.operation !== "upsert" && item.operation !== "delete") return false;
+  if (!item.payload || typeof item.payload !== "object") return false;
+  if (typeof item.createdAt !== "string" || item.createdAt.length === 0) return false;
+  if (typeof item.retryCount !== "number" || !Number.isInteger(item.retryCount) || item.retryCount < 0) return false;
+  if (item.lastError !== undefined && typeof item.lastError !== "string") return false;
+  if (item.userId !== undefined && item.userId !== null && typeof item.userId !== "string") return false;
+  return true;
+}
+
 /**
  * Sync queue'yu localStorage'dan okur. Yoksa veya bozuksa boş dizi döner.
  */
@@ -27,7 +41,7 @@ export function loadSyncQueue(): SyncQueueItem[] {
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed as SyncQueueItem[];
+    return parsed.filter(isSyncQueueItem);
   } catch {
     return [];
   }

@@ -1,5 +1,7 @@
 "use client";
 
+import Image from "next/image";
+import Link from "next/link";
 import {
   Activity,
   BarChart3,
@@ -13,6 +15,7 @@ import {
   Sparkles,
   Star,
   TrendingUp,
+  Users,
   type LucideIcon,
 } from "lucide-react";
 import type { ProfilePreferences } from "@/lib/profile-preferences";
@@ -27,6 +30,7 @@ type NavItem = {
   ghost?: boolean;
   badge?: string;
   badgeTone?: "soon" | "accent" | "default";
+  href?: string;
 };
 
 const SECTIONS: { label: string; items: NavItem[] }[] = [
@@ -37,6 +41,7 @@ const SECTIONS: { label: string; items: NavItem[] }[] = [
       { id: "library", label: "Kütüphanem", icon: Library },
       { id: "discover", label: "Keşfet", icon: Compass },
       { id: "calendar", label: "Takvim", icon: Calendar },
+      { id: "people", label: "Kullanıcı Ara", icon: Users, href: "/people" },
     ],
   },
   {
@@ -171,6 +176,15 @@ function NavRow({
     badgeClass += "bg-zinc-800 text-zinc-400";
   }
 
+  const content = <>
+      {isActive && !ghost && (
+        <span aria-hidden="true" className="absolute -left-2.5 top-1.5 bottom-1.5 w-[2px] rounded-r bg-amber-400/70" />
+      )}
+      <Icon className={`w-4 h-4 shrink-0 ${ghost ? "opacity-60" : ""}`} />
+      <span className="truncate">{item.label}</span>
+      {item.badge && <span className={badgeClass}>{item.badge}</span>}
+    </>;
+  if (item.href) return <Link href={item.href} className={`${base} ${stateClass}`} title={item.label}>{content}</Link>;
   return (
     <button
       type="button"
@@ -181,15 +195,7 @@ function NavRow({
       aria-current={isActive ? "page" : undefined}
       title={ghost ? `${item.label} - yakında` : item.label}
     >
-      {isActive && !ghost && (
-        <span
-          aria-hidden="true"
-          className="absolute -left-2.5 top-1.5 bottom-1.5 w-[2px] rounded-r bg-amber-400/70"
-        />
-      )}
-      <Icon className={`w-4 h-4 shrink-0 ${ghost ? "opacity-60" : ""}`} />
-      <span className="truncate">{item.label}</span>
-      {item.badge && <span className={badgeClass}>{item.badge}</span>}
+      {content}
     </button>
   );
 }
@@ -281,6 +287,20 @@ export default function AppSidebar({
       className="hidden lg:flex sticky top-0 h-screen w-64 shrink-0 flex-col gap-3 border-r border-zinc-800/60 bg-zinc-950/40 px-4 py-4"
       aria-label="Birincil navigasyon"
     >
+      <div className="flex h-9 min-w-0 items-center gap-2 px-1">
+        <Image
+          src="/brand/media-tracker-mark.svg"
+          alt=""
+          aria-hidden="true"
+          width={36}
+          height={36}
+          className="h-9 w-9 shrink-0 object-contain"
+        />
+        <span className="truncate text-base font-semibold tracking-tight text-zinc-100">
+          MediaTracker
+        </span>
+      </div>
+
       <SidebarProfileCard
         profileName={profileName}
         tagline={profileTagline}

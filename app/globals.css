@@ -91,6 +91,12 @@
   }
 }
 
+@media (min-width: 768px) {
+  .social-profile-grid-item {
+    grid-row: var(--social-grid-row);
+  }
+}
+
 
 /* ============================================ */
 /* R10 — Dünya (World) token altyapısı          */

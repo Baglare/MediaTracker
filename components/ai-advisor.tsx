@@ -34,9 +34,16 @@ import { GlobalSearchResult } from "@/lib/global-search-types";
 import { expandTargetFamily } from "@/lib/ai/target-family";
 import {
   appendRecommendationFeedbackEvent,
+  clearDismissedRecommendationFeedback,
   readRecommendationFeedbackEvents,
+  removeDismissedRecommendationFeedback,
 } from "@/lib/ai/recommendation-feedback";
-import type { RecommendationFeedbackAction } from "@/lib/ai/types";
+import { buildAiEngineStatus } from "@/lib/ai/engine-status";
+import type {
+  AiCandidate,
+  AiEngineStatus,
+  RecommendationFeedbackAction,
+} from "@/lib/ai/types";
 
 // ---- Tipler ----
 export interface AiSettings {
@@ -50,25 +57,6 @@ export interface AiSettings {
   includeRatings?: boolean;
   includeFavorites?: boolean;
   includeProgress?: boolean;
-}
-
-interface AiCandidate {
-  // R36/R38 — server tarafı `score` + `scoreReasons` üretiyor; client kartta
-  // "Neden önerildi" bullet listesi olarak gösteriyor.
-  score?: number;
-  scoreReasons?: string[];
-  source: "tvmaze" | "anilist" | "openlibrary" | "omdb" | "tmdb" | "library";
-  externalId: string;
-  type: MediaType;
-  title: string;
-  overview?: string;
-  releaseYear?: number;
-  coverUrl?: string;
-  genres?: string[];
-  totalProgress?: number;
-  averageScore?: number;
-  globalSearch?: GlobalSearchResult;
-  libraryItemId?: string;
 }
 
 interface AiRetrievalDebug {
@@ -188,6 +176,7 @@ interface AiSession {
   rejectedCandidates?: RejectedCandidate[];
   settings: AiSettings;
   debug?: AiDebugInfo;
+  engineStatus?: AiEngineStatus;
 }
 
 interface AiActiveContext {
@@ -627,71 +616,40 @@ function buildExternalClientEmptyMessage(prompt: string, researchMode: ResearchM
   return `İsteğini "${prompt.trim()}" olarak yorumladım. ${sourceLabel} bu kapsamda uygun yeni aday bulamadım. Kapsamı genişletmeyi veya farklı bir mood/tür denemeyi deneyebilirsin.`;
 }
 
-function formatList(values?: string[]) {
-  return values && values.length > 0 ? values.join(", ") : "Yok";
+function providerLabel(provider: AiEngineStatus["provider"]): string {
+  if (provider === "mock") return "Mock";
+  if (provider === "openai") return "OpenAI";
+  if (provider === "safe_fallback") return "Güvenli fallback";
+  if (provider === "openrouter") return "OpenRouter";
+  if (provider === "unknown") return "Bilinmiyor";
+  return provider.charAt(0).toUpperCase() + provider.slice(1);
 }
 
-function summarizeDebug(debug: AiDebugInfo): string[] {
-  const r = debug.retrieval;
-  const failedProviders = debug.failedProviders?.length
-    ? debug.failedProviders.map((p) => `${p.provider}/${p.stage}: ${p.error}`).join(", ")
-    : "yok";
-  if (!r) {
-    return [
-      `Provider: ${debug.selectedProvider || debug.provider || "mock"}${debug.fellBackToMock ? " (fallback)" : ""} | Error: ${debug.providerError || "yok"} | Model: ${debug.usedModel || "bilinmiyor"}`,
-      `Attempts: ${formatList(debug.attemptedProviders)} | Calls: ${
-        debug.providerCallCounts ? Object.entries(debug.providerCallCounts).map(([k, v]) => `${k}: ${v}`).join(", ") : `openai: ${debug.openaiCallCount ?? 0}, gemini: ${debug.geminiCallCount ?? 0}, openrouter: ${debug.openrouterCallCount ?? 0}, groq: ${debug.groqCallCount ?? 0}`
-      }`,
-      `OpenAI toggle: ${debug.useOpenAIProvider ? "Açık" : "Kapalı"} | Rate limit: ${debug.rateLimitHit ? "Evet" : "Hayir"} | Timeout: ${debug.timeoutHit ? "Evet" : "Hayir"} | Safe fallback: ${debug.safeFallbackUsed ? "Evet" : "Hayir"}`,
-      `Fallback reason: ${debug.fallbackReason || "yok"} | Note: ${debug.note || "yok"}`,
-      `Failed providers: ${failedProviders} | Follow-up merged: ${debug.followUpMerged ? "Evet" : "Hayir"} | Active context: ${debug.activeContextSummary || "yok"}`,
-    ];
+function embeddingLabel(mode: AiEngineStatus["embeddingMode"]): string {
+  if (mode === "python_service") return "Python ML service";
+  if (mode === "local_mock") return "Local mock embedding";
+  return "Devre dışı";
+}
+
+function persistentCacheLabel(status: AiEngineStatus["persistentCache"]): string {
+  if (status === "active") return "Aktif";
+  if (status === "disabled") return "Pasif";
+  return "Kullanılmadı";
+}
+
+function recommendationContextLabels(rec: AiRecommendation): string[] {
+  const labels: string[] = [];
+  const status = rec.candidate?.status;
+  if (rec.inLibrary && (status === "watching" || status === "reading" || status === "paused")) {
+    labels.push("Devam önerisi");
+  } else if (rec.inLibrary) {
+    labels.push("Kütüphanende");
+  } else {
+    labels.push("Yeni keşif");
   }
-
-  const querySummary = r.executedQueries && r.executedQueries.length > 0
-    ? r.executedQueries
-        .slice(0, 6)
-        .map((q) => `${q.source}/${q.mediaType}: "${q.query}" (${q.resultCount})`)
-        .join(" | ")
-    : "Çalıştırılan query yok";
-
-  const sourceCounts = r.sourceCandidateCounts
-    ? Object.entries(r.sourceCandidateCounts).map(([k, v]) => `${k}: ${v}`).join(", ")
-    : "Yok";
-
-  const filterReasons = r.filterSummary?.reasons
-    ? Object.entries(r.filterSummary.reasons).map(([k, v]) => `${k}: ${v}`).join(", ")
-    : "Yok";
-
-  return [
-    `Task: ${r.taskType || "bilinmiyor"} | Provider: ${debug.selectedProvider || debug.provider || "mock"}${debug.fellBackToMock || r.providerFallback ? " (fallback)" : ""} | Error: ${debug.providerError || "yok"} | Model: ${debug.usedModel || "bilinmiyor"}`,
-    `Attempts: ${formatList(debug.attemptedProviders)} | Calls: ${
-      debug.providerCallCounts ? Object.entries(debug.providerCallCounts).map(([k, v]) => `${k}: ${v}`).join(", ") : `openai: ${debug.openaiCallCount ?? 0}, gemini: ${debug.geminiCallCount ?? 0}, openrouter: ${debug.openrouterCallCount ?? 0}, groq: ${debug.groqCallCount ?? 0}`
-    }`,
-    `OpenAI toggle: ${debug.useOpenAIProvider ? "Açık" : "Kapalı"} | Rate limit: ${debug.rateLimitHit ? "Evet" : "Hayir"} | Timeout: ${debug.timeoutHit ? "Evet" : "Hayir"} | Safe fallback: ${debug.safeFallbackUsed ? "Evet" : "Hayir"}`,
-    `Fallback reason: ${debug.fallbackReason || "yok"} | Provider errors: ${
-      debug.providerErrors ? Object.entries(debug.providerErrors).map(([k, v]) => `${k}: ${v}`).join(", ") || "yok" : "yok"
-    }`,
-    `Failed providers: ${failedProviders} | Follow-up merged: ${debug.followUpMerged ? "Evet" : "Hayir"} | Active context: ${debug.activeContextSummary || "yok"}`,
-    `Target: ${formatList(r.targetMediaTypes)} | Source: ${formatList(r.sourceTypes)}${r.sourceContext ? ` | Context: ${r.sourceContext}` : ""}`,
-    `Signals: ${formatList(r.preferenceSignals)} | Avoid: ${formatList(r.avoidSignals)}`,
-    `Clarification: ${r.needsClarification ? r.clarificationQuestion || "İstendi" : "Hayır"}`,
-    `Plan: ${(r.searchPlans || []).map((p) => `${p.source}/${p.mediaType} [${p.queries.join(", ")}]`).join(" | ") || "Yok"}`,
-    `Ideas: ${r.candidateIdeasCount ?? 0} | Verified: ${r.verifiedCount ?? 0} | Unverified: ${r.rejectedUnverifiedCount ?? 0} | Fallback search: ${r.fallbackSearchUsed ? "Evet" : "Hayır"}`,
-    `Verification counts: ${
-      r.verificationSourceCounts
-        ? Object.entries(r.verificationSourceCounts).map(([k, v]) => `${k}: ${v}`).join(", ") || "Yok"
-        : "Yok"
-    }`,
-    `Queries: ${querySummary}`,
-    `Source counts: ${sourceCounts}`,
-    `Filtering: ${r.filterSummary?.before ?? 0} -> ${r.filterSummary?.after ?? 0} | Removed: ${r.filterSummary?.removed ?? 0} | Reasons: ${filterReasons}`,
-    `Final candidates: ${r.finalCandidateCount ?? 0} | Refined pass: ${r.refinedPassUsed ? "Evet" : "Hayır"} | Notes: ${formatList(r.notes)}`,
-    `High-rated source: ${r.highRatedSourceCount ?? 0} | Deterministic fallback: ${r.deterministicFallbackUsed ? "Evet" : "Hayır"} | Taste signals: ${formatList(r.deterministicTasteSignals)}`,
-    `Source titles: ${formatList(r.sourceTitles)} | Excluded source titles: ${formatList(r.excludedSourceTitles)}`,
-    `Taste queries: ${formatList(r.tasteSignalQueries)} | Direct title query used: ${r.directTitleQueryUsed ? "Evet" : "Hayır"}`,
-    `Parse repair: ${r.parseRepairUsed ? "Evet" : "Hayır"} | Safe fallback: ${r.safeFallbackUsed ? "Evet" : "Hayır"} | Ideation failed: ${r.ideationFailedReason || "yok"}`,
-  ];
+  if ((rec.candidate?.feedbackScore ?? 0) < 0) labels.push("Negatif feedback nedeniyle aşağı sıralandı");
+  if ((rec.candidate?.feedbackScore ?? 0) > 0) labels.push("Olumlu feedback ile güçlendi");
+  return labels;
 }
 
 export default function AiAdvisor({
@@ -714,6 +672,8 @@ export default function AiAdvisor({
   // Backend aday havuzunu title/externalSource/externalId/mediaType ile filtreler.
   const [dismissedSignals, setDismissedSignals] = useState<Record<string, DismissedSignal>>({});
   const [debugInfo, setDebugInfo] = useState<AiDebugInfo | null>(null);
+  const [engineStatus, setEngineStatus] = useState<AiEngineStatus | null>(null);
+  const [feedbackNotice, setFeedbackNotice] = useState<string | null>(null);
   const [showDebug, setShowDebug] = useState(false);
   const [pendingClarification, setPendingClarification] = useState<{
     originalPrompt: string;
@@ -763,6 +723,7 @@ export default function AiAdvisor({
           dismissedSignals?: Record<string, DismissedSignal>;
           pendingClarification?: { originalPrompt: string; question: string } | null;
           debugInfo?: AiDebugInfo | null;
+          engineStatus?: AiEngineStatus | null;
           activeContext?: AiActiveContext | null;
         };
         if (snap.v === ACTIVE_SESSION_VERSION) {
@@ -776,6 +737,7 @@ export default function AiAdvisor({
           }
           if (snap.pendingClarification) setPendingClarification(snap.pendingClarification);
           if (snap.debugInfo) setDebugInfo(snap.debugInfo);
+          if (snap.engineStatus) setEngineStatus(snap.engineStatus);
           if (snap.activeContext) activeContextRef.current = snap.activeContext;
         }
       }
@@ -808,13 +770,14 @@ export default function AiAdvisor({
         addedIds,
         pendingClarification,
         debugInfo,
+        engineStatus,
         activeContext: activeContextRef.current,
       };
       localStorage.setItem(ACTIVE_SESSION_KEY, JSON.stringify(snap));
     } catch {
       // ignore (kotanın dolması ya da JSON cycle gibi nadir durumlar)
     }
-  }, [messages, recommendations, rejected, addedIds, pendingClarification, debugInfo]);
+  }, [messages, recommendations, rejected, addedIds, pendingClarification, debugInfo, engineStatus]);
 
   useEffect(() => {
     try {
@@ -905,6 +868,8 @@ export default function AiAdvisor({
       setViewingSessionId(null);
       setAddedIds({});
       setDebugInfo(null);
+      setEngineStatus(null);
+      setFeedbackNotice(null);
       setShowDebug(false);
       setPendingClarification(null);
       setLoadingStep(-1);
@@ -937,7 +902,8 @@ export default function AiAdvisor({
     assistantText: string,
     rejectedList: RejectedCandidate[],
     debug?: AiDebugInfo,
-    requestId?: string
+    requestId?: string,
+    status?: AiEngineStatus
   ) {
     if (requestId && inFlightRequestId.current !== requestId) return;
     if (requestId) {
@@ -949,6 +915,8 @@ export default function AiAdvisor({
     setRecommendations(recs);
     setRejected(rejectedList);
     setDebugInfo(debug || null);
+    setEngineStatus(status || null);
+    setFeedbackNotice(null);
     setShowDebug(false);
     if (debug?.retrieval?.needsClarification) {
       setPendingClarification({
@@ -984,6 +952,7 @@ export default function AiAdvisor({
       rejectedCandidates: rejectedList,
       settings,
       debug,
+      engineStatus: status,
     };
     persistSessions([
       session,
@@ -996,6 +965,7 @@ export default function AiAdvisor({
     text: string;
     rejected: RejectedCandidate[];
     debug?: AiDebugInfo;
+    engineStatus?: AiEngineStatus;
   } | null> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), AI_REQUEST_TIMEOUT_MS);
@@ -1062,6 +1032,7 @@ export default function AiAdvisor({
         text: data.assistantMessage || buildAssistantMessage(prompt, settings, recs.length),
         rejected: Array.isArray(data.rejectedCandidates) ? data.rejectedCandidates : [],
         debug: data.debug,
+        engineStatus: data.engineStatus,
       };
     } catch {
       return null;
@@ -1079,25 +1050,32 @@ export default function AiAdvisor({
       text: string;
       rejected: RejectedCandidate[];
       debug?: AiDebugInfo;
+      engineStatus?: AiEngineStatus;
     } | null>
   ) {
     if (inFlightRequestId.current !== requestId) return;
     if (step >= LOADING_STEPS.length) {
       const finishWithClientFallback = () => {
+        const localStatus = buildAiEngineStatus({
+          provider: "mock",
+          providerFallbackUsed: true,
+          evaluatedCandidateCount: mediaList.length,
+          candidates: [],
+        });
         if (researchMode === "source-apis" || researchMode === "web") {
-          finishWith(prompt, [], buildExternalClientEmptyMessage(prompt, researchMode), [], undefined, requestId);
+          finishWith(prompt, [], buildExternalClientEmptyMessage(prompt, researchMode), [], undefined, requestId, localStatus);
           return;
         }
         const recs = buildLocalFallbackRecs(prompt, mediaList);
         const text = buildAssistantMessage(prompt, settings, recs.length);
-        finishWith(prompt, recs, text, [], undefined, requestId);
+        finishWith(prompt, recs, text, [], undefined, requestId, localStatus);
       };
 
       apiPromise
         .then((apiResult) => {
           if (inFlightRequestId.current !== requestId) return;
           if (apiResult) {
-            finishWith(prompt, apiResult.recs, apiResult.text, apiResult.rejected, apiResult.debug, requestId);
+            finishWith(prompt, apiResult.recs, apiResult.text, apiResult.rejected, apiResult.debug, requestId, apiResult.engineStatus);
           } else {
             finishWithClientFallback();
           }
@@ -1257,6 +1235,8 @@ export default function AiAdvisor({
     setRecommendations([]);
     setRejected([]);
     setDebugInfo(null);
+    setEngineStatus(null);
+    setFeedbackNotice(null);
     setShowDebug(false);
     const requestId = generateId("req");
     inFlightRequestId.current = requestId;
@@ -1283,6 +1263,8 @@ export default function AiAdvisor({
     setViewingSessionId(null);
     setAddedIds({});
     setDebugInfo(null);
+    setEngineStatus(null);
+    setFeedbackNotice(null);
     setShowDebug(false);
     setPendingClarification(null);
     setLoadingStep(-1);
@@ -1299,6 +1281,8 @@ export default function AiAdvisor({
     setRecommendations(s.recommendations);
     setRejected(s.rejectedCandidates || []);
     setDebugInfo(s.debug || null);
+    setEngineStatus(s.engineStatus || null);
+    setFeedbackNotice(null);
     setShowDebug(false);
     setPendingClarification(null);
     activeContextRef.current = null;
@@ -1360,17 +1344,27 @@ export default function AiAdvisor({
       next[key] = signal;
       return limitDismissedSignals(next);
     });
+    setFeedbackNotice("İlgilenmiyorum tercihin kaydedildi; sonraki önerilerde bu sinyal dikkate alınacak.");
   }
   function handleUndoDismissRec(rec: AiRecommendation) {
     const key = feedbackKeyFromRec(rec);
+    removeDismissedRecommendationFeedback({
+      title: rec.title,
+      mediaType: rec.mediaType,
+      externalSource: rec.externalSource,
+      externalId: rec.externalId,
+    });
     setDismissedSignals((prev) => {
       const next = { ...prev };
       delete next[key];
       return next;
     });
+    setFeedbackNotice("İlgilenmiyorum tercihi geri alındı.");
   }
   function handleClearDismissedFeedback() {
+    clearDismissedRecommendationFeedback();
     setDismissedSignals({});
+    setFeedbackNotice("İlgilenmiyorum kayıtları temizlendi.");
   }
   function handleSimilarRec(rec: AiRecommendation) {
     if (isLoading || inFlightRequestId.current) return;
@@ -1609,25 +1603,44 @@ export default function AiAdvisor({
           </div>
         )}
 
-        {debugInfo && !isLoading && (
+        {engineStatus && !isLoading && (
           <div className="rounded-xl bg-zinc-950/30 border border-zinc-800/60 overflow-hidden">
             <button
               onClick={() => setShowDebug((prev) => !prev)}
+              aria-expanded={showDebug}
               className="w-full flex items-center justify-between gap-3 px-3 py-2 text-xs text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50 transition-colors cursor-pointer"
             >
-              <span>Teknik planı göster</span>
+              <span className="flex items-center gap-2">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400/80" />
+                Öneri Motoru Durumu
+              </span>
               <ChevronRight className={`w-3.5 h-3.5 transition-transform ${showDebug ? "rotate-90" : ""}`} />
             </button>
             {showDebug && (
-              <div className="px-3 pb-3 space-y-1.5">
-                {summarizeDebug(debugInfo).map((line, i) => (
-                  <p key={`debug-${i}`} className="text-[11px] leading-relaxed text-zinc-500">
-                    {line}
-                  </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 px-3 pb-3">
+                {[
+                  ["AI provider", `${providerLabel(engineStatus.provider)}${engineStatus.model ? ` · ${engineStatus.model}` : ""}`],
+                  ["Embedding", embeddingLabel(engineStatus.embeddingMode)],
+                  ["Provider fallback", engineStatus.providerFallbackUsed ? "Kullanıldı" : "Kullanılmadı"],
+                  ["Değerlendirilen aday", String(engineStatus.evaluatedCandidateCount)],
+                  ["Kaynaklar", engineStatus.sources.length > 0 ? engineStatus.sources.join(", ") : "Kaynak yok"],
+                  ["Feedback sinyali", engineStatus.feedbackApplied ? `Uygulandı · ${engineStatus.feedbackEventCount} kayıt` : engineStatus.feedbackEventCount > 0 ? `${engineStatus.feedbackEventCount} kayıt, bu sonuçta skor değişmedi` : "Sinyal yok"],
+                  ["Persistent cache", persistentCacheLabel(engineStatus.persistentCache)],
+                ].map(([label, value]) => (
+                  <div key={label} className="rounded-lg border border-zinc-800/60 bg-zinc-900/35 px-2.5 py-2 min-w-0">
+                    <p className="text-[10px] uppercase tracking-wide text-zinc-600">{label}</p>
+                    <p className="mt-0.5 text-[11px] text-zinc-300 break-words">{value}</p>
+                  </div>
                 ))}
               </div>
             )}
           </div>
+        )}
+
+        {feedbackNotice && (
+          <p role="status" className="px-3 py-2 rounded-xl border border-emerald-500/20 bg-emerald-500/5 text-xs text-emerald-300/90">
+            {feedbackNotice}
+          </p>
         )}
 
         {/* R38 — Öneri kartları */}
@@ -1638,6 +1651,7 @@ export default function AiAdvisor({
               const canAdd = !!rec.candidate?.globalSearch;
               const dismissed = !!dismissedSignals[feedbackKeyFromRec(rec)];
               const reasonBullets = buildReasonBullets(rec);
+              const contextLabels = recommendationContextLabels(rec);
               const releaseYear = rec.candidate?.releaseYear;
               return (
                 <div
@@ -1690,6 +1704,13 @@ export default function AiAdvisor({
                         {rec.overview}
                       </p>
                     )}
+                    <div className="flex flex-wrap gap-1 pt-0.5">
+                      {contextLabels.map((label) => (
+                        <span key={`${rec.id}-${label}`} className="px-1.5 py-0.5 rounded text-[10px] bg-zinc-800/70 text-zinc-400 border border-zinc-700/60">
+                          {label}
+                        </span>
+                      ))}
+                    </div>
                                       </div>
                 </div>
 

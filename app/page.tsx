@@ -13,18 +13,18 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 import AppSidebar from "@/components/app-sidebar";
 import AppTopbar from "@/components/app-topbar";
+import AppTabContent from "@/components/app-tab-content";
 import ProfileSettingsCard from "@/components/profile-settings-card";
-import RightRailSettingsCard from "@/components/right-rail-settings-card";
+import SocialProfileEditor from "@/components/social/social-profile-editor";
 import { ProfileAvatar } from "@/components/sidebar-profile-card";
 import RightRail from "@/components/right-rail";
 import PageHeader from "@/components/page-header";
 import { TabType } from "@/components/app-tabs";
-import ActivityLogPanel from "@/components/activity-log-panel";
 // MediaFilters artık LibraryControlBar tarafından sarmalanıyor; burada
 // yalnızca type re-export'lar gerekli.
 // R18.1: Durum filtresi WorldHero altında bağımsız bir satır; bu yüzden
 // `StatusFilterRow`'u doğrudan burada da tüketiyoruz.
-import { type ThemeFilter, type EastSubFilter, StatusFilterRow } from "@/components/media-filters";
+import { StatusFilterRow } from "@/components/media-filters";
 // R11: WorldHero — Doğu/Kadraj/Arşiv için genelleştirilmiş hero
 // (eski EastThemeHeader R16'da silindi).
 import WorldHero from "@/components/world-hero";
@@ -41,24 +41,20 @@ import TvmazeSearch from "@/components/tvmaze-search";
 import AniListSearch from "@/components/anilist-search";
 import OpenLibrarySearch from "@/components/openlibrary-search";
 import GlobalSearch from "@/components/global-search";
-import DataManagementPanel from "@/components/data-management-panel";
-import CloudSyncStatusCard from "@/components/cloud-sync-status-card";
-import AuthPanel from "@/components/auth-panel";
-import CloudDataStatusCard from "@/components/cloud-data-status-card";
 import { useAuth } from "@/hooks/use-auth";
-import {
-  enqueueMediaDelete,
-  enqueueMediaUpsert,
-  enqueueProgressLog,
-  setUserId as setSyncUserId,
-} from "@/lib/sync-manager";
+import { useMediaLibrary } from "@/hooks/use-media-library";
+import { usePersistedPreferences } from "@/hooks/use-persisted-preferences";
 import QuickAddModal from "@/components/quick-add-modal";
 import ManualGroupModal, {
   type ManualGroupAction,
   generateManualGroupId,
 } from "@/components/manual-group-modal";
-import EnhancedDashboard from "@/components/enhanced-dashboard";
-import AiAdvisor from "@/components/ai-advisor";
+import {
+  DistributionBar,
+  PersonalControls,
+  PersonalEmptyState,
+  PersonalMetricCard,
+} from "@/components/personal-tab-ui";
 import {
   ChevronDown,
   ChevronUp,
@@ -66,63 +62,34 @@ import {
   PlayCircle,
   Layers,
   Library as LibraryIcon,
-  LayoutDashboard,
   Compass,
   Calendar,
   TrendingUp,
-  Sparkles,
   Heart,
   ListChecks,
   Star,
   NotebookPen,
   BarChart3,
   Search,
-  Activity as ActivityIcon,
-  Settings as SettingsIcon,
   UserRound,
   Pencil,
 } from "lucide-react";
 import LibraryControlBar, {
   LibrarySectionControls,
-  type LibrarySort,
-  type LibraryView,
 } from "@/components/library-control-bar";
 import { GlobalSearchCategory, GlobalSearchLibraryStatus, GlobalSearchResult } from "@/lib/global-search-types";
-import { mockMediaList } from "@/lib/mock-media";
 import {
-  DEFAULT_PROFILE_PREFERENCES,
-  loadProfilePreferences,
   resolveProfileDisplayName,
   resolveProfileTagline,
   resolveSelectedTitle,
-  saveProfilePreferences,
-  type ProfilePreferences,
 } from "@/lib/profile-preferences";
-import {
-  DEFAULT_RIGHT_RAIL_PREFERENCES,
-  loadRightRailPreferences,
-  saveRightRailPreferences,
-  type RightRailPreferences,
-} from "@/lib/right-rail-preferences";
-import {
-  loadMediaList,
-  saveMediaList,
-  clearMediaList,
-  loadProgressLogs,
-  saveProgressLogs,
-  loadUIPreferences,
-  saveUIPreferences,
-  DEFAULT_UI_PREFERENCES,
-} from "@/lib/storage";
-import { getIncrementAmount, getProgressLabel, getProgressUnit, getStatusLabel, isMovieLike } from "@/lib/progress";
-import { MediaItem, MediaType, MediaStatus, ProgressLog, withMediaClassification } from "@/lib/types";
+import { MediaItem, MediaType, ProgressLog, withMediaClassification } from "@/lib/types";
 import {
   getTvmazeSeasonExternalId,
   getTvmazeSeasonNumber,
   getTvmazeShowExternalId,
   groupMediaItems,
   resolveAniListSeriesGroup,
-  withInferredSeriesGroup,
 } from "@/lib/series-group";
 import { calculateDashboardStats } from "@/lib/dashboard-stats";
 import { calculateUserProgression } from "@/lib/user-progression";
@@ -135,108 +102,49 @@ import type { TmdbNormalizedDetail } from "@/lib/tmdb-types";
 export default function HomePage() {
   // ---- AUTH (cloud aktarım için) ----
   const { user: authUser, configured: authConfigured } = useAuth();
+  const {
+    mediaList,
+    progressLogs,
+    isLoaded,
+    incrementMedia: handleIncrement,
+    completeMedia: handleComplete,
+    saveMedia,
+    deleteMedia,
+    toggleFavorite: handleToggleFavorite,
+    updateRating: handleUpdateRating,
+    commitMediaChanges,
+    importMedia,
+    resetMedia,
+  } = useMediaLibrary(authUser?.id ?? null);
 
   // ---- STATE (Durumlar) ----
-
-  // Medya listesi — SSR'da boş dizi, hidrasyon sonrası effect'te localStorage'dan yüklenir
-  const [mediaList, setMediaList] = useState<MediaItem[]>([]);
-  // İlerleme logları
-  const [progressLogs, setProgressLogs] = useState<ProgressLog[]>([]);
   // Aktif sekme
   const [activeTab, setActiveTab] = useState<TabType>("dashboard");
-
-  // İlk yüklenme tamamlandı mı? (localStorage okunana kadar bekliyoruz)
-  const [isLoaded, setIsLoaded] = useState(false);
-  // R18: UI tercihleri (themeFilter/eastSubFilter/typeFilter/statusFilter/
-  // librarySort/libraryView) localStorage'dan hidrate edilene kadar persist
-  // effect'ini bekletiyoruz. Hidrasyon hem SSR/build, hem `mediaList`
-  // hidrasyonu ile aynı pattern'i izler.
-  const [uiPrefsLoaded, setUiPrefsLoaded] = useState(false);
-  const [profilePrefsLoaded, setProfilePrefsLoaded] = useState(false);
-  const [profilePreferences, setProfilePreferences] = useState<ProfilePreferences>(
-    DEFAULT_PROFILE_PREFERENCES
-  );
-  const [rightRailPrefsLoaded, setRightRailPrefsLoaded] = useState(false);
-  const [rightRailPreferences, setRightRailPreferences] = useState<RightRailPreferences>(
-    DEFAULT_RIGHT_RAIL_PREFERENCES
-  );
+  const {
+    profilePreferences,
+    setProfilePreferences,
+    rightRailPreferences,
+    setRightRailPreferences,
+    typeFilter,
+    setTypeFilter,
+    statusFilter,
+    setStatusFilter,
+    themeFilter,
+    eastSubFilter,
+    setEastSubFilter,
+    librarySort,
+    setLibrarySort,
+    libraryView,
+    setLibraryView,
+    continueSectionOpen,
+    setContinueSectionOpen,
+    seriesSectionOpen,
+    setSeriesSectionOpen,
+    worldTransition,
+    handleThemeFilterChange,
+  } = usePersistedPreferences();
   // Arama çubuğundaki metin (R18: kasıtlı olarak persist edilmiyor)
   const [searchQuery, setSearchQuery] = useState("");
-  // Seçili medya türü filtresi (R18: persist)
-  const [typeFilter, setTypeFilter] = useState<MediaType | "all">(DEFAULT_UI_PREFERENCES.typeFilter);
-  // Seçili durum filtresi (R18: persist)
-  const [statusFilter, setStatusFilter] = useState<MediaStatus | "active" | "all">(
-    DEFAULT_UI_PREFERENCES.statusFilter
-  );
-  // V5A.1 / R9: Üst seviye "Dünya" filtresi (Tümü / Doğu / Kadraj / Arşiv).
-  // State adı `themeFilter` ve "east"/"screen"/"library" iç değerleri R9'da
-  // korundu; sadece UI label'ı ve sekme adları yenilendi. (R18: persist)
-  const [themeFilter, setThemeFilter] = useState<ThemeFilter>(DEFAULT_UI_PREFERENCES.themeFilter);
-  // V5A.1: Doğu seçiliyken aktif alt filtre (Tümü / Anime / Manga / Novel). (R18: persist)
-  const [eastSubFilter, setEastSubFilter] = useState<EastSubFilter>(
-    DEFAULT_UI_PREFERENCES.eastSubFilter
-  );
-  // R5: Kütüphanem singleton bölümü için sıralama + görünüm tercihi.
-  // Sadece üçüncü bölümü (tekil item'lar) etkiler; "Devam Ettiklerim" ve
-  // "Seri Koleksiyonlarım" kendi sıralamasını korur. (R18: persist)
-  const [librarySort, setLibrarySort] = useState<LibrarySort>(DEFAULT_UI_PREFERENCES.librarySort);
-  const [libraryView, setLibraryView] = useState<LibraryView>(DEFAULT_UI_PREFERENCES.libraryView);
-  // R18.2: Kütüphanem section collapse durumları. Sadece görünümü kontrol
-  // eder; hesap pipeline'larına dokunmaz.
-  const [continueSectionOpen, setContinueSectionOpen] = useState<boolean>(
-    DEFAULT_UI_PREFERENCES.continueSectionOpen
-  );
-  const [seriesSectionOpen, setSeriesSectionOpen] = useState<boolean>(
-    DEFAULT_UI_PREFERENCES.seriesSectionOpen
-  );
-
-  // R13.2: Macro transition tetik state'i. WorldTransition artık worldAttr
-  // prop'unu otomatik izlemiyor — sadece kullanıcı Dünya filtresini
-  // değiştirince burada token bumpluyoruz. Sekme geçişi, medya ekleme,
-  // settings'e girip çıkma vb. olaylar transition tetiklemez.
-  const [worldTransition, setWorldTransition] = useState<{
-    token: number;
-    world: "east" | "screen" | "arch" | "neutral";
-  } | null>(null);
-
-  // V5A.1/V5A.2: Theme mode değişince bağımlı filtreleri tutarlı tut.
-  // - Doğu dışına çıkılırsa eastSubFilter "all"a düşer (anlamı kalmaz).
-  // - typeFilter, yeni theme altında MediaFilters'da görünmeyecek bir değere
-  //   sabitlenmiş olabilir (örn. theme=screen, typeFilter="anime"). Bu durumda
-  //   "all"a sıfırlanır; aksi halde kullanıcı artık değiştiremediği bir filtreyle
-  //   boş listeye bakar.
-  const handleThemeFilterChange = (next: ThemeFilter) => {
-    setThemeFilter(next);
-    if (next !== "east") {
-      setEastSubFilter("all");
-    }
-    if (next === "east") {
-      // Doğu aktifken Medya Türü bloğu zaten gizli; tutarlılık için reset.
-      setTypeFilter("all");
-    } else if (next === "screen") {
-      if (typeFilter !== "all" && typeFilter !== "movie" && typeFilter !== "tv") {
-        setTypeFilter("all");
-      }
-    } else if (next === "library") {
-      if (typeFilter !== "all" && typeFilter !== "book") {
-        setTypeFilter("all");
-      }
-    }
-
-    // R13.2: Macro transition tetiklemesi *yalnız burada*. ThemeFilter →
-    // WorldKey eşlemesi worldAttr ile aynı; ama tetik bu fonksiyondan başka
-    // hiçbir yerden bumplanmaz. Neutral'ı da gönderiyoruz (component zaten
-    // skipliyor) — token monotonik artsın diye.
-    const targetWorld =
-      next === "east" ? "east"
-      : next === "screen" ? "screen"
-      : next === "library" ? "arch"
-      : "neutral";
-    setWorldTransition((prev) => ({
-      token: (prev?.token ?? 0) + 1,
-      world: targetWorld,
-    }));
-  };
 
   // Gelişmiş aramaları (eski panelleri) gösterme durumu
   const [showAdvancedSearches, setShowAdvancedSearches] = useState(false);
@@ -304,97 +212,6 @@ export default function HomePage() {
     onConfirm: () => {},
   });
 
-  // ---- Sync manager'a auth user'ı bildir ----
-  useEffect(() => {
-    setSyncUserId(authUser?.id ?? null);
-  }, [authUser?.id]);
-
-  // ---- localStorage: Verileri yükle (ilk açılışta bir kez çalışır) ----
-  useEffect(() => {
-    const saved = loadMediaList();
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-only hydration from localStorage
-    setMediaList(saved && saved.length > 0 ? saved : mockMediaList);
-    setProgressLogs(loadProgressLogs());
-    setIsLoaded(true);
-  }, []);
-
-  // ---- localStorage: Her değişiklikte kaydet ----
-  useEffect(() => {
-    if (!isLoaded) return;
-    saveMediaList(mediaList);
-    saveProgressLogs(progressLogs);
-  }, [mediaList, progressLogs, isLoaded]);
-
-  // ---- R18: UI tercihlerini localStorage'dan hidrate et (mount-only) ----
-  // Kritik: setState'leri burada doğrudan `setThemeFilter` üzerinden yapıyoruz,
-  // `handleThemeFilterChange` üzerinden değil. Aksi halde mount sırasında
-  // `worldTransition` token'ı bumplanır ve R13.2 macro overlay sayfa
-  // açılışında oynar — istemiyoruz. `normalizeUIPreferences` zaten theme↔type
-  // tutarlılığını uyguladığı için hidrasyon sonrası worldAttr direkt doğru
-  // değere oturur.
-  useEffect(() => {
-    const prefs = loadUIPreferences();
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-only hydration from localStorage
-    setThemeFilter(prefs.themeFilter);
-    setEastSubFilter(prefs.eastSubFilter);
-    setTypeFilter(prefs.typeFilter);
-    setStatusFilter(prefs.statusFilter);
-    setLibrarySort(prefs.librarySort);
-    setLibraryView(prefs.libraryView);
-    setContinueSectionOpen(prefs.continueSectionOpen);
-    setSeriesSectionOpen(prefs.seriesSectionOpen);
-    setUiPrefsLoaded(true);
-  }, []);
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-only hydration from localStorage
-    setProfilePreferences(loadProfilePreferences());
-    setProfilePrefsLoaded(true);
-  }, []);
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-only hydration from localStorage
-    setRightRailPreferences(loadRightRailPreferences());
-    setRightRailPrefsLoaded(true);
-  }, []);
-
-  // ---- R18: UI tercihlerini her değişimde kaydet ----
-  // `uiPrefsLoaded` bayrağı, hidrasyon tamamlanmadan default değerlerin
-  // localStorage'a yazılıp gerçek snapshot'ı ezmesini engeller.
-  useEffect(() => {
-    if (!uiPrefsLoaded) return;
-    saveUIPreferences({
-      themeFilter,
-      eastSubFilter,
-      typeFilter,
-      statusFilter,
-      librarySort,
-      libraryView,
-      continueSectionOpen,
-      seriesSectionOpen,
-    });
-  }, [
-    uiPrefsLoaded,
-    themeFilter,
-    eastSubFilter,
-    typeFilter,
-    statusFilter,
-    librarySort,
-    libraryView,
-    continueSectionOpen,
-    seriesSectionOpen,
-  ]);
-
-  useEffect(() => {
-    if (!profilePrefsLoaded) return;
-    saveProfilePreferences(profilePreferences);
-  }, [profilePrefsLoaded, profilePreferences]);
-
-  useEffect(() => {
-    if (!rightRailPrefsLoaded) return;
-    saveRightRailPreferences(rightRailPreferences);
-  }, [rightRailPrefsLoaded, rightRailPreferences]);
-
   // ---- EYLEMLER (Actions) ----
 
   const handleTabChange = useCallback((tab: TabType) => {
@@ -408,6 +225,23 @@ export default function HomePage() {
     setEditingItem(null);
     setIsModalOpen(false);
   }, []);
+
+  const handleOpenAiDiscover = useCallback((title: string, mediaType: MediaType) => {
+    const category: GlobalSearchCategory =
+      mediaType === "movie" ? "movie"
+      : mediaType === "tv" ? "tv"
+      : mediaType === "anime" ? "anime"
+      : mediaType === "manga" || mediaType === "manhwa" || mediaType === "manhua" ? "manga"
+      : mediaType === "light_novel" || mediaType === "web_novel" || mediaType === "visual_novel" ? "novel"
+      : mediaType === "book" ? "book"
+      : "all";
+    setDiscoverPrefill((previous) => ({
+      query: title,
+      category,
+      token: (previous?.token ?? 0) + 1,
+    }));
+    handleTabChange("discover");
+  }, [handleTabChange]);
 
   async function handleAddMissingTvmazeParts(showIdOrItem: string | MediaItem) {
     const showId =
@@ -475,175 +309,6 @@ export default function HomePage() {
   }
 
   /**
-   * Yeni log ekleme yardımcı fonksiyonu
-   */
-  const addProgressLog = useCallback((
-    mediaId: string,
-    mediaTitle: string,
-    mediaType: MediaType,
-    action: "increment" | "complete" | "manual_adjust" | "added",
-    amount: number,
-    previousProgress: number,
-    newProgress: number,
-    detail?: string
-  ) => {
-    const nowIso = new Date().toISOString();
-    const newLog: ProgressLog = {
-      id: `log-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-      mediaId,
-      mediaTitle,
-      mediaType,
-      action,
-      detail,
-      amount,
-      unit: getProgressUnit(mediaType),
-      previousProgress,
-      newProgress,
-      createdAt: nowIso,
-    };
-
-    // Birleştirme kararını eagerly yap — StrictMode'da çift enqueue olmasın diye.
-    const isMergeable = action === "increment" || action === "manual_adjust";
-    let mergedLog: ProgressLog | null = null;
-    let mergeIdx = -1;
-
-    if (isMergeable) {
-      const MERGE_WINDOW_MS = 60 * 60 * 1000;
-      for (let i = progressLogs.length - 1; i >= 0; i--) {
-        if (progressLogs[i].mediaId === mediaId) { mergeIdx = i; break; }
-      }
-      const last = mergeIdx >= 0 ? progressLogs[mergeIdx] : null;
-      const canMerge =
-        last &&
-        last.action === action &&
-        last.newProgress === previousProgress &&
-        Date.now() - new Date(last.createdAt).getTime() < MERGE_WINDOW_MS;
-
-      if (canMerge && last) {
-        mergedLog = {
-          ...last,
-          amount: last.amount + amount,
-          newProgress,
-          createdAt: nowIso,
-          detail: detail ?? last.detail,
-        };
-      }
-    }
-
-    if (mergedLog) {
-      const finalMerged = mergedLog;
-      const finalIdx = mergeIdx;
-      setProgressLogs((prev) => {
-        const next = prev.slice();
-        // index güvenliği: prev değişmiş olabilir
-        const idxInPrev = next.findIndex((l) => l.id === finalMerged.id);
-        if (idxInPrev >= 0) next[idxInPrev] = finalMerged;
-        else if (finalIdx >= 0 && finalIdx < next.length) next[finalIdx] = finalMerged;
-        else next.push(finalMerged);
-        return next;
-      });
-      enqueueProgressLog(finalMerged);
-    } else {
-      setProgressLogs((prev) => [...prev, newLog]);
-      enqueueProgressLog(newLog);
-    }
-  }, [progressLogs]);
-
-  const buildAddedLogDetail = useCallback((item: MediaItem) => {
-    const detailParts = ["Kütüphaneye eklendi"];
-    const progressLabel = getProgressLabel(item.type);
-
-    if (item.status !== "planning") {
-      detailParts.push(`Durum: ${getStatusLabel(item.status)}`);
-    }
-
-    if (item.currentProgress > 0 || item.status === "completed") {
-      detailParts.push(`İlerleme: ${item.currentProgress}/${item.totalProgress} ${progressLabel}`);
-    }
-
-    return detailParts.join(" • ");
-  }, []);
-
-  /**
-   * +1 butonuna basılınca ilerlemeyi artırır.
-   */
-  const handleIncrement = useCallback((id: string) => {
-    const item = mediaList.find((m) => m.id === id);
-    if (!item) return;
-
-    // Movie-like (film + AniList anime MOVIE) için +1 mantıklı değil; sadece "Tamamla" var.
-    if (isMovieLike(item)) return;
-    const amount = getIncrementAmount(item.type);
-    if (amount === 0) return;
-
-    // Bilinmeyen toplam (totalProgress <= 0) durumunda clamp yapma; serbest artır.
-    const hasKnownTotal = item.totalProgress > 0;
-    if (hasKnownTotal && item.currentProgress >= item.totalProgress) return;
-
-    const prevProgress = item.currentProgress;
-    const newProgress = hasKnownTotal
-      ? Math.min(item.currentProgress + amount, item.totalProgress)
-      : item.currentProgress + amount;
-    const newStatus =
-      hasKnownTotal && newProgress >= item.totalProgress
-        ? "completed"
-        : item.status;
-    const updated: MediaItem = { ...item, currentProgress: newProgress, status: newStatus };
-
-    setMediaList((prev) => prev.map((m) => (m.id === id ? updated : m)));
-    enqueueMediaUpsert(updated);
-
-    addProgressLog(
-      item.id,
-      item.title,
-      item.type,
-      "increment",
-      amount,
-      prevProgress,
-      newProgress
-    );
-  }, [addProgressLog, mediaList]);
-
-  /**
-   * "Tamamla" butonuna basılınca ilerlemeyi %100 yapar.
-   */
-  const handleComplete = useCallback((id: string) => {
-    const item = mediaList.find((m) => m.id === id);
-    if (!item) return;
-    // Zaten "completed" ise hiçbir şey yapma; ama 220/220 olup status hâlâ
-    // watching/reading/paused/planning ise sadece status'u güncelle.
-    if (item.status === "completed") return;
-
-    const prevProgress = item.currentProgress;
-    // Bilinmeyen toplam: progress'i mevcut değerinde tut, sadece status'u completed yap.
-    // Bilinen toplam: progress'i totale çek.
-    const newProgress =
-      item.totalProgress > 0
-        ? item.totalProgress
-        : Math.max(item.currentProgress, 0);
-    const updated: MediaItem = { ...item, currentProgress: newProgress, status: "completed" };
-
-    setMediaList((prev) => prev.map((m) => (m.id === id ? updated : m)));
-    enqueueMediaUpsert(updated);
-
-    // Eğer ilerleme zaten tamsa log üretme (status-only değişiklik için kayıt
-    // gerekmiyor, completed bir kez logged'lanmış olabilir).
-    if (prevProgress >= item.totalProgress) {
-      return;
-    }
-
-    addProgressLog(
-      item.id,
-      item.title,
-      item.type,
-      "complete",
-      newProgress - prevProgress,
-      prevProgress,
-      newProgress
-    );
-  }, [addProgressLog, mediaList]);
-
-  /**
    * Yeni medya eklemek için modal'ı aç
    */
   function handleOpenAddModal() {
@@ -670,62 +335,7 @@ export default function HomePage() {
    * Modal'dan gelen veriyi kaydet (ekleme veya güncelleme)
    */
   function handleSaveMedia(item: MediaItem) {
-    const classifiedItem = withMediaClassification(withInferredSeriesGroup(item));
-    type LogPayload = {
-      id: string;
-      title: string;
-      type: MediaType;
-      action: "increment" | "complete" | "manual_adjust" | "added";
-      amount: number;
-      prevProgress: number;
-      newProgress: number;
-      detail?: string;
-    };
-    const exists = mediaList.find((m) => m.id === classifiedItem.id);
-    let logPayload: LogPayload | null = null;
-    let mergedItem: MediaItem = classifiedItem;
-    if (exists) {
-      mergedItem = withMediaClassification({ ...exists, ...classifiedItem });
-      if (exists.currentProgress !== classifiedItem.currentProgress) {
-        logPayload = {
-          id: classifiedItem.id,
-          title: classifiedItem.title,
-          type: classifiedItem.type,
-          action: "manual_adjust",
-          amount: Math.abs(classifiedItem.currentProgress - exists.currentProgress),
-          prevProgress: exists.currentProgress,
-          newProgress: classifiedItem.currentProgress,
-        };
-      }
-      setMediaList((prev) => prev.map((m) => (m.id === classifiedItem.id ? mergedItem : m)));
-    } else {
-      logPayload = {
-        id: classifiedItem.id,
-        title: classifiedItem.title,
-        type: classifiedItem.type,
-        action: "added",
-        amount: classifiedItem.currentProgress,
-        prevProgress: 0,
-        newProgress: classifiedItem.currentProgress,
-        detail: buildAddedLogDetail(classifiedItem),
-      };
-      setMediaList((prev) => [...prev, classifiedItem]);
-    }
-    enqueueMediaUpsert(mergedItem);
-
-    if (logPayload) {
-      addProgressLog(
-        logPayload.id,
-        logPayload.title,
-        logPayload.type,
-        logPayload.action,
-        logPayload.amount,
-        logPayload.prevProgress,
-        logPayload.newProgress,
-        logPayload.detail
-      );
-    }
-
+    saveMedia(item);
     setIsModalOpen(false);
     setEditingItem(null);
   }
@@ -743,8 +353,7 @@ export default function HomePage() {
       message: `"${item.title}" silinecek. Bu işlem geri alınamaz. Emin misin?`,
       confirmLabel: "Sil",
       onConfirm: () => {
-        setMediaList((prev) => prev.filter((m) => m.id !== id));
-        enqueueMediaDelete(id);
+        deleteMedia(id);
         setConfirmState((s) => ({ ...s, isOpen: false }));
       },
     });
@@ -841,18 +450,12 @@ export default function HomePage() {
         });
       }
 
-      // 1) Saf state commit
-      setMediaList(nextList);
-
-      // 2) Render dışı yan etki: cloud sync queue
-      for (const m of touched) {
-        enqueueMediaUpsert(m);
-      }
+      commitMediaChanges(nextList, touched);
 
       // 3) Modal'ı kapat
       setGroupEditingItemId(null);
     },
-    [mediaList]
+    [commitMediaChanges, mediaList]
   );
 
   /**
@@ -866,42 +469,11 @@ export default function HomePage() {
         "Tüm değişikliklerin silinecek ve varsayılan mock veriler yüklenecek. Emin misin?",
       confirmLabel: "Sıfırla",
       onConfirm: () => {
-        clearMediaList();
-        setMediaList(mockMediaList);
+        resetMedia();
         setConfirmState((s) => ({ ...s, isOpen: false }));
       },
     });
   }
-
-  /**
-   * Favori durumunu değiştirir (toggle).
-   */
-  const handleToggleFavorite = useCallback((id: string) => {
-    const current = mediaList.find((m) => m.id === id);
-    if (!current) return;
-    const updated: MediaItem = { ...current, favorite: !current.favorite };
-    setMediaList((prev) => prev.map((m) => (m.id === id ? updated : m)));
-    enqueueMediaUpsert(updated);
-  }, [mediaList]);
-
-  /**
-   * R18.3: Hızlı puanlama. `rating === null` → kullanıcı puanı temizler.
-   * 0–10 integer aralığı validate edilir; aralık dışı değer no-op.
-   * `handleToggleFavorite` ile aynı render-phase güvenli kalıbı: değer ile
-   * commit + handler bağlamında enqueue.
-   */
-  const handleUpdateRating = useCallback((id: string, rating: number | null) => {
-    if (rating !== null) {
-      if (!Number.isInteger(rating) || rating < 0 || rating > 10) return;
-    }
-    const current = mediaList.find((m) => m.id === id);
-    if (!current) return;
-    const next: number | null = rating;
-    if ((current.userRating ?? null) === next) return;
-    const updated: MediaItem = { ...current, userRating: next };
-    setMediaList((prev) => prev.map((m) => (m.id === id ? updated : m)));
-    enqueueMediaUpsert(updated);
-  }, [mediaList]);
 
   /**
    * Onay penceresi açan yardımcı fonksiyon (DataManagementPanel için)
@@ -917,16 +489,6 @@ export default function HomePage() {
         setConfirmState((s) => ({ ...s, isOpen: false }));
       },
     });
-  }
-
-  /**
-   * Import sonrası medya listesini günceller.
-   */
-  function handleImport(items: MediaItem[], logs: ProgressLog[]) {
-    setMediaList(items.map((item) => withMediaClassification(item)));
-    if (logs) {
-      setProgressLogs(logs);
-    }
   }
 
   // ---- TVmaze: Online Arama Yardımcıları ----
@@ -1325,18 +887,12 @@ export default function HomePage() {
           return merged;
         });
 
-        // Önce state'i güncelle (saf değer geç, updater fn kullanma).
-        setMediaList(nextList);
-
-        // Sonra dış store yan etkilerini event handler bağlamında, render dışında çalıştır.
-        for (const merged of patchedItems) {
-          enqueueMediaUpsert(merged);
-        }
+        commitMediaChanges(nextList, patchedItems);
       }
 
       setPendingQuickAdd({ singleItem: newItem, seasonItems: null });
     },
-    [isInLibrary, mediaList]
+    [commitMediaChanges, isInLibrary, mediaList]
   );
 
   const handleAddFromOmdb = useCallback(
@@ -1592,140 +1148,6 @@ export default function HomePage() {
     return resolveSelectedTitle(profilePreferences, userProgression.title);
   }, [profilePreferences, userProgression.title]);
 
-  type PersonalPageIcon = typeof Heart;
-
-  const PersonalEmptyState = ({
-    icon: Icon,
-    title,
-    description,
-    tone = "text-amber-400/80",
-  }: {
-    icon: PersonalPageIcon;
-    title: string;
-    description: string;
-    tone?: string;
-  }) => (
-    <div className="flex flex-col items-center justify-center py-20 sm:py-24 bg-zinc-900/30 rounded-2xl border border-zinc-800/60 min-w-0">
-      <div className="w-16 h-16 rounded-2xl bg-zinc-900 ring-1 ring-zinc-800/80 grid place-items-center mb-4 shadow-sm shadow-black/30">
-        <Icon className={`w-7 h-7 ${tone}`} />
-      </div>
-      <p className="text-zinc-200 text-sm font-medium text-center">{title}</p>
-      <p className="text-zinc-500 text-xs mt-1.5 max-w-xs text-center leading-relaxed">
-        {description}
-      </p>
-    </div>
-  );
-
-  const PersonalControls = ({
-    searchValue,
-    onSearchChange,
-    searchPlaceholder,
-    sortValue,
-    onSortChange,
-    sortOptions,
-    countLabel,
-  }: {
-    searchValue: string;
-    onSearchChange: (value: string) => void;
-    searchPlaceholder: string;
-    sortValue: string;
-    onSortChange: (value: string) => void;
-    sortOptions: { value: string; label: string }[];
-    countLabel: string;
-  }) => (
-    <div className="flex flex-col sm:flex-row gap-2.5 sm:items-center min-w-0">
-      <div className="relative flex-1 min-w-0">
-        <Search
-          aria-hidden
-          className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 pointer-events-none"
-        />
-        <input
-          type="text"
-          value={searchValue}
-          onChange={(e) => onSearchChange(e.target.value)}
-          placeholder={searchPlaceholder}
-          className="w-full h-10 pl-9 pr-3 rounded-xl bg-zinc-900/40 border border-zinc-800/70 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500/40"
-        />
-      </div>
-      <div className="flex items-center gap-2 min-w-0">
-        <label className="text-[11px] uppercase tracking-[0.14em] text-zinc-500 font-semibold shrink-0">
-          Sırala
-        </label>
-        <select
-          value={sortValue}
-          onChange={(e) => onSortChange(e.target.value)}
-          className="h-10 min-w-0 max-w-full px-3 rounded-xl bg-zinc-900/40 border border-zinc-800/70 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500/40 cursor-pointer"
-        >
-          {sortOptions.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div className="text-[12px] text-zinc-500 sm:ml-2 shrink-0">{countLabel}</div>
-    </div>
-  );
-
-  const PersonalMetricCard = ({
-    label,
-    value,
-    hint,
-    accent = false,
-  }: {
-    label: string;
-    value: string | number;
-    hint?: string;
-    accent?: boolean;
-  }) => (
-    <div className="rounded-2xl border border-zinc-800/60 bg-zinc-900/35 p-4 min-w-0">
-      <p className="text-[11px] uppercase tracking-[0.14em] text-zinc-500 font-semibold truncate">
-        {label}
-      </p>
-      <p className={`mt-2 text-2xl font-semibold tabular-nums truncate ${accent ? "text-amber-200" : "text-zinc-100"}`}>
-        {value}
-      </p>
-      {hint && <p className="mt-1 text-xs text-zinc-500 truncate">{hint}</p>}
-    </div>
-  );
-
-  const DistributionBar = ({
-    label,
-    count,
-    max,
-    tone = "amber",
-  }: {
-    label: string;
-    count: number;
-    max: number;
-    tone?: "amber" | "violet" | "emerald" | "rose" | "sky";
-  }) => {
-    const toneClass =
-      tone === "violet"
-        ? "bg-violet-400"
-        : tone === "emerald"
-          ? "bg-emerald-400"
-          : tone === "rose"
-            ? "bg-rose-400"
-            : tone === "sky"
-              ? "bg-sky-400"
-              : "bg-amber-400";
-    const width = count > 0 && max > 0 ? Math.max(4, Math.round((count / max) * 100)) : 0;
-    return (
-      <div className="min-w-0">
-        <div className="flex items-center justify-between gap-3 mb-1">
-          <span className="text-[12px] text-zinc-300 truncate">{label}</span>
-          <span className="text-[12px] font-mono tabular-nums text-zinc-500 shrink-0">
-            {count}
-          </span>
-        </div>
-        <div className="h-2 rounded-full bg-zinc-800/70 overflow-hidden">
-          <div className={`h-full rounded-full ${toneClass}`} style={{ width: `${width}%` }} />
-        </div>
-      </div>
-    );
-  };
-
   // ---- RENDER ----
 
   if (!isLoaded) {
@@ -1796,29 +1218,32 @@ export default function HomePage() {
             için max-w-7xl + mx-auto kalktı; içerik sütununu boğmuyor.
             xl'de horizontal padding biraz daraltıldı (rail ile nefes alsın). */}
         <main className={`relative w-full px-4 sm:px-6 lg:px-8 py-6 lg:py-8 flex-1 min-w-0 ${shouldShowRightRail ? "xl:px-6" : "xl:px-8 2xl:px-10"}`}>
-        
-        {/* DASHBOARD SEKMESI */}
-        {activeTab === "dashboard" && (
-          <div>
-            <PageHeader
-              icon={LayoutDashboard}
-              title="Dashboard"
-              subtitle="Genel istatistikler ve son aktiviteler"
-            />
-            <EnhancedDashboard
-              stats={dashboardStats}
-              mediaList={mediaList}
-              progressLogs={progressLogs}
-              onSelectMedia={handleOpenDetailModal}
-              onIncrement={handleIncrement}
-              onComplete={handleComplete}
-              onEdit={handleOpenEditModal}
-              onToggleFavorite={handleToggleFavorite}
-              onDeleteMedia={handleDeleteRequest}
-              onUpdateRating={handleUpdateRating}
-            />
-          </div>
-        )}
+        <AppTabContent
+          activeTab={activeTab}
+          mediaList={mediaList}
+          progressLogs={progressLogs}
+          dashboardStats={dashboardStats}
+          mediaActions={{
+            onSelectMedia: handleOpenDetailModal,
+            onIncrement: handleIncrement,
+            onComplete: handleComplete,
+            onEdit: handleOpenEditModal,
+            onToggleFavorite: handleToggleFavorite,
+            onDeleteMedia: handleDeleteRequest,
+            onUpdateRating: handleUpdateRating,
+          }}
+          onAddFromGlobalSearch={handleAddFromGlobalSearch}
+          onOpenAiDiscover={handleOpenAiDiscover}
+          settings={{
+            user: authUser,
+            configured: authConfigured,
+            rightRailPreferences,
+            onRightRailPreferencesChange: setRightRailPreferences,
+            onReplaceData: importMedia,
+            onReset: handleResetRequest,
+            onConfirm: openConfirmDialog,
+          }}
+        />
 
         {/* KÜTÜPHANEM SEKMESI */}
         {activeTab === "library" && (
@@ -3231,53 +2656,6 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* AI DANIŞMAN SEKMESI */}
-        {activeTab === "ai" && (
-          <div>
-            <PageHeader
-              icon={Sparkles}
-              title="AI Danışman"
-              subtitle="Kütüphanenden yola çıkarak öneriler ve analizler"
-            />
-            <AiAdvisor
-              mediaList={mediaList}
-              progressLogs={progressLogs}
-              resetSignal={0}
-              onAddToLibrary={handleAddFromGlobalSearch}
-              onOpenDiscover={(rec) => {
-                // R40 — Keşfet'e geç + arama kutusunu öneri başlığıyla ve
-                // doğru kategori chip'iyle doldur. Auto-search GlobalSearch
-                // tarafında prefill prop'u algılayınca tetiklenir.
-                const cat: GlobalSearchCategory =
-                  rec.mediaType === "movie" ? "movie" :
-                  rec.mediaType === "tv" ? "tv" :
-                  rec.mediaType === "anime" ? "anime" :
-                  rec.mediaType === "manga" || rec.mediaType === "manhwa" || rec.mediaType === "manhua" ? "manga" :
-                  rec.mediaType === "light_novel" || rec.mediaType === "web_novel" || rec.mediaType === "visual_novel" ? "novel" :
-                  rec.mediaType === "book" ? "book" : "all";
-                setDiscoverPrefill((prev) => ({
-                  query: rec.title,
-                  category: cat,
-                  token: (prev?.token ?? 0) + 1,
-                }));
-                handleTabChange("discover");
-              }}
-            />
-          </div>
-        )}
-
-        {/* AKTİVİTE SEKMESI */}
-        {activeTab === "activity" && (
-          <div>
-            <PageHeader
-              icon={ActivityIcon}
-              title="Aktivite"
-              subtitle="İlerleme ve durum kayıtlarının zaman çizelgesi"
-            />
-            <ActivityLogPanel progressLogs={progressLogs} />
-          </div>
-        )}
-
         {/* PROFIL SEKMESI */}
         {activeTab === "profile" && (
           <div className="space-y-5 max-w-[96rem]">
@@ -3652,84 +3030,20 @@ export default function HomePage() {
                   automaticTitle={userProgression.title}
                   onChange={setProfilePreferences}
                 />
+                <SocialProfileEditor
+                  authConfigured={authConfigured}
+                  authenticated={Boolean(authUser)}
+                  localPreferences={profilePreferences}
+                  profileName={profileName}
+                  selectedTitle={journeyTitle}
+                  media={mediaList}
+                  progression={userProgression}
+                />
               </div>
             )}
           </div>
         )}
 
-        {/* AYARLAR SEKMESI */}
-        {activeTab === "settings" && (
-          // R7.1: RightRail bu sekmede gizli; main column tüm genişliği alır.
-          // 2 kolonlu grid lg+'da; küçük "durum" tipindeki paneller solda,
-          // veri/aksiyon panelleri sağda. "Uygulama Bilgisi" bütün satırı kaplar.
-          <div>
-            <PageHeader
-              icon={SettingsIcon}
-              title="Ayarlar"
-              subtitle="Hesap, cloud sync, veri yönetimi ve uygulama bilgisi"
-            />
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-5 items-start">
-              {/* Sol kolon: hesap + cloud sync durumu */}
-              <div className="space-y-4 lg:space-y-5">
-                <AuthPanel />
-                <CloudSyncStatusCard />
-                <RightRailSettingsCard
-                  preferences={rightRailPreferences}
-                  onChange={setRightRailPreferences}
-                />
-              </div>
-
-              {/* Sağ kolon: cloud veri + veri yönetimi */}
-              <div className="space-y-4 lg:space-y-5">
-                <CloudDataStatusCard
-                  user={authUser}
-                  configured={authConfigured}
-                  mediaItems={mediaList}
-                  progressLogs={progressLogs}
-                  setMediaItems={setMediaList}
-                  setProgressLogs={setProgressLogs}
-                  onConfirm={openConfirmDialog}
-                />
-                <DataManagementPanel
-                  mediaList={mediaList}
-                  progressLogs={progressLogs}
-                  onImport={handleImport}
-                  onReset={handleResetRequest}
-                  onConfirm={openConfirmDialog}
-                />
-              </div>
-
-              {/* Uygulama Bilgisi & Credits — satırı tam kaplar */}
-              <div className="lg:col-span-2 bg-zinc-900/30 rounded-2xl border border-zinc-800/60 p-6">
-                <h3 className="text-base font-semibold text-zinc-100 mb-4 tracking-tight">
-                  Uygulama Bilgisi
-                </h3>
-                <div className="space-y-4 text-sm text-zinc-400">
-                  <p>
-                    <strong>MediaTracker</strong> tüm verileri tarayıcınızın yerel depolama alanında (localStorage) tutar. Verileriniz hiçbir dış sunucuya gönderilmez veya bir veritabanına kaydedilmez.
-                  </p>
-                  <div className="h-px bg-zinc-800/60 my-4" />
-                  <h4 className="font-medium text-zinc-300">Veri Kaynakları (APIs)</h4>
-                  <ul className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-2 list-disc pl-5">
-                    <li>
-                      TV show data powered by <a href="https://www.tvmaze.com/" target="_blank" rel="noopener noreferrer" className="text-zinc-300 hover:text-amber-400 underline underline-offset-2">TVmaze</a>.
-                    </li>
-                    <li>
-                      Anime and manga data from <a href="https://anilist.co/" target="_blank" rel="noopener noreferrer" className="text-zinc-300 hover:text-amber-400 underline underline-offset-2">AniList</a>.
-                    </li>
-                    <li>
-                      Book data from <a href="https://openlibrary.org/" target="_blank" rel="noopener noreferrer" className="text-zinc-300 hover:text-amber-400 underline underline-offset-2">Open Library</a>.
-                    </li>
-                    <li>
-                      This product uses the <a href="https://www.themoviedb.org/" target="_blank" rel="noopener noreferrer" className="text-zinc-300 hover:text-amber-400 underline underline-offset-2">TMDB API</a> but is not endorsed or certified by TMDB.
-                      <br/><span className="text-xs text-zinc-500 italic">Not: Film araması geçici olarak devre dışı. TMDB erişimi düzeldiğinde aktif edilebilir.</span>
-                    </li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
         </main>
       </div>
 

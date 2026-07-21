@@ -226,6 +226,31 @@ export interface AiRecommendation {
   candidate?: AiCandidate;    // Quick Add akışı için
 }
 
+export type AiEngineProvider =
+  | "mock"
+  | "openai"
+  | "gemini"
+  | "openrouter"
+  | "groq"
+  | "safe_fallback"
+  | "unknown";
+
+export type AiEmbeddingMode = "python_service" | "local_mock" | "disabled";
+export type AiPersistentCacheStatus = "active" | "disabled" | "not_used";
+
+/** Kullanıcıya gösterilebilen, secret ve ham hata içermeyen sınırlı motor özeti. */
+export interface AiEngineStatus {
+  provider: AiEngineProvider;
+  model?: string;
+  embeddingMode: AiEmbeddingMode;
+  providerFallbackUsed: boolean;
+  evaluatedCandidateCount: number;
+  sources: AiCandidate["source"][];
+  feedbackApplied: boolean;
+  feedbackEventCount: number;
+  persistentCache: AiPersistentCacheStatus;
+}
+
 export type RecommendationFeedbackAction =
   | "shown"
   | "dismissed"
@@ -258,6 +283,7 @@ export interface AiRecommendResponse {
   rejectedCandidates?: { title: string; reason: string }[];
   transparencySummary: string;
   intent?: AiIntent;
+  engineStatus?: AiEngineStatus;
   debug?: {
     provider: string;
     attemptedProviders?: string[];

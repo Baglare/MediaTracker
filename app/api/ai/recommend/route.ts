@@ -19,6 +19,7 @@ import {
   buildEmbeddingSimilarityProfilePayloads,
 } from "@/lib/ai/embedding-similarity-scorer";
 import { embedManyWithFallback } from "@/lib/ai/embedding-provider";
+import { buildAiEngineStatus, retainVerifiedRecommendations } from "@/lib/ai/engine-status";
 import { applyTextSimilarityScoring } from "@/lib/ai/text-similarity-scorer";
 import {
   CandidateSearchResult,
@@ -1700,7 +1701,7 @@ export async function POST(req: NextRequest) {
   );
   debugNotes.push(`r55_embedding_text_ready:n=${candidates.filter((candidate) => candidate.embeddingHash).length}`);
   debugNotes.push(
-    `r57_embedding_provider:provider=${embeddingVectorResult.provider} requested=${embeddingVectorResult.requested} embedded=${embeddingVectorResult.embedded} dims=${embeddingVectorResult.dimensions} fallback=${embeddingVectorResult.fallbackUsed ? "yes" : "no"}${embeddingVectorResult.error ? ` error=${embeddingVectorResult.error}` : ""}`
+    `r57_embedding_provider:provider=${embeddingVectorResult.provider} requested=${embeddingVectorResult.requested} embedded=${embeddingVectorResult.embedded} dims=${embeddingVectorResult.dimensions} fallback=${embeddingVectorResult.fallbackUsed ? "yes" : "no"} error=${embeddingVectorResult.error ? "yes" : "no"}`
   );
   debugNotes.push(
     `r60_embedding_cache:hits=${embeddingVectorResult.cache?.hits ?? 0},misses=${embeddingVectorResult.cache?.misses ?? 0},stored=${embeddingVectorResult.cache?.stored ?? 0},size=${embeddingVectorResult.cache?.size ?? 0}`
@@ -1782,6 +1783,21 @@ export async function POST(req: NextRequest) {
       rejectedCandidates: mergedRejectedEmpty.length > 0 ? mergedRejectedEmpty : undefined,
       transparencySummary: buildTransparencySummary(settings),
       intent,
+      engineStatus: buildAiEngineStatus({
+        provider: providerState.selectedProvider || "safe_fallback",
+        model: providerState.usedModel,
+        providerFallbackUsed: providerState.safeFallbackUsed || providerState.failedProviders.length > 0,
+        evaluatedCandidateCount: hybridScoringResult.stats.count,
+        candidates,
+        feedbackEventCount: feedbackScoringResult.stats.events,
+        feedbackAdjustedCount: feedbackScoringResult.stats.adjusted + feedbackScoringResult.stats.rejectedDismissedExact,
+        embedding: {
+          provider: embeddingVectorResult.provider,
+          requested: embeddingVectorResult.requested,
+          fallbackUsed: embeddingVectorResult.fallbackUsed,
+          persistentCacheDisabled: embeddingVectorResult.persistentCache?.disabled,
+        },
+      }),
       debug: {
         provider: providerState.selectedProvider || "safe_fallback",
         ...providerDebugFields(providerState),
@@ -1821,7 +1837,7 @@ export async function POST(req: NextRequest) {
       note: response.debug?.note,
       retrieval: retrievalDebug,
     };
-    response.recommendations = response.recommendations.map((r) => ({
+    response.recommendations = retainVerifiedRecommendations(response.recommendations, candidates).map((r) => ({
       ...r,
       inLibrary:
         r.inLibrary ||
@@ -1832,6 +1848,21 @@ export async function POST(req: NextRequest) {
       count: response.recommendations.length,
       researchMode,
       providerIssue: providerState.rateLimitHit || providerState.timeoutHit,
+    });
+    response.engineStatus = buildAiEngineStatus({
+      provider: providerState.selectedProvider || response.debug?.provider,
+      model: providerState.usedModel,
+      providerFallbackUsed: providerState.safeFallbackUsed || providerState.failedProviders.length > 0,
+      evaluatedCandidateCount: hybridScoringResult.stats.count,
+      candidates,
+      feedbackEventCount: feedbackScoringResult.stats.events,
+      feedbackAdjustedCount: feedbackScoringResult.stats.adjusted + feedbackScoringResult.stats.rejectedDismissedExact,
+      embedding: {
+        provider: embeddingVectorResult.provider,
+        requested: embeddingVectorResult.requested,
+        fallbackUsed: embeddingVectorResult.fallbackUsed,
+        persistentCacheDisabled: embeddingVectorResult.persistentCache?.disabled,
+      },
     });
     // R36 + R37.2 — sistem tarafından hard-reject edilen adayları (skorlayıcı
     // + politika filtresi) LLM'in rejectedCandidates listesine ekle.
@@ -1865,10 +1896,10 @@ export async function POST(req: NextRequest) {
       provider: "mock",
       ...providerDebugFields(providerState),
       fellBackToMock: true,
-      note: err instanceof Error ? err.message : "unknown error",
+      note: "provider_ranking_failed",
       retrieval: { ...retrievalDebug, providerFallback: true },
     };
-    fallback.recommendations = fallback.recommendations.map((r) => ({
+    fallback.recommendations = retainVerifiedRecommendations(fallback.recommendations, candidates).map((r) => ({
       ...r,
       inLibrary:
         r.inLibrary ||
@@ -1879,6 +1910,21 @@ export async function POST(req: NextRequest) {
       count: fallback.recommendations.length,
       researchMode,
       providerIssue: providerState.rateLimitHit || providerState.timeoutHit,
+    });
+    fallback.engineStatus = buildAiEngineStatus({
+      provider: "mock",
+      model: providerState.usedModel,
+      providerFallbackUsed: true,
+      evaluatedCandidateCount: hybridScoringResult.stats.count,
+      candidates,
+      feedbackEventCount: feedbackScoringResult.stats.events,
+      feedbackAdjustedCount: feedbackScoringResult.stats.adjusted + feedbackScoringResult.stats.rejectedDismissedExact,
+      embedding: {
+        provider: embeddingVectorResult.provider,
+        requested: embeddingVectorResult.requested,
+        fallbackUsed: embeddingVectorResult.fallbackUsed,
+        persistentCacheDisabled: embeddingVectorResult.persistentCache?.disabled,
+      },
     });
     return NextResponse.json(fallback);
   }

@@ -35,8 +35,7 @@ interface CloudDataStatusCardProps {
   configured: boolean;
   mediaItems: MediaItem[];
   progressLogs: ProgressLog[];
-  setMediaItems: (items: MediaItem[]) => void;
-  setProgressLogs: (logs: ProgressLog[]) => void;
+  onReplaceData: (items: MediaItem[], logs: ProgressLog[]) => void;
   onConfirm: (title: string, message: string, onOk: () => void) => void;
 }
 
@@ -69,8 +68,7 @@ export default function CloudDataStatusCard({
   configured,
   mediaItems,
   progressLogs,
-  setMediaItems,
-  setProgressLogs,
+  onReplaceData,
   onConfirm,
 }: CloudDataStatusCardProps) {
   const [state, setState] = useState<LoadState>({ kind: "idle" });
@@ -211,8 +209,7 @@ export default function CloudDataStatusCard({
           showBanner({ kind: "error", text: res.message });
           return;
         }
-        setMediaItems(res.mediaItems);
-        setProgressLogs(res.progressLogs);
+        onReplaceData(res.mediaItems, res.progressLogs);
         showBanner({ kind: "success", text: res.message });
         void refresh();
       }
@@ -232,8 +229,7 @@ export default function CloudDataStatusCard({
           showBanner({ kind: "error", text: res.message });
           return;
         }
-        setMediaItems(res.mediaItems);
-        setProgressLogs(res.progressLogs);
+        onReplaceData(res.mediaItems, res.progressLogs);
         showBanner({ kind: "success", text: res.message });
         void refresh();
       }

@@ -20,8 +20,8 @@ import {
 import { MediaItem, ProgressLog } from "@/lib/types";
 import {
   createBackupPayload,
-  validateBackupPayload,
-  mergeImportedMediaItems,
+  parseBackupJson,
+  resolveBackupImport,
 } from "@/lib/backup";
 
 interface DataManagementPanelProps {
@@ -92,23 +92,20 @@ export default function DataManagementPanel({
         return;
       }
 
-      // JSON parse
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(text);
-      } catch {
-        showFeedback("error", "Geçersiz JSON dosyası. Dosya bozuk olabilir.");
-        return;
-      }
-
-      // Doğrula
-      const validation = validateBackupPayload(parsed);
+      const validation = parseBackupJson(text);
       if (!validation.valid) {
         showFeedback("error", validation.error);
         return;
       }
 
       const importedItems = validation.items;
+      const result = resolveBackupImport({
+        mode: importMode,
+        currentItems: mediaList,
+        importedItems,
+        currentLogs: progressLogs,
+        importedLogs: validation.logs,
+      });
 
       if (importMode === "replace") {
         // Replace: onay iste
@@ -116,19 +113,12 @@ export default function DataManagementPanel({
           "Verileri Değiştir",
           `Mevcut ${mediaList.length} içerik silinecek ve ${importedItems.length} içerik ile değiştirilecek. Emin misin?`,
           () => {
-            onImport(importedItems, validation.logs);
-            showFeedback(
-              "success",
-              `${importedItems.length} içerik ile liste değiştirildi.`
-            );
+            onImport(result.items, result.logs);
+            showFeedback("success", result.message);
           }
         );
       } else {
-        // Merge: duplicate kontrolü ile birleştir
-        const result = mergeImportedMediaItems(mediaList, importedItems, progressLogs, validation.logs);
-        if (result.items) {
-          onImport(result.items, result.logs || []);
-        }
+        onImport(result.items, result.logs);
         showFeedback("success", result.message);
       }
     };

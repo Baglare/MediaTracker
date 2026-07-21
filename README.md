@@ -17,8 +17,10 @@ Uygulamanın ana veri kaynağı tarayıcıdaki `localStorage` alanıdır. Supaba
 - Offline-first veri mimarisi ve `localStorage` tabanlı persistence.
 - JSON import/export, merge/replace veri yönetimi ve tarayıcı içi yedekleme akışı.
 - Supabase auth, manuel cloud aktarım ve sync queue hazırlığı.
+- Local-first kütüphaneden ayrılmış cloud sosyal profil, kullanıcı arama ve takip/engel temeli.
 - TMDB, OMDb, TVmaze, AniList ve Open Library entegrasyonları için normalize edilmiş medya modeli.
 - AI destekli öneri pipeline'ı, embedding tabanlı benzerlik skoru, provider fallback sistemi ve feedback-aware recommendation flow.
+- Ana sayfada medya domain durumu, kalıcı kullanıcı tercihleri ve sekme render orkestrasyonu ayrıştırılmış modüler yapı.
 - React/Next.js state yönetimi, TypeScript tip güvenliği ve responsive dashboard tasarımı.
 
 ## Özellikler
@@ -62,13 +64,21 @@ Uygulamanın ana veri kaynağı tarayıcıdaki `localStorage` alanıdır. Supaba
   - Cloud -> Yerel indirme
   - Cloud verisini yerel veriyle birleştirme
   - Mutasyonlar için sync queue ve online durumda flush altyapısı
+- Sosyal profil:
+  - `/u/[username]` public/protected/personal profil route’u ve `/people` kullanıcı araması
+  - Asimetrik takip/istek, karşılıklı Yin/Yang durumu ve engelleme RPC’leri
+  - Kontrollü profil grid’i, avatar/banner ve yalnızca açıkça seçilen vitrin/istatistik/progression/not snapshot’ları
+  - Kurulum, görünürlük ve manuel test ayrıntıları: [`docs/SOCIAL_PROFILE_FOUNDATION.md`](docs/SOCIAL_PROFILE_FOUNDATION.md)
 - AI Danışman:
   - Kütüphane profiline göre öneri
   - Puanlara, favorilere, ilerlemeye ve notlara göre öneri
   - Dünya kapsamı: karışık, Doğu, Kadraj, Arşiv veya her dünyadan bir öneri
   - Kaynak API'leriyle aday doğrulama
   - Provider fallback akışı
-  - AI oturum geçmişi ve ilgilenmiyorum geri bildirimi
+  - Provider, embedding, fallback, aday, kaynak, feedback ve persistent cache durumunu secret göstermeden özetleyen teknik durum alanı
+  - Öneri gerekçeleri, kütüphane/devam/keşif bağlamı ve feedback etkisi etiketleri
+  - AI oturum geçmişi; sonraki isteğin sıralamasına katılan ilgilenmiyorum geri bildirimi
+  - Tekrarlanabilir demo akışları için [`docs/AI_RECOMMENDATION_DEMO.md`](docs/AI_RECOMMENDATION_DEMO.md)
 
 ## Teknoloji
 
@@ -91,6 +101,7 @@ media-tracker/
   hooks/                  Client hook'ları
   lib/                    Domain tipleri, storage, sync, AI, Supabase ve API yardımcıları
   lib/ai/                 AI Danışman pipeline'ı, provider'lar ve scoring katmanı
+  lib/social/             Sosyal profil domain, doğrulama, görünürlük ve server loader katmanı
   lib/supabase/           Supabase client, repository, mapping ve cloud actions
   ml-service/             Opsiyonel FastAPI embedding servisi
   public/                 Placeholder ve statik görseller
@@ -175,8 +186,9 @@ Temel kullanım için hiçbir değişken zorunlu değildir. Aşağıdaki değiş
 
 | Değişken | Zorunlu mu? | Kullanım |
 | --- | --- | --- |
-| `NEXT_PUBLIC_SUPABASE_URL` | Hayır | Supabase auth, cloud aktarım ve persistent embedding cache için |
+| `NEXT_PUBLIC_SUPABASE_URL` | Hayır | Supabase auth, cloud aktarım ve persistent embedding cache bağlantısı için |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Hayır | Supabase client bağlantısı için |
+| `SUPABASE_SERVICE_ROLE_KEY` | Hayır | Yalnızca server-side persistent embedding cache erişimi için |
 | `TMDB_READ_ACCESS_TOKEN` | Hayır | Film aramasında TMDB birincil kaynak |
 | `OMDB_API_KEY` | Hayır | Film aramasında OMDb fallback ve detay kaynağı |
 | `AI_PROVIDER` | Hayır | `mock`, `auto`, `openai`, `gemini`, `openrouter`, `groq` |
@@ -194,20 +206,22 @@ Temel kullanım için hiçbir değişken zorunlu değildir. Aşağıdaki değiş
 | `MEDIA_TRACKER_EMBEDDING_CACHE` | Hayır | `off` verilirse embedding cache kapanır |
 | `MEDIA_TRACKER_PERSISTENT_EMBEDDING_CACHE` | Hayır | `off` verilirse Supabase tabanlı embedding cache kapanır |
 
-Güvenlik notu: Supabase `service_role` anahtarı bu projede client tarafına eklenmemelidir. `.env.local` Git'e gönderilmemelidir.
+Güvenlik notu: `SUPABASE_SERVICE_ROLE_KEY` yalnızca server-side kullanılmalı; client component'e, API yanıtına veya loglara eklenmemeli ve `NEXT_PUBLIC_` prefix'i almamalıdır. Persistent embedding cache için opsiyoneldir. Anahtar yoksa persistent cache hata vermeden devre dışı kalır; bellek içi cache, mock fallback ve ana offline-first uygulama çalışmaya devam eder. `.env.local` ve gerçek anahtarlar Git'e gönderilmemelidir.
 
 ## Supabase Kurulumu
 
 Cloud özelliklerini kullanmak istiyorsan:
 
 1. Supabase projesi oluştur.
-2. `supabase/schema.sql` dosyasındaki SQL'i Supabase SQL Editor içinde çalıştır.
+2. Yeni kurulumda `supabase/schema.sql` dosyasındaki SQL'i Supabase SQL Editor içinde çalıştır. Mevcut projede Sosyal Faz 1 için `supabase/migrations/20260721_social_profile_foundation.sql` migration’ını uygula; bu adım private `profile-assets` bucket ve politikalarını da oluşturur.
 3. Supabase Project Settings -> API bölümünden URL ve anon key değerlerini al.
 4. `.env.local` içine şunları ekle:
 
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=...
 NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+# Opsiyonel, yalnızca server-side persistent embedding cache için:
+SUPABASE_SERVICE_ROLE_KEY=...
 ```
 
 5. Uygulamayı yeniden başlat.
@@ -263,6 +277,13 @@ npm run lint
 
 ESLint kontrollerini çalıştırır.
 
+```bash
+npm run test
+npm run test:run
+```
+
+Vitest'i izleme modunda veya tek seferlik test paketi olarak çalıştırır.
+
 ## API Route'ları
 
 - `GET /api/tmdb/search?q=...`
@@ -294,6 +315,7 @@ Next.js tarafı `MEDIA_TRACKER_ML_SERVICE_URL` doluysa bu servisi kullanır. Ser
 - Next.js 16 ve React 19 kullanıldığı için render-phase state update kurallarına dikkat edilmelidir.
 - `localStorage` hidrasyonu mount effect'lerinde yapılır.
 - Mutasyon akışlarında state güncellemesi ve sync queue yan etkileri ayrı tutulmalıdır.
+- `app/page.tsx` composition root olarak kalır; medya mutasyonları hook'ta, kalıcı tercihler ayrı hook'ta ve ortak sekme blokları orchestration component'inde tutulur.
 - Yeni medya kaynağı eklenirse normalizer, global search, AI candidate source union'ları ve UI label'ları birlikte güncellenmelidir.
 - AniList otomatik gruplama title benzerliğiyle yapılmaz; güvenli relation verisi kullanılır.
 - Bilinmeyen total progress için sahte `1` fallback'i yerine kaynağın semantiğine uygun değer korunmalıdır.

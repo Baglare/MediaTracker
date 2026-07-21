@@ -7,6 +7,28 @@
 import { MediaItem, ProgressLog, withMediaClassification } from "./types";
 import { withInferredSeriesGroup } from "./series-group";
 
+const VALID_MEDIA_TYPES = new Set<MediaItem["type"]>([
+  "movie",
+  "tv",
+  "anime",
+  "manga",
+  "manhwa",
+  "manhua",
+  "book",
+  "light_novel",
+  "web_novel",
+  "visual_novel",
+]);
+
+const VALID_MEDIA_STATUSES = new Set<MediaItem["status"]>([
+  "watching",
+  "reading",
+  "planning",
+  "completed",
+  "paused",
+  "dropped",
+]);
+
 // ---- Export Yapısı ----
 
 /** Backup JSON dosyasının yapısı */
@@ -49,6 +71,28 @@ export interface ImportResult {
   skippedCount?: number;
 }
 
+export type BackupImportMode = "merge" | "replace";
+
+export interface ResolvedBackupImport {
+  items: MediaItem[];
+  logs: ProgressLog[];
+  message: string;
+  addedCount: number;
+  skippedCount: number;
+}
+
+export function parseBackupJson(
+  text: string
+): { valid: true; items: MediaItem[]; logs: ProgressLog[] } | { valid: false; error: string } {
+  let payload: unknown;
+  try {
+    payload = JSON.parse(text);
+  } catch {
+    return { valid: false, error: "Geçersiz JSON dosyası. Dosya bozuk olabilir." };
+  }
+  return validateBackupPayload(payload);
+}
+
 /**
  * Backup JSON'ının geçerli olup olmadığını kontrol eder.
  * Geçerliyse mediaItems dizisini döner, değilse hata mesajı döner.
@@ -81,9 +125,12 @@ export function validateBackupPayload(
   }
 
   // Her item'ın en azından id ve title alanına sahip olduğunu kontrol et
-  const items = data.mediaItems as MediaItem[];
-  const normalizedItems = items
-    .filter((item) => item && typeof item === "object" && item.title)
+  const normalizedItems = data.mediaItems
+    .filter((item): item is Partial<MediaItem> => {
+      if (!item || typeof item !== "object") return false;
+      const title = (item as { title?: unknown }).title;
+      return typeof title === "string" && title.trim().length > 0;
+    })
     .map(normalizeImportedMediaItem);
 
   // progressLogs array kontrolü
@@ -107,6 +154,13 @@ function generateId(): string {
  * Eksik veya hatalı alanlar için varsayılan değerler atar.
  */
 export function normalizeImportedMediaItem(item: Partial<MediaItem>): MediaItem {
+  const type = typeof item.type === "string" && VALID_MEDIA_TYPES.has(item.type)
+    ? item.type
+    : "movie";
+  const status = typeof item.status === "string" && VALID_MEDIA_STATUSES.has(item.status)
+    ? item.status
+    : "planning";
+
   // userRating doğrulama: 0-10 arası tam sayı olmalı
   let userRating: number | null | undefined = item.userRating;
   if (userRating !== null && userRating !== undefined) {
@@ -142,14 +196,16 @@ export function normalizeImportedMediaItem(item: Partial<MediaItem>): MediaItem 
   const currentProgress = Math.max(0, Math.min(Number(item.currentProgress) || 0, totalProgress));
 
   return withMediaClassification({
-    id: item.id || generateId(),
-    title: String(item.title || "İsimsiz"),
-    type: item.type || "movie",
+    id: typeof item.id === "string" && item.id.trim().length > 0 ? item.id : generateId(),
+    title: typeof item.title === "string" ? item.title.trim() : "İsimsiz",
+    type,
     theme: item.theme,
     mediaType: item.mediaType,
     subType: item.subType,
-    status: item.status || "planning",
-    coverImage: item.coverImage || `/placeholders/${item.type || "movie"}.svg`,
+    status,
+    coverImage: typeof item.coverImage === "string" && item.coverImage.length > 0
+      ? item.coverImage
+      : `/placeholders/${type}.svg`,
     currentProgress,
     totalProgress,
 
@@ -274,5 +330,44 @@ export function mergeImportedMediaItems(
     logs: mergedLogs,
     addedCount: toAdd.length,
     skippedCount,
+  };
+}
+
+/**
+ * Doğrulanmış import verisini seçilen moda göre saf biçimde hazırlar.
+ * localStorage'a yazmaz; çağıran UI mevcut onay akışını koruyarak sonucu uygular.
+ */
+export function resolveBackupImport(args: {
+  mode: BackupImportMode;
+  currentItems: MediaItem[];
+  importedItems: MediaItem[];
+  currentLogs?: ProgressLog[];
+  importedLogs?: ProgressLog[];
+}): ResolvedBackupImport {
+  const currentLogs = args.currentLogs ?? [];
+  const importedLogs = args.importedLogs ?? [];
+
+  if (args.mode === "replace") {
+    return {
+      items: args.importedItems,
+      logs: importedLogs,
+      message: `${args.importedItems.length} içerik ile liste değiştirildi.`,
+      addedCount: args.importedItems.length,
+      skippedCount: 0,
+    };
+  }
+
+  const merged = mergeImportedMediaItems(
+    args.currentItems,
+    args.importedItems,
+    currentLogs,
+    importedLogs
+  );
+  return {
+    items: merged.items ?? args.currentItems,
+    logs: merged.logs ?? currentLogs,
+    message: merged.message,
+    addedCount: merged.addedCount ?? 0,
+    skippedCount: merged.skippedCount ?? 0,
   };
 }

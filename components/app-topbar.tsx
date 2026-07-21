@@ -8,7 +8,9 @@
 // Mobil/tablet altında (lg<) sidebar gizli; bunun yerine yatay scroll'lu
 // `AppTabs` döndürürüz ki TabType erişimi kaybolmasın.
 
-import { ChevronRight, Settings } from "lucide-react";
+import Image from "next/image";
+import Link from "next/link";
+import { ChevronRight, Settings, Users } from "lucide-react";
 import type { ProfilePreferences } from "@/lib/profile-preferences";
 import CloudModeBadge from "./cloud-mode-badge";
 import AppTabs, { type TabType } from "./app-tabs";
@@ -61,6 +63,14 @@ export default function AppTopbar({
           title="Profili aç"
         >
           <ProfileAvatar profileName={profileName} preferences={profilePreferences} size="sm" />
+          <Image
+            src="/brand/media-tracker-mark.svg"
+            alt=""
+            aria-hidden="true"
+            width={24}
+            height={24}
+            className="h-6 w-6 shrink-0 object-contain"
+          />
           <div className="min-w-0">
             <span className="block truncate text-sm font-semibold text-zinc-100 tracking-tight">
               MediaTracker
@@ -84,6 +94,7 @@ export default function AppTopbar({
           <div className="hidden sm:block">
             <CloudModeBadge />
           </div>
+          <Link href="/people" className="lg:hidden grid h-8 w-8 place-items-center rounded-lg border border-zinc-800/70 bg-zinc-900/35 text-zinc-400 transition-colors hover:border-violet-500/35 hover:text-violet-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40" aria-label="Kullanıcı ara" title="Kullanıcı ara"><Users className="h-4 w-4" aria-hidden="true" /></Link>
           <button
             type="button"
             onClick={() => onChangeTab("settings")}
