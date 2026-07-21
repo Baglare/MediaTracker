@@ -44,6 +44,7 @@ import GlobalSearch from "@/components/global-search";
 import { useAuth } from "@/hooks/use-auth";
 import { useMediaLibrary } from "@/hooks/use-media-library";
 import { usePersistedPreferences } from "@/hooks/use-persisted-preferences";
+import { useSocialAvatar } from "@/hooks/use-social-avatar";
 import QuickAddModal from "@/components/quick-add-modal";
 import ManualGroupModal, {
   type ManualGroupAction,
@@ -1148,6 +1149,8 @@ export default function HomePage() {
     return resolveSelectedTitle(profilePreferences, userProgression.title);
   }, [profilePreferences, userProgression.title]);
 
+  const socialAvatar = useSocialAvatar(authConfigured, authUser?.id ?? null);
+
   // ---- RENDER ----
 
   if (!isLoaded) {
@@ -1200,6 +1203,7 @@ export default function HomePage() {
         profileName={profileName}
         profileTagline={profileTagline}
         profilePreferences={profilePreferences}
+        socialAvatarUrl={socialAvatar.socialAvatarUrl}
         progression={userProgression}
         journeyTitle={journeyTitle}
       />
@@ -1211,6 +1215,7 @@ export default function HomePage() {
           onOpenProfile={() => handleTabChange("profile")}
           profileName={profileName}
           profilePreferences={profilePreferences}
+          socialAvatarUrl={socialAvatar.socialAvatarUrl}
         />
 
         {/* Ana içerik alanı.
@@ -2775,7 +2780,7 @@ export default function HomePage() {
                 <div className="relative flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                   <div className="flex min-w-0 flex-col sm:flex-row sm:items-center gap-5">
                     <div className="rounded-3xl bg-zinc-950/45 p-2 ring-1 ring-zinc-800/70 shadow-inner shadow-black/30">
-                      <ProfileAvatar profileName={profileName} preferences={profilePreferences} size="lg" />
+                      <ProfileAvatar profileName={profileName} preferences={profilePreferences} socialAvatarUrl={socialAvatar.socialAvatarUrl} size="lg" />
                     </div>
                     <div className="min-w-0">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-500">
@@ -3029,6 +3034,11 @@ export default function HomePage() {
                   profileName={profileName}
                   automaticTitle={userProgression.title}
                   onChange={setProfilePreferences}
+                  authenticated={Boolean(authUser)}
+                  userId={authUser?.id ?? null}
+                  hasSocialProfile={socialAvatar.hasSocialProfile}
+                  socialAvatarUrl={socialAvatar.socialAvatarUrl}
+                  onSocialAvatarChanged={socialAvatar.updateSocialAvatar}
                 />
                 <SocialProfileEditor
                   authConfigured={authConfigured}
@@ -3038,6 +3048,8 @@ export default function HomePage() {
                   selectedTitle={journeyTitle}
                   media={mediaList}
                   progression={userProgression}
+                  socialAvatarUrl={socialAvatar.socialAvatarUrl}
+                  onProfileChanged={socialAvatar.refresh}
                 />
               </div>
             )}

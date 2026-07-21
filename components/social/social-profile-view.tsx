@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ProfileGrid } from "@/components/social/profile-grid";
 import { SocialActions } from "@/components/social/social-actions";
 import { YinYangConnection } from "@/components/social/yin-yang-connection";
+import { ProfileAvatar } from "@/components/sidebar-profile-card";
 import type { SocialProfilePayload } from "@/lib/social/types";
 
 function StateCard({ title, text }: { title: string; text: string }) {
@@ -22,7 +23,7 @@ export function SocialProfileView({ payload }: { payload: SocialProfilePayload }
         <div className="h-36 bg-gradient-to-br from-violet-950 via-zinc-900 to-zinc-950 bg-cover bg-center sm:h-52" style={profile.bannerUrl ? { backgroundImage: `url(${JSON.stringify(profile.bannerUrl).slice(1, -1)})` } : undefined} />
         <div className="px-5 pb-5 sm:px-8">
           <div className="-mt-12 flex flex-col gap-4 sm:-mt-14 sm:flex-row sm:items-end">
-            <div className="grid h-24 w-24 shrink-0 place-items-center overflow-hidden rounded-full border-4 border-zinc-900 bg-violet-900 text-2xl font-bold sm:h-28 sm:w-28">{profile.avatarUrl ? <span className="h-full w-full bg-cover bg-center" style={{ backgroundImage: `url(${JSON.stringify(profile.avatarUrl).slice(1, -1)})` }} role="img" aria-label={`${profile.displayName} avatarı`} /> : profile.displayName.slice(0, 2).toUpperCase()}</div>
+            <div className="shrink-0 rounded-full border-4 border-zinc-900"><ProfileAvatar profileName={profile.displayName} socialAvatarUrl={profile.avatarUrl} allowLocalFallback={false} size="xl" shape="circle" ariaLabel={`${profile.displayName} avatarı`} /></div>
             <div className="min-w-0 flex-1 pb-1"><div className="flex flex-wrap items-center gap-2"><h1 className="truncate text-2xl font-bold">{profile.displayName}</h1><span className="rounded-full bg-zinc-800 px-2 py-1 text-xs text-zinc-400">{profile.visibilityMode === "protected" ? "Korumalı" : "Herkese açık"}</span></div><p className="text-sm text-zinc-400">@{profile.username}{profile.selectedTitle ? ` · ${profile.selectedTitle}` : ""}</p></div>
           </div>
           {profile.bio && <p className="mt-4 max-w-3xl whitespace-pre-wrap text-sm text-zinc-300">{profile.bio}</p>}

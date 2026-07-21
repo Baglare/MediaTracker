@@ -89,6 +89,7 @@ interface AppSidebarProps {
   profileName: string;
   profileTagline: string;
   profilePreferences: ProfilePreferences;
+  socialAvatarUrl?: string;
   progression: UserProgression;
   journeyTitle: string;
 }
@@ -275,6 +276,7 @@ export default function AppSidebar({
   profileName,
   profileTagline,
   profilePreferences,
+  socialAvatarUrl,
   progression,
   journeyTitle,
 }: AppSidebarProps) {
@@ -305,6 +307,7 @@ export default function AppSidebar({
         profileName={profileName}
         tagline={profileTagline}
         preferences={profilePreferences}
+        socialAvatarUrl={socialAvatarUrl}
         onOpenProfile={onOpenProfile}
         onOpenSettings={onOpenSettings}
       />

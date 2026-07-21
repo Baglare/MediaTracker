@@ -39,6 +39,7 @@ interface AppTopbarProps {
   onOpenProfile: () => void;
   profileName: string;
   profilePreferences: ProfilePreferences;
+  socialAvatarUrl?: string;
 }
 
 export default function AppTopbar({
@@ -47,6 +48,7 @@ export default function AppTopbar({
   onOpenProfile,
   profileName,
   profilePreferences,
+  socialAvatarUrl,
 }: AppTopbarProps) {
   return (
     <header
@@ -62,7 +64,7 @@ export default function AppTopbar({
           aria-label="Profili aç"
           title="Profili aç"
         >
-          <ProfileAvatar profileName={profileName} preferences={profilePreferences} size="sm" />
+          <ProfileAvatar profileName={profileName} preferences={profilePreferences} socialAvatarUrl={socialAvatarUrl} size="sm" />
           <Image
             src="/brand/media-tracker-mark.svg"
             alt=""

@@ -2,6 +2,8 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const migration = readFileSync(new URL("../supabase/migrations/20260721_social_profile_foundation.sql", import.meta.url), "utf8");
+const smokeFixMigration = readFileSync(new URL("../supabase/migrations/20260721_social_profile_live_smoke_fixes.sql", import.meta.url), "utf8");
+const protectedVisibilityV2 = readFileSync(new URL("../supabase/migrations/20260721_social_profile_protected_visibility_fix_v2.sql", import.meta.url), "utf8");
 
 describe("social Supabase migration contract (static, not live RLS integration)", () => {
   it("enforces username uniqueness, cooldown, history reservation and serialized claims", () => {
@@ -47,5 +49,20 @@ describe("social Supabase migration contract (static, not live RLS integration)"
     expect(migration).toContain("(storage.foldername(name))[1]=auth.uid()::text");
     expect(migration).toContain("social_profile_asset_visible");
     expect(migration).not.toContain("SERVICE_ROLE");
+  });
+
+  it("raises protected module visibility in a replacement server-side helper", () => {
+    expect(smokeFixMigration).toContain("select visibility_mode");
+    expect(smokeFixMigration).toContain("v_profile_visibility = 'public' and p_visibility = 'public'");
+    expect(smokeFixMigration).toContain("status = 'accepted'");
+    expect(smokeFixMigration).toContain("p_visibility in ('public', 'followers')");
+    expect(smokeFixMigration).not.toMatch(/update\s+public\.profile_modules/i);
+  });
+
+  it("ships the protected visibility replacement as a second deployable migration", () => {
+    expect(protectedVisibilityV2).toContain("create or replace function public.social_can_view_module");
+    expect(protectedVisibilityV2).toContain("select visibility_mode");
+    expect(protectedVisibilityV2).toContain("status = 'accepted'");
+    expect(protectedVisibilityV2).not.toMatch(/update\s+public\.profile_modules/i);
   });
 });

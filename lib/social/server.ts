@@ -1,6 +1,7 @@
 import "server-only";
 
 import { resolveConnectionState } from "@/lib/social/relationships";
+import { canViewModule } from "@/lib/social/visibility";
 import {
   CONNECTION_COLORS,
   PROFILE_VISIBILITIES,
@@ -115,18 +116,27 @@ export async function loadSocialProfile(username: string): Promise<SocialProfile
   const profile = profileOf(rawProfile);
   if (!profile) return empty;
   const [avatarUrl, bannerUrl] = await Promise.all([signedAssetUrl(rawProfile?.avatarPath), signedAssetUrl(rawProfile?.bannerPath)]);
-  const stats = validateStatsSnapshot(root.stats);
-  const progression = validateProgressionSnapshot(root.progression);
+  const relationship = relationshipOf(root.relationship, profile.connectionColor);
+  const visibilityContext = {
+    anonymous: relationship.anonymous,
+    self: relationship.self,
+    viewerFollowsOwner: relationship.viewerFollowsOwner === "accepted",
+    ownerFollowsViewer: relationship.ownerFollowsViewer === "accepted",
+  };
+  const modules = modulesOf(root.modules).filter((module) => canViewModule(profile.visibilityMode, module.visibility, visibilityContext));
+  const visibleModules = new Set(modules.map((module) => module.moduleKey));
+  const stats = visibleModules.has("stats") ? validateStatsSnapshot(root.stats) : null;
+  const progression = visibleModules.has("progression") ? validateProgressionSnapshot(root.progression) : null;
   return {
     status: "available",
     profile: { ...profile, avatarUrl, bannerUrl },
-    relationship: relationshipOf(root.relationship, profile.connectionColor),
-    modules: modulesOf(root.modules),
-    favorites: mediaOf(root.favorites, 5),
-    current: mediaOf(root.current, 6),
-    stats: stats.ok ? stats.value : undefined,
-    progression: progression.ok ? progression.value : undefined,
-    sharedNotes: Array.isArray(root.sharedNotes) ? root.sharedNotes as SocialProfilePayload["sharedNotes"] : [],
+    relationship,
+    modules,
+    favorites: visibleModules.has("favorites") ? mediaOf(root.favorites, 5) : [],
+    current: visibleModules.has("current") ? mediaOf(root.current, 6) : [],
+    stats: stats?.ok ? stats.value : undefined,
+    progression: progression?.ok ? progression.value : undefined,
+    sharedNotes: visibleModules.has("shared_notes") && Array.isArray(root.sharedNotes) ? root.sharedNotes as SocialProfilePayload["sharedNotes"] : [],
   };
 }
 

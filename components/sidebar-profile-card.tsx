@@ -1,21 +1,28 @@
 "use client";
 
 import { Archive, BookOpen, Clapperboard, Settings, Sparkles, UserRound } from "lucide-react";
-import type { AvatarAccent, PresetAvatar, ProfilePreferences } from "@/lib/profile-preferences";
+import { useState } from "react";
+import { DEFAULT_PROFILE_PREFERENCES, type AvatarAccent, type PresetAvatar, type ProfilePreferences } from "@/lib/profile-preferences";
+import { resolveAvatarSource } from "@/lib/social/avatar";
 import CloudModeBadge from "./cloud-mode-badge";
 
 interface SidebarProfileCardProps {
   profileName: string;
   tagline: string;
   preferences: ProfilePreferences;
+  socialAvatarUrl?: string;
   onOpenProfile: () => void;
   onOpenSettings: () => void;
 }
 
 interface ProfileAvatarProps {
   profileName: string;
-  preferences: ProfilePreferences;
-  size?: "sm" | "md" | "lg";
+  preferences?: ProfilePreferences;
+  socialAvatarUrl?: string;
+  allowLocalFallback?: boolean;
+  size?: "sm" | "md" | "lg" | "social" | "xl";
+  shape?: "rounded" | "circle";
+  ariaLabel?: string;
 }
 
 const ACCENT_CLASSES: Record<AvatarAccent, string> = {
@@ -39,6 +46,8 @@ const SIZE_CLASSES = {
   sm: "h-8 w-8 rounded-lg text-xs",
   md: "h-9 w-9 rounded-xl text-sm",
   lg: "h-16 w-16 rounded-2xl text-xl",
+  social: "h-12 w-12 rounded-full text-base",
+  xl: "h-24 w-24 rounded-full text-2xl sm:h-28 sm:w-28",
 };
 
 function getInitial(profileName: string): string {
@@ -50,32 +59,44 @@ function getInitial(profileName: string): string {
 export function ProfileAvatar({
   profileName,
   preferences,
+  socialAvatarUrl,
+  allowLocalFallback = true,
   size = "md",
+  shape = "rounded",
+  ariaLabel,
 }: ProfileAvatarProps) {
-  const Icon = PRESET_ICONS[preferences.presetAvatar];
+  const effectivePreferences = preferences ?? DEFAULT_PROFILE_PREFERENCES;
+  const [failedSocialUrl, setFailedSocialUrl] = useState<string>();
+  const usableSocialUrl = failedSocialUrl === socialAvatarUrl ? undefined : socialAvatarUrl;
+  const resolved = resolveAvatarSource({ socialAvatarUrl: usableSocialUrl, localPreferences: effectivePreferences, allowLocalFallback });
+  const Icon = PRESET_ICONS[effectivePreferences.presetAvatar];
   const sizeClass = SIZE_CLASSES[size];
   const iconSizeClass = size === "lg" ? "h-7 w-7" : size === "sm" ? "h-4 w-4" : "h-5 w-5";
+  const shapeClass = shape === "circle" ? "!rounded-full" : "";
 
-  if (preferences.avatarMode === "image" && preferences.avatarImageDataUrl) {
+  if (resolved.imageUrl) {
     return (
       // next/image data URL avatar için anlamlı bir kazanç sağlamıyor (boyut tipi olarak runtime'da değişken,
       // remote pattern yok). Klasik <img> bilinçli tercih.
       // eslint-disable-next-line @next/next/no-img-element
       <img
-        src={preferences.avatarImageDataUrl}
-        alt=""
-        className={`${sizeClass} shrink-0 object-cover shadow-sm shadow-black/30 ring-1 ring-zinc-700/60`}
+        src={resolved.imageUrl}
+        alt={ariaLabel ?? ""}
+        onError={resolved.source === "social" ? () => setFailedSocialUrl(socialAvatarUrl) : undefined}
+        className={`${sizeClass} ${shapeClass} shrink-0 object-cover shadow-sm shadow-black/30 ring-1 ring-zinc-700/60`}
       />
     );
   }
 
   return (
     <div
-      className={`${sizeClass} grid shrink-0 place-items-center bg-gradient-to-br font-bold shadow-sm ${
-        ACCENT_CLASSES[preferences.avatarAccent]
+      className={`${sizeClass} ${shapeClass} grid shrink-0 place-items-center bg-gradient-to-br font-bold shadow-sm ${
+        ACCENT_CLASSES[effectivePreferences.avatarAccent]
       }`}
+      role={ariaLabel ? "img" : undefined}
+      aria-label={ariaLabel}
     >
-      {preferences.avatarMode === "preset" ? (
+      {resolved.source === "preset" ? (
         <Icon className={iconSizeClass} aria-hidden="true" />
       ) : (
         getInitial(profileName)
@@ -88,6 +109,7 @@ export default function SidebarProfileCard({
   profileName,
   tagline,
   preferences,
+  socialAvatarUrl,
   onOpenProfile,
   onOpenSettings,
 }: SidebarProfileCardProps) {
@@ -101,7 +123,7 @@ export default function SidebarProfileCard({
           aria-label="Profili aç"
           title="Profili aç"
         >
-          <ProfileAvatar profileName={profileName} preferences={preferences} />
+          <ProfileAvatar profileName={profileName} preferences={preferences} socialAvatarUrl={socialAvatarUrl} />
         </button>
 
         <div className="min-w-0 flex-1">

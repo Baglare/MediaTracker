@@ -16,8 +16,10 @@ export function canViewProfileDetails(mode: ProfileVisibility, context: Visibili
 export function canViewModule(mode: ProfileVisibility, visibility: ModuleVisibility, context: VisibilityContext): boolean {
   if (context.self) return true;
   if (mode === "personal") return false;
-  if (visibility === "public") return true;
+  if (mode === "public" && visibility === "public") return true;
   if (context.anonymous) return false;
+  if (mode === "protected" && !context.viewerFollowsOwner) return false;
+  if (visibility === "public") return true;
   if (visibility === "followers") return context.viewerFollowsOwner;
   if (visibility === "mutual") return context.viewerFollowsOwner && context.ownerFollowsViewer;
   return false;

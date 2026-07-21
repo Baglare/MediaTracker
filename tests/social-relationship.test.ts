@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decideFollow, removeRelationshipsOnBlock, resolveConnectionState } from "@/lib/social/relationships";
+import { buildYinYangConnectionViewModel, decideFollow, removeRelationshipsOnBlock, resolveConnectionState } from "@/lib/social/relationships";
 
 describe("social follow, block and Yin/Yang state", () => {
   it.each([
@@ -37,5 +37,24 @@ describe("social follow, block and Yin/Yang state", () => {
       { followerId: "c", followingId: "a", status: "accepted" },
     ];
     expect(removeRelationshipsOnBlock(rows, "a", "b")).toEqual([rows[2]]);
+  });
+
+  it.each([
+    ["accepted", null, false, false, { yin: "active", yang: "passive" }],
+    [null, "accepted", false, false, { yin: "passive", yang: "active" }],
+    ["accepted", "pending", false, false, { yin: "active", yang: "pending" }],
+    ["pending", "accepted", false, false, { yin: "pending", yang: "active" }],
+    ["accepted", "accepted", false, false, { yin: "active", yang: "active" }],
+    ["pending", null, false, false, { yin: "pending", yang: "passive" }],
+    [null, "pending", false, false, { yin: "passive", yang: "pending" }],
+    ["accepted", "accepted", true, false, { yin: "passive", yang: "passive" }],
+    ["accepted", "accepted", false, true, { yin: "passive", yang: "passive" }],
+  ] as const)("keeps Yin/Yang directions independent for owner=%s viewer=%s self=%s anonymous=%s", (owner, viewer, self, anonymous, expected) => {
+    expect(buildYinYangConnectionViewModel({
+      ownerFollowsViewer: owner,
+      viewerFollowsOwner: viewer,
+      self,
+      anonymous,
+    })).toEqual(expected);
   });
 });

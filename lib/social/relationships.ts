@@ -1,5 +1,26 @@
 import type { ConnectionState, FollowStatus, ProfileVisibility, RelationshipFacts } from "@/lib/social/types";
 
+export type ConnectionPieceState = "active" | "pending" | "passive";
+
+export interface YinYangConnectionViewModel {
+  yin: ConnectionPieceState;
+  yang: ConnectionPieceState;
+}
+
+function pieceState(status: FollowStatus | null): ConnectionPieceState {
+  if (status === "accepted") return "active";
+  if (status === "pending") return "pending";
+  return "passive";
+}
+
+export function buildYinYangConnectionViewModel(facts: RelationshipFacts): YinYangConnectionViewModel {
+  if (facts.self || facts.anonymous) return { yin: "passive", yang: "passive" };
+  return {
+    yin: pieceState(facts.ownerFollowsViewer),
+    yang: pieceState(facts.viewerFollowsOwner),
+  };
+}
+
 export function resolveConnectionState(facts: RelationshipFacts): ConnectionState {
   if (facts.self) return "self";
   if (facts.anonymous) return "anonymous";

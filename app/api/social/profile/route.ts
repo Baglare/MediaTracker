@@ -12,6 +12,9 @@ import {
 } from "@/lib/social/validation";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 function failure(message: string, status = 400) {
   return NextResponse.json({ ok: false, message }, { status });
 }
@@ -24,7 +27,9 @@ async function context() {
 }
 
 export async function GET() {
-  return NextResponse.json(await loadOwnSocialEditorData());
+  return NextResponse.json(await loadOwnSocialEditorData(), {
+    headers: { "Cache-Control": "private, no-store, max-age=0" },
+  });
 }
 
 export async function POST(request: Request) {

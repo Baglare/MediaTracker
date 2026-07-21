@@ -12,6 +12,7 @@ export interface ProfilePreferences {
   avatarAccent: AvatarAccent;
   presetAvatar: PresetAvatar;
   avatarImageDataUrl?: string;
+  socialAvatarMigrationDismissedFor?: string;
   selectedTitleMode: SelectedTitleMode;
   manualTitle: string;
 }
@@ -60,6 +61,9 @@ function normalizeProfilePreferences(raw: unknown): ProfilePreferences {
   }
   if (typeof r.avatarImageDataUrl === "string" && r.avatarImageDataUrl.startsWith("data:image/")) {
     base.avatarImageDataUrl = r.avatarImageDataUrl;
+  }
+  if (typeof r.socialAvatarMigrationDismissedFor === "string") {
+    base.socialAvatarMigrationDismissedFor = r.socialAvatarMigrationDismissedFor.slice(0, 128);
   }
 
   return base;

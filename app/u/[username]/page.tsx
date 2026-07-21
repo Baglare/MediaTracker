@@ -4,6 +4,9 @@ import { redirect } from "next/navigation";
 import { SocialProfileView } from "@/components/social/social-profile-view";
 import { loadSocialProfile } from "@/lib/social/server";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export async function generateMetadata({ params }: { params: Promise<{ username: string }> }): Promise<Metadata> {
   const { username } = await params;
   return { title: `@${username} · MediaTracker`, description: "MediaTracker sosyal profili" };

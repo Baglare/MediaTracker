@@ -6,7 +6,9 @@ Sosyal Faz 1, Supabase hesabına bağlı public/protected/personal profilleri, a
 
 ## Local-first / cloud-social ayrımı
 
-Yerel medya kütüphanesi ve kişisel profil tercihleri ana veri kaynağı olmaya devam eder. Sosyal profile giriş yapmak cloud media upload başlatmaz, sync tercihini değiştirmez ve favori/not/istatistik yayımlamaz. Yerel profil adı, tagline ve unvan ilk formu yalnızca ön doldurur; kullanıcı `Kaydet` demeden cloud’a yazılmaz. Yerel avatar data URL’si otomatik yüklenmez.
+Yerel medya kütüphanesi ve kişisel profil tercihleri ana veri kaynağı olmaya devam eder. Sosyal profile giriş yapmak cloud media upload başlatmaz, sync tercihini değiştirmez ve favori/not/istatistik yayımlamaz. Yerel profil adı, tagline ve unvan ilk formu yalnızca ön doldurur; kullanıcı `Kaydet` demeden cloud’a yazılmaz.
+
+Kullanıcı açısından tek bir profil fotoğrafı vardır. Authenticated sosyal profil sahibinde güvenli cloud `avatarUrl` ana kaynaktır; yoksa yalnız kendi hesabında yerel avatar fallback, ardından initials kullanılır. Ziyaret edilen başka profillerde yerel fallback kullanılmaz. Sosyal profili olup yalnız yerel resmi bulunan kullanıcıya bir defalık taşıma teklifi gösterilir; açık onay olmadan data URL cloud’a yüklenmez. Başarılı cloud upload sonrası aynı görsel yerel offline fallback olarak tutulabilir. Offline cloud değişikliği sessizce ayrı bir avatar üretmez; upload başarısız olur ve eski cloud avatar korunur.
 
 Cloud’a yalnızca kullanıcının açıkça seçtiği şu veriler gider:
 
@@ -36,6 +38,8 @@ Cloud’a yalnızca kullanıcının açıkça seçtiği şu veriler gider:
 
 Personal profil modunda kayıtlı tercihler silinmez ancak bütün modüller fiilen yalnızca sahibine görünür. `get_social_profile` RPC’si gizli modül satırlarını, grid config’ini, snapshot’ları ve not içeriğini response’a eklemeden önce filtreler; istemci CSS’i güvenlik sınırı değildir.
 
+Protected profilde bütün modüllerin efektif minimum görünürlüğü `followers` olur. Veritabanında `public` olarak kayıtlı bir modül anonymous veya authenticated stranger response’una girmez; kayıtlı visibility değeri değiştirilmez. Ortak server loader, RPC sonucunu aynı kuralla tekrar süzerek API ve `/u/[username]` SSR akışlarını eşitler. Bu viewer-specific giriş noktaları `force-dynamic`, `revalidate = 0` ve API tarafında `private, no-store` kullanır; kullanıcıya özel response ortak cache’e yazılmaz.
+
 ## Takip lifecycle ve Yin/Yang
 
 Takip asimetriktir. Public profil için `accepted`, protected profil için `pending` kayıt oluşur. Self-follow, duplicate, personal profil ve iki yönlü block durumu RPC’de reddedilir. Pending kayıt gönderici tarafından iptal; alıcı tarafından kabul/ret edilebilir. Accepted kayıt takip eden tarafından bırakılabilir veya profil sahibi follower’ı kaldırabilir. Karşı yön etkilenmez.
@@ -56,13 +60,13 @@ Hazır modül anahtarları: favoriler, şu anda, istatistik, progression, rozet 
 
 Yerel `personalNotes` hiçbir sosyal sorguya açılmaz. Kullanıcı önce notu seçer, sonra ayrı onay adımında metni düzenler, görünürlük ve spoiler durumunu belirler. `social_share_note` RPC’si `confirmed = true` olmadan insert yapmaz. Authenticated rolün tabloya doğrudan insert/update/delete yetkisi kaldırılmıştır. Snapshot oluşturulduktan sonra yerel not değişse bile otomatik güncellenmez; unshare yalnızca snapshot’ı siler.
 
-## Storage
+## Storage ve profil fotoğrafı
 
-Migration private `profile-assets` bucket’ını oluşturur. Yol düzeni `{user_id}/avatar/{uuid}.{ext}` ve `{user_id}/banner/{uuid}.{ext}` şeklindedir. JPG/PNG/WebP kabul edilir; route avatar için 5 MB, banner için 10 MB sınırı uygular. Kullanıcı yalnızca kendi klasörüne yazabilir. Public/protected asset erişimi kısa ömürlü signed URL ile, personal ve block durumlarıyla tutarlı security-definer görünürlük kontrolü üzerinden sağlanır. Yeni upload veya profil update başarısızsa eski görsel korunur; başarıdan sonra eski object temizlenir. Service role kullanılmaz.
+Migration private `profile-assets` bucket’ını oluşturur. Yol düzeni `{user_id}/avatar/{uuid}.{ext}` ve `{user_id}/banner/{uuid}.{ext}` şeklindedir. JPG/PNG/WebP kabul edilir; route avatar için 5 MB, banner için 10 MB sınırı uygular. Kullanıcı yalnızca kendi klasörüne yazabilir. Public/protected asset erişimi kısa ömürlü signed URL ile, personal ve block durumlarıyla tutarlı security-definer görünürlük kontrolü üzerinden sağlanır. Profil fotoğrafı için uygulamada tek upload kontrolü mevcut `/api/social/assets` endpoint’ini kullanır. Yeni upload veya profil update başarısızsa eski görsel korunur; başarıdan sonra eski object temizlenir. Service role kullanılmaz.
 
 ## Supabase kurulumu
 
-1. Mevcut Supabase projesinde `supabase/migrations/20260721_social_profile_foundation.sql` dosyasını Supabase CLI migration akışı veya SQL Editor ile uygula.
+1. Yeni kurulumda migration’ları sırayla uygula. Social Phase 1 daha önce kurulmuş uzak projede en son `supabase/migrations/20260721_social_profile_protected_visibility_fix_v2.sql` migration’ını uygula.
 2. Migration’ın tabloları, RPC’leri, RLS politikalarını ve private `profile-assets` bucket/policy’lerini oluşturduğunu doğrula.
 3. `NEXT_PUBLIC_SUPABASE_URL` ve `NEXT_PUBLIC_SUPABASE_ANON_KEY` değerlerini mevcut yöntemle tanımla.
 4. İki test hesabıyla public/protected/personal, follow request, block ve asset erişimini doğrula.

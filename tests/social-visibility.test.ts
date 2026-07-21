@@ -34,6 +34,23 @@ describe("social visibility matrix", () => {
     expect(canViewModule("personal", visibility, contexts.mutual)).toBe(false);
   });
 
+  it.each<[ModuleVisibility, keyof typeof contexts, boolean]>([
+    ["public", "anon", false],
+    ["public", "viewer", false],
+    ["public", "follower", true],
+    ["followers", "follower", true],
+    ["mutual", "follower", false],
+    ["mutual", "mutual", true],
+  ])("raises protected %s modules to the follower minimum for %s", (visibility, viewer, expected) => {
+    expect(canViewModule("protected", visibility, contexts[viewer])).toBe(expected);
+  });
+
+  it("lets self view every stored module visibility", () => {
+    for (const visibility of ["public", "followers", "mutual", "self"] as const) {
+      expect(canViewModule("protected", visibility, contexts.self)).toBe(true);
+    }
+  });
+
   it("builds deterministic editor preview contexts", () => {
     expect(previewContext("public").anonymous).toBe(true);
     expect(previewContext("followers").viewerFollowsOwner).toBe(true);
