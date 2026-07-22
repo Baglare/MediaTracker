@@ -273,6 +273,13 @@ export interface Database {
       list_social_notifications: { Args: { p_cursor_created_at?: string; p_cursor_id?: string; p_limit?: number }; Returns: Json };
       social_notification_action: { Args: { p_action: string; p_notification?: string | null; p_entity_type?: string | null; p_entity_id?: string | null }; Returns: Json };
       social_report: { Args: { p_activity: string | null; p_comment: string | null; p_category: string; p_note?: string | null }; Returns: Json };
+      xp_attest_local_event: { Args: { p_event_type: string; p_canonical_key: string; p_media: Json; p_total_progress?: number | null; p_idempotency_key?: string | null }; Returns: Json };
+      xp_import_legacy: { Args: { p_media_count: number; p_progress_log_count: number; p_completed_count: number; p_rated_count: number; p_favorite_count: number; p_noted_count: number; p_world_counts: Json }; Returns: Json };
+      xp_sync_media_states: { Args: { p_items: Json; p_replace?: boolean }; Returns: Json };
+      get_xp_dashboard: { Args: { p_event_limit?: number }; Returns: Json };
+      get_xp_public_summary: { Args: { p_user: string }; Returns: Json };
+      xp_select_badges: { Args: { p_badge_keys: string[] }; Returns: Json };
+      xp_select_title: { Args: { p_title: string }; Returns: Json };
     };
     Enums: Record<string, never>;
   };

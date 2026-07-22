@@ -34,6 +34,7 @@ import {
   sendSocialOutboxItem,
 } from "@/lib/social/local-social";
 import { DEFAULT_ACTIVITY_PREFERENCES, type SocialPreferences } from "@/lib/social/interactions";
+import { flushXpOutbox, queueXpMediaState, sendXpOutboxBatch } from "@/lib/xp/outbox";
 
 type ProgressAction = "increment" | "complete" | "manual_adjust" | "added";
 
@@ -44,6 +45,14 @@ export function useMediaLibrary(userId: string | null) {
 
   useEffect(() => {
     setSyncUserId(userId);
+  }, [userId]);
+
+  useEffect(() => {
+    if (!userId) return;
+    void flushXpOutbox(userId, sendXpOutboxBatch);
+    const flush = () => { void flushXpOutbox(userId, sendXpOutboxBatch); };
+    window.addEventListener("online", flush);
+    return () => window.removeEventListener("online", flush);
   }, [userId]);
 
   useEffect(() => {
@@ -153,6 +162,16 @@ export function useMediaLibrary(userId: string | null) {
     void flushSocialOutbox(userId, sendSocialOutboxItem);
   }, [userId]);
 
+  const queueXpMutation = useCallback((next: MediaItem, deleted = false, flush = true) => {
+    if (!userId) return;
+    try {
+      queueXpMediaState(next, userId, deleted);
+      if (flush) void flushXpOutbox(userId, sendXpOutboxBatch);
+    } catch {
+      // XP kuyruğu local-first medya mutasyonunu hiçbir zaman geri almamalı.
+    }
+  }, [userId]);
+
   const buildAddedLogDetail = useCallback((item: MediaItem) => {
     const details = ["Kütüphaneye eklendi"];
     if (item.status !== "planning") details.push(`Durum: ${getStatusLabel(item.status)}`);
@@ -183,6 +202,7 @@ export function useMediaLibrary(userId: string | null) {
     setMediaList((previous) => previous.map((candidate) => candidate.id === id ? updated : candidate));
     enqueueMediaUpsert(updated);
     queueSocialMutation(item, updated);
+    queueXpMutation(updated);
     addProgressLog({
       mediaId: item.id,
       mediaTitle: item.title,
@@ -192,7 +212,7 @@ export function useMediaLibrary(userId: string | null) {
       previousProgress: item.currentProgress,
       newProgress,
     });
-  }, [addProgressLog, mediaList, queueSocialMutation]);
+  }, [addProgressLog, mediaList, queueSocialMutation, queueXpMutation]);
 
   const completeMedia = useCallback((id: string) => {
     const item = mediaList.find((candidate) => candidate.id === id);
@@ -202,6 +222,7 @@ export function useMediaLibrary(userId: string | null) {
     setMediaList((previous) => previous.map((candidate) => candidate.id === id ? updated : candidate));
     enqueueMediaUpsert(updated);
     queueSocialMutation(item, updated);
+    queueXpMutation(updated);
     if (item.currentProgress >= item.totalProgress) return;
     addProgressLog({
       mediaId: item.id,
@@ -212,7 +233,7 @@ export function useMediaLibrary(userId: string | null) {
       previousProgress: item.currentProgress,
       newProgress,
     });
-  }, [addProgressLog, mediaList, queueSocialMutation]);
+  }, [addProgressLog, mediaList, queueSocialMutation, queueXpMutation]);
 
   const saveMedia = useCallback((item: MediaItem) => {
     const classified = withMediaClassification(withInferredSeriesGroup(item));
@@ -226,6 +247,7 @@ export function useMediaLibrary(userId: string | null) {
     );
     enqueueMediaUpsert(stored);
     queueSocialMutation(existing, stored);
+    queueXpMutation(stored);
 
     if (existing && existing.currentProgress !== classified.currentProgress) {
       addProgressLog({
@@ -249,12 +271,14 @@ export function useMediaLibrary(userId: string | null) {
         detail: buildAddedLogDetail(classified),
       });
     }
-  }, [addProgressLog, buildAddedLogDetail, mediaList, queueSocialMutation]);
+  }, [addProgressLog, buildAddedLogDetail, mediaList, queueSocialMutation, queueXpMutation]);
 
   const deleteMedia = useCallback((id: string) => {
+    const item = mediaList.find((candidate) => candidate.id === id);
     setMediaList((previous) => previous.filter((item) => item.id !== id));
     enqueueMediaDelete(id);
-  }, []);
+    if (item) queueXpMutation(item, true);
+  }, [mediaList, queueXpMutation]);
 
   const toggleFavorite = useCallback((id: string) => {
     const current = mediaList.find((item) => item.id === id);
@@ -263,7 +287,8 @@ export function useMediaLibrary(userId: string | null) {
     setMediaList((previous) => previous.map((item) => item.id === id ? updated : item));
     enqueueMediaUpsert(updated);
     queueSocialMutation(current, updated);
-  }, [mediaList, queueSocialMutation]);
+    queueXpMutation(updated);
+  }, [mediaList, queueSocialMutation, queueXpMutation]);
 
   const updateRating = useCallback((id: string, rating: number | null) => {
     if (rating !== null && (!Number.isInteger(rating) || rating < 0 || rating > 10)) return;
@@ -273,22 +298,34 @@ export function useMediaLibrary(userId: string | null) {
     setMediaList((previous) => previous.map((item) => item.id === id ? updated : item));
     enqueueMediaUpsert(updated);
     queueSocialMutation(current, updated);
-  }, [mediaList, queueSocialMutation]);
+    queueXpMutation(updated);
+  }, [mediaList, queueSocialMutation, queueXpMutation]);
 
   const commitMediaChanges = useCallback((next: MediaItem[], changed: MediaItem[] = []) => {
     setMediaList(next);
-    changed.forEach(enqueueMediaUpsert);
-  }, []);
+    const nextIds = new Set(next.map((item) => item.id));
+    mediaList.filter((item) => !nextIds.has(item.id)).forEach((item) => queueXpMutation(item, true, false));
+    changed.forEach((item) => { enqueueMediaUpsert(item); queueXpMutation(item, false, false); });
+    if (userId) void flushXpOutbox(userId, sendXpOutboxBatch);
+  }, [mediaList, queueXpMutation, userId]);
 
   const importMedia = useCallback((items: MediaItem[], logs: ProgressLog[]) => {
-    setMediaList(items.map((item) => withMediaClassification(item)));
+    const classified = items.map((item) => withMediaClassification(item));
+    const nextIds = new Set(classified.map((item) => item.id));
+    mediaList.filter((item) => !nextIds.has(item.id)).forEach((item) => queueXpMutation(item, true, false));
+    classified.forEach((item) => queueXpMutation(item, false, false));
+    if (userId) void flushXpOutbox(userId, sendXpOutboxBatch);
+    setMediaList(classified);
     setProgressLogs(logs);
-  }, []);
+  }, [mediaList, queueXpMutation, userId]);
 
   const resetMedia = useCallback(() => {
     clearMediaList();
+    mediaList.forEach((item) => queueXpMutation(item, true, false));
+    mockMediaList.forEach((item) => queueXpMutation(item, false, false));
+    if (userId) void flushXpOutbox(userId, sendXpOutboxBatch);
     setMediaList(mockMediaList);
-  }, []);
+  }, [mediaList, queueXpMutation, userId]);
 
   return {
     mediaList,

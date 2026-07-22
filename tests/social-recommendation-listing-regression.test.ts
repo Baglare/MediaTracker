@@ -6,6 +6,7 @@ const migrationName = "20260721134500_recommendation_listing_regression_fix.sql"
 const migration = readFileSync(new URL(`../supabase/migrations/${migrationName}`, import.meta.url), "utf8").trim();
 const schema = readFileSync(new URL("../supabase/schema.sql", import.meta.url), "utf8");
 const marker = `-- Recommendation listing regression fix (kept in sync with ${migrationName})`;
+const xpMarker = "-- BEGIN XP V2 PROGRESSION";
 const inboxSource = readFileSync(new URL("../components/social/recommendation-inbox.tsx", import.meta.url), "utf8");
 
 const row = {
@@ -17,7 +18,7 @@ const row = {
 const resolveAvatar = async () => undefined;
 
 describe("recommendation listing regression", () => {
-  it("uses a unique migration and keeps canonical schema synchronized", () => { const names = readdirSync(new URL("../supabase/migrations/", import.meta.url)); expect(migrationName).toMatch(/^\d{14}_.+\.sql$/); expect(names.filter((name) => name.startsWith("20260721134500"))).toEqual([migrationName]); expect(schema.slice(schema.indexOf(marker) + marker.length).trim()).toBe(migration); });
+  it("uses a unique migration and keeps canonical schema synchronized", () => { const names = readdirSync(new URL("../supabase/migrations/", import.meta.url)); expect(migrationName).toMatch(/^\d{14}_.+\.sql$/); expect(names.filter((name) => name.startsWith("20260721134500"))).toEqual([migrationName]); expect(schema.slice(schema.indexOf(marker) + marker.length,schema.indexOf(xpMarker)).trim()).toBe(migration); });
   it("uses the real recommendation event timestamp column", () => { expect(migration).toContain("e.occurred_at"); expect(migration).not.toMatch(/\be\.created_at\b/); });
   it("keeps messages and events optional enrichment instead of filtering joins", () => { expect(migration).toContain("'lastEvent',(select jsonb_build_object"); expect(migration).toContain("'lastMessagePreview',case"); expect(migration).not.toMatch(/join\s+public\.social_recommendation_(?:messages|events)\s/i); });
   it("keeps incoming and outgoing participant directions explicit", () => { expect(migration).toContain("p_box='received' then r.recipient_id=v_user else r.sender_id=v_user"); expect(schema).toContain("auth.uid() in (sender_id,recipient_id)"); });

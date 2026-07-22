@@ -94,6 +94,7 @@ import {
 } from "@/lib/series-group";
 import { calculateDashboardStats } from "@/lib/dashboard-stats";
 import { calculateUserProgression } from "@/lib/user-progression";
+import { useXpProgression } from "@/hooks/use-xp-progression";
 import { TvmazeNormalizedDetail } from "@/lib/tvmaze-types";
 import { OpenLibraryNormalizedResult } from "@/lib/openlibrary-types";
 import { AniListNormalizedResult } from "@/lib/anilist-types";
@@ -1133,9 +1134,11 @@ export default function HomePage() {
     return calculateDashboardStats(mediaList, progressLogs);
   }, [mediaList, progressLogs]);
 
-  const userProgression = useMemo(() => {
+  const legacyUserProgression = useMemo(() => {
     return calculateUserProgression(mediaList, progressLogs);
   }, [mediaList, progressLogs]);
+
+  const { progression: userProgression } = useXpProgression(authUser?.id ?? null, legacyUserProgression);
 
   const profileName = useMemo(() => {
     return resolveProfileDisplayName(profilePreferences, authUser);

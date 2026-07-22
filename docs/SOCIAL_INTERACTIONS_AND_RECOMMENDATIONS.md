@@ -1,8 +1,10 @@
 # Sosyal Etkileşimler ve Medya Önerileri
 
+> Recommendation `completed` event’i ile tamamlanma sonrası anlamlı recipient feedback’i XP V2 tarafından server-side ve idempotent biçimde tüketilir. Puanlar ve anti-abuse kuralları için [XP V2 ve İlerleme Sistemi](./XP_V2_PROGRESSION_SYSTEM.md) belgesine bakın.
+
 ## Kapsam
 
-Sosyal Faz 2; Faz 1 profil, takip ve block temeli üzerinde `/feed`, `/recommendations` ve `/notifications` alanlarını sağlar. Medya kütüphanesi local-first kalır; cloud'a tam `MediaItem`, `personalNotes` veya ham localStorage kaydı gönderilmez. XP V2, genel DM ve gerçek zamanlı sohbet bu kapsamda değildir.
+Sosyal Faz 2; Faz 1 profil, takip ve block temeli üzerinde `/feed`, `/recommendations` ve `/notifications` alanlarını sağlar. Medya kütüphanesi local-first kalır; cloud'a tam `MediaItem`, `personalNotes` veya ham localStorage kaydı gönderilmez. XP V2 ayrı progression katmanıdır; genel DM ve gerçek zamanlı sohbet bu kapsamda değildir.
 
 ## Feed ve etkileşimler
 
@@ -70,4 +72,4 @@ Komut kullanıcı tarafından, hedef proje ve migration geçmişi doğrulandıkt
 - Badge senkronizasyonu aynı sekmede custom event, sekmeler arasında polling/focus refresh kullanır; BroadcastChannel/realtime yoktur.
 - Recommendation mesajlarında attachment, typing indicator, per-message read receipt veya reaction yoktur.
 - Başka cihazdaki local recommendation link otomatik senkronize edilmez.
-- XP V2, genel DM, kulüp, chat ve feed ranking bu fazın dışındadır.
+- Genel DM, kulüp, chat ve feed ranking bu fazın dışındadır.

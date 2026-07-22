@@ -1,4 +1,5 @@
 import type { MediaType } from "@/lib/types";
+import type { PublicXpSummary } from "@/lib/xp/types";
 
 export const PROFILE_VISIBILITIES = ["public", "protected", "personal"] as const;
 export const MODULE_VISIBILITIES = ["public", "followers", "mutual", "self"] as const;
@@ -150,6 +151,7 @@ export interface SocialProfilePayload {
   current: SocialMediaSnapshot[];
   stats?: SocialStatsSnapshot;
   progression?: SocialProgressionSnapshot;
+  xp?: PublicXpSummary;
   sharedNotes: Array<Omit<SharedNoteInput, "confirmed"> & { id: string; createdAt: string; updatedAt: string }>;
   activity?: Array<{ id: string; eventType: string; visibility: ModuleVisibility; media: { title: string; mediaType: MediaType; coverUrl?: string }; rating?: number; text?: string; createdAt: string }>;
   redirectUsername?: string;

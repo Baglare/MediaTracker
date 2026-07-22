@@ -1,0 +1,28 @@
+import { readFileSync, readdirSync } from "node:fs";
+import { describe, expect, it } from "vitest";
+
+const migrationName="20260721140000_xp_v2_progression.sql";
+const sql=readFileSync(new URL(`../supabase/migrations/${migrationName}`,import.meta.url),"utf8").trim();
+const schema=readFileSync(new URL("../supabase/schema.sql",import.meta.url),"utf8");
+const begin="-- BEGIN XP V2 PROGRESSION";const end="-- END XP V2 PROGRESSION";
+const schemaBlock=schema.slice(schema.lastIndexOf(begin),schema.lastIndexOf(end)+end.length).trim();
+
+describe("XP V2 SQL contract (static, not live RLS integration)",()=>{
+  it("uses a unique 14-digit migration timestamp",()=>{expect(migrationName).toMatch(/^\d{14}_.+\.sql$/);const names=readdirSync(new URL("../supabase/migrations/",import.meta.url));expect(new Set(names.map((name)=>name.slice(0,14))).size).toBe(names.length);});
+  it.each(["xp_events","xp_event_allocations","xp_user_totals","xp_user_world_totals","xp_user_branch_totals","xp_legacy_imports","xp_quest_definitions","xp_user_quest_progress","xp_badge_definitions","xp_user_badges"])("creates and enables RLS for %s",(table)=>{expect(sql).toContain(`create table if not exists public.${table}`);expect(sql).toContain(`alter table public.${table} enable row level security`);});
+  it("keeps event history and allocations immutable",()=>{expect(sql).toContain("xp_events_immutable before update or delete");expect(sql).toContain("xp_allocations_immutable before update or delete");expect(sql).toContain("raise exception 'xp_event_immutable'");});
+  it("deduplicates each event per user",()=>expect(sql).toContain("unique(user_id,dedupe_key)"));
+  it("accepts no XP amount in the public local event RPC",()=>{expect(sql).toContain("xp_attest_local_event(p_event_type text,p_canonical_key text,p_media jsonb,p_total_progress integer default null,p_idempotency_key text default null)");expect(sql).not.toMatch(/xp_attest_local_event\([^)]*amount/i);});
+  it("allocates the configured local event rewards server-side",()=>{for(const amount of [4,5,3,20,15])expect(sql).toContain(`'amount',${amount}`);expect(sql).toContain("v_general:=25+v_bonus");expect(sql).toContain("'amount',v_general");expect(sql).toContain("public.xp_commitment_bonus(p_total_progress)");});
+  it("implements all commitment bonus bands with a 15 XP cap",()=>{expect(sql).toContain("p_total_progress<=12 then 3");expect(sql).toContain("p_total_progress<=50 then 7");expect(sql).toContain("p_total_progress<=200 then 10");expect(sql).toContain("else 15");});
+  it("records the historical daily-limit behavior that the follow-up migration supersedes",()=>{expect(sql).toContain("recorded_at>=date_trunc('day',now())");expect(sql).toContain("reason','daily_limit'");});
+  it("computes legacy XP on the server, imports once and awards no branch baseline",()=>{expect(sql).toContain("v_total:=p_media_count*10+p_progress_log_count*5+p_completed_count*30+p_rated_count*8+p_favorite_count*5+p_noted_count*8");expect(sql).toContain("user_id uuid primary key");expect(sql).toContain("'branchXpAwarded',false");const fn=sql.slice(sql.indexOf("create or replace function public.xp_import_legacy"),sql.indexOf("create or replace function public.xp_award_recommendation_completion"));expect(fn).not.toContain("'axisType','branch'");});
+  it("derives both recommendation beneficiaries from the server row",()=>{expect(sql).toContain("v_rec.recipient_id,'recommendation_completed_recipient'");expect(sql).toContain("v_rec.sender_id,'recommendation_completed_sender'");expect(sql).toContain("'recommendation_completed_recipient:'||p_recommendation::text");expect(sql).toContain("'recommendation_completed_sender:'||p_recommendation::text");});
+  it("awards completion feedback only to the recipient after completion and once",()=>{expect(sql).toContain("v_rec.progress_status='completed' and new.author_id=v_rec.recipient_id and length(btrim(new.body))>=40");expect(sql).toContain("'recommendation_completion_feedback:'||new.recommendation_id::text||':'||new.author_id::text");});
+  it("does not award follow, comment, reaction, activity or recommendation send events",()=>{const eventCheck=sql.slice(sql.indexOf("event_type text not null check"),sql.indexOf("trust_level text"));for(const event of ["follow","comment","reaction","activity_shared","recommendation_sent","daily_login"])expect(eventCheck).not.toContain(`'${event}'`);});
+  it("seeds evergreen quests and keeps the unavailable review quest inactive",()=>{for(const quest of ["first_trace","first_final","three_worlds","friend_advice","recommendation_found","profile_curator"])expect(sql).toContain(`'${quest}'`);expect(sql).toContain("'critical_view'");expect(sql).toContain("5,0,null,false");});
+  it("awards badges server-side and limits selection to five earned badges",()=>{expect(sql).toContain("insert into public.xp_user_badges");expect(sql).toContain("array_length(p_badge_keys,1),0)>5");expect(sql).toContain("raise exception 'badge_not_earned'");});
+  it("protects each public XP projection with the existing social profile module gate",()=>{expect(sql).toContain("v_profile:=public.get_social_profile(v_username)");expect(sql).toContain("m->>'moduleKey'='progression'");expect(sql).toContain("m->>'moduleKey'='badges'");expect(sql).toContain("case when v_can_progression");expect(sql).toContain("case when v_can_badges");});
+  it("revokes direct writes and only grants focused RPC execution",()=>{expect(sql).toMatch(/revoke insert,update,delete on public\.xp_events[\s\S]*from anon,authenticated/);expect(sql).toContain("grant execute on function public.xp_attest_local_event");});
+  it("keeps schema.sql XP V2 block synchronized with the migration",()=>expect(schemaBlock).toBe(sql));
+});

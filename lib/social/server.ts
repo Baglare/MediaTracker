@@ -19,6 +19,7 @@ import { getSupabaseServerClient } from "@/lib/supabase/server";
 import type { Json } from "@/lib/supabase/types";
 import { socialRecord, validateActivityVisibility, validateSocialMediaSnapshot, validateUuid } from "@/lib/social/interactions-validation";
 import { validateActivityType } from "@/lib/social/interactions-validation";
+import { parsePublicXpSummary } from "@/lib/xp/validation";
 
 const BUCKET = "profile-assets";
 
@@ -129,6 +130,8 @@ export async function loadSocialProfile(username: string): Promise<SocialProfile
   const visibleModules = new Set(modules.map((module) => module.moduleKey));
   const stats = visibleModules.has("stats") ? validateStatsSnapshot(root.stats) : null;
   const progression = visibleModules.has("progression") ? validateProgressionSnapshot(root.progression) : null;
+  const xpResult = visibleModules.has("progression") || visibleModules.has("badges") ? await client.rpc("get_xp_public_summary", { p_user: profile.id }) : { data: null, error: null };
+  const xp = xpResult.error ? undefined : parsePublicXpSummary(xpResult.data);
   const activityResult = visibleModules.has("activity") ? await client.rpc("list_profile_activity", { p_owner: profile.id, p_limit: 8 }) : { data: [], error: null };
   const activity = !activityResult.error && Array.isArray(activityResult.data) ? activityResult.data.flatMap((entry) => {
     const item = socialRecord(entry); const id = validateUuid(item?.id); const type = validateActivityType(item?.eventType); const visibility = validateActivityVisibility(item?.visibility); const media = validateSocialMediaSnapshot(item?.media); const createdAt = stringOf(item?.createdAt);
@@ -143,6 +146,7 @@ export async function loadSocialProfile(username: string): Promise<SocialProfile
     current: visibleModules.has("current") ? mediaOf(root.current, 6) : [],
     stats: stats?.ok ? stats.value : undefined,
     progression: progression?.ok ? progression.value : undefined,
+    xp,
     sharedNotes: visibleModules.has("shared_notes") && Array.isArray(root.sharedNotes) ? root.sharedNotes as SocialProfilePayload["sharedNotes"] : [],
     activity,
   };
