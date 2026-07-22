@@ -20,8 +20,11 @@ import type { Json } from "@/lib/supabase/types";
 import { socialRecord, validateActivityVisibility, validateSocialMediaSnapshot, validateUuid } from "@/lib/social/interactions-validation";
 import { validateActivityType } from "@/lib/social/interactions-validation";
 import { parsePublicXpSummary } from "@/lib/xp/validation";
+import { normalizeProfilePresentationPreferences } from "@/lib/personalization/validation";
+import type { OwnProfileSummary } from "@/lib/social/profile-summary";
 
 const BUCKET = "profile-assets";
+type SocialServerClient = NonNullable<Awaited<ReturnType<typeof getSupabaseServerClient>>>;
 
 function objectOf(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
@@ -39,13 +42,16 @@ function followOf(value: unknown): FollowStatus | null {
   return value === "pending" || value === "accepted" ? value : null;
 }
 
-export async function createSignedSocialAssetUrl(path: unknown): Promise<string | undefined> {
+async function createSignedSocialAssetUrlWithClient(client: SocialServerClient, path: unknown): Promise<string | undefined> {
   const assetPath = stringOf(path);
   if (!assetPath) return undefined;
-  const client = await getSupabaseServerClient();
-  if (!client) return undefined;
   const { data, error } = await client.storage.from(BUCKET).createSignedUrl(assetPath, 300);
   return error ? undefined : data.signedUrl;
+}
+
+export async function createSignedSocialAssetUrl(path: unknown): Promise<string | undefined> {
+  const client = await getSupabaseServerClient();
+  return client ? createSignedSocialAssetUrlWithClient(client, path) : undefined;
 }
 
 function relationshipOf(value: unknown, ownerColor: ConnectionColor) {
@@ -72,6 +78,7 @@ function profileOf(value: unknown): Omit<PublicSocialProfile, "avatarUrl" | "ban
     id: String(record.id),
     username: String(record.username),
     displayName: stringOf(record.displayName) ?? String(record.username),
+    tagline: stringOf(record.tagline) ?? "",
     bio: stringOf(record.bio) ?? "",
     location: stringOf(record.location),
     language: stringOf(record.language),
@@ -79,6 +86,7 @@ function profileOf(value: unknown): Omit<PublicSocialProfile, "avatarUrl" | "ban
     connectionColor: colorOf(record.connectionColor),
     joinedAt: stringOf(record.joinedAt) ?? new Date(0).toISOString(),
     selectedTitle: stringOf(record.selectedTitle),
+    presentation: normalizeProfilePresentationPreferences(record.presentation),
     followerCount: typeof record.followerCount === "number" ? record.followerCount : undefined,
     followingCount: typeof record.followingCount === "number" ? record.followingCount : undefined,
   };
@@ -104,7 +112,7 @@ export async function loadSocialProfile(username: string): Promise<SocialProfile
   const empty: SocialProfilePayload = { status: "not_found", modules: [], favorites: [], current: [], sharedNotes: [] };
   const client = await getSupabaseServerClient();
   if (!client) return { ...empty, status: "not_configured" };
-  const { data, error } = await client.rpc("get_social_profile", { p_username: username });
+  const { data, error } = await client.rpc("get_unified_social_profile", { p_username: username });
   const root = objectOf(data);
   if (error || !root) return empty;
   const status = root.status;
@@ -118,7 +126,6 @@ export async function loadSocialProfile(username: string): Promise<SocialProfile
   const rawProfile = objectOf(root.profile);
   const profile = profileOf(rawProfile);
   if (!profile) return empty;
-  const [avatarUrl, bannerUrl] = await Promise.all([createSignedSocialAssetUrl(rawProfile?.avatarPath), createSignedSocialAssetUrl(rawProfile?.bannerPath)]);
   const relationship = relationshipOf(root.relationship, profile.connectionColor);
   const visibilityContext = {
     anonymous: relationship.anonymous,
@@ -130,9 +137,17 @@ export async function loadSocialProfile(username: string): Promise<SocialProfile
   const visibleModules = new Set(modules.map((module) => module.moduleKey));
   const stats = visibleModules.has("stats") ? validateStatsSnapshot(root.stats) : null;
   const progression = visibleModules.has("progression") ? validateProgressionSnapshot(root.progression) : null;
-  const xpResult = visibleModules.has("progression") || visibleModules.has("badges") ? await client.rpc("get_xp_public_summary", { p_user: profile.id }) : { data: null, error: null };
+  const [avatarUrl, bannerUrl, xpResult, activityResult] = await Promise.all([
+    createSignedSocialAssetUrlWithClient(client, rawProfile?.avatarPath),
+    createSignedSocialAssetUrlWithClient(client, rawProfile?.bannerPath),
+    visibleModules.has("progression") || visibleModules.has("badges")
+      ? client.rpc("get_xp_public_summary", { p_user: profile.id })
+      : Promise.resolve({ data: null, error: null }),
+    visibleModules.has("activity")
+      ? client.rpc("list_profile_activity", { p_owner: profile.id, p_limit: 8 })
+      : Promise.resolve({ data: [], error: null }),
+  ]);
   const xp = xpResult.error ? undefined : parsePublicXpSummary(xpResult.data);
-  const activityResult = visibleModules.has("activity") ? await client.rpc("list_profile_activity", { p_owner: profile.id, p_limit: 8 }) : { data: [], error: null };
   const activity = !activityResult.error && Array.isArray(activityResult.data) ? activityResult.data.flatMap((entry) => {
     const item = socialRecord(entry); const id = validateUuid(item?.id); const type = validateActivityType(item?.eventType); const visibility = validateActivityVisibility(item?.visibility); const media = validateSocialMediaSnapshot(item?.media); const createdAt = stringOf(item?.createdAt);
     return item && id.ok && type.ok && visibility.ok && media.ok && createdAt && !Number.isNaN(Date.parse(createdAt)) ? [{ id: id.value, eventType: type.value, visibility: visibility.value, media: { title: media.value.title, mediaType: media.value.mediaType, coverUrl: media.value.coverUrl }, rating: typeof item.rating === "number" ? item.rating : undefined, text: stringOf(item.text), createdAt }] : [];
@@ -199,7 +214,7 @@ export async function loadOwnSocialEditorData(): Promise<SocialProfileEditorData
   const { data: auth } = await client.auth.getUser();
   if (!auth.user) return { configured: true, authenticated: false, modules: [], favorites: [], current: [], sharedNotes: [], blockedAccounts: [] };
   const [profileResult, modulesResult, showcaseResult, notesResult, blocksResult] = await Promise.all([
-    client.from("profiles").select("username,display_name,bio,location,language,visibility_mode,connection_color,avatar_path,banner_path,selected_title,username_changed_at").eq("id", auth.user.id).maybeSingle(),
+    client.from("profiles").select("username,display_name,tagline,bio,location,language,visibility_mode,connection_color,avatar_path,banner_path,selected_title,profile_palette_id,banner_mode,banner_position,overlay_strength,avatar_frame,surface_style,motif_intensity,username_changed_at").eq("id", auth.user.id).maybeSingle(),
     client.from("profile_modules").select("module_key,enabled,visibility,grid_x,grid_y,grid_width,grid_height,mobile_order,config").eq("user_id", auth.user.id).order("mobile_order"),
     client.from("profile_media_showcase").select("showcase_kind,title,media_type,external_source,external_id,cover_url,world,sort_order").eq("user_id", auth.user.id).order("sort_order"),
     client.from("profile_shared_notes").select("id,media_title,media_type,external_source,external_id,content,contains_spoiler,visibility,created_at,updated_at").eq("user_id", auth.user.id).order("created_at", { ascending: false }),
@@ -207,20 +222,37 @@ export async function loadOwnSocialEditorData(): Promise<SocialProfileEditorData
   ]);
   const row = profileResult.data;
   const showcase = showcaseResult.data ?? [];
+  const [avatarUrl, bannerUrl] = row
+    ? await Promise.all([
+      createSignedSocialAssetUrlWithClient(client, row.avatar_path),
+      createSignedSocialAssetUrlWithClient(client, row.banner_path),
+    ])
+    : [undefined, undefined];
   return {
     configured: true,
     authenticated: true,
     profile: row?.username ? {
       username: row.username,
       displayName: row.display_name ?? row.username,
+      tagline: row.tagline ?? "",
       bio: row.bio,
       location: row.location ?? undefined,
       language: row.language ?? undefined,
       visibilityMode: row.visibility_mode,
       connectionColor: colorOf(row.connection_color),
       selectedTitle: row.selected_title ?? undefined,
-      avatarUrl: await createSignedSocialAssetUrl(row.avatar_path),
-      bannerUrl: await createSignedSocialAssetUrl(row.banner_path),
+      presentation: normalizeProfilePresentationPreferences({
+        version: 1,
+        paletteId: row.profile_palette_id,
+        bannerMode: row.banner_mode,
+        bannerPosition: row.banner_position,
+        overlayStrength: row.overlay_strength,
+        avatarFrame: row.avatar_frame,
+        surfaceStyle: row.surface_style,
+        motifIntensity: row.motif_intensity,
+      }),
+      avatarUrl,
+      bannerUrl,
       usernameChangedAt: row.username_changed_at ?? undefined,
     } : undefined,
     modules: modulesOf((modulesResult.data ?? []).map((item) => ({ moduleKey: item.module_key, enabled: item.enabled, visibility: item.visibility, gridX: item.grid_x, gridY: item.grid_y, gridWidth: item.grid_width, gridHeight: item.grid_height, mobileOrder: item.mobile_order, config: item.config }))),
@@ -233,6 +265,25 @@ export async function loadOwnSocialEditorData(): Promise<SocialProfileEditorData
       const displayName = stringOf(item?.displayName);
       return id && displayName ? [{ id, displayName, username: stringOf(item?.username) }] : [];
     }) : [],
+  };
+}
+
+export async function loadOwnSocialProfileSummary(): Promise<OwnProfileSummary> {
+  const client = await getSupabaseServerClient();
+  if (!client) return {};
+  const { data: auth } = await client.auth.getUser();
+  if (!auth.user) return {};
+  const { data } = await client
+    .from("profiles")
+    .select("display_name,tagline,avatar_path,selected_title")
+    .eq("id", auth.user.id)
+    .maybeSingle();
+  if (!data) return {};
+  return {
+    displayName: data.display_name ?? undefined,
+    tagline: data.tagline ?? undefined,
+    avatarUrl: await createSignedSocialAssetUrlWithClient(client, data.avatar_path),
+    selectedTitle: data.selected_title ?? undefined,
   };
 }
 

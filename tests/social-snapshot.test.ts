@@ -24,7 +24,7 @@ describe("social snapshots and local prefill", () => {
 
   it("uses local preferences only as form prefill", () => {
     const prefill = prefillSocialProfile({ ...DEFAULT_PROFILE_PREFERENCES, displayName: "Bağlare", profileTagline: "Yerel bio", avatarImageDataUrl: "data:image/png;base64,secret" }, "Fallback", "Yolcu");
-    expect(prefill).toMatchObject({ username: "", displayName: "Bağlare", bio: "Yerel bio", visibilityMode: "personal" });
+    expect(prefill).toMatchObject({ username: "", displayName: "Bağlare", tagline: "Yerel bio", bio: "", visibilityMode: "personal" });
     expect(JSON.stringify(prefill)).not.toContain("data:image");
     expect(JSON.stringify(prefill)).not.toContain("library");
   });

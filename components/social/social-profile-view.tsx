@@ -1,13 +1,14 @@
 import Link from "next/link";
 
+import { ProfileHero } from "@/components/profile/profile-hero";
 import { ProfileGrid } from "@/components/social/profile-grid";
 import { SocialActions } from "@/components/social/social-actions";
 import { YinYangConnection } from "@/components/social/yin-yang-connection";
-import { ProfileAvatar } from "@/components/sidebar-profile-card";
+import { resolveProfileIdentity } from "@/lib/personalization/profile-identity";
 import type { SocialProfilePayload } from "@/lib/social/types";
 
 function StateCard({ title, text }: { title: string; text: string }) {
-  return <main className="app-page mx-auto grid min-h-[70vh] max-w-3xl place-items-center px-4"><div className="app-panel rounded-2xl border p-8 text-center"><h1 className="text-xl font-semibold">{title}</h1><p className="mt-2 text-sm text-[var(--app-text-muted)]">{text}</p><Link href="/people" className="mt-5 inline-block text-sm text-[var(--app-accent-strong)]">Kullanıcı aramaya dön</Link></div></main>;
+  return <div className="mx-auto grid min-h-[55vh] max-w-3xl place-items-center"><div className="app-panel rounded-2xl border p-8 text-center"><h1 className="text-xl font-semibold">{title}</h1><p className="mt-2 text-sm text-[var(--app-text-muted)]">{text}</p><Link href="/people" className="mt-5 inline-block text-sm text-[var(--app-accent-strong)]">Kullanıcı aramaya dön</Link></div></div>;
 }
 
 export function SocialProfileView({ payload }: { payload: SocialProfilePayload }) {
@@ -16,22 +17,28 @@ export function SocialProfileView({ payload }: { payload: SocialProfilePayload }
   if (payload.status === "unavailable") return <StateCard title="Profil kullanılamıyor" text="Bu profile şu anda erişilemiyor." />;
   if (payload.status !== "available" || !payload.profile || !payload.relationship) return <StateCard title="Profil bulunamadı" text="Kullanıcı adı mevcut değil veya profil kaldırılmış." />;
   const profile = payload.profile;
-  return <main className="app-page min-h-screen">
-    <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
-      <Link href="/people" className="mb-4 inline-block text-sm text-zinc-400 hover:text-zinc-200">← Kullanıcı ara</Link>
-      <header className="app-panel overflow-hidden rounded-3xl border">
-        <div className="h-36 bg-gradient-to-br from-violet-950 via-zinc-900 to-zinc-950 bg-cover bg-center sm:h-52" style={profile.bannerUrl ? { backgroundImage: `url(${JSON.stringify(profile.bannerUrl).slice(1, -1)})` } : undefined} />
-        <div className="px-5 pb-5 sm:px-8">
-          <div className="-mt-12 flex flex-col gap-4 sm:-mt-14 sm:flex-row sm:items-end">
-            <div className="shrink-0 rounded-full border-4 border-[var(--app-surface-1)]"><ProfileAvatar profileName={profile.displayName} socialAvatarUrl={profile.avatarUrl} allowLocalFallback={false} size="xl" shape="circle" ariaLabel={`${profile.displayName} avatarı`} /></div>
-            <div className="min-w-0 flex-1 pb-1"><div className="flex flex-wrap items-center gap-2"><h1 className="truncate text-2xl font-bold">{profile.displayName}</h1><span className="rounded-full bg-zinc-800 px-2 py-1 text-xs text-zinc-400">{profile.visibilityMode === "protected" ? "Korumalı" : "Herkese açık"}</span></div><p className="text-sm text-zinc-400">@{profile.username}{profile.selectedTitle ? ` · ${profile.selectedTitle}` : ""}</p></div>
-          </div>
-          {profile.bio && <p className="mt-4 max-w-3xl whitespace-pre-wrap text-sm text-zinc-300">{profile.bio}</p>}
-          <p className="mt-2 text-xs text-zinc-500">{[profile.location, profile.language?.toUpperCase(), `Katılım ${new Date(profile.joinedAt).toLocaleDateString("tr-TR")}`].filter(Boolean).join(" · ")}</p>
-          <div className="mt-5 flex flex-col justify-between gap-4 border-t border-zinc-800 pt-4 sm:flex-row sm:items-center"><YinYangConnection relationship={payload.relationship} following={profile.followingCount} followers={profile.followerCount} /><SocialActions targetId={profile.id} state={payload.relationship.state} viewerFollowsOwner={payload.relationship.viewerFollowsOwner} ownerFollowsViewer={payload.relationship.ownerFollowsViewer} /></div>
-        </div>
-      </header>
-      <div className="mt-5"><ProfileGrid payload={payload} /></div>
+  const identity = resolveProfileIdentity({ authenticated: true, socialProfile: profile, fallbackName: profile.username });
+  const publicActions = payload.relationship.self ? (
+    <Link href="/profile?mode=edit" className="app-primary-action rounded-xl px-4 py-2 text-sm font-semibold">Profili düzenle</Link>
+  ) : (
+    <div className="flex flex-col items-stretch gap-3 sm:items-end">
+      <YinYangConnection relationship={payload.relationship} following={profile.followingCount} followers={profile.followerCount} />
+      <SocialActions targetId={profile.id} state={payload.relationship.state} viewerFollowsOwner={payload.relationship.viewerFollowsOwner} ownerFollowsViewer={payload.relationship.ownerFollowsViewer} />
     </div>
-  </main>;
+  );
+  const dominantWorld = payload.xp?.worlds.slice().sort((a, b) => b.xp - a.xp)[0]?.key;
+  const dominantWorldSummary = payload.xp?.worlds.find((world) => world.key === dominantWorld);
+  const progression = payload.xp
+    ? { level: payload.xp.level ?? 1, totalXp: payload.xp.totalXp ?? 0, tier: dominantWorldSummary?.tier, dominantWorld, badges: payload.xp.badges }
+    : payload.progression
+      ? { level: payload.progression.level, totalXp: payload.progression.totalXp, tier: payload.progression.tier, dominantWorld: payload.progression.dominantWorld }
+      : undefined;
+  return (
+    <div data-profile-palette={profile.presentation.paletteId} className="mx-auto w-full max-w-6xl space-y-5">
+      <ProfileHero variant="public" identity={identity} presentation={profile.presentation} progression={progression} visibilityLabel={profile.visibilityMode === "protected" ? "Korumalı" : "Herkese açık"} location={profile.location} language={profile.language} joinedAt={`Katılım ${new Date(profile.joinedAt).toLocaleDateString("tr-TR")}`} actions={publicActions} />
+      {identity.bio && <section className="app-card rounded-2xl border p-5"><h2 className="text-sm font-semibold">Hakkında</h2><p className="mt-2 whitespace-pre-wrap text-sm text-[var(--app-text-secondary)]">{identity.bio}</p></section>}
+      {payload.relationship.self && <YinYangConnection relationship={payload.relationship} following={profile.followingCount} followers={profile.followerCount} />}
+      <ProfileGrid payload={payload} />
+    </div>
+  );
 }

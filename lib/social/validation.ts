@@ -1,4 +1,15 @@
 import type { MediaType } from "@/lib/types";
+import { DEFAULT_PROFILE_PRESENTATION_PREFERENCES } from "@/lib/personalization/defaults";
+import {
+  PROFILE_AVATAR_FRAMES,
+  PROFILE_BANNER_MODES,
+  PROFILE_BANNER_POSITIONS,
+  PROFILE_MOTIF_INTENSITIES,
+  PROFILE_OVERLAY_STRENGTHS,
+  PROFILE_PALETTE_IDS,
+  PROFILE_SURFACE_STYLES,
+} from "@/lib/personalization/validation";
+import type { ProfilePresentationPreferences } from "@/lib/personalization/types";
 import {
   CONNECTION_COLORS,
   MODULE_VISIBILITIES,
@@ -72,10 +83,12 @@ export function validateSocialProfileInput(value: unknown): ValidationResult<Soc
   const username = validateUsername(record.username);
   if (!username.ok) return username;
   const displayName = plainText(record.displayName, 60);
+  const tagline = record.tagline === undefined ? "" : plainText(record.tagline, 120);
   const bio = plainText(record.bio, 500);
   const location = record.location === undefined || record.location === "" ? "" : plainText(record.location, 80);
   const language = record.language === undefined || record.language === "" ? "" : plainText(record.language, 12);
   if (!displayName) return { ok: false, error: "Görünen ad 1–60 karakter olmalı." };
+  if (tagline === null) return { ok: false, error: "Tagline en fazla 120 karakter olmalı ve HTML içermemeli." };
   if (bio === null) return { ok: false, error: "Bio en fazla 500 karakter olmalı ve HTML içermemeli." };
   if (location === null) return { ok: false, error: "Konum en fazla 80 karakter olmalı." };
   if (language === null || (language && !SAFE_LANGUAGES.has(language.toLowerCase()))) return { ok: false, error: "Dil değeri desteklenmiyor." };
@@ -83,19 +96,47 @@ export function validateSocialProfileInput(value: unknown): ValidationResult<Soc
   const color = CONNECTION_COLORS.includes(record.connectionColor as ConnectionColor) ? record.connectionColor as ConnectionColor : "neutral";
   const selectedTitle = record.selectedTitle === undefined || record.selectedTitle === "" ? "" : plainText(record.selectedTitle, 60);
   if (selectedTitle === null) return { ok: false, error: "Ünvan en fazla 60 karakter olmalı." };
+  const presentation = record.presentation === undefined
+    ? { ok: true as const, value: DEFAULT_PROFILE_PRESENTATION_PREFERENCES }
+    : validateCloudProfilePresentation(record.presentation);
+  if (!presentation.ok) return presentation;
   return {
     ok: true,
     value: {
       username: username.value,
       displayName,
+      tagline,
       bio,
       location: location || undefined,
       language: language?.toLowerCase() || undefined,
       visibilityMode: record.visibilityMode as ProfileVisibility,
       connectionColor: color,
       selectedTitle: selectedTitle || undefined,
+      presentation: presentation.value,
     },
   };
+}
+
+export function validateCloudProfilePresentation(value: unknown): ValidationResult<ProfilePresentationPreferences> {
+  const record = recordOf(value);
+  if (!record || record.version !== 1) return { ok: false, error: "Profil sunum verisi geçersiz." };
+  if (!PROFILE_PALETTE_IDS.includes(record.paletteId as ProfilePresentationPreferences["paletteId"])) return { ok: false, error: "Profil palette değeri geçersiz." };
+  if (!PROFILE_BANNER_MODES.includes(record.bannerMode as ProfilePresentationPreferences["bannerMode"])) return { ok: false, error: "Banner türü geçersiz." };
+  if (!PROFILE_BANNER_POSITIONS.includes(record.bannerPosition as ProfilePresentationPreferences["bannerPosition"])) return { ok: false, error: "Banner konumu geçersiz." };
+  if (!PROFILE_OVERLAY_STRENGTHS.includes(record.overlayStrength as ProfilePresentationPreferences["overlayStrength"])) return { ok: false, error: "Overlay gücü geçersiz." };
+  if (!PROFILE_AVATAR_FRAMES.includes(record.avatarFrame as ProfilePresentationPreferences["avatarFrame"])) return { ok: false, error: "Avatar çerçevesi geçersiz." };
+  if (!PROFILE_SURFACE_STYLES.includes(record.surfaceStyle as ProfilePresentationPreferences["surfaceStyle"])) return { ok: false, error: "Profil yüzeyi geçersiz." };
+  if (!PROFILE_MOTIF_INTENSITIES.includes(record.motifIntensity as ProfilePresentationPreferences["motifIntensity"])) return { ok: false, error: "Motif yoğunluğu geçersiz." };
+  return { ok: true, value: {
+    version: 1,
+    paletteId: record.paletteId as ProfilePresentationPreferences["paletteId"],
+    bannerMode: record.bannerMode as ProfilePresentationPreferences["bannerMode"],
+    bannerPosition: record.bannerPosition as ProfilePresentationPreferences["bannerPosition"],
+    overlayStrength: record.overlayStrength as ProfilePresentationPreferences["overlayStrength"],
+    avatarFrame: record.avatarFrame as ProfilePresentationPreferences["avatarFrame"],
+    surfaceStyle: record.surfaceStyle as ProfilePresentationPreferences["surfaceStyle"],
+    motifIntensity: record.motifIntensity as ProfilePresentationPreferences["motifIntensity"],
+  } };
 }
 
 export function validateModuleLayout(value: unknown): ValidationResult<ProfileModuleLayout> {

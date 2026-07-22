@@ -18,16 +18,17 @@ describe("profile identity resolver", () => {
     expect(resolveProfileIdentity({
       authenticated: true,
       localPreferences,
-      socialProfile: { displayName: "Cloud Ad", bio: "Cloud bio", selectedTitle: "Cloud Ünvan" },
-    })).toMatchObject({ displayName: "Cloud Ad", tagline: "Cloud bio", selectedTitle: "Cloud Ünvan", source: "social" });
+      socialProfile: { displayName: "Cloud Ad", tagline: "Cloud tagline", bio: "Cloud bio", selectedTitle: "Cloud Ünvan" },
+    })).toMatchObject({ displayName: "Cloud Ad", tagline: "Cloud tagline", bio: "Cloud bio", selectedTitle: "Cloud Ünvan", source: "social" });
   });
 
   it("uses local displayName when cloud displayName is missing", () => {
     expect(resolveProfileIdentity({ authenticated: true, localPreferences, socialProfile: { bio: "Cloud bio" } }).displayName).toBe("Yerel Ad");
   });
 
-  it("uses local tagline when cloud bio is missing", () => {
+  it("uses local tagline when cloud tagline is missing without deriving it from bio", () => {
     expect(resolveProfileIdentity({ authenticated: true, localPreferences, socialProfile: { displayName: "Cloud Ad" } }).tagline).toBe("Yerel tagline");
+    expect(resolveProfileIdentity({ authenticated: true, localPreferences, socialProfile: { displayName: "Cloud Ad", bio: "Uzun cloud bio" } }).tagline).toBe("Yerel tagline");
   });
 
   it("keeps cloud avatar ahead of the local image fallback", () => {

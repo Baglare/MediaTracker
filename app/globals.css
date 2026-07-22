@@ -357,6 +357,12 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+[data-profile-palette="neutral"] { --profile-primary: var(--app-accent); --profile-strong: var(--app-accent-strong); --profile-soft: var(--app-accent-soft); --profile-ink: var(--app-text-primary); }
+[data-profile-palette="east"] { --profile-primary: #f59e0b; --profile-strong: #fbbf24; --profile-soft: rgba(245, 158, 11, 0.18); --profile-ink: #fff7ed; }
+[data-profile-palette="screen"] { --profile-primary: #38bdf8; --profile-strong: #67e8f9; --profile-soft: rgba(56, 189, 248, 0.18); --profile-ink: #ecfeff; }
+[data-profile-palette="arch"] { --profile-primary: #d97706; --profile-strong: #fbbf24; --profile-soft: rgba(217, 119, 6, 0.18); --profile-ink: #fffbeb; }
+[data-profile-palette="ocean"] { --profile-primary: #14b8a6; --profile-strong: #5eead4; --profile-soft: rgba(20, 184, 166, 0.18); --profile-ink: #ecfeff; }
+
 .app-page {
   background: var(--app-bg);
   color: var(--app-text-primary);

@@ -1,4 +1,5 @@
 import type { MediaType } from "@/lib/types";
+import type { ProfilePresentationPreferences } from "@/lib/personalization/types";
 import type { PublicXpSummary } from "@/lib/xp/types";
 
 export const PROFILE_VISIBILITIES = ["public", "protected", "personal"] as const;
@@ -38,12 +39,14 @@ export type ViewerPreviewMode = "public" | "followers" | "mutual" | "self";
 export interface SocialProfileInput {
   username: string;
   displayName: string;
+  tagline: string;
   bio: string;
   location?: string;
   language?: string;
   visibilityMode: ProfileVisibility;
   connectionColor: ConnectionColor;
   selectedTitle?: string;
+  presentation: ProfilePresentationPreferences;
 }
 
 export interface ProfileModuleLayout {
@@ -129,6 +132,7 @@ export interface PublicSocialProfile {
   id: string;
   username: string;
   displayName: string;
+  tagline: string;
   bio: string;
   location?: string;
   language?: string;
@@ -138,6 +142,7 @@ export interface PublicSocialProfile {
   bannerUrl?: string;
   joinedAt: string;
   selectedTitle?: string;
+  presentation: ProfilePresentationPreferences;
   followerCount?: number;
   followingCount?: number;
 }

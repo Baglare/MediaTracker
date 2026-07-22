@@ -2,102 +2,23 @@
 
 import Image from "next/image";
 import Link from "next/link";
+
 import {
-  Activity,
-  BarChart3,
-  Bell,
-  Calendar,
-  Compass,
-  Heart,
-  LayoutDashboard,
-  Library,
-  ListChecks,
-  NotebookPen,
-  Sparkles,
-  Star,
-  Send,
-  TrendingUp,
-  Users,
-  type LucideIcon,
-} from "lucide-react";
+  APP_NAVIGATION_ITEMS,
+  APP_NAVIGATION_SECTIONS,
+  APP_NAVIGATION_SECTION_LABELS,
+  type AppNavigationId,
+  type AppNavigationItem,
+  type DashboardTabId,
+} from "@/components/app-shell/app-navigation";
+import { NotificationBadge } from "@/components/social/notification-badge";
 import type { ProfilePreferences } from "@/lib/profile-preferences";
 import type { UserProgression, UserProgressionTier, UserProgressionWorld } from "@/lib/user-progression";
-import type { TabType } from "./app-tabs";
 import SidebarProfileCard from "./sidebar-profile-card";
-import { NotificationBadge } from "@/components/social/notification-badge";
-
-type NavItem = {
-  id: TabType | string;
-  label: string;
-  icon: LucideIcon;
-  ghost?: boolean;
-  badge?: string;
-  badgeTone?: "soon" | "accent" | "default";
-  href?: string;
-  unread?: boolean;
-};
-
-const SECTIONS: { label: string; items: NavItem[] }[] = [
-  {
-    label: "Genel",
-    items: [
-      { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-      { id: "library", label: "Kütüphanem", icon: Library },
-      { id: "discover", label: "Keşfet", icon: Compass },
-      { id: "calendar", label: "Takvim", icon: Calendar },
-    ],
-  },
-  {
-    label: "Sosyal",
-    items: [
-      { id: "feed", label: "Akış", icon: Activity, href: "/feed" },
-      { id: "recommendations", label: "Öneriler", icon: Send, href: "/recommendations" },
-      { id: "notifications", label: "Bildirimler", icon: Bell, href: "/notifications", unread: true },
-      { id: "people", label: "Kullanıcı Ara", icon: Users, href: "/people" },
-    ],
-  },
-  {
-    label: "Kişisel",
-    items: [
-      { id: "progress", label: "İlerlemem", icon: TrendingUp },
-      { id: "watchlist", label: "İzleme Listem", icon: ListChecks },
-      { id: "favorites", label: "Favorilerim", icon: Heart },
-      { id: "ratings", label: "Puanlamalarım", icon: Star },
-      { id: "notes", label: "Notlarım", icon: NotebookPen },
-      { id: "stats", label: "İstatistikler", icon: BarChart3 },
-    ],
-  },
-  {
-    label: "Yardımcılar",
-    items: [
-      { id: "ai", label: "AI Danışman", icon: Sparkles, badge: "Beta", badgeTone: "accent" },
-      { id: "activity", label: "Aktivite", icon: Activity },
-    ],
-  },
-];
-
-const REAL_TABS = new Set<TabType>([
-  "dashboard",
-  "library",
-  "discover",
-  "calendar",
-  "progress",
-  "watchlist",
-  "favorites",
-  "ratings",
-  "notes",
-  "stats",
-  "profile",
-  "ai",
-  "activity",
-  "settings",
-]);
 
 interface AppSidebarProps {
-  activeTab: TabType;
-  onChange: (tab: TabType) => void;
-  onOpenProfile: () => void;
-  onOpenSettings: () => void;
+  activeNavigationId: AppNavigationId | DashboardTabId;
+  onChange: (tab: DashboardTabId) => void;
   profileName: string;
   profileTagline: string;
   profilePreferences: ProfilePreferences;
@@ -110,34 +31,10 @@ const JOURNEY_ACCENTS: Record<
   UserProgressionWorld,
   { panel: string; text: string; fill: string; glow: string; tierGlow: string }
 > = {
-  east: {
-    panel: "border-amber-500/20 bg-amber-500/[0.06]",
-    text: "text-amber-200",
-    fill: "from-amber-300 to-yellow-500",
-    glow: "shadow-amber-950/20",
-    tierGlow: "shadow-amber-500/10",
-  },
-  screen: {
-    panel: "border-cyan-500/20 bg-cyan-500/[0.06]",
-    text: "text-cyan-200",
-    fill: "from-cyan-300 to-blue-500",
-    glow: "shadow-cyan-950/20",
-    tierGlow: "shadow-cyan-500/10",
-  },
-  arch: {
-    panel: "border-red-400/20 bg-red-400/[0.05]",
-    text: "text-orange-200",
-    fill: "from-orange-300 to-red-500",
-    glow: "shadow-red-950/20",
-    tierGlow: "shadow-orange-500/10",
-  },
-  mixed: {
-    panel: "border-violet-500/20 bg-violet-500/[0.06]",
-    text: "text-violet-200",
-    fill: "from-violet-300 to-zinc-300",
-    glow: "shadow-violet-950/20",
-    tierGlow: "shadow-violet-500/10",
-  },
+  east: { panel: "border-amber-500/20 bg-amber-500/[0.06]", text: "text-amber-200", fill: "from-amber-300 to-yellow-500", glow: "shadow-amber-950/20", tierGlow: "shadow-amber-500/10" },
+  screen: { panel: "border-cyan-500/20 bg-cyan-500/[0.06]", text: "text-cyan-200", fill: "from-cyan-300 to-blue-500", glow: "shadow-cyan-950/20", tierGlow: "shadow-cyan-500/10" },
+  arch: { panel: "border-red-400/20 bg-red-400/[0.05]", text: "text-orange-200", fill: "from-orange-300 to-red-500", glow: "shadow-red-950/20", tierGlow: "shadow-orange-500/10" },
+  mixed: { panel: "border-violet-500/20 bg-violet-500/[0.06]", text: "text-violet-200", fill: "from-violet-300 to-zinc-300", glow: "shadow-violet-950/20", tierGlow: "shadow-violet-500/10" },
 };
 
 const TIER_LABELS: Record<UserProgressionTier, string> = {
@@ -161,195 +58,84 @@ const TIER_CARD_CLASSES: Record<UserProgressionTier, string> = {
   master: "shadow-lg ring-1 ring-zinc-600/70",
 };
 
-function NavRow({
-  item,
-  isActive,
-  onClick,
-}: {
-  item: NavItem;
-  isActive: boolean;
-  onClick: () => void;
-}) {
+function NavigationRow({ item, active, onNavigateTab }: { item: AppNavigationItem; active: boolean; onNavigateTab: (tab: DashboardTabId) => void }) {
   const Icon = item.icon;
-  const ghost = !!item.ghost;
-  const base =
-    "group relative w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-[13px] font-medium transition-colors text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-focus)]";
-  const stateClass = ghost
-    ? "text-zinc-600 cursor-not-allowed"
-    : isActive
-      ? "bg-[var(--app-selected)] text-[var(--app-text-primary)] cursor-pointer"
-      : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/30 cursor-pointer";
-
-  let badgeClass = "ml-auto text-[10px] font-mono px-1.5 py-0.5 rounded-full ";
-  if (item.badgeTone === "soon") {
-    badgeClass += "border border-dashed border-zinc-700/70 text-zinc-500";
-  } else if (item.badgeTone === "accent") {
-    badgeClass += "bg-amber-500/15 text-amber-300";
-  } else {
-    badgeClass += "bg-zinc-800 text-zinc-400";
-  }
-
-  const content = <>
-      {isActive && !ghost && (
-        <span aria-hidden="true" className="absolute -left-2.5 top-1.5 bottom-1.5 w-[2px] rounded-r bg-[var(--app-accent)]" />
-      )}
-      <Icon className={`w-4 h-4 shrink-0 ${ghost ? "opacity-60" : ""}`} />
+  const classes = `group relative flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[13px] font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-focus)] ${
+    active
+      ? "bg-[var(--app-selected)] text-[var(--app-text-primary)]"
+      : "text-[var(--app-text-muted)] hover:bg-[var(--app-hover)] hover:text-[var(--app-text-primary)]"
+  }`;
+  const content = (
+    <>
+      {active && <span aria-hidden="true" className="absolute -left-2.5 bottom-1.5 top-1.5 w-[2px] rounded-r bg-[var(--app-accent)]" />}
+      <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
       <span className="truncate">{item.label}</span>
-      {item.badge && <span className={badgeClass}>{item.badge}</span>}
+      {item.badge && <span className="ml-auto rounded-full bg-[var(--app-accent-soft)] px-1.5 py-0.5 font-mono text-[10px] text-[var(--app-accent-strong)]">{item.badge}</span>}
       {item.unread && <span className="ml-auto"><NotificationBadge /></span>}
-    </>;
-  if (item.href) return <Link href={item.href} className={`${base} ${stateClass}`} title={item.label}>{content}</Link>;
-  return (
-    <button
-      type="button"
-      className={`${base} ${stateClass}`}
-      onClick={ghost ? undefined : onClick}
-      disabled={ghost}
-      aria-disabled={ghost || undefined}
-      aria-current={isActive ? "page" : undefined}
-      title={ghost ? `${item.label} - yakında` : item.label}
-    >
-      {content}
-    </button>
+    </>
   );
+
+  if (item.destination.kind === "route") {
+    return <Link href={item.destination.href} className={classes} aria-current={active ? "page" : undefined} title={item.label}>{content}</Link>;
+  }
+  const tab = item.destination.tab;
+  return <button type="button" className={`${classes} cursor-pointer`} onClick={() => onNavigateTab(tab)} aria-current={active ? "page" : undefined} title={item.label}>{content}</button>;
 }
 
-function JourneyCard({
-  progression,
-  journeyTitle,
-  active,
-  onClick,
-}: {
-  progression: UserProgression;
-  journeyTitle: string;
-  active: boolean;
-  onClick: () => void;
-}) {
+function JourneyCard({ progression, journeyTitle, active, onClick }: { progression: UserProgression; journeyTitle: string; active: boolean; onClick: () => void }) {
   const accent = JOURNEY_ACCENTS[progression.dominantWorld];
-  const progressWidth = `${Math.round(progression.progressPercent * 100)}%`;
   const remainingXp = Math.max(0, progression.nextLevelXp - progression.currentLevelXp);
-  const tierLabel = TIER_LABELS[progression.tier];
-
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`w-full rounded-xl border p-3 text-left shadow-sm transition-colors cursor-pointer hover:bg-zinc-900/65 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/35 ${accent.panel} ${accent.glow} ${TIER_CARD_CLASSES[progression.tier]} ${
-        active ? "ring-1 ring-amber-400/35" : ""
-      }`}
+      className={`w-full cursor-pointer rounded-xl border p-3 text-left shadow-sm transition-colors hover:bg-[var(--app-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-focus)] ${accent.panel} ${accent.glow} ${TIER_CARD_CLASSES[progression.tier]} ${active ? "ring-1 ring-[var(--app-focus)]" : ""}`}
       aria-current={active ? "page" : undefined}
       title="İstatistiklere git"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-500">
-            Yolculuk
-          </p>
-          <p className="mt-1 truncate text-[13px] font-semibold text-zinc-50">
-            Seviye {progression.level}
-          </p>
-          <p className={`mt-0.5 truncate text-[11px] font-medium ${accent.text}`}>
-            {journeyTitle}
-          </p>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--app-text-muted)]">Yolculuk</p>
+          <p className="mt-1 truncate text-[13px] font-semibold text-[var(--app-text-primary)]">Seviye {progression.level}</p>
+          <p className={`mt-0.5 truncate text-[11px] font-medium ${accent.text}`}>{journeyTitle}</p>
         </div>
-        <span
-          className={`shrink-0 rounded-full bg-zinc-950/45 px-2.5 py-1 text-[11px] font-semibold tabular-nums ring-1 ${TIER_CLASSES[progression.tier]} ${accent.text} ${accent.tierGlow}`}
-        >
-          Level {progression.level}
-        </span>
+        <span className={`shrink-0 rounded-full bg-[var(--app-surface-3)] px-2.5 py-1 text-[11px] font-semibold tabular-nums ring-1 ${TIER_CLASSES[progression.tier]} ${accent.text} ${accent.tierGlow}`}>Level {progression.level}</span>
       </div>
-      <span className={`mt-2 inline-flex rounded-full bg-zinc-950/35 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] ring-1 ring-zinc-800/70 ${accent.text}`}>
-        {tierLabel}
-      </span>
-
-      <div className="mt-3">
-        <div className="h-2 overflow-hidden rounded-full bg-zinc-950/60 ring-1 ring-zinc-800/80">
-          <div
-            className={`h-full rounded-full bg-gradient-to-r ${accent.fill}`}
-            style={{ width: progressWidth }}
-          />
-        </div>
-        <div className="mt-2 flex items-center justify-between gap-3 text-[10px] font-mono tabular-nums text-zinc-500">
-          <span>{progression.currentLevelXp} / {progression.nextLevelXp} XP</span>
-          <span>{Math.round(progression.progressPercent * 100)}%</span>
-        </div>
-        <p className="mt-1 text-[10.5px] text-zinc-500">
-          Sonraki seviyeye {remainingXp} XP
-        </p>
+      <span className={`mt-2 inline-flex rounded-full bg-[var(--app-surface-3)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] ring-1 ring-[var(--app-border)] ${accent.text}`}>{TIER_LABELS[progression.tier]}</span>
+      <div className="mt-3 h-2 overflow-hidden rounded-full bg-[var(--app-surface-3)] ring-1 ring-[var(--app-border)]">
+        <div className={`h-full rounded-full bg-gradient-to-r ${accent.fill}`} style={{ width: `${Math.round(progression.progressPercent * 100)}%` }} />
       </div>
+      <div className="mt-2 flex items-center justify-between gap-3 text-[10px] font-mono tabular-nums text-[var(--app-text-muted)]">
+        <span>{progression.currentLevelXp} / {progression.nextLevelXp} XP</span><span>{Math.round(progression.progressPercent * 100)}%</span>
+      </div>
+      <p className="mt-1 text-[10.5px] text-[var(--app-text-muted)]">Sonraki seviyeye {remainingXp} XP</p>
     </button>
   );
 }
 
-export default function AppSidebar({
-  activeTab,
-  onChange,
-  onOpenProfile,
-  onOpenSettings,
-  profileName,
-  profileTagline,
-  profilePreferences,
-  socialAvatarUrl,
-  progression,
-  journeyTitle,
-}: AppSidebarProps) {
-  const handleClick = (id: string) => {
-    if (REAL_TABS.has(id as TabType)) onChange(id as TabType);
-  };
-
+export default function AppSidebar({ activeNavigationId, onChange, profileName, profileTagline, profilePreferences, socialAvatarUrl, progression, journeyTitle }: AppSidebarProps) {
   return (
-    <aside
-      className="app-panel hidden lg:flex sticky top-0 h-screen w-64 shrink-0 flex-col gap-3 border-r px-4 py-4 shadow-none"
-      aria-label="Birincil navigasyon"
-    >
-      <div className="flex h-9 min-w-0 items-center gap-2 px-1">
-        <Image
-          src="/brand/media-tracker-mark.svg"
-          alt=""
-          aria-hidden="true"
-          width={36}
-          height={36}
-          className="h-9 w-9 shrink-0 object-contain"
-        />
-        <span className="truncate text-base font-semibold tracking-tight text-zinc-100">
-          MediaTracker
-        </span>
-      </div>
+    <aside className="app-panel hidden h-screen w-64 shrink-0 flex-col gap-3 border-r px-4 py-4 shadow-none lg:sticky lg:top-0 lg:flex" aria-label="Birincil navigasyon">
+      <Link href="/" className="flex h-9 min-w-0 items-center gap-2 rounded px-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-focus)]">
+        <Image src="/brand/media-tracker-mark.svg" alt="" aria-hidden="true" width={36} height={36} className="h-9 w-9 shrink-0 object-contain" />
+        <span className="truncate text-base font-semibold tracking-tight text-[var(--app-text-primary)]">MediaTracker</span>
+      </Link>
 
-      <SidebarProfileCard
-        profileName={profileName}
-        tagline={profileTagline}
-        preferences={profilePreferences}
-        socialAvatarUrl={socialAvatarUrl}
-        onOpenProfile={onOpenProfile}
-        onOpenSettings={onOpenSettings}
-      />
+      <SidebarProfileCard profileName={profileName} tagline={profileTagline} preferences={profilePreferences} socialAvatarUrl={socialAvatarUrl} />
 
-      <nav className="flex-1 min-h-0 overflow-y-auto -mx-1 px-1 flex flex-col gap-3">
-        {SECTIONS.map((section) => (
-          <div key={section.label} className="flex flex-col gap-px">
-            <div className="px-2.5 pt-1.5 pb-1 text-[10px] font-semibold tracking-[0.16em] text-zinc-600 uppercase">
-              {section.label}
-            </div>
-            {section.items.map((item) => (
-              <NavRow
-                key={item.id}
-                item={item}
-                isActive={activeTab === item.id}
-                onClick={() => handleClick(item.id)}
-              />
+      <nav className="-mx-1 flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-1">
+        {APP_NAVIGATION_SECTIONS.map((section) => (
+          <div key={section} className="flex flex-col gap-px">
+            <div className="px-2.5 pb-1 pt-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--app-text-muted)]">{APP_NAVIGATION_SECTION_LABELS[section]}</div>
+            {APP_NAVIGATION_ITEMS.filter((item) => item.section === section).map((item) => (
+              <NavigationRow key={item.id} item={item} active={activeNavigationId === item.id} onNavigateTab={onChange} />
             ))}
           </div>
         ))}
       </nav>
 
-      <div className="mt-1 border-t border-zinc-800/60 pt-3">
-        <JourneyCard
-          progression={progression}
-          journeyTitle={journeyTitle}
-          active={activeTab === "stats"}
-          onClick={() => handleClick("stats")}
-        />
+      <div className="mt-1 border-t border-[var(--app-border)] pt-3">
+        <JourneyCard progression={progression} journeyTitle={journeyTitle} active={activeNavigationId === "stats"} onClick={() => onChange("stats")} />
       </div>
     </aside>
   );

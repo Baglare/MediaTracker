@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { cookies } from "next/headers";
 
 import { AppearanceRuntime } from "@/components/personalization/appearance-runtime";
+import { RouteAppShell } from "@/components/app-shell/route-app-shell";
 import {
   APPEARANCE_COOKIE_NAME,
   parseAppearanceCookie,
@@ -45,7 +46,7 @@ export default async function RootLayout({
     >
       <body className="min-h-full flex flex-col font-sans">
         <AppearanceRuntime initialIdentity={initialIdentity}>
-          {children}
+          <RouteAppShell>{children}</RouteAppShell>
         </AppearanceRuntime>
       </body>
     </html>

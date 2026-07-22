@@ -2,6 +2,7 @@ import type { ProfilePreferences } from "@/lib/profile-preferences";
 import type { SocialProfileInput, SocialProgressionSnapshot, SocialStatsSnapshot } from "@/lib/social/types";
 import type { MediaItem } from "@/lib/types";
 import type { UserProgression } from "@/lib/user-progression";
+import { defaultProfilePresentationPreferences } from "@/lib/personalization/defaults";
 
 export function socialWorldFor(type: MediaItem["type"]): "east" | "screen" | "arch" {
   if (type === "movie" || type === "tv") return "screen";
@@ -42,10 +43,12 @@ export function prefillSocialProfile(preferences: ProfilePreferences, fallbackNa
   return {
     username: "",
     displayName: preferences.displayName.trim() || fallbackName,
-    bio: preferences.profileTagline.trim(),
+    tagline: preferences.profileTagline.trim(),
+    bio: "",
     visibilityMode: "personal",
     connectionColor: preferences.avatarAccent === "zinc" ? "neutral" : preferences.avatarAccent,
     selectedTitle,
+    presentation: defaultProfilePresentationPreferences(),
   };
 }
 

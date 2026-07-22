@@ -44,15 +44,23 @@ export async function POST(request: Request) {
     const validated = validateSocialProfileInput(input.profile);
     if (!validated.ok) return failure(validated.error);
     const profile = validated.value;
-    const { data, error } = await auth.client.rpc("social_save_profile", {
+    const { data, error } = await auth.client.rpc("social_save_unified_profile", {
       p_username: profile.username,
       p_display_name: profile.displayName,
+      p_tagline: profile.tagline,
       p_bio: profile.bio,
       p_location: profile.location ?? "",
       p_language: profile.language ?? "",
       p_visibility_mode: profile.visibilityMode,
       p_connection_color: profile.connectionColor,
       p_selected_title: profile.selectedTitle ?? "",
+      p_profile_palette_id: profile.presentation.paletteId,
+      p_banner_mode: profile.presentation.bannerMode,
+      p_banner_position: profile.presentation.bannerPosition,
+      p_overlay_strength: profile.presentation.overlayStrength,
+      p_avatar_frame: profile.presentation.avatarFrame,
+      p_surface_style: profile.presentation.surfaceStyle,
+      p_motif_intensity: profile.presentation.motifIntensity,
     });
     return error ? failure("Profil kaydedilemedi. Kullanıcı adı veya değişiklik süresi kuralını kontrol et.", 409) : NextResponse.json(data);
   }

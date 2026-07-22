@@ -23,6 +23,7 @@ interface ProfileSettingsCardProps {
   hasSocialProfile: boolean;
   socialAvatarUrl?: string;
   onSocialAvatarChanged: (url: string | undefined) => void;
+  showIdentityFields?: boolean;
 }
 
 const ACCENT_OPTIONS: { value: AvatarAccent; label: string; className: string }[] = [
@@ -120,6 +121,7 @@ export default function ProfileSettingsCard({
   hasSocialProfile,
   socialAvatarUrl,
   onSocialAvatarChanged,
+  showIdentityFields = true,
 }: ProfileSettingsCardProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
@@ -237,7 +239,7 @@ export default function ProfileSettingsCard({
             </span>
           </div>
 
-          <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+          {showIdentityFields && <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
             <label className="min-w-0">
               <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
                 Görünen ad
@@ -263,7 +265,7 @@ export default function ProfileSettingsCard({
                 className="mt-1.5 w-full h-10 rounded-xl bg-zinc-950/45 border border-zinc-800/70 px-3 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-amber-500/25 focus:border-amber-500/35"
               />
             </label>
-          </div>
+          </div>}
 
           {!hasSocialProfile && <div className="mt-5 grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div>
@@ -382,7 +384,7 @@ export default function ProfileSettingsCard({
             {imageMessage && <p role="status" className="mt-3 rounded-lg bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300 ring-1 ring-emerald-500/25">{imageMessage}</p>}
           </div>
 
-          <div className="mt-5 grid grid-cols-1 md:grid-cols-[minmax(0,16rem)_minmax(0,1fr)] gap-4">
+          {showIdentityFields && <div className="mt-5 grid grid-cols-1 md:grid-cols-[minmax(0,16rem)_minmax(0,1fr)] gap-4">
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
                 Ünvan
@@ -418,7 +420,7 @@ export default function ProfileSettingsCard({
                 className="mt-1.5 w-full h-10 rounded-xl bg-zinc-950/45 border border-zinc-800/70 px-3 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-violet-500/25 focus:border-violet-500/35 disabled:opacity-50"
               />
             </label>
-          </div>
+          </div>}
         </div>
       </div>
     </section>

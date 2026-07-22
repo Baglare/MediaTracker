@@ -74,6 +74,12 @@ afterEach(() => {
 });
 
 describe("sync queue and manager", () => {
+  it("keeps the hydration server snapshot referentially stable", async () => {
+    const manager = await import("@/lib/sync-manager");
+
+    expect(manager.getServerSnapshot()).toBe(manager.getServerSnapshot());
+  });
+
   it("enqueues a new media item upsert", async () => {
     const manager = await import("@/lib/sync-manager");
     const { loadSyncQueue } = await import("@/lib/sync-queue");

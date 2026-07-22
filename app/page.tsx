@@ -11,12 +11,10 @@
 "use client";
 
 import { useState, useMemo, useEffect, useCallback } from "react";
-import AppSidebar from "@/components/app-sidebar";
-import AppTopbar from "@/components/app-topbar";
+import { useRouter, useSearchParams } from "next/navigation";
+import { dashboardTabHref, parseDashboardTab } from "@/components/app-shell/app-navigation";
+import { AppearanceWorldScope } from "@/components/personalization/appearance-runtime";
 import AppTabContent from "@/components/app-tab-content";
-import ProfileSettingsCard from "@/components/profile-settings-card";
-import SocialProfileEditor from "@/components/social/social-profile-editor";
-import { ProfileAvatar } from "@/components/sidebar-profile-card";
 import RightRail from "@/components/right-rail";
 import PageHeader from "@/components/page-header";
 import { TabType } from "@/components/app-tabs";
@@ -44,8 +42,6 @@ import GlobalSearch from "@/components/global-search";
 import { useAuth } from "@/hooks/use-auth";
 import { useMediaLibrary } from "@/hooks/use-media-library";
 import { usePersistedPreferences } from "@/hooks/use-persisted-preferences";
-import { useSocialAvatar } from "@/hooks/use-social-avatar";
-import { AppearanceWorldScope } from "@/components/personalization/appearance-runtime";
 import QuickAddModal from "@/components/quick-add-modal";
 import ManualGroupModal, {
   type ManualGroupAction,
@@ -60,7 +56,6 @@ import {
 import {
   ChevronDown,
   ChevronUp,
-  ArrowLeft,
   PlayCircle,
   Layers,
   Library as LibraryIcon,
@@ -73,18 +68,11 @@ import {
   NotebookPen,
   BarChart3,
   Search,
-  UserRound,
-  Pencil,
 } from "lucide-react";
 import LibraryControlBar, {
   LibrarySectionControls,
 } from "@/components/library-control-bar";
 import { GlobalSearchCategory, GlobalSearchLibraryStatus, GlobalSearchResult } from "@/lib/global-search-types";
-import {
-  resolveProfileDisplayName,
-  resolveProfileTagline,
-  resolveSelectedTitle,
-} from "@/lib/profile-preferences";
 import { MediaItem, MediaType, ProgressLog, withMediaClassification } from "@/lib/types";
 import {
   getTvmazeSeasonExternalId,
@@ -121,11 +109,12 @@ export default function HomePage() {
   } = useMediaLibrary(authUser?.id ?? null);
 
   // ---- STATE (Durumlar) ----
-  // Aktif sekme
-  const [activeTab, setActiveTab] = useState<TabType>("dashboard");
+  // Dashboard sekmesinin tek kaynağı URL query'sidir. Kalıcı AppShell altında
+  // aynı pathname'deki query geçişleri page remount gerektirmeden yansır.
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const activeTab = parseDashboardTab(searchParams.get("tab"));
   const {
-    profilePreferences,
-    setProfilePreferences,
     rightRailPreferences,
     setRightRailPreferences,
     typeFilter,
@@ -177,7 +166,6 @@ export default function HomePage() {
     category: GlobalSearchCategory;
     token: number;
   } | null>(null);
-  const [profileMode, setProfileMode] = useState<"view" | "edit">("view");
 
   // Modal durumları
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -220,14 +208,11 @@ export default function HomePage() {
   const handleTabChange = useCallback((tab: TabType) => {
     // R40 — AI sekmesi terkedildiğinde otomatik reset KALDIRILDI; oturum
     // kullanıcı "Konuyu kapat" diyene kadar yaşamaya devam eder.
-    if (tab === "profile") {
-      setProfileMode("view");
-    }
-    setActiveTab(tab);
+    router.push(dashboardTabHref(tab));
     setDetailMediaId(null);
     setEditingItem(null);
     setIsModalOpen(false);
-  }, []);
+  }, [router]);
 
   const handleOpenAiDiscover = useCallback((title: string, mediaType: MediaType) => {
     const category: GlobalSearchCategory =
@@ -1141,26 +1126,12 @@ export default function HomePage() {
 
   const { progression: userProgression } = useXpProgression(authUser?.id ?? null, legacyUserProgression);
 
-  const profileName = useMemo(() => {
-    return resolveProfileDisplayName(profilePreferences, authUser);
-  }, [profilePreferences, authUser]);
-
-  const profileTagline = useMemo(() => {
-    return resolveProfileTagline(profilePreferences);
-  }, [profilePreferences]);
-
-  const journeyTitle = useMemo(() => {
-    return resolveSelectedTitle(profilePreferences, userProgression.title);
-  }, [profilePreferences, userProgression.title]);
-
-  const socialAvatar = useSocialAvatar(authConfigured, authUser?.id ?? null);
-
   // ---- RENDER ----
 
   if (!isLoaded) {
     return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
-        <p className="text-zinc-500 text-sm">Yükleniyor...</p>
+      <div className="grid min-h-64 place-items-center">
+        <p className="text-sm text-[var(--app-text-muted)]">Kütüphane yükleniyor...</p>
       </div>
     );
   }
@@ -1171,7 +1142,7 @@ export default function HomePage() {
   // ekranı dünya bağlamından bağımsız (R8'deki RightRail gizleme kararıyla
   // tutarlı). Bu tur sadece CSS variable plumbing — tüketici bileşen yok.
   const worldAttr: "east" | "screen" | "arch" | "neutral" =
-    activeTab === "settings" || activeTab === "profile"
+    activeTab === "settings"
       ? "neutral"
       : themeFilter === "east"
         ? "east"
@@ -1180,53 +1151,16 @@ export default function HomePage() {
         : themeFilter === "library"
           ? "arch"
           : "neutral";
-  const shouldShowRightRail = !["dashboard", "ai", "settings", "profile"].includes(activeTab);
+  const shouldShowRightRail = !["dashboard", "ai", "settings"].includes(activeTab);
 
   return (
-    // R1 App Shell: sol sidebar (lg+) + main column + opsiyonel sağ rail (xl+).
-    // Mobile/tablet'te sidebar gizli; AppTopbar fallback AppTabs gösterir.
-    // R10: data-world scope (yukarıdaki worldAttr). globals.css altındaki
-    // [data-world="..."] selector'ları --w-* tokenlarını set eder.
-    // R17 + R18.5.1: Horizontal taşma güvencesi `overflow-x-clip` ile sağlanır;
-    // `overflow-x-hidden` bir **scroll container** oluşturduğu için AppSidebar
-    // ve RightRail'ın `sticky top-0` davranışını bozuyordu (sticky ancestor
-    // viewport yerine bu container'a anchor oluyordu). `clip` scroll
-    // container oluşturmadan taşan içeriği kırpar — sticky çalışmaya devam
-    // eder, dar ekran taşması da yutulur.
-    <AppearanceWorldScope world={worldAttr} className="app-page min-h-screen flex overflow-x-clip">
+    <AppearanceWorldScope world={worldAttr} className="flex min-w-0 overflow-x-clip">
+      <div className={`relative w-full min-w-0 px-4 py-6 sm:px-6 lg:px-8 lg:py-8 ${shouldShowRightRail ? "xl:px-6" : "xl:px-8 2xl:px-10"}`}>
       {/* R13.2: Macro transition overlay — data-world scope'unun içinde
           duruyor ki --w-* tokenları aktif dünyanın renklerine resolve olsun.
           Artık worldAttr otomatik izlenmiyor; sadece handleThemeFilterChange
           içinde bumplanan worldTransition token'ına tepki veriyor. */}
       <WorldTransition trigger={worldTransition} />
-      <AppSidebar
-        activeTab={activeTab}
-        onChange={handleTabChange}
-        onOpenProfile={() => handleTabChange("profile")}
-        onOpenSettings={() => handleTabChange("settings")}
-        profileName={profileName}
-        profileTagline={profileTagline}
-        profilePreferences={profilePreferences}
-        socialAvatarUrl={socialAvatar.socialAvatarUrl}
-        progression={userProgression}
-        journeyTitle={journeyTitle}
-      />
-
-      <div className="flex-1 min-w-0 flex flex-col">
-        <AppTopbar
-          activeTab={activeTab}
-          onChangeTab={handleTabChange}
-          onOpenProfile={() => handleTabChange("profile")}
-          profileName={profileName}
-          profilePreferences={profilePreferences}
-          socialAvatarUrl={socialAvatar.socialAvatarUrl}
-        />
-
-        {/* Ana içerik alanı.
-            R6: Shell zaten sidebar+rail ile column genişliğini kontrol ettiği
-            için max-w-7xl + mx-auto kalktı; içerik sütununu boğmuyor.
-            xl'de horizontal padding biraz daraltıldı (rail ile nefes alsın). */}
-        <main className={`relative w-full px-4 sm:px-6 lg:px-8 py-6 lg:py-8 flex-1 min-w-0 ${shouldShowRightRail ? "xl:px-6" : "xl:px-8 2xl:px-10"}`}>
         <AppTabContent
           activeTab={activeTab}
           mediaList={mediaList}
@@ -2665,421 +2599,6 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* PROFIL SEKMESI */}
-        {activeTab === "profile" && (
-          <div className="space-y-5 max-w-[96rem]">
-            <PageHeader
-              icon={UserRound}
-              title="Profil"
-              subtitle="Görünen ad, avatar, ünvan ve yolculuk kimliği"
-            />
-
-            {profileMode === "view" ? (() => {
-              const favoriteShowcase = mediaList
-                .filter((item) => item.favorite === true)
-                .slice()
-                .sort((a, b) => a.title.localeCompare(b.title, "tr"))
-                .slice(0, 10);
-              const recentProfileLogs = progressLogs
-                .slice()
-                .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-                .slice(0, 6);
-              const ratedItems = mediaList.filter(
-                (item) => typeof item.userRating === "number" && Number.isFinite(item.userRating)
-              );
-              const averageRating =
-                ratedItems.length > 0
-                  ? ratedItems.reduce((sum, item) => sum + (item.userRating ?? 0), 0) / ratedItems.length
-                  : 0;
-              const maxWorldCount = Math.max(
-                1,
-                userProgression.worldCounts.east,
-                userProgression.worldCounts.screen,
-                userProgression.worldCounts.arch
-              );
-              const worldRows = [
-                { label: "Doğu", value: userProgression.worldCounts.east, bar: "bg-amber-300" },
-                { label: "Kadraj", value: userProgression.worldCounts.screen, bar: "bg-cyan-300" },
-                { label: "Arşiv", value: userProgression.worldCounts.arch, bar: "bg-orange-300" },
-              ];
-              const tierLabels = {
-                basic: "Basic",
-                refined: "Refined",
-                elite: "Elite",
-                master: "Master",
-              } as const;
-              const worldAccent = {
-                east: {
-                  line: "via-amber-300/70",
-                  border: "border-amber-500/30",
-                  borderStrong: "border-amber-400/45",
-                  shadow: "shadow-amber-950/20",
-                  badge: "bg-amber-500/12 text-amber-200 ring-amber-500/25",
-                  mutedBadge: "bg-zinc-950/45 text-amber-100 ring-amber-500/20",
-                  progress: "from-amber-300 via-yellow-400 to-amber-500",
-                },
-                screen: {
-                  line: "via-cyan-300/70",
-                  border: "border-cyan-500/30",
-                  borderStrong: "border-cyan-300/45",
-                  shadow: "shadow-cyan-950/20",
-                  badge: "bg-cyan-500/12 text-cyan-200 ring-cyan-500/25",
-                  mutedBadge: "bg-zinc-950/45 text-cyan-100 ring-cyan-500/20",
-                  progress: "from-cyan-300 via-sky-400 to-blue-500",
-                },
-                arch: {
-                  line: "via-orange-300/70",
-                  border: "border-orange-500/30",
-                  borderStrong: "border-orange-300/45",
-                  shadow: "shadow-orange-950/20",
-                  badge: "bg-orange-500/12 text-orange-200 ring-orange-500/25",
-                  mutedBadge: "bg-zinc-950/45 text-orange-100 ring-orange-500/20",
-                  progress: "from-orange-300 via-amber-400 to-red-500",
-                },
-                mixed: {
-                  line: "via-violet-300/70",
-                  border: "border-violet-500/25",
-                  borderStrong: "border-violet-300/40",
-                  shadow: "shadow-violet-950/20",
-                  badge: "bg-violet-500/12 text-violet-200 ring-violet-500/25",
-                  mutedBadge: "bg-zinc-950/45 text-violet-100 ring-violet-500/20",
-                  progress: "from-violet-300 via-zinc-300 to-cyan-300",
-                },
-              }[userProgression.dominantWorld];
-              const tierFrame = {
-                basic: "border-zinc-800/60 shadow-black/20",
-                refined: `${worldAccent.border} shadow-lg ${worldAccent.shadow}`,
-                elite: `${worldAccent.border} shadow-lg ${worldAccent.shadow} ring-1 ring-zinc-800/80`,
-                master: `${worldAccent.borderStrong} shadow-xl ${worldAccent.shadow} ring-1 ring-zinc-700/80`,
-              }[userProgression.tier];
-              const tierMotifOpacity = {
-                basic: "opacity-60",
-                refined: "opacity-75",
-                elite: "opacity-90",
-                master: "opacity-100",
-              }[userProgression.tier];
-              const profileActionLabel = (action: ProgressLog["action"]) => {
-                switch (action) {
-                  case "increment":
-                    return "İlerleme";
-                  case "complete":
-                    return "Tamamlandı";
-                  case "manual_adjust":
-                    return "Düzenleme";
-                  case "added":
-                    return "Eklendi";
-                  default:
-                    return action;
-                }
-              };
-
-              return (
-              <>
-              <section className={`relative overflow-hidden rounded-2xl border bg-[linear-gradient(135deg,rgba(39,39,42,0.58),rgba(9,9,11,0.72))] p-5 sm:p-6 lg:p-7 min-w-0 ${tierFrame}`}>
-                <div
-                  aria-hidden
-                  className={`absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent ${worldAccent.line} to-transparent ${tierMotifOpacity}`}
-                />
-
-                <div className="relative flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-                  <div className="flex min-w-0 flex-col sm:flex-row sm:items-center gap-5">
-                    <div className="rounded-3xl bg-zinc-950/45 p-2 ring-1 ring-zinc-800/70 shadow-inner shadow-black/30">
-                      <ProfileAvatar profileName={profileName} preferences={profilePreferences} socialAvatarUrl={socialAvatar.socialAvatarUrl} size="lg" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-500">
-                        Profil vitrini
-                      </p>
-                      <h2 className="mt-2 truncate text-3xl font-semibold tracking-tight text-zinc-50 sm:text-4xl">
-                        {profileName}
-                      </h2>
-                      <p className="mt-2 max-w-2xl text-sm leading-relaxed text-zinc-400">
-                        {profileTagline}
-                      </p>
-                      <div className="mt-4 flex flex-wrap items-center gap-2">
-                        <span className={`rounded-full px-3 py-1.5 text-xs font-semibold ring-1 ${worldAccent.badge}`}>
-                          Level {userProgression.level}
-                        </span>
-                        <span className={`rounded-full px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] ring-1 ${worldAccent.mutedBadge}`}>
-                          {tierLabels[userProgression.tier]}
-                        </span>
-                        <span className="rounded-full bg-zinc-950/45 px-3 py-1.5 text-xs font-medium text-zinc-200 ring-1 ring-zinc-800/70">
-                          {journeyTitle}
-                        </span>
-                        <span className="rounded-full bg-zinc-950/45 px-3 py-1.5 text-xs font-medium text-zinc-400 ring-1 ring-zinc-800/70">
-                          {userProgression.dominantWorld === "east"
-                            ? "Doğu"
-                            : userProgression.dominantWorld === "screen"
-                              ? "Kadraj"
-                              : userProgression.dominantWorld === "arch"
-                                ? "Arşiv"
-                                : "Karma"}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex w-full shrink-0 flex-col gap-4 border-t border-zinc-800/60 pt-4 lg:w-72 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
-                    <button
-                      type="button"
-                      onClick={() => setProfileMode("edit")}
-                      className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-amber-500/15 px-4 text-sm font-semibold text-amber-200 ring-1 ring-amber-500/30 transition-colors hover:bg-amber-500/20 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/50"
-                    >
-                      <Pencil className="h-4 w-4" aria-hidden="true" />
-                      Profili Düzenle
-                    </button>
-
-                    <div className="flex items-end justify-between gap-3">
-                      <div>
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
-                          XP ilerleme
-                        </p>
-                        <p className="mt-1 text-2xl font-semibold tabular-nums text-zinc-50">
-                          {Math.round(userProgression.progressPercent * 100)}%
-                        </p>
-                      </div>
-                      <p className="text-right text-[11px] font-mono tabular-nums text-zinc-500">
-                        {userProgression.currentLevelXp}/{userProgression.nextLevelXp}
-                      </p>
-                    </div>
-                    <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-zinc-900 ring-1 ring-zinc-800/80">
-                      <div
-                        className={`h-full rounded-full bg-gradient-to-r ${worldAccent.progress}`}
-                        style={{ width: `${Math.round(userProgression.progressPercent * 100)}%` }}
-                      />
-                    </div>
-                    <p className="mt-2 text-xs text-zinc-500">
-                      Sonraki seviyeye {Math.max(0, userProgression.nextLevelXp - userProgression.currentLevelXp)} XP
-                    </p>
-                  </div>
-                </div>
-
-                <div className="relative mt-6 grid grid-cols-2 gap-x-5 gap-y-4 border-t border-zinc-800/60 pt-4 lg:grid-cols-4">
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Toplam XP</p>
-                    <p className="mt-1 text-lg font-semibold tabular-nums text-zinc-100">{userProgression.totalXp}</p>
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Doğu</p>
-                    <p className="mt-1 text-lg font-semibold tabular-nums text-zinc-100">{userProgression.worldCounts.east}</p>
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Kadraj</p>
-                    <p className="mt-1 text-lg font-semibold tabular-nums text-zinc-100">{userProgression.worldCounts.screen}</p>
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Arşiv</p>
-                    <p className="mt-1 text-lg font-semibold tabular-nums text-zinc-100">{userProgression.worldCounts.arch}</p>
-                  </div>
-                </div>
-              </section>
-              <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.1fr)_minmax(20rem,0.9fr)] gap-5 items-start">
-                <section className="rounded-2xl border border-zinc-800/60 bg-zinc-900/30 p-4 sm:p-5 min-w-0">
-                  <div className="flex items-end justify-between gap-3 mb-4">
-                    <div>
-                      <h2 className="text-sm font-semibold text-zinc-100">Favori Vitrini</h2>
-                      <p className="mt-1 text-xs text-zinc-500">
-                        Öne çıkan favori içerikler
-                      </p>
-                    </div>
-                    <span className="text-[11px] font-mono tabular-nums text-zinc-500">
-                      {favoriteShowcase.length}
-                    </span>
-                  </div>
-                  {favoriteShowcase.length === 0 ? (
-                    <div className="rounded-xl border border-dashed border-zinc-800/80 bg-zinc-950/25 px-4 py-8 text-center">
-                      <p className="text-sm font-medium text-zinc-300">Henüz favori vitrin yok</p>
-                      <p className="mt-1 text-xs text-zinc-500">
-                        Favori işaretlediğin içerikler burada poster vitrini olarak görünür.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-3">
-                      {favoriteShowcase.map((item) => (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onClick={() => handleOpenDetailModal(item)}
-                          className="group min-w-0 text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/40 rounded-xl"
-                          title={item.title}
-                        >
-                          <div className="aspect-[2/3] overflow-hidden rounded-xl border border-zinc-800/70 bg-zinc-950/45 shadow-sm shadow-black/20 transition-colors group-hover:border-amber-400/35">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={item.coverImage || "/placeholders/book.svg"}
-                              alt=""
-                              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-                              loading="lazy"
-                            />
-                          </div>
-                          <p className="mt-2 truncate text-[11px] font-medium text-zinc-300">
-                            {item.title}
-                          </p>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </section>
-
-                <section className="rounded-2xl border border-zinc-800/60 bg-zinc-900/30 p-4 sm:p-5 min-w-0">
-                  <div className="flex items-end justify-between gap-3 mb-4">
-                    <div>
-                      <h2 className="text-sm font-semibold text-zinc-100">Son Aktiviteler</h2>
-                      <p className="mt-1 text-xs text-zinc-500">
-                        En yeni ilerleme kayıtları
-                      </p>
-                    </div>
-                    <span className="text-[11px] font-mono tabular-nums text-zinc-500">
-                      {recentProfileLogs.length}
-                    </span>
-                  </div>
-                  {recentProfileLogs.length === 0 ? (
-                    <div className="rounded-xl border border-dashed border-zinc-800/80 bg-zinc-950/25 px-4 py-8 text-center">
-                      <p className="text-sm font-medium text-zinc-300">Henüz aktivite yok</p>
-                      <p className="mt-1 text-xs text-zinc-500">
-                        İlerleme kaydettikçe son hareketlerin burada görünür.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {recentProfileLogs.map((log) => (
-                        <div key={log.id} className="rounded-xl border border-zinc-800/60 bg-zinc-950/25 p-3 min-w-0">
-                          <div className="flex items-center justify-between gap-3">
-                            <p className="truncate text-[12px] font-medium text-zinc-200">{log.mediaTitle}</p>
-                            <span className="shrink-0 rounded-full bg-zinc-900 px-2 py-0.5 text-[10px] text-zinc-500 ring-1 ring-zinc-800/70">
-                              {profileActionLabel(log.action)}
-                            </span>
-                          </div>
-                          <p className="mt-1 truncate text-[11px] text-zinc-500">
-                            {new Date(log.createdAt).toLocaleDateString("tr-TR")}
-                            {log.detail ? ` · ${log.detail}` : ""}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </section>
-              </div>
-
-              <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] gap-5 items-start">
-                <section className="rounded-2xl border border-zinc-800/60 bg-zinc-900/30 p-4 sm:p-5 min-w-0">
-                  <h2 className="text-sm font-semibold text-zinc-100">Medya Kimliği</h2>
-                  <div className="mt-4 grid grid-cols-2 sm:grid-cols-5 gap-4">
-                    <div className="min-w-0">
-                      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Toplam</p>
-                      <p className="mt-1 text-xl font-semibold tabular-nums text-zinc-100">{dashboardStats.totalItems}</p>
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Tamamlanan</p>
-                      <p className="mt-1 text-xl font-semibold tabular-nums text-zinc-100">{dashboardStats.completedItems}</p>
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Devam</p>
-                      <p className="mt-1 text-xl font-semibold tabular-nums text-zinc-100">{dashboardStats.inProgressItems}</p>
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Ortalama</p>
-                      <p className="mt-1 text-xl font-semibold tabular-nums text-zinc-100">
-                        {ratedItems.length > 0 ? averageRating.toFixed(1) : "—"}
-                      </p>
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Favori</p>
-                      <p className="mt-1 text-xl font-semibold tabular-nums text-zinc-100">{dashboardStats.favoriteItems}</p>
-                    </div>
-                  </div>
-                </section>
-
-                <section className="rounded-2xl border border-zinc-800/60 bg-zinc-900/30 p-4 sm:p-5 min-w-0">
-                  <h2 className="text-sm font-semibold text-zinc-100">Dünya Dağılımı</h2>
-                  <div className="mt-4 space-y-3">
-                    {worldRows.map((row) => {
-                      const width = row.value > 0 ? Math.max(5, Math.round((row.value / maxWorldCount) * 100)) : 0;
-                      return (
-                        <div key={row.label} className="min-w-0">
-                          <div className="mb-1 flex items-center justify-between gap-3">
-                            <span className="text-[12px] text-zinc-300">{row.label}</span>
-                            <span className="text-[12px] font-mono tabular-nums text-zinc-500">{row.value}</span>
-                          </div>
-                          <div className="h-2 overflow-hidden rounded-full bg-zinc-950/60 ring-1 ring-zinc-800/70">
-                            <div className={`h-full rounded-full ${row.bar}`} style={{ width: `${width}%` }} />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </section>
-              </div>
-              </>
-              );
-            })() : (
-              <div className="space-y-4">
-                <div className="flex flex-col gap-3 rounded-2xl border border-zinc-800/60 bg-zinc-900/30 p-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-300/80">
-                      Düzenleme
-                    </p>
-                    <h2 className="mt-1 text-lg font-semibold text-zinc-100">Profil kimliğini düzenle</h2>
-                    <p className="mt-1 text-sm text-zinc-500">
-                      Değişiklikler bu tarayıcıdaki yerel profil tercihine anlık kaydedilir.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setProfileMode("view")}
-                    className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-zinc-800/80 bg-zinc-950/35 px-4 text-sm font-medium text-zinc-300 transition-colors hover:border-amber-500/35 hover:bg-amber-500/10 hover:text-amber-200 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/40"
-                  >
-                    <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-                    Vitrine dön
-                  </button>
-                </div>
-                <ProfileSettingsCard
-                  preferences={profilePreferences}
-                  profileName={profileName}
-                  automaticTitle={userProgression.title}
-                  onChange={setProfilePreferences}
-                  authenticated={Boolean(authUser)}
-                  userId={authUser?.id ?? null}
-                  hasSocialProfile={socialAvatar.hasSocialProfile}
-                  socialAvatarUrl={socialAvatar.socialAvatarUrl}
-                  onSocialAvatarChanged={socialAvatar.updateSocialAvatar}
-                />
-                <SocialProfileEditor
-                  authConfigured={authConfigured}
-                  authenticated={Boolean(authUser)}
-                  userId={authUser?.id ?? null}
-                  localPreferences={profilePreferences}
-                  profileName={profileName}
-                  selectedTitle={journeyTitle}
-                  media={mediaList}
-                  progression={userProgression}
-                  socialAvatarUrl={socialAvatar.socialAvatarUrl}
-                  onProfileChanged={socialAvatar.refresh}
-                />
-              </div>
-            )}
-          </div>
-        )}
-
-        </main>
-      </div>
-
-      {/* R47: Dashboard, AI Danışman ve Ayarlar sağ rail olmadan tam genişlik kullanır.
-          Diğer sekmeler mevcut RightRail davranışını korur. */}
-      {shouldShowRightRail && (
-        <RightRail
-          mediaList={mediaList}
-          progressLogs={progressLogs}
-          stats={dashboardStats}
-          preferences={rightRailPreferences}
-          progression={userProgression}
-          // R15: RightRail dünya bazlı çalışsın diye themeFilter geçiyoruz.
-          // Search/status/type/eastSubFilter'a kasıtlı olarak duyarsız.
-          themeFilter={themeFilter}
-          onOpenDetail={handleOpenDetailModal}
-        />
-      )}
-
       {/* Medya Ekle / Düzenle Modalı */}
       <MediaModal
         isOpen={isModalOpen}
@@ -3142,6 +2661,18 @@ export default function HomePage() {
         onSave={handleCommitGroupAction}
         onClose={() => setGroupEditingItemId(null)}
       />
+      </div>
+      {shouldShowRightRail && (
+        <RightRail
+          mediaList={mediaList}
+          progressLogs={progressLogs}
+          stats={dashboardStats}
+          preferences={rightRailPreferences}
+          progression={userProgression}
+          themeFilter={themeFilter}
+          onOpenDetail={handleOpenDetailModal}
+        />
+      )}
     </AppearanceWorldScope>
   );
 }

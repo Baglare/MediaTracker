@@ -4,7 +4,9 @@ import {
 } from "@/lib/profile-preferences";
 
 export interface SocialProfileIdentityInput {
+  username?: string;
   displayName?: string;
+  tagline?: string;
   bio?: string;
   avatarUrl?: string;
   bannerUrl?: string;
@@ -21,7 +23,9 @@ export interface ResolveProfileIdentityInput {
 
 export interface ResolvedProfileIdentity {
   displayName: string;
+  username?: string;
   tagline: string;
+  bio: string;
   avatarUrl?: string;
   localAvatarDataUrl?: string;
   bannerUrl?: string;
@@ -52,7 +56,7 @@ export function resolveProfileIdentity(input: ResolveProfileIdentityInput): Reso
   const local = input.localPreferences;
   const social = input.authenticated ? input.socialProfile : undefined;
   const localName = cleanText(local?.displayName, 48);
-  const localTagline = cleanText(local?.profileTagline, 80);
+  const localTagline = cleanText(local?.profileTagline, 120);
   const fallbackName = cleanText(input.fallbackName, 60) || "Baglare";
   const automaticTitle = cleanText(input.automaticTitle, 48);
   const manualTitle = local?.selectedTitleMode === "manual" ? cleanText(local.manualTitle, 48) : "";
@@ -61,9 +65,11 @@ export function resolveProfileIdentity(input: ResolveProfileIdentityInput): Reso
     : undefined;
 
   const displayName = cleanText(social?.displayName, 60) || localName || fallbackName;
-  const tagline = cleanText(social?.bio, 500)
+  const tagline = cleanText(social?.tagline, 120)
     || localTagline
     || DEFAULT_PROFILE_PREFERENCES.profileTagline;
+  const bio = cleanText(social?.bio, 500);
+  const username = cleanText(social?.username, 24);
   const selectedTitle = cleanText(social?.selectedTitle, 48) || manualTitle || automaticTitle;
   const avatarUrl = safeUrl(social?.avatarUrl);
   const bannerUrl = safeUrl(social?.bannerUrl);
@@ -76,7 +82,9 @@ export function resolveProfileIdentity(input: ResolveProfileIdentityInput): Reso
 
   return {
     displayName,
+    ...(username ? { username } : {}),
     tagline,
+    bio,
     ...(avatarUrl ? { avatarUrl } : {}),
     ...(localAvatarDataUrl ? { localAvatarDataUrl } : {}),
     ...(bannerUrl ? { bannerUrl } : {}),

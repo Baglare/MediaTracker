@@ -200,10 +200,10 @@ export default function MediaCard({
         className={`absolute top-0 left-0 right-0 h-px bg-gradient-to-r ${accentGradient} opacity-40 group-hover:opacity-90 transition-opacity`}
       />
 
-      {/* === R18.5: Favori corner ribbon ===
-          Kartın sağ-üst köşesinde clip-path'li flag/bayrak şeklinde küçük
-          bir overlay. Cover'dan bağımsız; kart kimliğinin bir parçası.
-          Pasifse silik zinc outline; aktifse rose dolu + drop-shadow + glow.
+      {/* === Favori corner ribbon ===
+          Görünür kurdele eski dikey bookmark oranını korur; dış button alanı
+          klavye ve dokunma için daha geniş bir hit target sağlar.
+          Pasifse tema yüzeyi; aktifse favoriye özel kontrollü rose dolgu.
           Mikro animasyon: ikon kısaca scale (motion-safe), bg/color smooth
           transition. Aşırı değil — premium "snap". */}
       <button
@@ -213,37 +213,34 @@ export default function MediaCard({
           onToggleFavorite(item.id);
         }}
         title={isFavorite ? "Favoriden Çıkar" : "Favoriye Ekle"}
+        aria-label={isFavorite ? `${item.title} favorilerden çıkar` : `${item.title} favorilere ekle`}
         aria-pressed={isFavorite}
-        className={`absolute top-0 right-4 z-30 inline-flex items-start justify-center w-6 h-9 transition-all duration-200 cursor-pointer ${
-          isFavorite
-            ? "text-rose-50 drop-shadow-[0_2px_6px_rgba(244,63,94,0.55)]"
-            : "text-zinc-500 hover:text-rose-300"
-        }`}
-        style={{
-          clipPath: "polygon(0 0, 100% 0, 100% 100%, 50% 72%, 0 100%)",
-          background: isFavorite
-            ? "linear-gradient(180deg, #f43f5e 0%, #e11d48 100%)"
-            : "linear-gradient(180deg, rgba(39,39,42,0.85) 0%, rgba(24,24,27,0.75) 100%)",
-          boxShadow: isFavorite
-            ? "inset 0 0 0 1px rgba(255,255,255,0.18)"
-            : "inset 0 0 0 1px rgba(82,82,91,0.55)",
-        }}
+        className="absolute right-3 top-0 z-30 inline-flex h-11 w-9 cursor-pointer items-start justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-focus)]"
       >
-        {/* R18.5.1: Ribbon ŞEKLİ (clip-path flag) korunur; ikon ❤ Heart oldu.
-            Aktifte fill-current + scale-110 snap; pasifte outline. */}
-        <Heart
-          className={`mt-1.5 w-3.5 h-3.5 motion-safe:transition-transform motion-safe:duration-200 ${
-            isFavorite ? "fill-current scale-110" : "scale-100"
+        <span
+          data-favorite-ribbon={isFavorite ? "active" : "inactive"}
+          className={`inline-flex h-9 w-6 items-start justify-center transition-colors duration-200 ${
+            isFavorite
+              ? "bg-gradient-to-b from-rose-400 to-rose-600 text-white drop-shadow-[0_2px_5px_rgba(190,18,60,0.28)]"
+              : "bg-[color-mix(in_srgb,var(--app-surface-elevated)_88%,transparent)] text-[var(--app-text-secondary)] shadow-[inset_0_0_0_1px_var(--app-border-strong),0_2px_5px_rgba(0,0,0,0.18)] hover:text-rose-500"
           }`}
-          strokeWidth={isFavorite ? 1.5 : 1.75}
-        />
+          style={{ clipPath: "polygon(0 0, 100% 0, 100% 100%, 50% 72%, 0 100%)" }}
+          aria-hidden="true"
+        >
+          <Heart
+            className={`mt-1.5 h-3.5 w-3.5 motion-safe:transition-transform motion-safe:duration-200 ${
+              isFavorite ? "fill-current scale-110" : "scale-100"
+            }`}
+            strokeWidth={isFavorite ? 1.5 : 1.75}
+          />
+        </span>
       </button>
 
       {/* R20: Mobilde gap/padding hafifçe daraltıldı, sm+'da eski değerler. */}
       <div className="flex gap-3 sm:gap-4 p-3 pr-4 sm:p-4 sm:pr-5 flex-1">
         {/* R18.5: Cover artık tek overlay taşıyor: sol-üstte rating badge.
-            Favori cover'dan tamamen alındı; kartın sağ-üst köşesinde shaped
-            corner ribbon olarak yaşıyor (aşağıda <FavoriteRibbon/>).
+            Favori cover'dan tamamen alındı; kartın sağ-üst köşesinde dikey
+            bookmark/ribbon olarak yaşıyor.
             Cover'ın iç ring/rounded wrapper'ı sadece görseli kırpar; rating
             popover bu wrapper'ın dışında, aşağı doğru açılır. */}
         <div className="relative w-20 h-28 flex-shrink-0">

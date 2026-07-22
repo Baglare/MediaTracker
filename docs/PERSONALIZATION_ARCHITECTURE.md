@@ -2,7 +2,7 @@
 
 ## Amaç
 
-Bu belge MediaTracker'ın temel uygulama görünümünü, dünya vurgusunu, cihaz tercihlerini ve public profil sunumunu birbirinden ayıran P0 sınırlarını ve bunları aktif hâle getiren P1 tema motorunu tanımlar. P1 bir sayfa redesign turu değildir; mevcut hiyerarşiyi koruyarak Obsidyen, Porselen, Okyanus ve Sistem seçeneklerini çalışır hâle getirir.
+Bu belge MediaTracker'ın temel uygulama görünümünü, dünya vurgusunu, cihaz tercihlerini ve public profil sunumunu birbirinden ayıran P0 sınırlarını; P1 tema motorunu ve P2 birleşik uygulama kabuğu/profil kimliği katmanını tanımlar. Bu aşamalar sayfa redesign'i değildir; mevcut özellikleri ortak, test edilebilir sınırlar altında toplar.
 
 ## Mevcut sorun
 
@@ -35,7 +35,7 @@ Kimlik görünen ad, tagline/bio, avatar, banner ve seçili ünvanı çözer. Gi
 
 ### Profile presentation
 
-Public profil görsel kimliğidir: palette, banner mode/position, overlay, avatar frame, surface style ve motif intensity. Bu model P0'da yalnız tip ve runtime normalization katmanıdır; veritabanına yazılmaz ve editör UI'ına eklenmez.
+Public profil görsel kimliğidir: palette, banner mode/position, overlay, avatar frame, surface style ve motif intensity. P2 ile allowlist değerleri cloud profile'a bağlanmıştır. Bu alanlar yalnız `ProfileHero` ve profil modül vurgularını etkiler; base theme'i veya bütün sayfayı değiştirmez.
 
 ### Connection color
 
@@ -51,9 +51,9 @@ Chart palette tamamlanan, devam eden, planlanan, duraklatılan ve bırakılan du
 | --- | --- | --- | --- |
 | App appearance | Local-only `localStorage` | Private/device | Obsidyen default |
 | Kütüphane filtreleri | Local-only mevcut UI preferences | Private/device | Mevcut filtre defaultları |
-| Yerel profil | Local-only mevcut profile preferences | Private/device | Güvenli yerel varsayılan |
-| Sosyal profil identity | Cloud-backed | Public/protected/personal politikasına bağlı | Eksik alanda yerel identity |
-| Profile presentation | Gelecekte cloud-backed | Public | P0 sade default |
+| Yerel profil/cache | Local-only mevcut profile preferences | Private/device | Girişsiz kullanım, offline/eksik cloud fallback |
+| Birleşik profil identity | Cloud-backed ana kaynak | Public/protected/personal politikasına bağlı | Eksik alanda local cache, auth metadata, güvenli default |
+| Profile presentation | Cloud-backed | Public loader görünürlük politikasına bağlı | Sade normalize edilmiş default |
 | Connection color | Cloud-backed sosyal ilişki | İlişki görünümü | `neutral` |
 | Chart palette | Gelecekte local-only app preference | Private/device | `standard` |
 
@@ -77,10 +77,11 @@ Chart palette tamamlanan, devam eden, planlanan, duraklatılan ve bırakılan du
 
 ## Profil modeli
 
-- **Identity:** Kim olduğu; cloud→local→fallback önceliği.
-- **Presentation:** Public profilinin nasıl göründüğü; kimlik ve ilişki renginden bağımsız.
-- **Self view:** Yerel fallback kullanabilir; banner eklenmez.
-- **Public view:** Yetkilendirilmiş cloud identity kullanır; yerel data URL sızdırmaz.
+- **Identity:** Kim olduğu; authenticated cloud → local cache/fallback → auth metadata → güvenli default önceliği.
+- **Presentation:** Profilin nasıl göründüğü; kimlik, uygulama teması ve ilişki renginden bağımsız cloud allowlist verisi.
+- **Self view:** Aynı cloud kimliği ve banner'ı kullanır; düzenleme, XP ve yerel kütüphane özetleri gösterir.
+- **Public view:** Aynı kimliği viewer görünürlük kurallarıyla sunar; yerel data URL sızdırmaz.
+- **Preview:** Birleşik editördeki henüz kaydedilmemiş identity/presentation taslağını ortak hero ile gösterir.
 
 ## P1 tema motoru
 
@@ -116,10 +117,46 @@ Tema scope'ları ana/muted metin, input, border, focus, overlay, danger, success
 
 Ana sayfadaki tüm tekil className'ler mekanik olarak dönüştürülmedi. Shared shell/modal alanları doğrudan semantik utility kullanırken, eski kartların çoğu tema scope'undaki zinc eşlemesinden yararlanır. Domain accent'leri, rating, spoiler, lifecycle, hata ve başarı renkleri kendi anlamlarını korur.
 
+## P2 birleşik kabuk ve profil
+
+### Canonical AppShell
+
+`AppShell` uygulama iskeletinin tek bileşim noktasıdır. `authenticated` modu sidebar, profil kartı, topbar, mobil navigasyon, içerik ve isteğe bağlı Right Rail'i taşır. `public` modu anonim `/u/[username]` erişiminde MediaTracker markası, tema scope'u, sınırlı navigasyon ve ortak içerik genişliğini korur; private menüleri göstermez. P1 appearance runtime root layout'ta kalır ve route shell içinde kopyalanmaz.
+
+Dashboard içindeki eski bölümler tek turda route'a çevrilmemiştir. Merkezi, tipli navigation registry gerçek route'ları `Link` ile; eski dashboard bölümlerini `/?tab=...` adapter'ıyla açar. `/feed`, `/recommendations`, `/notifications`, `/people`, `/progression`, `/profile` ve `/u/[username]` URL'leri değişmemiştir. `SocialPageShell` yalnız feature başlığı ve içerik düzenidir; ikinci sidebar/topbar veya bağımsız site arka planı oluşturmaz.
+
+### Unified profile identity
+
+Cloud profil mevcut olduğunda görünen ad, kullanıcı adı, tagline, bio, avatar, banner, seçili unvan, görünürlük, modül düzeni, paylaşım tercihleri ve presentation alanlarının ana kaynağıdır. Local profil ikinci kimlik değildir; girişsiz kullanım, profil kurulmadan önceki prefill, offline fallback/son bilinen güvenli cache ve açık avatar migration'ından önceki yerel görsel için korunur. Cloud save sonrasında yalnız görünen ad ve tagline local cache'e yazılır; username, görünürlük, modüller veya private cloud state local preference'a kopyalanmaz.
+
+Tagline ve bio ayrıdır: tagline en fazla 120 karakterlik kısa hero metnidir; bio en fazla 500 karakterlik detay alanıdır. Bio'dan otomatik tagline üretilmez. Cloud avatar yerel görselden önce gelir. Local data URL kullanıcı izni olmadan cloud'a yüklenmez. Banner cloud-backed kalır; görsel yoksa seçili palette'e ait güvenli gradient gösterilir.
+
+Cloud isteği başarısızlığı “profil yok” sayılmaz. `/profile` mevcut local kimlikle çalışır ve cloud verisinin yenilenemediğini açıkça belirtir. `personal`, `unavailable`, `not configured` ve local-only durumları ayrı sunulur.
+
+### ProfileHero ve viewer context
+
+Tek `ProfileHero`, `self`, `public` ve `preview` varyantlarını destekler. Banner, avatar, ad, kullanıcı adı, tagline, unvan, seviye/tier ve profil palette markup'ı ortaktır. Self varyantı düzenleme ve public görünüm aksiyonlarını; public varyantı takip/Yin-Yang ve görünürlük bağlamını; preview varyantı edit taslağını sunar. Aynı profil `self`, `public`, `followers`, `mutual` ve `anonymous` viewer bağlamlarında farklı izinlerle gösterilir; bunlar ayrı kimlikler değildir.
+
+Banner modu `none`, `gradient`, `world` veya `image` olabilir. Kullanıcı banner URL'si CSS string'ine gömülmez; güvenli image kaynağı olarak render edilir. Eksik image palette gradient'ine düşer. Overlay allowlist'i metin kontrastını korur. Avatar frame yalnız sunumdur ve avatar kaynağını değiştirmez. Motif metni kapatmaz ve sürekli animasyon üretmez.
+
+### Birleşik editör
+
+`UnifiedProfileEditor` kimlik, profil görseli, presentation, sosyal/gizlilik ve modül/paylaşım alanlarını tek deneyimde birleştirir. Kimlik ve presentation açık “Değişiklikleri kaydet” aksiyonuyla tek cloud isteğinde kaydedilir; `Vazgeç` taslağı son kaydedilen duruma döndürür. Mevcut layout, preference ve sharing editörleri yeniden kullanılır. Girişsiz mod yalnız local kimlik/avatar kontrollerini gösterir; username, banner upload, görünürlük ve cloud modülleri çalışıyormuş gibi sunulmaz.
+
+### Migration ve güvenlik
+
+`20260722110000_unified_profile_presentation.sql`, `profiles` tablosuna `tagline`, `profile_palette_id`, `banner_mode`, `banner_position`, `overlay_strength`, `avatar_frame`, `surface_style` ve `motif_intensity` alanlarını ekler. SQL constraint'leri P0 TypeScript allowlist'leriyle aynıdır. `social_save_unified_profile` kimliği `auth.uid()` içinden alır; client başka kullanıcı id'si seçemez. Direct profile insert/update kapalı kalır, mevcut avatar/banner asset kolon izni korunur. `get_unified_social_profile`, presentation alanlarını mevcut görünürlük güvenli loader sonucu `available` ise ekler. Migration yalnız repoda oluşturulmuştur; remote'a uygulanmamıştır.
+
+`connectionColor` değişmeden Yin/Yang ilişki sunumuna aittir. Profile palette, banner, app base theme, accent veya RLS kararında kullanılmaz.
+
+### Manuel doğrulama matrisi
+
+Uygulama çalıştırıldığında Dashboard, Feed, Öneriler, Bildirimler, Kullanıcı Ara, İlerleme, `/profile` ve `/u/[username]` arasında shell sürekliliği; kendi/diğer/anonim viewer aksiyonları; Obsidyen/Porselen/Okyanus altında banner kontrastı; offline fallback ve kompakt favori kontrolü birlikte kontrol edilmelidir. Statik kontrat testleri screenshot regression veya canlı RLS testi değildir.
+
 ## Gelecek aşamalar
 
 - **P1 Tema motoru:** Tamamlandı; root runtime, cookie mirror, aktif tema/accent UI ve shared semantic uyumluluk eklendi.
-- **P2 Birleşik profil ve ProfileHero:** Identity resolver'ı self/public yüzeylerine bağlama, presentation persistence tasarımı.
+- **P2 Birleşik profil ve ProfileHero:** Tamamlandı; canonical shell, `/profile`, ortak hero, cloud presentation ve local fallback/cache bağlandı.
 - **P3 Grafik ve düzen kişiselleştirmesi:** Chart palette ve layout seçeneklerini UI/persistence ile bağlama.
 - **P4 Ortak sayfa tasarım sistemi ve ana sayfa refactor'ı:** Semantik yüzey primitive'leriyle kontrollü sayfa dönüşümü.
 
@@ -127,6 +164,7 @@ Ana sayfadaki tüm tekil className'ler mekanik olarak dönüştürülmedi. Share
 
 - Client preference modellerinde ham CSS ve sınırsız renk seçici yoktur.
 - P1'de tema seçimi aktiftir; bütün `zinc` sınıfları mekanik olarak dönüştürülmemiştir.
-- DB migration, remote Supabase değişikliği ve public profil değişikliği yoktur.
-- Self-profile banner, yeni profil edit formu, birleşik `ProfileHero` ve chart palette UI yoktur.
-- P2 birleşik profil/ProfileHero; P3 chart palette ve düzen seçimi olarak ayrı kalır.
+- P2 migration dosyası oluşturulmuştur; remote Supabase işlemi veya migration apply yapılmamıştır.
+- Dashboard'un diğer internal sekmeleri route'a taşınmamış, kütüphane/dashboard genel refactor'ı yapılmamıştır.
+- Public profil modülleri ve sosyal feature'lar yeniden tasarlanmamış; header ve shell sınırları birleştirilmiştir.
+- Chart palette, density/effects ve dashboard layout UI hâlâ P3 kapsamındadır.

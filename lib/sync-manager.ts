@@ -44,6 +44,15 @@ let onlineListenersAttached = false;
 
 const listeners = new Set<Listener>();
 let cachedSnapshot: SyncSnapshot = computeSnapshot();
+const serverSnapshot: SyncSnapshot = {
+  pending: 0,
+  orphaned: 0,
+  syncing: false,
+  online: true,
+  lastError: null,
+  lastSyncAt: null,
+  hasUser: false,
+};
 
 function isFlushableForCurrentUser(item: SyncQueueItem): boolean {
   // Anonim (login öncesi) → her zaman adopte edilebilir
@@ -107,16 +116,8 @@ export function getSnapshot(): SyncSnapshot {
 }
 
 export function getServerSnapshot(): SyncSnapshot {
-  // SSR sırasında stabil değer
-  return {
-    pending: 0,
-    orphaned: 0,
-    syncing: false,
-    online: true,
-    lastError: null,
-    lastSyncAt: null,
-    hasUser: false,
-  };
+  // useSyncExternalStore, hydration boyunca aynı referansı bekler.
+  return serverSnapshot;
 }
 
 export function subscribe(l: Listener): () => void {

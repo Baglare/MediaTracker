@@ -24,6 +24,7 @@ export function useXpProgression(userId: string | null, fallback: UserProgressio
   }, [userId]);
 
   useEffect(() => {
+    if (!userId) return;
     let active = true;
     fetch("/api/xp", { cache: "no-store" })
       .then(async (response) => {
@@ -38,7 +39,8 @@ export function useXpProgression(userId: string | null, fallback: UserProgressio
     window.addEventListener("focus", onRefresh);
     window.addEventListener("media-tracker:xp-changed", onRefresh);
     return () => { active = false; window.removeEventListener("focus", onRefresh); window.removeEventListener("media-tracker:xp-changed", onRefresh); };
-  }, [refresh]);
+  }, [refresh, userId]);
 
-  return { summary, progression: summary ? summaryToLegacyProgression(summary) : fallback, source: summary ? "xp_v2" as const : "legacy_local" as const, loading, error, refresh };
+  const currentSummary = userId ? summary : null;
+  return { summary: currentSummary, progression: currentSummary ? summaryToLegacyProgression(currentSummary) : fallback, source: currentSummary ? "xp_v2" as const : "legacy_local" as const, loading: userId ? loading : false, error: userId ? error : undefined, refresh };
 }

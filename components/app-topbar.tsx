@@ -1,131 +1,59 @@
 "use client";
 
-// ============================================
-// App Topbar (R1: Layout Redesign)
-// ============================================
-// Slim üst çubuk: breadcrumb + cloud durumu rozeti.
-// Eski `AppHeader`'ın yerini tutar; ana navigasyon `AppSidebar`'a taşındı.
-// Mobil/tablet altında (lg<) sidebar gizli; bunun yerine yatay scroll'lu
-// `AppTabs` döndürürüz ki TabType erişimi kaybolmasın.
-
+import { Bell, ChevronRight, Settings, Users } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { Bell, ChevronRight, Settings, Users } from "lucide-react";
-import type { ProfilePreferences } from "@/lib/profile-preferences";
-import CloudModeBadge from "./cloud-mode-badge";
-import AppTabs, { type TabType } from "./app-tabs";
-import { ProfileAvatar } from "./sidebar-profile-card";
-import { NotificationBadge } from "@/components/social/notification-badge";
 
-const TAB_LABELS: Record<TabType, string> = {
-  dashboard: "Dashboard",
-  library: "Kütüphanem",
-  discover: "Keşfet",
-  calendar: "Takvim",
-  progress: "İlerlemem",
-  watchlist: "İzleme Listem",
-  favorites: "Favorilerim",
-  ratings: "Puanlamalarım",
-  notes: "Notlarım",
-  stats: "İstatistikler",
-  profile: "Profil",
-  ai: "AI Danışman",
-  activity: "Aktivite",
-  settings: "Ayarlar",
-};
+import {
+  getAppNavigationItem,
+  type AppNavigationId,
+  type DashboardTabId,
+} from "@/components/app-shell/app-navigation";
+import { NotificationBadge } from "@/components/social/notification-badge";
+import type { ProfilePreferences } from "@/lib/profile-preferences";
+import AppTabs from "./app-tabs";
+import CloudModeBadge from "./cloud-mode-badge";
+import { ProfileAvatar } from "./sidebar-profile-card";
 
 interface AppTopbarProps {
-  activeTab: TabType;
-  onChangeTab: (tab: TabType) => void;
-  onOpenProfile: () => void;
+  activeNavigationId: AppNavigationId | DashboardTabId;
+  onChangeTab: (tab: DashboardTabId) => void;
   profileName: string;
   profilePreferences: ProfilePreferences;
   socialAvatarUrl?: string;
 }
 
-export default function AppTopbar({
-  activeTab,
-  onChangeTab,
-  onOpenProfile,
-  profileName,
-  profilePreferences,
-  socialAvatarUrl,
-}: AppTopbarProps) {
+export default function AppTopbar({ activeNavigationId, onChangeTab, profileName, profilePreferences, socialAvatarUrl }: AppTopbarProps) {
+  const activeLabel = getAppNavigationItem(activeNavigationId)?.label ?? "MediaTracker";
   return (
-    <header
-      className="sticky top-0 z-40 border-b border-[var(--app-border)] bg-[color-mix(in_srgb,var(--app-bg)_82%,transparent)] backdrop-blur-md"
-      role="banner"
-    >
-      <div className="flex items-center gap-4 px-4 sm:px-6 lg:px-6 h-14">
-        {/* Mobil marka (sidebar gizliyken yerine geçer) */}
-        <button
-          type="button"
-          onClick={onOpenProfile}
-          className="flex min-w-0 items-center gap-2 rounded-lg text-left lg:hidden cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-focus)]"
-          aria-label="Profili aç"
-          title="Profili aç"
-        >
+    <header className="sticky top-0 z-40 border-b border-[var(--app-border)] bg-[color-mix(in_srgb,var(--app-bg)_82%,transparent)] backdrop-blur-md" role="banner">
+      <div className="flex h-14 items-center gap-4 px-4 sm:px-6 lg:px-6">
+        <Link href="/profile" className="flex min-w-0 items-center gap-2 rounded-lg text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-focus)] lg:hidden" aria-label="Profili aç">
           <ProfileAvatar profileName={profileName} preferences={profilePreferences} socialAvatarUrl={socialAvatarUrl} size="sm" />
-          <Image
-            src="/brand/media-tracker-mark.svg"
-            alt=""
-            aria-hidden="true"
-            width={24}
-            height={24}
-            className="h-6 w-6 shrink-0 object-contain"
-          />
+          <Image src="/brand/media-tracker-mark.svg" alt="" aria-hidden="true" width={24} height={24} className="h-6 w-6 shrink-0 object-contain" />
           <div className="min-w-0">
-            <span className="block truncate text-sm font-semibold text-zinc-100 tracking-tight">
-              MediaTracker
-            </span>
-            <span className="block max-w-[8rem] truncate text-[10px] text-zinc-500 sm:max-w-[12rem]">
-              {profileName}
-            </span>
+            <span className="block truncate text-sm font-semibold tracking-tight text-[var(--app-text-primary)]">MediaTracker</span>
+            <span className="block max-w-[8rem] truncate text-[10px] text-[var(--app-text-muted)] sm:max-w-[12rem]">{profileName}</span>
           </div>
-        </button>
+        </Link>
 
-        {/* Breadcrumb — lg+ sidebar var, marka tekrar etmeyelim */}
-        <div className="hidden lg:flex items-center gap-1.5 text-[13px] text-zinc-500 min-w-0">
-          <span>MediaTracker</span>
-          <ChevronRight className="w-3 h-3 opacity-50 shrink-0" aria-hidden="true" />
-          <strong className="text-zinc-100 font-semibold truncate">
-            {TAB_LABELS[activeTab]}
-          </strong>
+        <div className="hidden min-w-0 items-center gap-1.5 text-[13px] text-[var(--app-text-muted)] lg:flex">
+          <Link href="/" className="rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-focus)]">MediaTracker</Link>
+          <ChevronRight className="h-3 w-3 shrink-0 opacity-50" aria-hidden="true" />
+          <strong className="truncate font-semibold text-[var(--app-text-primary)]">{activeLabel}</strong>
         </div>
 
         <div className="ml-auto flex items-center gap-2">
-          <div className="hidden sm:block">
-            <CloudModeBadge />
-          </div>
-          <Link href="/people" className="lg:hidden grid h-8 w-8 place-items-center rounded-lg border border-zinc-800/70 bg-zinc-900/35 text-zinc-400 transition-colors hover:border-violet-500/35 hover:text-violet-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40" aria-label="Kullanıcı ara" title="Kullanıcı ara"><Users className="h-4 w-4" aria-hidden="true" /></Link>
-          <Link href="/notifications" className="relative lg:hidden grid h-8 w-8 place-items-center rounded-lg border border-zinc-800/70 bg-zinc-900/35 text-zinc-400 hover:text-violet-200" aria-label="Bildirimler" title="Bildirimler"><Bell className="h-4 w-4" aria-hidden="true" /><span className="absolute -right-2 -top-2"><NotificationBadge /></span></Link>
-          <button
-            type="button"
-            onClick={() => onChangeTab("settings")}
-            className={`lg:hidden grid h-8 w-8 place-items-center rounded-lg border transition-colors cursor-pointer ${
-              activeTab === "settings"
-                ? "border-[var(--app-accent)] bg-[var(--app-selected)] text-[var(--app-accent-strong)]"
-                : "border-[var(--app-border)] bg-[var(--app-surface-1)] text-[var(--app-text-muted)] hover:border-[var(--app-accent)] hover:bg-[var(--app-accent-soft)] hover:text-[var(--app-accent-strong)]"
-            } focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-focus)]`}
-            aria-label="Ayarları aç"
-            title="Ayarları aç"
-          >
-            <Settings className="h-4 w-4" aria-hidden="true" />
-          </button>
+          <div className="hidden sm:block"><CloudModeBadge /></div>
+          <Link href="/people" className="grid h-8 w-8 place-items-center rounded-lg border border-[var(--app-border)] bg-[var(--app-surface-1)] text-[var(--app-text-muted)] transition-colors hover:border-[var(--app-accent)] hover:text-[var(--app-accent-strong)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-focus)] lg:hidden" aria-label="Kullanıcı ara"><Users className="h-4 w-4" aria-hidden="true" /></Link>
+          <Link href="/notifications" className="relative grid h-8 w-8 place-items-center rounded-lg border border-[var(--app-border)] bg-[var(--app-surface-1)] text-[var(--app-text-muted)] hover:text-[var(--app-accent-strong)] lg:hidden" aria-label="Bildirimler"><Bell className="h-4 w-4" aria-hidden="true" /><span className="absolute -right-2 -top-2"><NotificationBadge /></span></Link>
+          <button type="button" onClick={() => onChangeTab("settings")} className={`grid h-8 w-8 cursor-pointer place-items-center rounded-lg border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-focus)] lg:hidden ${activeNavigationId === "settings" ? "border-[var(--app-accent)] bg-[var(--app-selected)] text-[var(--app-accent-strong)]" : "border-[var(--app-border)] bg-[var(--app-surface-1)] text-[var(--app-text-muted)] hover:border-[var(--app-accent)]"}`} aria-label="Ayarları aç"><Settings className="h-4 w-4" aria-hidden="true" /></button>
         </div>
       </div>
 
-      {/* Mobil/tablet fallback tab bar (lg altı). Sidebar gizliyken kullanıcıya
-          sekmeleri kaybolmuş hissi vermemek için mevcut AppTabs'i kullanıyoruz.
-          R20: Mobilde edge padding sıkılaştı, sekmeler full-bleed yatay scroll'a
-          yaslanır; gradient edge fade ile scroll'un devam ettiği ipucu verir. */}
-      <div className="lg:hidden relative border-t border-[var(--app-border)] px-3 sm:px-6 py-1.5 sm:py-2">
-        <AppTabs activeTab={activeTab} onChange={onChangeTab} />
-        {/* Sağ kenar fade — taşan tab olduğunda kullanıcıya kaydırma sinyali */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute top-0 right-0 h-full w-6 bg-gradient-to-l from-[var(--app-bg)] to-transparent"
-        />
+      <div className="relative border-t border-[var(--app-border)] px-3 py-1.5 sm:px-6 sm:py-2 lg:hidden">
+        <AppTabs activeNavigationId={activeNavigationId} onChange={onChangeTab} />
+        <div aria-hidden="true" className="pointer-events-none absolute right-0 top-0 h-full w-6 bg-gradient-to-l from-[var(--app-bg)] to-transparent" />
       </div>
     </header>
   );

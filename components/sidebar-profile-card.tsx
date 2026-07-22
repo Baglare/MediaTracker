@@ -1,7 +1,9 @@
 "use client";
 
 import { Archive, BookOpen, Clapperboard, Settings, Sparkles, UserRound } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
+import { dashboardTabHref } from "@/components/app-shell/app-navigation";
 import { DEFAULT_PROFILE_PREFERENCES, type AvatarAccent, type PresetAvatar, type ProfilePreferences } from "@/lib/profile-preferences";
 import { resolveAvatarSource } from "@/lib/social/avatar";
 import CloudModeBadge from "./cloud-mode-badge";
@@ -11,8 +13,6 @@ interface SidebarProfileCardProps {
   tagline: string;
   preferences: ProfilePreferences;
   socialAvatarUrl?: string;
-  onOpenProfile: () => void;
-  onOpenSettings: () => void;
 }
 
 interface ProfileAvatarProps {
@@ -83,7 +83,7 @@ export function ProfileAvatar({
         src={resolved.imageUrl}
         alt={ariaLabel ?? ""}
         onError={resolved.source === "social" ? () => setFailedSocialUrl(socialAvatarUrl) : undefined}
-        className={`${sizeClass} ${shapeClass} shrink-0 object-cover shadow-sm shadow-black/30 ring-1 ring-zinc-700/60`}
+        className={`${sizeClass} ${shapeClass} shrink-0 object-cover shadow-sm shadow-black/30 ring-1 ring-[var(--app-border-strong)]`}
       />
     );
   }
@@ -110,45 +110,40 @@ export default function SidebarProfileCard({
   tagline,
   preferences,
   socialAvatarUrl,
-  onOpenProfile,
-  onOpenSettings,
 }: SidebarProfileCardProps) {
   return (
-    <div className="rounded-xl border border-zinc-800/70 bg-zinc-900/35 p-3 shadow-sm shadow-black/20">
+    <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-2)] p-3 shadow-sm shadow-black/20">
       <div className="flex items-start gap-3">
-        <button
-          type="button"
-          onClick={onOpenProfile}
-          className="shrink-0 cursor-pointer rounded-xl text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/30"
+        <Link
+          href="/profile"
+          className="shrink-0 cursor-pointer rounded-xl text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-focus)]"
           aria-label="Profili aç"
           title="Profili aç"
         >
           <ProfileAvatar profileName={profileName} preferences={preferences} socialAvatarUrl={socialAvatarUrl} />
-        </button>
+        </Link>
 
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={onOpenProfile}
-              className="min-w-0 cursor-pointer rounded-md text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/30"
+            <Link
+              href="/profile"
+              className="min-w-0 cursor-pointer rounded-md text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-focus)]"
               aria-label="Profili aç"
               title="Profili aç"
             >
-              <p className="truncate text-[13px] font-semibold leading-tight text-zinc-50">
+              <p className="truncate text-[13px] font-semibold leading-tight text-[var(--app-text-primary)]">
                 {profileName}
               </p>
-              <p className="mt-0.5 truncate text-[10.5px] text-zinc-500">{tagline}</p>
-            </button>
-            <button
-              type="button"
-              onClick={onOpenSettings}
-              className="ml-auto grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-zinc-800/70 bg-zinc-950/35 text-zinc-500 transition-colors hover:border-amber-500/35 hover:bg-amber-500/10 hover:text-amber-200 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/35"
+              <p className="mt-0.5 truncate text-[10.5px] text-[var(--app-text-muted)]">{tagline}</p>
+            </Link>
+            <Link
+              href={dashboardTabHref("settings")}
+              className="ml-auto grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-[var(--app-border)] bg-[var(--app-surface-3)] text-[var(--app-text-muted)] transition-colors hover:border-[var(--app-accent)] hover:bg-[var(--app-hover)] hover:text-[var(--app-text-primary)] cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-focus)]"
               aria-label="Ayarları aç"
               title="Ayarları aç"
             >
               <Settings className="h-3.5 w-3.5" aria-hidden="true" />
-            </button>
+            </Link>
           </div>
 
           <div className="mt-2 max-w-full overflow-hidden opacity-80">

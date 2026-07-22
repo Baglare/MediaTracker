@@ -23,13 +23,19 @@ const ACCENT_MODES = new Set<AccentMode>(["auto", "theme", "east", "screen", "ar
 const EFFECTS_LEVELS = new Set<EffectsLevel>(["off", "subtle", "full"]);
 const DENSITIES = new Set<AppDensity>(["comfortable", "compact"]);
 export const PROFILE_PALETTE_IDS = ["neutral", "east", "screen", "arch", "ocean"] as const satisfies readonly ProfilePaletteId[];
+export const PROFILE_BANNER_MODES = ["none", "gradient", "world", "image"] as const satisfies readonly ProfileBannerMode[];
+export const PROFILE_BANNER_POSITIONS = ["top", "center", "bottom"] as const satisfies readonly ProfileBannerPosition[];
+export const PROFILE_OVERLAY_STRENGTHS = ["low", "medium", "high"] as const satisfies readonly ProfileOverlayStrength[];
+export const PROFILE_AVATAR_FRAMES = ["none", "subtle", "world", "tier"] as const satisfies readonly ProfileAvatarFrame[];
+export const PROFILE_SURFACE_STYLES = ["solid", "soft_glass", "textured"] as const satisfies readonly ProfileSurfaceStyle[];
+export const PROFILE_MOTIF_INTENSITIES = ["none", "subtle", "full"] as const satisfies readonly ProfileMotifIntensity[];
 const PROFILE_PALETTES = new Set<ProfilePaletteId>(PROFILE_PALETTE_IDS);
-const BANNER_MODES = new Set<ProfileBannerMode>(["none", "gradient", "world", "image"]);
-const BANNER_POSITIONS = new Set<ProfileBannerPosition>(["top", "center", "bottom"]);
-const OVERLAY_STRENGTHS = new Set<ProfileOverlayStrength>(["low", "medium", "high"]);
-const AVATAR_FRAMES = new Set<ProfileAvatarFrame>(["none", "subtle", "world", "tier"]);
-const SURFACE_STYLES = new Set<ProfileSurfaceStyle>(["solid", "soft_glass", "textured"]);
-const MOTIF_INTENSITIES = new Set<ProfileMotifIntensity>(["none", "subtle", "full"]);
+const BANNER_MODES = new Set<ProfileBannerMode>(PROFILE_BANNER_MODES);
+const BANNER_POSITIONS = new Set<ProfileBannerPosition>(PROFILE_BANNER_POSITIONS);
+const OVERLAY_STRENGTHS = new Set<ProfileOverlayStrength>(PROFILE_OVERLAY_STRENGTHS);
+const AVATAR_FRAMES = new Set<ProfileAvatarFrame>(PROFILE_AVATAR_FRAMES);
+const SURFACE_STYLES = new Set<ProfileSurfaceStyle>(PROFILE_SURFACE_STYLES);
+const MOTIF_INTENSITIES = new Set<ProfileMotifIntensity>(PROFILE_MOTIF_INTENSITIES);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);

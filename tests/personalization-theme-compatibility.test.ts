@@ -9,6 +9,7 @@ const runtime = readFileSync("components/personalization/appearance-runtime.tsx"
 const settings = readFileSync("components/personalization/appearance-settings-card.tsx", "utf8");
 const appPage = readFileSync("app/page.tsx", "utf8");
 const socialShell = readFileSync("components/social/social-page-shell.tsx", "utf8");
+const appShell = readFileSync("components/app-shell/app-shell.tsx", "utf8");
 
 const REQUIRED_CSS_TOKENS = [
   "--app-bg",
@@ -60,8 +61,9 @@ describe("theme registry and CSS compatibility", () => {
 
   it("uses semantic tokens for body and primary app shells", () => {
     expect(css).toMatch(/body\s*\{[\s\S]*background-color: var\(--app-bg\)/);
-    expect(appPage).toContain("app-page min-h-screen");
-    expect(socialShell).toContain("app-page min-h-screen");
+    expect(layout).toContain("<RouteAppShell>{children}</RouteAppShell>");
+    expect(appShell).toContain("app-page min-h-screen");
+    expect(socialShell).not.toContain("min-h-screen");
     expect(css).toContain("--color-zinc-950: var(--app-bg)");
   });
 
@@ -74,7 +76,7 @@ describe("theme registry and CSS compatibility", () => {
   });
 
   it("does not introduce obvious light-on-light shared shell combinations", () => {
-    expect(`${appPage}\n${socialShell}`).not.toMatch(/bg-white[^\n]*text-white/);
+    expect(`${appPage}\n${appShell}\n${socialShell}`).not.toMatch(/bg-white[^\n]*text-white/);
   });
 });
 
