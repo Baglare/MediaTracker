@@ -53,7 +53,7 @@ export default function AppTopbar({
 }: AppTopbarProps) {
   return (
     <header
-      className="sticky top-0 z-40 border-b border-zinc-800/60 bg-zinc-950/70 backdrop-blur-md"
+      className="sticky top-0 z-40 border-b border-[var(--app-border)] bg-[color-mix(in_srgb,var(--app-bg)_82%,transparent)] backdrop-blur-md"
       role="banner"
     >
       <div className="flex items-center gap-4 px-4 sm:px-6 lg:px-6 h-14">
@@ -61,7 +61,7 @@ export default function AppTopbar({
         <button
           type="button"
           onClick={onOpenProfile}
-          className="flex min-w-0 items-center gap-2 rounded-lg text-left lg:hidden cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/30"
+          className="flex min-w-0 items-center gap-2 rounded-lg text-left lg:hidden cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-focus)]"
           aria-label="Profili aç"
           title="Profili aç"
         >
@@ -104,9 +104,9 @@ export default function AppTopbar({
             onClick={() => onChangeTab("settings")}
             className={`lg:hidden grid h-8 w-8 place-items-center rounded-lg border transition-colors cursor-pointer ${
               activeTab === "settings"
-                ? "border-amber-500/35 bg-amber-500/15 text-amber-200"
-                : "border-zinc-800/70 bg-zinc-900/35 text-zinc-400 hover:border-amber-500/35 hover:bg-amber-500/10 hover:text-amber-200"
-            } focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/40`}
+                ? "border-[var(--app-accent)] bg-[var(--app-selected)] text-[var(--app-accent-strong)]"
+                : "border-[var(--app-border)] bg-[var(--app-surface-1)] text-[var(--app-text-muted)] hover:border-[var(--app-accent)] hover:bg-[var(--app-accent-soft)] hover:text-[var(--app-accent-strong)]"
+            } focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-focus)]`}
             aria-label="Ayarları aç"
             title="Ayarları aç"
           >
@@ -119,12 +119,12 @@ export default function AppTopbar({
           sekmeleri kaybolmuş hissi vermemek için mevcut AppTabs'i kullanıyoruz.
           R20: Mobilde edge padding sıkılaştı, sekmeler full-bleed yatay scroll'a
           yaslanır; gradient edge fade ile scroll'un devam ettiği ipucu verir. */}
-      <div className="lg:hidden relative border-t border-zinc-800/60 px-3 sm:px-6 py-1.5 sm:py-2">
+      <div className="lg:hidden relative border-t border-[var(--app-border)] px-3 sm:px-6 py-1.5 sm:py-2">
         <AppTabs activeTab={activeTab} onChange={onChangeTab} />
         {/* Sağ kenar fade — taşan tab olduğunda kullanıcıya kaydırma sinyali */}
         <div
           aria-hidden
-          className="pointer-events-none absolute top-0 right-0 h-full w-6 bg-gradient-to-l from-zinc-950/80 to-transparent"
+          className="pointer-events-none absolute top-0 right-0 h-full w-6 bg-gradient-to-l from-[var(--app-bg)] to-transparent"
         />
       </div>
     </header>

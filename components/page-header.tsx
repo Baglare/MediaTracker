@@ -24,17 +24,17 @@ export default function PageHeader({
   actions,
 }: PageHeaderProps) {
   return (
-    <header className="flex items-end justify-between gap-4 pb-3 mb-5 border-b border-zinc-800/60">
+    <header className="flex items-end justify-between gap-4 pb-3 mb-5 border-b border-[var(--app-border)]">
       <div className="flex items-center gap-2.5 min-w-0">
-        <div className="w-8 h-8 rounded-lg bg-zinc-900/60 ring-1 ring-zinc-800/80 grid place-items-center">
-          <Icon className="w-4 h-4 text-amber-400/90" />
+        <div className="w-8 h-8 rounded-lg bg-[var(--app-surface-1)] ring-1 ring-[var(--app-border)] grid place-items-center">
+          <Icon className="w-4 h-4 text-[var(--app-accent-strong)]" />
         </div>
         <div className="min-w-0">
-          <h1 className="text-lg font-semibold text-zinc-50 tracking-tight leading-tight truncate">
+          <h1 className="text-lg font-semibold text-[var(--app-text-primary)] tracking-tight leading-tight truncate">
             {title}
           </h1>
           {subtitle && (
-            <p className="text-[12px] text-zinc-500 leading-tight mt-0.5 truncate">
+            <p className="text-[12px] text-[var(--app-text-muted)] leading-tight mt-0.5 truncate">
               {subtitle}
             </p>
           )}

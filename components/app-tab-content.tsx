@@ -11,6 +11,7 @@ import CloudSyncStatusCard from "@/components/cloud-sync-status-card";
 import DataManagementPanel from "@/components/data-management-panel";
 import EnhancedDashboard from "@/components/enhanced-dashboard";
 import PageHeader from "@/components/page-header";
+import AppearanceSettingsCard from "@/components/personalization/appearance-settings-card";
 import RightRailSettingsCard from "@/components/right-rail-settings-card";
 import type { TabType } from "@/components/app-tabs";
 import type { DashboardStats } from "@/lib/dashboard-stats";
@@ -103,6 +104,7 @@ export default function AppTabContent({
     <div>
       <PageHeader icon={SettingsIcon} title="Ayarlar" subtitle="Hesap, cloud sync, veri yönetimi ve uygulama bilgisi" />
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-5 items-start">
+        <AppearanceSettingsCard />
         <div className="space-y-4 lg:space-y-5">
           <AuthPanel />
           <CloudSyncStatusCard />
@@ -130,7 +132,7 @@ export default function AppTabContent({
           />
         </div>
 
-        <div className="lg:col-span-2 bg-zinc-900/30 rounded-2xl border border-zinc-800/60 p-6">
+        <div className="app-panel lg:col-span-2 rounded-2xl border p-6">
           <div className="mb-4 flex items-center gap-2.5">
             <Image
               src="/brand/media-tracker-mark.svg"

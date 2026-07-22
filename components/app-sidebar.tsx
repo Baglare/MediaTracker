@@ -173,11 +173,11 @@ function NavRow({
   const Icon = item.icon;
   const ghost = !!item.ghost;
   const base =
-    "group relative w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-[13px] font-medium transition-colors text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/35";
+    "group relative w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-[13px] font-medium transition-colors text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-focus)]";
   const stateClass = ghost
     ? "text-zinc-600 cursor-not-allowed"
     : isActive
-      ? "bg-zinc-800/60 text-zinc-50 cursor-pointer"
+      ? "bg-[var(--app-selected)] text-[var(--app-text-primary)] cursor-pointer"
       : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/30 cursor-pointer";
 
   let badgeClass = "ml-auto text-[10px] font-mono px-1.5 py-0.5 rounded-full ";
@@ -191,7 +191,7 @@ function NavRow({
 
   const content = <>
       {isActive && !ghost && (
-        <span aria-hidden="true" className="absolute -left-2.5 top-1.5 bottom-1.5 w-[2px] rounded-r bg-amber-400/70" />
+        <span aria-hidden="true" className="absolute -left-2.5 top-1.5 bottom-1.5 w-[2px] rounded-r bg-[var(--app-accent)]" />
       )}
       <Icon className={`w-4 h-4 shrink-0 ${ghost ? "opacity-60" : ""}`} />
       <span className="truncate">{item.label}</span>
@@ -299,7 +299,7 @@ export default function AppSidebar({
 
   return (
     <aside
-      className="hidden lg:flex sticky top-0 h-screen w-64 shrink-0 flex-col gap-3 border-r border-zinc-800/60 bg-zinc-950/40 px-4 py-4"
+      className="app-panel hidden lg:flex sticky top-0 h-screen w-64 shrink-0 flex-col gap-3 border-r px-4 py-4 shadow-none"
       aria-label="Birincil navigasyon"
     >
       <div className="flex h-9 min-w-0 items-center gap-2 px-1">

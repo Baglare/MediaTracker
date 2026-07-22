@@ -7,7 +7,7 @@ import { ProfileAvatar } from "@/components/sidebar-profile-card";
 import type { SocialProfilePayload } from "@/lib/social/types";
 
 function StateCard({ title, text }: { title: string; text: string }) {
-  return <main className="mx-auto grid min-h-[70vh] max-w-3xl place-items-center px-4"><div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-8 text-center"><h1 className="text-xl font-semibold">{title}</h1><p className="mt-2 text-sm text-zinc-400">{text}</p><Link href="/people" className="mt-5 inline-block text-sm text-violet-300">Kullanıcı aramaya dön</Link></div></main>;
+  return <main className="app-page mx-auto grid min-h-[70vh] max-w-3xl place-items-center px-4"><div className="app-panel rounded-2xl border p-8 text-center"><h1 className="text-xl font-semibold">{title}</h1><p className="mt-2 text-sm text-[var(--app-text-muted)]">{text}</p><Link href="/people" className="mt-5 inline-block text-sm text-[var(--app-accent-strong)]">Kullanıcı aramaya dön</Link></div></main>;
 }
 
 export function SocialProfileView({ payload }: { payload: SocialProfilePayload }) {
@@ -16,14 +16,14 @@ export function SocialProfileView({ payload }: { payload: SocialProfilePayload }
   if (payload.status === "unavailable") return <StateCard title="Profil kullanılamıyor" text="Bu profile şu anda erişilemiyor." />;
   if (payload.status !== "available" || !payload.profile || !payload.relationship) return <StateCard title="Profil bulunamadı" text="Kullanıcı adı mevcut değil veya profil kaldırılmış." />;
   const profile = payload.profile;
-  return <main className="min-h-screen bg-zinc-950 text-zinc-100">
+  return <main className="app-page min-h-screen">
     <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
       <Link href="/people" className="mb-4 inline-block text-sm text-zinc-400 hover:text-zinc-200">← Kullanıcı ara</Link>
-      <header className="overflow-hidden rounded-3xl border border-zinc-800 bg-zinc-900">
+      <header className="app-panel overflow-hidden rounded-3xl border">
         <div className="h-36 bg-gradient-to-br from-violet-950 via-zinc-900 to-zinc-950 bg-cover bg-center sm:h-52" style={profile.bannerUrl ? { backgroundImage: `url(${JSON.stringify(profile.bannerUrl).slice(1, -1)})` } : undefined} />
         <div className="px-5 pb-5 sm:px-8">
           <div className="-mt-12 flex flex-col gap-4 sm:-mt-14 sm:flex-row sm:items-end">
-            <div className="shrink-0 rounded-full border-4 border-zinc-900"><ProfileAvatar profileName={profile.displayName} socialAvatarUrl={profile.avatarUrl} allowLocalFallback={false} size="xl" shape="circle" ariaLabel={`${profile.displayName} avatarı`} /></div>
+            <div className="shrink-0 rounded-full border-4 border-[var(--app-surface-1)]"><ProfileAvatar profileName={profile.displayName} socialAvatarUrl={profile.avatarUrl} allowLocalFallback={false} size="xl" shape="circle" ariaLabel={`${profile.displayName} avatarı`} /></div>
             <div className="min-w-0 flex-1 pb-1"><div className="flex flex-wrap items-center gap-2"><h1 className="truncate text-2xl font-bold">{profile.displayName}</h1><span className="rounded-full bg-zinc-800 px-2 py-1 text-xs text-zinc-400">{profile.visibilityMode === "protected" ? "Korumalı" : "Herkese açık"}</span></div><p className="text-sm text-zinc-400">@{profile.username}{profile.selectedTitle ? ` · ${profile.selectedTitle}` : ""}</p></div>
           </div>
           {profile.bio && <p className="mt-4 max-w-3xl whitespace-pre-wrap text-sm text-zinc-300">{profile.bio}</p>}

@@ -45,6 +45,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useMediaLibrary } from "@/hooks/use-media-library";
 import { usePersistedPreferences } from "@/hooks/use-persisted-preferences";
 import { useSocialAvatar } from "@/hooks/use-social-avatar";
+import { AppearanceWorldScope } from "@/components/personalization/appearance-runtime";
 import QuickAddModal from "@/components/quick-add-modal";
 import ManualGroupModal, {
   type ManualGroupAction,
@@ -1192,7 +1193,7 @@ export default function HomePage() {
     // viewport yerine bu container'a anchor oluyordu). `clip` scroll
     // container oluşturmadan taşan içeriği kırpar — sticky çalışmaya devam
     // eder, dar ekran taşması da yutulur.
-    <div data-world={worldAttr} className="min-h-screen bg-zinc-950 text-zinc-100 flex overflow-x-clip">
+    <AppearanceWorldScope world={worldAttr} className="app-page min-h-screen flex overflow-x-clip">
       {/* R13.2: Macro transition overlay — data-world scope'unun içinde
           duruyor ki --w-* tokenları aktif dünyanın renklerine resolve olsun.
           Artık worldAttr otomatik izlenmiyor; sadece handleThemeFilterChange
@@ -3141,6 +3142,6 @@ export default function HomePage() {
         onSave={handleCommitGroupAction}
         onClose={() => setGroupEditingItemId(null)}
       />
-    </div>
+    </AppearanceWorldScope>
   );
 }

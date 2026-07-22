@@ -349,14 +349,14 @@ export default function MediaModal({ isOpen, editingItem, onSave, onClose }: Med
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm overflow-y-auto"
+      className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-[var(--app-overlay)] backdrop-blur-sm overflow-y-auto"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
       aria-label={isEditMode ? "Medya Düzenle" : "Yeni Medya Ekle"}
     >
       <div
-        className="relative w-full sm:max-w-2xl bg-zinc-900/95 border border-zinc-800/80 rounded-t-2xl sm:rounded-2xl shadow-2xl shadow-black/60 overflow-hidden flex flex-col max-h-[92vh] sm:my-6"
+        className="app-panel relative w-full sm:max-w-2xl border rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] sm:my-6"
         onClick={(e) => e.stopPropagation()}
       >
         {/* === STICKY HEADER === */}

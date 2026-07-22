@@ -31,12 +31,12 @@ export default function ConfirmDialog({
   return (
     // Arka plan karartması (tıklayınca iptal olur)
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-[var(--app-overlay)] p-4"
       onClick={onCancel}
     >
       {/* Modal kutusu */}
       <div
-        className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 max-w-sm w-full shadow-2xl"
+        className="app-panel border rounded-2xl p-6 max-w-sm w-full shadow-2xl"
         onClick={(e) => e.stopPropagation()} // Kutunun içine tıklayınca kapanmasın
       >
         {/* Uyarı ikonu ve başlık */}

@@ -115,12 +115,187 @@
    leri henüz bu utility'leri tüketmiyor — sonraki turlarda dokunulacak. */
 
 :root,
+[data-theme="obsidian"] {
+  /* P1: CSS gerçek tema renklerinin source of truth'udur. */
+  --app-bg: #09090b;
+  --app-surface-1: #18181b;
+  --app-surface-2: #27272a;
+  --app-surface-3: #3f3f46;
+  --app-surface-elevated: #18181b;
+  --app-text-primary: #fafafa;
+  --app-text-secondary: #d4d4d8;
+  --app-text-muted: #71717a;
+  --app-border: #27272a;
+  --app-border-strong: #3f3f46;
+  --app-scrollbar-thumb-hover: #52525b;
+  --app-shadow: rgba(0, 0, 0, 0.30);
+  --app-overlay: rgba(0, 0, 0, 0.72);
+  --app-focus: #a78bfa;
+  --app-accent: #8b5cf6;
+  --app-accent-strong: #a78bfa;
+  --app-accent-soft: rgba(139, 92, 246, 0.30);
+  --app-accent-contrast: #fafafa;
+  --app-danger: #fb7185;
+  --app-danger-soft: rgba(244, 63, 94, 0.12);
+  --app-success: #34d399;
+  --app-success-soft: rgba(16, 185, 129, 0.12);
+  --app-warning: #fbbf24;
+  --app-warning-soft: rgba(245, 158, 11, 0.12);
+  --app-input-bg: #09090b;
+  --app-hover: #27272a;
+  --app-selected: rgba(139, 92, 246, 0.16);
+}
+
+[data-theme="porcelain"] {
+  --app-bg: #f5f5f4;
+  --app-surface-1: #fafaf9;
+  --app-surface-2: #e7e5e4;
+  --app-surface-3: #d6d3d1;
+  --app-surface-elevated: #fffdfa;
+  --app-text-primary: #1c1917;
+  --app-text-secondary: #44403c;
+  --app-text-muted: #78716c;
+  --app-border: #d6d3d1;
+  --app-border-strong: #a8a29e;
+  --app-scrollbar-thumb-hover: #78716c;
+  --app-shadow: rgba(28, 25, 23, 0.14);
+  --app-overlay: rgba(28, 25, 23, 0.48);
+  --app-focus: #7c3aed;
+  --app-accent: #7c3aed;
+  --app-accent-strong: #6d28d9;
+  --app-accent-soft: rgba(124, 58, 237, 0.14);
+  --app-accent-contrast: #fafaf9;
+  --app-danger: #be123c;
+  --app-danger-soft: rgba(190, 18, 60, 0.10);
+  --app-success: #047857;
+  --app-success-soft: rgba(4, 120, 87, 0.10);
+  --app-warning: #b45309;
+  --app-warning-soft: rgba(180, 83, 9, 0.10);
+  --app-input-bg: #fafaf9;
+  --app-hover: #e7e5e4;
+  --app-selected: rgba(124, 58, 237, 0.12);
+
+  /* Mevcut zinc utility'lerini açık temada semantik role eşle. */
+  --color-zinc-950: var(--app-bg);
+  --color-zinc-900: var(--app-surface-1);
+  --color-zinc-800: var(--app-surface-2);
+  --color-zinc-700: var(--app-surface-3);
+  --color-zinc-600: #8a817c;
+  --color-zinc-500: var(--app-text-muted);
+  --color-zinc-400: var(--app-text-secondary);
+  --color-zinc-300: #292524;
+  --color-zinc-200: #292524;
+  --color-zinc-100: var(--app-text-primary);
+  --color-zinc-50: var(--app-text-primary);
+  --color-violet-300: #6d28d9;
+  --color-violet-400: #7c3aed;
+  --color-amber-200: #92400e;
+  --color-amber-300: #92400e;
+  --color-amber-400: #b45309;
+  --color-cyan-200: #155e75;
+  --color-cyan-300: #0e7490;
+  --color-emerald-300: #047857;
+  --color-emerald-400: #059669;
+  --color-rose-300: #be123c;
+  --color-rose-400: #e11d48;
+  --color-red-300: #b91c1c;
+  --color-red-400: #dc2626;
+  --color-orange-200: #9a3412;
+  --color-orange-300: #c2410c;
+  --color-sky-300: #0369a1;
+  --color-sky-400: #0284c7;
+}
+
+[data-theme="ocean"] {
+  --app-bg: #06111f;
+  --app-surface-1: #0b1b2d;
+  --app-surface-2: #10263d;
+  --app-surface-3: #16344f;
+  --app-surface-elevated: #0e2238;
+  --app-text-primary: #ecfeff;
+  --app-text-secondary: #bae6fd;
+  --app-text-muted: #7dd3fc;
+  --app-border: #164e63;
+  --app-border-strong: #0e7490;
+  --app-scrollbar-thumb-hover: #0891b2;
+  --app-shadow: rgba(2, 8, 23, 0.40);
+  --app-overlay: rgba(2, 8, 23, 0.76);
+  --app-focus: #22d3ee;
+  --app-accent: #0ea5e9;
+  --app-accent-strong: #22d3ee;
+  --app-accent-soft: rgba(34, 211, 238, 0.16);
+  --app-accent-contrast: #06111f;
+  --app-danger: #fb7185;
+  --app-danger-soft: rgba(251, 113, 133, 0.12);
+  --app-success: #2dd4bf;
+  --app-success-soft: rgba(45, 212, 191, 0.12);
+  --app-warning: #fbbf24;
+  --app-warning-soft: rgba(251, 191, 36, 0.12);
+  --app-input-bg: #071827;
+  --app-hover: #10263d;
+  --app-selected: rgba(34, 211, 238, 0.14);
+
+  --color-zinc-950: var(--app-bg);
+  --color-zinc-900: var(--app-surface-1);
+  --color-zinc-800: var(--app-surface-2);
+  --color-zinc-700: var(--app-surface-3);
+  --color-zinc-600: #4f7897;
+  --color-zinc-500: var(--app-text-muted);
+  --color-zinc-400: var(--app-text-secondary);
+  --color-zinc-300: #d7f3ff;
+  --color-zinc-200: #e0f7ff;
+  --color-zinc-100: var(--app-text-primary);
+  --color-zinc-50: var(--app-text-primary);
+}
+
+/* Uygulama accent'i içerik dünyasının --w-* kimliğinden bağımsızdır. */
+[data-resolved-accent="east"] {
+  --app-accent: #e8b86a;
+  --app-accent-strong: #f3c878;
+  --app-accent-soft: rgba(232, 184, 106, 0.16);
+  --app-accent-contrast: #2c1a08;
+  --app-focus: #e8b86a;
+  --app-selected: rgba(232, 184, 106, 0.16);
+}
+
+[data-resolved-accent="screen"] {
+  --app-accent: #6fb0e0;
+  --app-accent-strong: #92c4ec;
+  --app-accent-soft: rgba(111, 176, 224, 0.16);
+  --app-accent-contrast: #0a1622;
+  --app-focus: #6fb0e0;
+  --app-selected: rgba(111, 176, 224, 0.16);
+}
+
+[data-resolved-accent="arch"] {
+  --app-accent: #b8956a;
+  --app-accent-strong: #d4b385;
+  --app-accent-soft: rgba(184, 149, 106, 0.16);
+  --app-accent-contrast: #2a1810;
+  --app-focus: #b8956a;
+  --app-selected: rgba(184, 149, 106, 0.16);
+}
+
+[data-resolved-accent="neutral"] {
+  --app-accent: #a1a1aa;
+  --app-accent-strong: #d4d4d8;
+  --app-accent-soft: rgba(161, 161, 170, 0.14);
+  --app-accent-contrast: #18181b;
+  --app-focus: #a1a1aa;
+  --app-selected: rgba(161, 161, 170, 0.14);
+}
+
+:root,
 [data-world="neutral"] {
+
   --w-primary: #a1a1aa;             /* zinc-400, sessiz nötr */
   --w-primary-strong: #d4d4d8;      /* zinc-300 */
   --w-secondary: #71717a;           /* zinc-500 */
   --w-ink: #18181b;                 /* zinc-900 */
   --w-soft: rgba(161, 161, 170, 0.10);
+  --w-border: rgba(161, 161, 170, 0.30);
+  --w-glow: rgba(161, 161, 170, 0.22);
+  --w-chart-primary: #a1a1aa;
 }
 
 /* Doğu — sıcak altın + lake kırmızı */
@@ -130,6 +305,9 @@
   --w-secondary: #d96f5b;
   --w-ink: #2c1a08;
   --w-soft: rgba(232, 184, 106, 0.14);
+  --w-border: rgba(232, 184, 106, 0.38);
+  --w-glow: rgba(232, 184, 106, 0.28);
+  --w-chart-primary: #e8b86a;
 }
 
 /* Kadraj — sinema mavisi + spot kırmızı */
@@ -139,6 +317,9 @@
   --w-secondary: #e84a4a;
   --w-ink: #0a1622;
   --w-soft: rgba(111, 176, 224, 0.14);
+  --w-border: rgba(111, 176, 224, 0.36);
+  --w-glow: rgba(111, 176, 224, 0.28);
+  --w-chart-primary: #6fb0e0;
 }
 
 /* Arşiv — parşömen altını + mum mührü kırmızısı */
@@ -148,6 +329,9 @@
   --w-secondary: #9d4646;
   --w-ink: #2a1810;
   --w-soft: rgba(184, 149, 106, 0.14);
+  --w-border: rgba(184, 149, 106, 0.36);
+  --w-glow: rgba(184, 149, 106, 0.28);
+  --w-chart-primary: #b8956a;
 }
 
 /* R16 cleanup: R10'da tanımlanan .text-world-primary / .bg-world-soft /
@@ -161,8 +345,8 @@
 /* ============================================ */
 
 body {
-  background-color: #09090b;
-  color: #fafafa;
+  background-color: var(--app-bg);
+  color: var(--app-text-primary);
   font-family:
     system-ui,
     -apple-system,
@@ -173,31 +357,88 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+.app-page {
+  background: var(--app-bg);
+  color: var(--app-text-primary);
+}
+
+.app-panel {
+  background: var(--app-surface-1);
+  color: var(--app-text-primary);
+  border-color: var(--app-border);
+  box-shadow: 0 12px 32px var(--app-shadow);
+}
+
+.app-card {
+  background: var(--app-surface-2);
+  color: var(--app-text-primary);
+  border-color: var(--app-border);
+}
+
+.app-input {
+  background: var(--app-input-bg);
+  color: var(--app-text-primary);
+  border-color: var(--app-border-strong);
+}
+
+.app-muted { color: var(--app-text-muted); }
+.app-border { border-color: var(--app-border); }
+
+.app-primary-action {
+  background: var(--app-accent);
+  color: var(--app-accent-contrast);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--app-accent) 38%, transparent);
+}
+
+.app-primary-action:hover { background: var(--app-accent-strong); }
+
+:where(a, button, input, select, textarea):focus-visible {
+  outline-color: var(--app-focus);
+}
+
+body,
+.app-page,
+.app-panel,
+.app-card,
+.app-input {
+  transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+
 ::-webkit-scrollbar {
   width: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #18181b;
+  background: var(--app-surface-1);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #3f3f46;
+  background: var(--app-surface-3);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #52525b;
+  background: var(--app-scrollbar-thumb-hover);
 }
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: #3f3f46 #18181b;
+  scrollbar-color: var(--app-surface-3) var(--app-surface-1);
 }
 
 ::selection {
-  background-color: rgba(139, 92, 246, 0.3);
-  color: #fafafa;
+  background-color: var(--app-accent-soft);
+  color: var(--app-text-primary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body,
+  .app-page,
+  .app-panel,
+  .app-card,
+  .app-input {
+    transition: none;
+  }
 }
 
 /* ============================================ */

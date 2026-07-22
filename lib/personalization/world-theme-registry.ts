@@ -1,0 +1,68 @@
+import type { WorldThemeDefinition, WorldThemeKey } from "./types";
+
+export const WORLD_THEME_REGISTRY: Readonly<Record<WorldThemeKey, WorldThemeDefinition>> = {
+  neutral: {
+    key: "neutral",
+    label: "Nötr",
+    shortDescription: "Dünya bağlamından bağımsız, sessiz zinc vurgu.",
+    primary: "#a1a1aa",
+    primaryStrong: "#d4d4d8",
+    secondary: "#71717a",
+    soft: "rgba(161, 161, 170, 0.10)",
+    ink: "#18181b",
+    border: "rgba(161, 161, 170, 0.30)",
+    glow: "rgba(161, 161, 170, 0.22)",
+    chartPrimary: "#a1a1aa",
+    iconKey: "neutral",
+    heroMotifKey: "none",
+  },
+  east: {
+    key: "east",
+    label: "Doğu",
+    shortDescription: "Anime, manga ve novel koleksiyonların.",
+    primary: "#e8b86a",
+    primaryStrong: "#f3c878",
+    secondary: "#d96f5b",
+    soft: "rgba(232, 184, 106, 0.14)",
+    ink: "#2c1a08",
+    border: "rgba(232, 184, 106, 0.38)",
+    glow: "rgba(232, 184, 106, 0.28)",
+    chartPrimary: "#e8b86a",
+    iconKey: "east",
+    heroMotifKey: "slash",
+  },
+  screen: {
+    key: "screen",
+    label: "Kadraj",
+    shortDescription: "Film ve dizi koleksiyonların.",
+    primary: "#6fb0e0",
+    primaryStrong: "#92c4ec",
+    secondary: "#e84a4a",
+    soft: "rgba(111, 176, 224, 0.14)",
+    ink: "#0a1622",
+    border: "rgba(111, 176, 224, 0.36)",
+    glow: "rgba(111, 176, 224, 0.28)",
+    chartPrimary: "#6fb0e0",
+    iconKey: "lens",
+    heroMotifKey: "aperture",
+  },
+  arch: {
+    key: "arch",
+    label: "Arşiv",
+    shortDescription: "Kitap koleksiyonun.",
+    primary: "#b8956a",
+    primaryStrong: "#d4b385",
+    secondary: "#9d4646",
+    soft: "rgba(184, 149, 106, 0.14)",
+    ink: "#2a1810",
+    border: "rgba(184, 149, 106, 0.36)",
+    glow: "rgba(184, 149, 106, 0.28)",
+    chartPrimary: "#b8956a",
+    iconKey: "book",
+    heroMotifKey: "wax-seal",
+  },
+};
+
+export function isWorldThemeKey(value: unknown): value is WorldThemeKey {
+  return typeof value === "string" && value in WORLD_THEME_REGISTRY;
+}

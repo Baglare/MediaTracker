@@ -170,11 +170,11 @@ export default function QuickAddModal({
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-[var(--app-overlay)] backdrop-blur-sm" onClick={onClose} />
 
-      <div className="relative w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl flex flex-col max-h-[90vh]">
+      <div className="app-panel relative w-full max-w-md border rounded-2xl shadow-2xl flex flex-col max-h-[90vh]">
         <div className="flex items-center justify-between p-5 border-b border-zinc-800">
-          <h2 className="text-xl font-bold text-white">Kütüphaneye Ekle</h2>
+          <h2 className="text-xl font-bold text-[var(--app-text-primary)]">Kütüphaneye Ekle</h2>
           <button
             type="button"
             onClick={onClose}
@@ -199,7 +199,7 @@ export default function QuickAddModal({
             <div className="flex-1 min-w-0 flex flex-col justify-center">
               <h3
                 title={titleForHeader}
-                className="text-lg font-bold text-white leading-tight break-words"
+                className="text-lg font-bold text-[var(--app-text-primary)] leading-tight break-words"
               >
                 {titleForHeader}
               </h3>

@@ -1,0 +1,94 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+
+import {
+  defaultAppearancePreferences,
+} from "@/lib/personalization/defaults";
+import type { AppAppearancePreferences } from "@/lib/personalization/types";
+import { normalizeAppearancePreferences } from "@/lib/personalization/validation";
+
+export const APPEARANCE_PREFERENCES_STORAGE_KEY = "mediaTracker:appearancePreferences:v1";
+
+export interface AppearancePreferencesStorage {
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
+  removeItem(key: string): void;
+}
+
+export function readAppearancePreferences(
+  storage: AppearancePreferencesStorage,
+  fallback: unknown = defaultAppearancePreferences(),
+): AppAppearancePreferences {
+  try {
+    const raw = storage.getItem(APPEARANCE_PREFERENCES_STORAGE_KEY);
+    return raw ? normalizeAppearancePreferences(JSON.parse(raw)) : normalizeAppearancePreferences(fallback);
+  } catch {
+    return normalizeAppearancePreferences(fallback);
+  }
+}
+
+export function writeAppearancePreferences(
+  storage: AppearancePreferencesStorage,
+  preferences: unknown,
+): AppAppearancePreferences {
+  const normalized = normalizeAppearancePreferences(preferences);
+  try {
+    storage.setItem(APPEARANCE_PREFERENCES_STORAGE_KEY, JSON.stringify(normalized));
+  } catch {
+    // Depolama kapalı/doluysa geçerli runtime state korunur.
+  }
+  return normalized;
+}
+
+export function resetStoredAppearancePreferences(
+  storage: AppearancePreferencesStorage,
+): AppAppearancePreferences {
+  const defaults = defaultAppearancePreferences();
+  try {
+    storage.removeItem(APPEARANCE_PREFERENCES_STORAGE_KEY);
+  } catch {
+    // Depolama erişimi olmasa da reset çağrısı default state döndürür.
+  }
+  return defaults;
+}
+
+export function useAppearancePreferences(initialPreferences: unknown = defaultAppearancePreferences()) {
+  const [preferences, setPreferencesState] = useState<AppAppearancePreferences>(() => (
+    normalizeAppearancePreferences(initialPreferences)
+  ));
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-only localStorage hydration
+    setPreferencesState(readAppearancePreferences(window.localStorage, initialPreferences));
+    setHydrated(true);
+  }, [initialPreferences]);
+
+  useEffect(() => {
+    if (hydrated) writeAppearancePreferences(window.localStorage, preferences);
+  }, [hydrated, preferences]);
+
+  const setPreferences = useCallback((next: unknown) => {
+    setPreferencesState(normalizeAppearancePreferences(next));
+  }, []);
+
+  const updatePreference = useCallback(<K extends keyof AppAppearancePreferences>(
+    key: K,
+    value: AppAppearancePreferences[K],
+  ) => {
+    setPreferencesState((current) => normalizeAppearancePreferences({ ...current, [key]: value }));
+  }, []);
+
+  const resetToDefaults = useCallback(() => {
+    setPreferencesState(resetStoredAppearancePreferences(window.localStorage));
+  }, []);
+
+  return {
+    preferences,
+    hydrated,
+    setPreferences,
+    updatePreference,
+    resetToDefaults,
+  };
+}

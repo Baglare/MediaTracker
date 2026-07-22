@@ -260,14 +260,14 @@ export default function ManualGroupModal({
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-[var(--app-overlay)] backdrop-blur-sm" onClick={onClose} />
 
       <form
         onSubmit={handleSubmit}
-        className="relative w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl flex flex-col max-h-[90vh]"
+        className="app-panel relative w-full max-w-md border rounded-2xl shadow-2xl flex flex-col max-h-[90vh]"
       >
         <div className="flex items-center justify-between p-5 border-b border-zinc-800">
-          <h2 className="text-lg font-bold text-white flex items-center gap-2">
+          <h2 className="text-lg font-bold text-[var(--app-text-primary)] flex items-center gap-2">
             <Layers className="w-4 h-4 text-violet-400" />
             Manuel Grup Yönetimi
           </h2>

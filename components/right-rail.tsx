@@ -51,6 +51,13 @@ import {
   type RightRailWidgetId,
 } from "@/lib/right-rail-preferences";
 import {
+  STANDARD_CHART_STATUS_PRESENTATION,
+} from "@/lib/personalization/chart-palette-registry";
+import type {
+  ChartStatusKey,
+  ChartStatusPresentation,
+} from "@/lib/personalization/types";
+import {
   formatProgressLogAction,
   formatProgressLogDetail,
   formatProgressLogRelativeTime,
@@ -109,7 +116,7 @@ function Widget({
         ? "text-emerald-300"
         : "text-[var(--w-primary-strong)]";
   return (
-    <div className="rounded-xl border border-zinc-800/60 bg-zinc-900/30 p-3.5">
+    <div className="app-card rounded-xl border p-3.5">
       <div className="flex items-center justify-between mb-2.5">
         <div className="flex items-center gap-1.5 text-[11.5px] font-semibold text-zinc-200 tracking-tight">
           <Icon className={`w-3.5 h-3.5 ${iconClass}`} />
@@ -130,66 +137,34 @@ function Widget({
 // 1) GENEL İLERLEME (R15: çok-segmentli donut + hover detay)
 // ===========================================================================
 
-type StatusSlice =
-  | "completed"
-  | "inProgress"
-  | "planning"
-  | "paused"
-  | "dropped";
+type StatusSlice = ChartStatusKey;
 
 interface SliceMeta {
   label: string;
   description: string;
-  // Renk: completed → world primary; diğerleri semantik sabit.
   color: string;
-  // Tailwind nokta sınıfı (sağdaki satır ikonu için).
   dotClass: string;
-  // Aktif satır highlight rengi (text + bg).
   rowActiveClass: string;
   rowTextClass: string;
 }
 
+function toSliceMeta(presentation: ChartStatusPresentation): SliceMeta {
+  return {
+    label: presentation.label,
+    description: presentation.description,
+    color: presentation.segmentColor,
+    dotClass: presentation.dotTone,
+    rowActiveClass: presentation.rowActiveSurface,
+    rowTextClass: presentation.textTone,
+  };
+}
+
 const SLICE_META: Record<StatusSlice, SliceMeta> = {
-  completed: {
-    label: "Tamamlanan",
-    description: "Bitirdiğin medyalar.",
-    color: "var(--w-primary)",
-    dotClass: "bg-[var(--w-primary)]",
-    rowActiveClass: "bg-[color-mix(in_srgb,var(--w-primary)_14%,transparent)]",
-    rowTextClass: "text-[var(--w-primary-strong)]",
-  },
-  inProgress: {
-    label: "Devam Eden",
-    description: "Şu anda izlediğin/okuduğun.",
-    color: "#a78bfa", // violet-400
-    dotClass: "bg-violet-400",
-    rowActiveClass: "bg-violet-500/12",
-    rowTextClass: "text-violet-300",
-  },
-  planning: {
-    label: "Planlanan",
-    description: "İleride başlamayı düşündüğün.",
-    color: "#7dd3fc", // sky-300
-    dotClass: "bg-sky-400",
-    rowActiveClass: "bg-sky-500/12",
-    rowTextClass: "text-sky-300",
-  },
-  paused: {
-    label: "Duraklatılan",
-    description: "Şimdilik ara verdiğin.",
-    color: "#fb923c", // orange-400
-    dotClass: "bg-orange-400",
-    rowActiveClass: "bg-orange-500/12",
-    rowTextClass: "text-orange-300",
-  },
-  dropped: {
-    label: "Bırakılan",
-    description: "Vazgeçtiğin kayıtlar.",
-    color: "#f87171", // red-400
-    dotClass: "bg-red-400",
-    rowActiveClass: "bg-red-500/12",
-    rowTextClass: "text-red-300",
-  },
+  completed: toSliceMeta(STANDARD_CHART_STATUS_PRESENTATION.completed),
+  inProgress: toSliceMeta(STANDARD_CHART_STATUS_PRESENTATION.inProgress),
+  planning: toSliceMeta(STANDARD_CHART_STATUS_PRESENTATION.planning),
+  paused: toSliceMeta(STANDARD_CHART_STATUS_PRESENTATION.paused),
+  dropped: toSliceMeta(STANDARD_CHART_STATUS_PRESENTATION.dropped),
 };
 
 const STATUS_ORDER: StatusSlice[] = [
@@ -1220,7 +1195,7 @@ export default function RightRail({
 
   return (
     <aside
-      className="hidden xl:flex sticky top-0 h-screen w-[18rem] shrink-0 flex-col gap-3 border-l border-zinc-800/60 bg-zinc-950/40 px-4 py-5 overflow-y-auto"
+      className="app-panel hidden xl:flex sticky top-0 h-screen w-[18rem] shrink-0 flex-col gap-3 border-l px-4 py-5 overflow-y-auto shadow-none"
       aria-label="Sağ panel"
     >
       <div className="text-[10px] font-semibold tracking-[0.16em] text-zinc-600 uppercase px-1">

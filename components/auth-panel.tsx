@@ -25,7 +25,7 @@ export default function AuthPanel() {
   const [submitting, setSubmitting] = useState(false);
 
   const cardCls =
-    "bg-zinc-900/50 rounded-2xl border border-zinc-800/50 p-6";
+    "app-panel rounded-2xl border p-6";
 
   // ---- Yapılandırılmamış ----
   if (!configured) {
@@ -137,8 +137,8 @@ export default function AuthPanel() {
   };
 
   const inputCls =
-    "w-full pl-10 pr-3 py-2.5 bg-zinc-950 border border-zinc-800 rounded-lg text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-violet-500/50";
-  const labelCls = "block text-xs font-medium text-zinc-400 mb-1.5";
+    "app-input w-full pl-10 pr-3 py-2.5 border rounded-lg text-sm placeholder:text-[var(--app-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--app-focus)]";
+  const labelCls = "block text-xs font-medium text-[var(--app-text-muted)] mb-1.5";
 
   return (
     <div className={cardCls}>
@@ -160,7 +160,7 @@ export default function AuthPanel() {
             setError(null);
             setSuccess(null);
           }}
-          className="text-xs text-violet-400 hover:text-violet-300 transition-colors cursor-pointer"
+          className="text-xs text-[var(--app-accent-strong)] hover:text-[var(--app-accent)] transition-colors cursor-pointer"
         >
           {mode === "signin" ? "Kayıt ol" : "Girişe dön"}
         </button>
@@ -228,7 +228,7 @@ export default function AuthPanel() {
         <button
           type="submit"
           disabled={submitting}
-          className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-violet-500/20 text-violet-300 ring-1 ring-violet-500/40 hover:bg-violet-500/30 transition-colors disabled:opacity-50 cursor-pointer"
+          className="app-primary-action w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors disabled:opacity-50 cursor-pointer"
         >
           {submitting
             ? "Lütfen bekle…"

@@ -23,6 +23,7 @@
 "use client";
 
 import type { MediaType } from "@/lib/types";
+import { WORLD_THEME_REGISTRY } from "@/lib/personalization/world-theme-registry";
 import type { EastSubFilter, ThemeFilter } from "./media-filters";
 
 // ----- Glyph + Sub-pill ikonları -----
@@ -195,8 +196,8 @@ const WORLDS: Record<WorldKey, WorldConfig> = {
     key: "east",
     glyph: "東",
     glyphFontClass: "text-base font-semibold",
-    title: "Doğu",
-    subtitle: "Anime, manga ve novel koleksiyonların.",
+    title: WORLD_THEME_REGISTRY.east.label,
+    subtitle: WORLD_THEME_REGISTRY.east.shortDescription,
     pills: [
       { kind: "east-sub", id: "all", label: "Tümü" },
       { kind: "east-sub", id: "anime", label: "Anime", Icon: KatanaIcon, activeAnimClass: "v5a-slash-anim" },
@@ -208,8 +209,8 @@ const WORLDS: Record<WorldKey, WorldConfig> = {
     key: "screen",
     glyph: "◉",
     glyphFontClass: "text-lg font-bold",
-    title: "Kadraj",
-    subtitle: "Film ve dizi koleksiyonların.",
+    title: WORLD_THEME_REGISTRY.screen.label,
+    subtitle: WORLD_THEME_REGISTRY.screen.shortDescription,
     pills: [
       { kind: "type", id: "all", label: "Tümü" },
       { kind: "type", id: "movie", label: "Film", Icon: LensIcon },
@@ -220,8 +221,8 @@ const WORLDS: Record<WorldKey, WorldConfig> = {
     key: "arch",
     glyph: "Æ",
     glyphFontClass: "text-lg font-bold italic",
-    title: "Arşiv",
-    subtitle: "Kitap koleksiyonun.",
+    title: WORLD_THEME_REGISTRY.arch.label,
+    subtitle: WORLD_THEME_REGISTRY.arch.shortDescription,
     pills: [
       { kind: "type", id: "all", label: "Tümü" },
       { kind: "type", id: "book", label: "Kitap", Icon: BookIcon },
