@@ -1,4 +1,13 @@
 import type { User } from "@supabase/supabase-js";
+import type { StorageWriteResult } from "./local-data-storage";
+import type { LocalOwnerScope } from "./local-owner-scope";
+import {
+  readPersonalData,
+  writePersonalData,
+  type PersonalDataCodec,
+  type PersonalDataReadResult,
+  type PersonalStorageLike,
+} from "./personal-data-storage";
 
 export type AvatarMode = "initials" | "preset" | "image";
 export type AvatarAccent = "amber" | "violet" | "cyan" | "rose" | "emerald" | "zinc";
@@ -17,7 +26,7 @@ export interface ProfilePreferences {
   manualTitle: string;
 }
 
-const PROFILE_PREFS_STORAGE_KEY = "mediaTracker:profilePreferences";
+export const PROFILE_PREFS_STORAGE_KEY = "mediaTracker:profilePreferences";
 
 export const DEFAULT_PROFILE_PREFERENCES: ProfilePreferences = {
   displayName: "",
@@ -38,7 +47,7 @@ function readString(value: unknown): string {
   return typeof value === "string" ? value : "";
 }
 
-function normalizeProfilePreferences(raw: unknown): ProfilePreferences {
+export function normalizeProfilePreferences(raw: unknown): ProfilePreferences {
   const base = { ...DEFAULT_PROFILE_PREFERENCES };
   if (!raw || typeof raw !== "object") return base;
   const r = raw as Record<string, unknown>;
@@ -59,7 +68,11 @@ function normalizeProfilePreferences(raw: unknown): ProfilePreferences {
   if (typeof r.selectedTitleMode === "string" && TITLE_MODES.has(r.selectedTitleMode as SelectedTitleMode)) {
     base.selectedTitleMode = r.selectedTitleMode as SelectedTitleMode;
   }
-  if (typeof r.avatarImageDataUrl === "string" && r.avatarImageDataUrl.startsWith("data:image/")) {
+  if (
+    typeof r.avatarImageDataUrl === "string"
+    && r.avatarImageDataUrl.startsWith("data:image/")
+    && r.avatarImageDataUrl.length <= 2_000_000
+  ) {
     base.avatarImageDataUrl = r.avatarImageDataUrl;
   }
   if (typeof r.socialAvatarMigrationDismissedFor === "string") {
@@ -67,6 +80,34 @@ function normalizeProfilePreferences(raw: unknown): ProfilePreferences {
   }
 
   return base;
+}
+
+export const profilePreferencesCodec: PersonalDataCodec<ProfilePreferences> = (value) => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return { ok: false, message: "Profil tercihleri object olmali." };
+  }
+  return { ok: true, value: normalizeProfilePreferences(value) };
+};
+
+export function readScopedProfilePreferences(
+  scope: LocalOwnerScope,
+  storage?: PersonalStorageLike,
+): PersonalDataReadResult<ProfilePreferences> {
+  return readPersonalData(scope, "profilePreferences", profilePreferencesCodec, storage);
+}
+
+export function writeScopedProfilePreferences(
+  scope: LocalOwnerScope,
+  preferences: ProfilePreferences,
+  storage?: PersonalStorageLike,
+): StorageWriteResult {
+  return writePersonalData(
+    scope,
+    "profilePreferences",
+    preferences,
+    profilePreferencesCodec,
+    storage,
+  );
 }
 
 export function loadProfilePreferences(): ProfilePreferences {

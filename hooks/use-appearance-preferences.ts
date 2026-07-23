@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   defaultAppearancePreferences,
@@ -67,18 +67,29 @@ export function useAppearancePreferences(initialPreferences: unknown = defaultAp
     normalizeAppearancePreferences(initialPreferences)
   ));
   const [hydrated, setHydrated] = useState(false);
+  const dirty = useRef(false);
 
   useEffect(() => {
+    const loaded = readAppearancePreferences(window.localStorage, initialPreferences);
     // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-only localStorage hydration
-    setPreferencesState(readAppearancePreferences(window.localStorage, initialPreferences));
+    setPreferencesState({
+      ...loaded,
+      theme: loaded.theme.kind === "preset"
+        ? loaded.theme
+        : { kind: "preset", id: "obsidian" },
+    });
     setHydrated(true);
   }, [initialPreferences]);
 
   useEffect(() => {
-    if (hydrated) writeAppearancePreferences(window.localStorage, preferences);
+    if (hydrated && dirty.current) {
+      writeAppearancePreferences(window.localStorage, preferences);
+      dirty.current = false;
+    }
   }, [hydrated, preferences]);
 
   const setPreferences = useCallback((next: unknown) => {
+    dirty.current = true;
     setPreferencesState(normalizeAppearancePreferences(next));
   }, []);
 
@@ -86,10 +97,12 @@ export function useAppearancePreferences(initialPreferences: unknown = defaultAp
     key: K,
     value: AppAppearancePreferences[K],
   ) => {
+    dirty.current = true;
     setPreferencesState((current) => normalizeAppearancePreferences({ ...current, [key]: value }));
   }, []);
 
   const resetToDefaults = useCallback(() => {
+    dirty.current = true;
     setPreferencesState(resetStoredAppearancePreferences(window.localStorage));
   }, []);
 

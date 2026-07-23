@@ -12,6 +12,7 @@ import {
 } from "react";
 
 import { useAppearancePreferences } from "@/hooks/use-appearance-preferences";
+import { useOwnerThemeSelection } from "@/hooks/use-owner-theme-selection";
 import { useCustomThemesRuntime } from "./custom-themes-runtime";
 import {
   appearanceCookieDocumentValue,
@@ -59,7 +60,9 @@ export function AppearanceRuntime({
 }) {
   const initialPreferences = useMemo<AppAppearancePreferences>(() => ({
     ...DEFAULT_APP_APPEARANCE_PREFERENCES,
-    theme: initialIdentity.theme,
+    theme: initialIdentity.theme.kind === "preset"
+      ? initialIdentity.theme
+      : { kind: "preset", id: "obsidian" },
     accentMode: initialIdentity.accentMode,
   }), [initialIdentity.accentMode, initialIdentity.theme]);
   const {
@@ -69,42 +72,34 @@ export function AppearanceRuntime({
     resetToDefaults,
   } = useAppearancePreferences(initialPreferences);
   const customThemes = useCustomThemesRuntime();
+  const ownerTheme = useOwnerThemeSelection();
   const [activeWorld, setActiveWorldState] = useState<WorldThemeKey>("neutral");
   const [prefersDark, setPrefersDark] = useState(initialIdentity.resolvedTheme !== "porcelain");
   const [previewTheme, setPreviewTheme] = useState<CustomThemeDefinition | null>(null);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- synchronize the system theme after hydration
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- synchronize system preference
     setPrefersDark(mediaQuery.matches);
     return subscribeToSystemTheme(mediaQuery, setPrefersDark);
   }, []);
 
-  const cookieTheme = useMemo<CustomThemeDefinition | undefined>(() => (
-    initialIdentity.customTheme
-      ? {
-          version: 1,
-          id: initialIdentity.customTheme.id,
-          name: "Aktif özel tema",
-          createdAt: "1970-01-01T00:00:00.000Z",
-          updatedAt: "1970-01-01T00:00:00.000Z",
-          inputs: initialIdentity.customTheme.inputs,
-          corrections: initialIdentity.customTheme.corrections,
-        }
-      : undefined
-  ), [initialIdentity.customTheme]);
-  const persistedCustomTheme = preferences.theme.kind === "custom"
-    ? customThemes.themes.find((theme) => theme.id === preferences.theme.id)
+  const effectiveTheme = ownerTheme.hydrated && ownerTheme.selection?.kind === "custom"
+    ? ownerTheme.selection
+    : preferences.theme;
+  const effectivePreferences = useMemo<AppAppearancePreferences>(() => ({
+    ...preferences,
+    theme: effectiveTheme,
+  }), [effectiveTheme, preferences]);
+  const persistedCustomTheme = effectiveTheme.kind === "custom"
+    ? customThemes.themes.find((theme) => theme.id === effectiveTheme.id)
     : undefined;
-  const runtimeCustomTheme = previewTheme
-    ?? persistedCustomTheme
-    ?? (!customThemes.hydrated && preferences.theme.kind === "custom"
-      && cookieTheme?.id === preferences.theme.id ? cookieTheme : undefined);
+  const runtimeCustomTheme = previewTheme ?? persistedCustomTheme;
   const runtimePreferences = useMemo<AppAppearancePreferences>(() => (
     previewTheme
-      ? { ...preferences, theme: { kind: "custom", id: previewTheme.id } }
-      : preferences
-  ), [preferences, previewTheme]);
+      ? { ...effectivePreferences, theme: { kind: "custom", id: previewTheme.id } }
+      : effectivePreferences
+  ), [effectivePreferences, previewTheme]);
   const attributes = useMemo(() => resolveRootAppearanceAttributes(
     runtimePreferences,
     activeWorld,
@@ -115,17 +110,18 @@ export function AppearanceRuntime({
   useEffect(() => {
     if (
       !hydrated
+      || !ownerTheme.hydrated
       || !customThemes.hydrated
-      || preferences.theme.kind !== "custom"
+      || effectiveTheme.kind !== "custom"
       || persistedCustomTheme
     ) return;
-    updatePreference("theme", { kind: "preset", id: "obsidian" });
+    ownerTheme.setSelection(null);
   }, [
     customThemes.hydrated,
+    effectiveTheme,
     hydrated,
+    ownerTheme,
     persistedCustomTheme,
-    preferences.theme,
-    updatePreference,
   ]);
 
   useEffect(() => {
@@ -134,26 +130,17 @@ export function AppearanceRuntime({
 
   useEffect(() => {
     if (previewTheme) return;
+    const cookieResolved = attributes.theme === "custom"
+      ? preferences.theme.kind === "preset" && preferences.theme.id !== "system"
+        ? preferences.theme.id
+        : "obsidian"
+      : attributes.theme;
     document.cookie = appearanceCookieDocumentValue({
-      theme: attributes.themeSelection,
-      resolvedTheme: attributes.theme,
+      theme: preferences.theme,
+      resolvedTheme: cookieResolved,
       accentMode: preferences.accentMode,
-      customTheme: attributes.themeSource === "custom" && runtimeCustomTheme
-        ? {
-            id: runtimeCustomTheme.id,
-            inputs: runtimeCustomTheme.inputs,
-            corrections: runtimeCustomTheme.corrections,
-          }
-        : undefined,
     }, window.location.protocol === "https:");
-  }, [
-    attributes.theme,
-    attributes.themeSelection,
-    attributes.themeSource,
-    preferences.accentMode,
-    previewTheme,
-    runtimeCustomTheme,
-  ]);
+  }, [attributes.theme, preferences.accentMode, preferences.theme, previewTheme]);
 
   const setActiveWorld = useCallback((world: WorldThemeKey) => {
     setActiveWorldState(world);
@@ -161,8 +148,12 @@ export function AppearanceRuntime({
 
   const setThemeSelection = useCallback((selection: ThemeSelection) => {
     setPreviewTheme(null);
-    updatePreference("theme", selection);
-  }, [updatePreference]);
+    if (selection.kind === "custom") {
+      ownerTheme.setSelection(selection);
+      return;
+    }
+    if (ownerTheme.setSelection(null)) updatePreference("theme", selection);
+  }, [ownerTheme, updatePreference]);
 
   const previewCustomTheme = useCallback((theme: CustomThemeDefinition) => {
     setPreviewTheme(theme);
@@ -174,12 +165,13 @@ export function AppearanceRuntime({
 
   const resetAppearance = useCallback(() => {
     setPreviewTheme(null);
+    ownerTheme.setSelection(null);
     resetToDefaults();
-  }, [resetToDefaults]);
+  }, [ownerTheme, resetToDefaults]);
 
   const value = useMemo<AppearanceRuntimeValue>(() => ({
-    preferences,
-    hydrated,
+    preferences: runtimePreferences,
+    hydrated: hydrated && ownerTheme.hydrated && customThemes.hydrated,
     updatePreference,
     resetToDefaults: resetAppearance,
     setThemeSelection,
@@ -194,14 +186,16 @@ export function AppearanceRuntime({
     activeWorld,
     attributes.resolvedAccent,
     attributes.theme,
-    hydrated,
-    preferences,
-    resetAppearance,
-    setThemeSelection,
-    previewCustomTheme,
     clearThemePreview,
+    customThemes.hydrated,
+    hydrated,
+    ownerTheme.hydrated,
+    previewCustomTheme,
     previewTheme,
+    resetAppearance,
+    runtimePreferences,
     setActiveWorld,
+    setThemeSelection,
     updatePreference,
   ]);
 

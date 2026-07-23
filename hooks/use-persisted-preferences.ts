@@ -4,17 +4,12 @@ import { useCallback, useEffect, useState } from "react";
 import type { EastSubFilter, ThemeFilter } from "@/components/media-filters";
 import type { LibrarySort, LibraryView } from "@/components/library-control-bar";
 import {
-  DEFAULT_PROFILE_PREFERENCES,
-  loadProfilePreferences,
-  saveProfilePreferences,
-  type ProfilePreferences,
-} from "@/lib/profile-preferences";
-import {
   DEFAULT_UI_PREFERENCES,
   loadUIPreferences,
   saveUIPreferences,
 } from "@/lib/storage";
 import type { MediaStatus, MediaType } from "@/lib/types";
+import { useOwnedProfilePreferences } from "./use-owned-profile-preferences";
 
 export type WorldTransitionState = {
   token: number;
@@ -22,11 +17,8 @@ export type WorldTransitionState = {
 } | null;
 
 export function usePersistedPreferences() {
+  const ownedProfile = useOwnedProfilePreferences();
   const [uiPrefsLoaded, setUiPrefsLoaded] = useState(false);
-  const [profilePrefsLoaded, setProfilePrefsLoaded] = useState(false);
-  const [profilePreferences, setProfilePreferences] = useState<ProfilePreferences>(
-    DEFAULT_PROFILE_PREFERENCES
-  );
   const [typeFilter, setTypeFilter] = useState<MediaType | "all">(
     DEFAULT_UI_PREFERENCES.typeFilter
   );
@@ -92,12 +84,6 @@ export function usePersistedPreferences() {
   }, []);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-only localStorage hydration
-    setProfilePreferences(loadProfilePreferences());
-    setProfilePrefsLoaded(true);
-  }, []);
-
-  useEffect(() => {
     if (!uiPrefsLoaded) return;
     saveUIPreferences({
       themeFilter,
@@ -121,13 +107,9 @@ export function usePersistedPreferences() {
     seriesSectionOpen,
   ]);
 
-  useEffect(() => {
-    if (profilePrefsLoaded) saveProfilePreferences(profilePreferences);
-  }, [profilePrefsLoaded, profilePreferences]);
-
   return {
-    profilePreferences,
-    setProfilePreferences,
+    profilePreferences: ownedProfile.profilePreferences,
+    setProfilePreferences: ownedProfile.setProfilePreferences,
     typeFilter,
     setTypeFilter,
     statusFilter,

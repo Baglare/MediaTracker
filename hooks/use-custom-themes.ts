@@ -1,21 +1,26 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   MAX_CUSTOM_THEMES,
   appendCustomTheme,
   createCustomThemeDefinition,
   deleteCustomTheme,
   normalizeCustomThemeCollection,
-  readCustomThemes,
+  readScopedCustomThemes,
   replaceCustomTheme,
-  resetStoredCustomThemes,
   updateCustomThemeDefinition,
-  writeCustomThemes,
+  writeScopedCustomThemes,
   type CustomThemeCollection,
   type CustomThemeDraftValue,
 } from "@/lib/personalization/custom-themes";
 import type { CustomThemeDefinition } from "@/lib/personalization/types";
+import type { LocalOwnerScope } from "@/lib/local-owner-scope";
+import {
+  isCurrentOwnerGeneration,
+  isHydratedOwnerVisible,
+} from "@/lib/local-owner-scope";
+import { migrateLegacyPersonalDomainToGuest } from "@/lib/personal-data-ownership";
 
 export function createSecureCustomThemeId(): string {
   if (typeof crypto.randomUUID === "function") return `ct_${crypto.randomUUID()}`;
@@ -28,34 +33,51 @@ function isoNow(): string {
   return new Date().toISOString();
 }
 
-export function useCustomThemes() {
+export function useCustomThemes(scope: LocalOwnerScope | null) {
   const [collection, setCollection] = useState<CustomThemeCollection>({ version: 1, themes: [] });
-  const [hydrated, setHydrated] = useState(false);
+  const [hydratedScopeKey, setHydratedScopeKey] = useState<string | null>(null);
+  const generation = useRef(0);
+  const visible = isHydratedOwnerVisible(scope?.key ?? null, hydratedScopeKey);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-only localStorage hydration
-    setCollection(readCustomThemes(window.localStorage));
-    setHydrated(true);
-  }, []);
+    const currentGeneration = generation.current + 1;
+    generation.current = currentGeneration;
+    queueMicrotask(() => {
+      if (!isCurrentOwnerGeneration(currentGeneration, generation.current)) return;
+      setHydratedScopeKey(null);
+      setCollection({ version: 1, themes: [] });
+      if (!scope) return;
+      if (scope.kind === "guest") {
+        migrateLegacyPersonalDomainToGuest("themes", window.localStorage);
+      }
+      const read = readScopedCustomThemes(scope, window.localStorage);
+      if (!isCurrentOwnerGeneration(currentGeneration, generation.current)) return;
+      setCollection(read.status === "valid" ? read.data : { version: 1, themes: [] });
+      setHydratedScopeKey(scope.key);
+    });
+  }, [scope]);
 
-  useEffect(() => {
-    if (hydrated) writeCustomThemes(window.localStorage, collection);
-  }, [collection, hydrated]);
+  const persist = useCallback((next: CustomThemeCollection) => {
+    if (!scope || !visible) throw new Error("custom_theme_owner_unavailable");
+    const result = writeScopedCustomThemes(scope, next, window.localStorage);
+    if (!result.ok) throw new Error(`custom_theme_storage_${result.code}`);
+    setCollection(next);
+  }, [scope, visible]);
 
   const create = useCallback((draft: CustomThemeDraftValue): CustomThemeDefinition => {
     if (collection.themes.length >= MAX_CUSTOM_THEMES) throw new Error("custom_theme_limit");
     const theme = createCustomThemeDefinition(createSecureCustomThemeId(), isoNow(), draft);
-    setCollection((current) => appendCustomTheme(current, theme));
+    persist(appendCustomTheme(collection, theme));
     return theme;
-  }, [collection.themes.length]);
+  }, [collection, persist]);
 
   const update = useCallback((id: string, draft: CustomThemeDraftValue): CustomThemeDefinition => {
     const existing = collection.themes.find((theme) => theme.id === id);
     if (!existing) throw new Error("custom_theme_not_found");
     const updated = updateCustomThemeDefinition(existing, isoNow(), draft);
-    setCollection((current) => replaceCustomTheme(current, updated));
+    persist(replaceCustomTheme(collection, updated));
     return updated;
-  }, [collection.themes]);
+  }, [collection, persist]);
 
   const duplicate = useCallback((id: string): CustomThemeDefinition => {
     const source = collection.themes.find((theme) => theme.id === id);
@@ -79,20 +101,20 @@ export function useCustomThemes() {
   }, [collection.themes, update]);
 
   const remove = useCallback((id: string) => {
-    setCollection((current) => deleteCustomTheme(current, id));
-  }, []);
+    persist(deleteCustomTheme(collection, id));
+  }, [collection, persist]);
 
   const reset = useCallback(() => {
-    setCollection(resetStoredCustomThemes(window.localStorage));
-  }, []);
+    persist({ version: 1, themes: [] });
+  }, [persist]);
 
   const replaceAll = useCallback((themes: readonly CustomThemeDefinition[]) => {
-    setCollection(normalizeCustomThemeCollection({ version: 1, themes }));
-  }, []);
+    persist(normalizeCustomThemeCollection({ version: 1, themes }));
+  }, [persist]);
 
   return {
-    themes: collection.themes,
-    hydrated,
+    themes: visible ? collection.themes : [],
+    hydrated: visible,
     create,
     update,
     duplicate,

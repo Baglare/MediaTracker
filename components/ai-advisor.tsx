@@ -33,10 +33,9 @@ import { MediaItem, MediaType, ProgressLog } from "@/lib/types";
 import { GlobalSearchResult } from "@/lib/global-search-types";
 import { expandTargetFamily } from "@/lib/ai/target-family";
 import {
-  appendRecommendationFeedbackEvent,
-  clearDismissedRecommendationFeedback,
-  readRecommendationFeedbackEvents,
-  removeDismissedRecommendationFeedback,
+  appendScopedRecommendationFeedbackEvent,
+  clearScopedDismissedRecommendationFeedback,
+  removeScopedDismissedRecommendationFeedback,
 } from "@/lib/ai/recommendation-feedback";
 import { buildAiEngineStatus } from "@/lib/ai/engine-status";
 import type {
@@ -44,6 +43,20 @@ import type {
   AiEngineStatus,
   RecommendationFeedbackAction,
 } from "@/lib/ai/types";
+import { useAuth } from "@/hooks/use-auth";
+import {
+  isHydratedOwnerVisible,
+  resolveLocalOwnerScope,
+} from "@/lib/local-owner-scope";
+import {
+  readAiFeedbackState,
+  readAiPreferencesState,
+  readAiSessionState,
+  writeAiFeedbackState,
+  writeAiPreferencesState,
+  writeAiSessionState,
+} from "@/lib/ai/local-state";
+import { migrateLegacyPersonalDomainToGuest } from "@/lib/personal-data-ownership";
 
 // ---- Tipler ----
 export interface AiSettings {
@@ -199,15 +212,11 @@ interface AiAdvisorProps {
   onOpenDiscover?: (rec: AiRecommendation) => void;
 }
 
-const SETTINGS_KEY = "media-tracker-ai-settings";
-const SESSIONS_KEY = "media-tracker-ai-sessions";
-const DISMISSED_FEEDBACK_KEY = "media-tracker-ai-dismissed-feedback";
 const MAX_DISMISSED_FEEDBACK = 100;
 // R40 — Aktif AI oturumu (chat + öneri kartları + local feedback) sayfa
 // yenilenmesinde geri yüklenebilmesi için bu key'e yazılır. handleNewTopic
 // veya boş state durumunda silinir. Konu Kapat → sohbeti temizler; kalıcı
 // feedback ayrı key'de tutulur.
-const ACTIVE_SESSION_KEY = "media-tracker-ai-active-session";
 const ACTIVE_SESSION_VERSION = 1;
 const MAX_SESSIONS = 8;
 
@@ -366,8 +375,6 @@ const DATA_TOGGLE_META: { key: keyof DataToggles; label: string }[] = [
   { key: "recentActivity", label: "Son aktiviteler" },
 ];
 
-const DATA_TOGGLES_KEY = "media-tracker-ai-data-toggles";
-const ADVISOR_PREFS_KEY = "media-tracker-ai-advisor-prefs";
 
 function buildModePrompt(
   mode: AdvisorMode,
@@ -659,6 +666,13 @@ export default function AiAdvisor({
   onAddToLibrary,
   onOpenDiscover,
 }: AiAdvisorProps) {
+  const auth = useAuth();
+  const ownerScope = useMemo(
+    () => resolveLocalOwnerScope(auth.loading ? undefined : auth.user?.id ?? null),
+    [auth.loading, auth.user?.id],
+  );
+  const ownerScopeKey = ownerScope?.key ?? null;
+  const [hydratedOwnerKey, setHydratedOwnerKey] = useState<string | null>(null);
   const [settings, setSettings] = useState<AiSettings>(DEFAULT_SETTINGS);
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<AiMessage[]>([]);
@@ -671,9 +685,13 @@ export default function AiAdvisor({
   // R42 — "İlgilenmiyorum" feedback'i localStorage'da kalıcı tutulur.
   // Backend aday havuzunu title/externalSource/externalId/mediaType ile filtreler.
   const [dismissedSignals, setDismissedSignals] = useState<Record<string, DismissedSignal>>({});
+  const [recommendationFeedbackEvents, setRecommendationFeedbackEvents] = useState<
+    import("@/lib/ai/types").RecommendationFeedbackEvent[]
+  >([]);
   const [debugInfo, setDebugInfo] = useState<AiDebugInfo | null>(null);
   const [engineStatus, setEngineStatus] = useState<AiEngineStatus | null>(null);
   const [feedbackNotice, setFeedbackNotice] = useState<string | null>(null);
+  const [aiStorageError, setAiStorageError] = useState<string | null>(null);
   const [showDebug, setShowDebug] = useState(false);
   const [pendingClarification, setPendingClarification] = useState<{
     originalPrompt: string;
@@ -691,66 +709,93 @@ export default function AiAdvisor({
   const feedbackContextRef = useRef<{ sessionId?: string; prompt?: string } | null>(null);
   const shownFeedbackKeysRef = useRef<Set<string>>(new Set());
   const feedbackLoadedRef = useRef(false);
+  const persistenceReadyRef = useRef(false);
+  const ownerVisible = isHydratedOwnerVisible(ownerScopeKey, hydratedOwnerKey);
+
+  useEffect(() => {
+    persistenceReadyRef.current = false;
+    if (!ownerVisible) return;
+    const timer = window.setTimeout(() => {
+      persistenceReadyRef.current = true;
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [ownerScopeKey, ownerVisible]);
 
   useEffect(() => {
     try {
-      const s = localStorage.getItem(SETTINGS_KEY);
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-only
-      if (s) setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(s) });
-      const list = localStorage.getItem(SESSIONS_KEY);
-      if (list) setSessions(JSON.parse(list));
-      const persistedFeedback = localStorage.getItem(DISMISSED_FEEDBACK_KEY);
-      if (persistedFeedback) {
-        setDismissedSignals(parseDismissedSignals(JSON.parse(persistedFeedback)));
+      feedbackLoadedRef.current = false;
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- owner switch must mask previous personal state
+      setSettings({ ...DEFAULT_SETTINGS });
+      setSessions([]);
+      setMessages([]);
+      setRecommendations([]);
+      setRejected([]);
+      setAddedIds({});
+      setDismissedSignals({});
+      setRecommendationFeedbackEvents([]);
+      setDataToggles({ ...DEFAULT_DATA_TOGGLES });
+      setScopeMode("mixed");
+      setResearchMode("library-only");
+      setPendingClarification(null);
+      setDebugInfo(null);
+      setEngineStatus(null);
+      setAiStorageError(null);
+      activeContextRef.current = null;
+      inFlightRequestId.current = null;
+      inFlightPromptKey.current = null;
+      setHydratedOwnerKey(null);
+      if (!ownerScope) return;
+      if (ownerScope.kind === "guest") {
+        migrateLegacyPersonalDomainToGuest("ai", window.localStorage);
       }
-      const dt = localStorage.getItem(DATA_TOGGLES_KEY);
-      if (dt) setDataToggles({ ...DEFAULT_DATA_TOGGLES, ...JSON.parse(dt) });
-      const prefs = localStorage.getItem(ADVISOR_PREFS_KEY);
-      if (prefs) {
-        const parsed = JSON.parse(prefs) as { scopeMode?: ScopeMode; researchMode?: ResearchMode };
-        if (parsed.scopeMode) setScopeMode(parsed.scopeMode);
-        if (parsed.researchMode) setResearchMode(parsed.researchMode);
+      const storedPreferences = readAiPreferencesState(ownerScope);
+      if (storedPreferences.status === "valid") {
+        setSettings(storedPreferences.data.settings);
+        setDataToggles(storedPreferences.data.dataToggles);
+        setScopeMode(storedPreferences.data.scopeMode);
+        setResearchMode(storedPreferences.data.researchMode);
       }
-      // R40 — Aktif oturum snapshot'ını geri yükle.
-      const active = localStorage.getItem(ACTIVE_SESSION_KEY);
-      if (active) {
-        const snap = JSON.parse(active) as {
+      const storedSessions = readAiSessionState(ownerScope);
+      if (storedSessions.status === "valid") {
+        setSessions(storedSessions.data.sessions as unknown as AiSession[]);
+        const snap = storedSessions.data.activeSession as {
           v?: number;
           messages?: AiMessage[];
           recommendations?: AiRecommendation[];
           rejected?: RejectedCandidate[];
           addedIds?: Record<string, boolean>;
-          dismissedSignals?: Record<string, DismissedSignal>;
           pendingClarification?: { originalPrompt: string; question: string } | null;
           debugInfo?: AiDebugInfo | null;
           engineStatus?: AiEngineStatus | null;
           activeContext?: AiActiveContext | null;
-        };
-        if (snap.v === ACTIVE_SESSION_VERSION) {
+        } | undefined;
+        if (snap?.v === ACTIVE_SESSION_VERSION) {
           if (Array.isArray(snap.messages)) setMessages(snap.messages);
           if (Array.isArray(snap.recommendations)) setRecommendations(snap.recommendations);
           if (Array.isArray(snap.rejected)) setRejected(snap.rejected);
-          if (snap.addedIds && typeof snap.addedIds === "object") setAddedIds(snap.addedIds);
-          if (snap.dismissedSignals && typeof snap.dismissedSignals === "object") {
-            const activeDismissed = parseDismissedSignals(snap.dismissedSignals);
-            setDismissedSignals((prev) => limitDismissedSignals({ ...prev, ...activeDismissed }));
-          }
+          if (snap.addedIds) setAddedIds(snap.addedIds);
           if (snap.pendingClarification) setPendingClarification(snap.pendingClarification);
           if (snap.debugInfo) setDebugInfo(snap.debugInfo);
           if (snap.engineStatus) setEngineStatus(snap.engineStatus);
           if (snap.activeContext) activeContextRef.current = snap.activeContext;
         }
       }
+      const storedFeedback = readAiFeedbackState(ownerScope);
+      if (storedFeedback.status === "valid") {
+        setDismissedSignals(parseDismissedSignals(storedFeedback.data.dismissedSignals));
+        setRecommendationFeedbackEvents(storedFeedback.data.recommendationEvents);
+      }
+      setHydratedOwnerKey(ownerScope.key);
     } catch {
       // ignore
     } finally {
       feedbackLoadedRef.current = true;
     }
-  }, []);
+  }, [ownerScope, ownerScopeKey]);
 
   // R40 — Aktif oturumu localStorage'a yaz. Boş state → key silinir.
   useEffect(() => {
-    if (!feedbackLoadedRef.current) return;
+    if (!feedbackLoadedRef.current || !persistenceReadyRef.current || !ownerScope || !ownerVisible) return;
     try {
       const isEmpty =
         messages.length === 0 &&
@@ -759,7 +804,11 @@ export default function AiAdvisor({
         Object.keys(addedIds).length === 0 &&
         !pendingClarification;
       if (isEmpty) {
-        localStorage.removeItem(ACTIVE_SESSION_KEY);
+        const result = writeAiSessionState(ownerScope, {
+          version: 1,
+          sessions: sessions as unknown as Record<string, unknown>[],
+        });
+        if (!result.ok) queueMicrotask(() => setAiStorageError(result.message));
         return;
       }
       const snap = {
@@ -773,20 +822,36 @@ export default function AiAdvisor({
         engineStatus,
         activeContext: activeContextRef.current,
       };
-      localStorage.setItem(ACTIVE_SESSION_KEY, JSON.stringify(snap));
+      const result = writeAiSessionState(ownerScope, {
+        version: 1,
+        sessions: sessions as unknown as Record<string, unknown>[],
+        activeSession: snap,
+      });
+      queueMicrotask(() => setAiStorageError(result.ok ? null : result.message));
     } catch {
       // ignore (kotanın dolması ya da JSON cycle gibi nadir durumlar)
     }
-  }, [messages, recommendations, rejected, addedIds, pendingClarification, debugInfo, engineStatus]);
+  }, [messages, recommendations, rejected, addedIds, pendingClarification, debugInfo, engineStatus, ownerScope, ownerVisible, sessions]);
 
   useEffect(() => {
+    if (!persistenceReadyRef.current || !ownerScope || !ownerVisible) return;
     try {
       const limited = limitDismissedSignals(dismissedSignals);
       if (Object.keys(limited).length === 0) {
-        localStorage.removeItem(DISMISSED_FEEDBACK_KEY);
+        const result = writeAiFeedbackState(ownerScope, {
+          version: 1,
+          dismissedSignals: {},
+          recommendationEvents: recommendationFeedbackEvents,
+        });
+        if (!result.ok) queueMicrotask(() => setAiStorageError(result.message));
         return;
       }
-      localStorage.setItem(DISMISSED_FEEDBACK_KEY, JSON.stringify(limited));
+      const result = writeAiFeedbackState(ownerScope, {
+        version: 1,
+        dismissedSignals: limited as unknown as Record<string, Record<string, unknown>>,
+        recommendationEvents: recommendationFeedbackEvents,
+      });
+      if (!result.ok) queueMicrotask(() => setAiStorageError(result.message));
       if (Object.keys(limited).length !== Object.keys(dismissedSignals).length) {
         // Cap'i aşan kayıtlar localStorage'a yazıldıktan sonra state'i normalize ediyoruz;
         // bu nadir bir trim olduğu için cascading render maliyeti kabul edilebilir.
@@ -796,7 +861,7 @@ export default function AiAdvisor({
     } catch {
       // bozuk veya dolu localStorage app'i düşürmesin
     }
-  }, [dismissedSignals]);
+  }, [dismissedSignals, ownerScope, ownerVisible, recommendationFeedbackEvents]);
 
   useEffect(() => {
     if (recommendations.length === 0) return;
@@ -815,20 +880,20 @@ export default function AiAdvisor({
   }, [recommendations]);
 
   useEffect(() => {
+    if (!persistenceReadyRef.current || !ownerScope || !ownerVisible) return;
     try {
-      localStorage.setItem(DATA_TOGGLES_KEY, JSON.stringify(dataToggles));
+      const result = writeAiPreferencesState(ownerScope, {
+        version: 1,
+        settings,
+        dataToggles,
+        scopeMode,
+        researchMode,
+      });
+      if (!result.ok) queueMicrotask(() => setAiStorageError(result.message));
     } catch {
       // ignore
     }
-  }, [dataToggles]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(ADVISOR_PREFS_KEY, JSON.stringify({ scopeMode, researchMode }));
-    } catch {
-      // ignore
-    }
-  }, [scopeMode, researchMode]);
+  }, [dataToggles, ownerScope, ownerVisible, researchMode, scopeMode, settings]);
 
   // R34/R44 — araştırma modu route'a ayrıca gönderilir; web modu provider
   // context'inde de gerçek web araştırması olarak işaretlenir.
@@ -839,14 +904,6 @@ export default function AiAdvisor({
       prev.useWebResearch === expectedUseWebResearch ? prev : { ...prev, useWebResearch: expectedUseWebResearch }
     );
   }
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-    } catch {
-      // ignore
-    }
-  }, [settings]);
 
   // R19: AI sekmesi dışına çıkıldığında parent `resetSignal`'ı artırır;
   // bu effect tüm aktif sohbet state'ini ve refs'i temizliyordu. React 19'da
@@ -889,11 +946,6 @@ export default function AiAdvisor({
 
   function persistSessions(next: AiSession[]) {
     setSessions(next);
-    try {
-      localStorage.setItem(SESSIONS_KEY, JSON.stringify(next));
-    } catch {
-      // ignore
-    }
   }
 
   function finishWith(
@@ -1003,7 +1055,7 @@ export default function AiAdvisor({
           // R39 — Session-level feedback: kullanıcının "İlgilenmiyorum"
           // dediği önerileri backend aday havuzundan filtrelesin.
           dismissed: Object.values(dismissedSignals),
-          recommendationFeedback: readRecommendationFeedbackEvents(),
+          recommendationFeedback: recommendationFeedbackEvents,
         }),
       });
       if (!res.ok) return null;
@@ -1316,7 +1368,8 @@ export default function AiAdvisor({
     rec: AiRecommendation,
     metadata?: { canAdd?: boolean; inLibrary?: boolean }
   ) {
-    appendRecommendationFeedbackEvent({
+    if (!ownerScope || !ownerVisible) return;
+    const persisted = appendScopedRecommendationFeedbackEvent(ownerScope, {
       action,
       recommendationId: rec.id,
       title: rec.title,
@@ -1332,6 +1385,12 @@ export default function AiAdvisor({
         canAdd: metadata?.canAdd ?? !!rec.candidate?.globalSearch,
       },
     });
+    if (persisted) {
+      setAiStorageError(null);
+      setRecommendationFeedbackEvents((current) => [...current, persisted].slice(-1000));
+    } else {
+      setAiStorageError("AI feedback yerel owner storage alanina kaydedilemedi.");
+    }
   }
 
   function handleDismissRec(rec: AiRecommendation) {
@@ -1348,12 +1407,20 @@ export default function AiAdvisor({
   }
   function handleUndoDismissRec(rec: AiRecommendation) {
     const key = feedbackKeyFromRec(rec);
-    removeDismissedRecommendationFeedback({
+    if (!ownerScope || !ownerVisible) return;
+    removeScopedDismissedRecommendationFeedback(ownerScope, {
       title: rec.title,
       mediaType: rec.mediaType,
       externalSource: rec.externalSource,
       externalId: rec.externalId,
     });
+    setRecommendationFeedbackEvents((current) => current.filter(
+      (event) => event.action !== "dismissed"
+        || (rec.externalSource && rec.externalId
+          ? event.externalSource !== rec.externalSource || event.externalId !== rec.externalId
+          : event.mediaType !== rec.mediaType
+            || event.title.trim().toLowerCase() !== rec.title.trim().toLowerCase()),
+    ));
     setDismissedSignals((prev) => {
       const next = { ...prev };
       delete next[key];
@@ -1362,7 +1429,11 @@ export default function AiAdvisor({
     setFeedbackNotice("İlgilenmiyorum tercihi geri alındı.");
   }
   function handleClearDismissedFeedback() {
-    clearDismissedRecommendationFeedback();
+    if (!ownerScope || !ownerVisible) return;
+    clearScopedDismissedRecommendationFeedback(ownerScope);
+    setRecommendationFeedbackEvents((current) => current.filter(
+      (event) => event.action !== "dismissed",
+    ));
     setDismissedSignals({});
     setFeedbackNotice("İlgilenmiyorum kayıtları temizlendi.");
   }
@@ -1401,8 +1472,23 @@ export default function AiAdvisor({
   const viewingSession = viewingSessionId ? sessions.find((s) => s.id === viewingSessionId) : null;
   const dismissedFeedbackCount = Object.keys(dismissedSignals).length;
 
+  if (!ownerVisible) {
+    return (
+      <section className="app-panel rounded-2xl border p-6" aria-busy="true">
+        <p className="text-sm text-[var(--app-text-muted)]">
+          Kisisel AI durumu guvenli owner scope icin yukleniyor...
+        </p>
+      </section>
+    );
+  }
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(260px,300px)] 2xl:grid-cols-[minmax(0,1fr)_minmax(320px,360px)] gap-6 2xl:gap-8">
+      {aiStorageError && (
+        <p role="alert" className="rounded-xl border border-[var(--app-danger)] bg-[var(--app-danger-soft)] p-3 text-sm text-[var(--app-danger)] lg:col-span-2">
+          {aiStorageError} Degisiklik bu owner icin kalici olmayabilir.
+        </p>
+      )}
       <div className="space-y-5 min-w-0">
         {/* Başlık */}
         <div className="flex flex-wrap items-start justify-between gap-3">

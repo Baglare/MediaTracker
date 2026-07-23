@@ -2,13 +2,19 @@
 
 import { createContext, useContext, type ReactNode } from "react";
 import { useCustomThemes } from "@/hooks/use-custom-themes";
+import { useAuth } from "@/hooks/use-auth";
+import { resolveLocalOwnerScope } from "@/lib/local-owner-scope";
 
 type CustomThemesRuntimeValue = ReturnType<typeof useCustomThemes>;
 
 const CustomThemesRuntimeContext = createContext<CustomThemesRuntimeValue | null>(null);
 
 export function CustomThemesRuntime({ children }: { children: ReactNode }) {
-  const value = useCustomThemes();
+  const auth = useAuth();
+  const scope = resolveLocalOwnerScope(
+    auth.loading ? undefined : auth.user?.id ?? null,
+  );
+  const value = useCustomThemes(scope);
   return (
     <CustomThemesRuntimeContext.Provider value={value}>
       {children}

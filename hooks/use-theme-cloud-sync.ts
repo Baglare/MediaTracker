@@ -11,12 +11,13 @@ import {
   initialThemeSyncChoice,
   mergeThemeStates,
   normalizeThemeCloudState,
-  readThemeCloudSyncPreferences,
-  writeThemeCloudSyncPreferences,
+  readScopedThemeCloudSyncPreferences,
+  writeScopedThemeCloudSyncPreferences,
   type InitialThemeSyncChoice,
   type ThemeCloudState,
   type ThemeCloudSyncPreferences,
 } from "@/lib/personalization/theme-cloud-sync";
+import { createUserOwnerScope } from "@/lib/local-owner-scope";
 
 type SyncStatus = "idle" | "loading" | "syncing" | "conflict" | "error";
 
@@ -55,16 +56,43 @@ export function useThemeCloudSync() {
   const [showInitialChoice, setShowInitialChoice] = useState(false);
   const lastSyncedSignature = useRef<string | null>(null);
   const initialCheckStarted = useRef(false);
+  const ownerGeneration = useRef(0);
+  const [hydratedOwnerKey, setHydratedOwnerKey] = useState<string | null>(null);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- device-local preference hydration
-    setPreferences(readThemeCloudSyncPreferences(window.localStorage));
-    setHydrated(true);
-  }, []);
+    ownerGeneration.current += 1;
+    const generation = ownerGeneration.current;
+    initialCheckStarted.current = false;
+    lastSyncedSignature.current = null;
+    queueMicrotask(() => {
+      if (generation !== ownerGeneration.current) return;
+      setHydratedOwnerKey(null);
+      setPreferences({ ...DEFAULT_THEME_CLOUD_SYNC_PREFERENCES });
+      setRemote(null);
+      setShowInitialChoice(false);
+      setStatus("idle");
+      if (auth.loading || !auth.user) {
+        setHydrated(!auth.loading);
+        return;
+      }
+      const scope = createUserOwnerScope(auth.user.id);
+      const read = readScopedThemeCloudSyncPreferences(scope, window.localStorage);
+      setPreferences(read.status === "valid"
+        ? read.data
+        : { ...DEFAULT_THEME_CLOUD_SYNC_PREFERENCES });
+      setHydratedOwnerKey(scope.key);
+      setHydrated(true);
+    });
+  }, [auth.loading, auth.user]);
 
   useEffect(() => {
-    if (hydrated) writeThemeCloudSyncPreferences(window.localStorage, preferences);
-  }, [hydrated, preferences]);
+    if (!hydrated || !auth.user || hydratedOwnerKey !== `user:${auth.user.id}`) return;
+    writeScopedThemeCloudSyncPreferences(
+      createUserOwnerScope(auth.user.id),
+      preferences,
+      window.localStorage,
+    );
+  }, [auth.user, hydrated, hydratedOwnerKey, preferences]);
 
   const updatePreferences = useCallback((patch: Partial<ThemeCloudSyncPreferences>) => {
     setPreferences((current) => ({ ...current, ...patch, version: 1 }));
@@ -72,6 +100,8 @@ export function useThemeCloudSync() {
 
   const fetchRemote = useCallback(async (): Promise<ThemeCloudState | null> => {
     if (!auth.user) return null;
+    const generation = ownerGeneration.current;
+    const ownerUserId = auth.user.id;
     setStatus("loading");
     try {
       const response = await fetch("/api/personalization/themes/sync", {
@@ -86,11 +116,13 @@ export function useThemeCloudSync() {
         throw new Error(error);
       }
       const state = normalizeThemeCloudState(json);
+      if (generation !== ownerGeneration.current || auth.user?.id !== ownerUserId) return null;
       if (!state) throw new Error("Bulut tema verisi geçersiz.");
       setRemote(state);
       setStatus("idle");
       return state;
     } catch (error) {
+      if (generation !== ownerGeneration.current || auth.user?.id !== ownerUserId) return null;
       const next = error instanceof Error ? error.message : "Bulut tema verisi alınamadı.";
       setStatus("error");
       setMessage(next);
@@ -106,6 +138,8 @@ export function useThemeCloudSync() {
     themes = customThemes.themes,
   ): Promise<boolean> => {
     if (!auth.user) return false;
+    const generation = ownerGeneration.current;
+    const ownerUserId = auth.user.id;
     setStatus("syncing");
     try {
       const response = await fetch("/api/personalization/themes/sync", {
@@ -119,6 +153,7 @@ export function useThemeCloudSync() {
         }),
       });
       const json = await responseJson(response) as SyncResponse | null;
+      if (generation !== ownerGeneration.current || auth.user?.id !== ownerUserId) return false;
       if (response.status === 409) {
         const conflictState = normalizeThemeCloudState(json?.state);
         if (conflictState) setRemote(conflictState);
@@ -150,6 +185,7 @@ export function useThemeCloudSync() {
       setMessage(successMessage);
       return true;
     } catch (error) {
+      if (generation !== ownerGeneration.current || auth.user?.id !== ownerUserId) return false;
       const next = error instanceof Error ? error.message : "Tema senkronizasyonu tamamlanamadı.";
       setStatus("error");
       setMessage(`${next} Yerel temaların korunuyor.`);
@@ -301,12 +337,15 @@ export function useThemeCloudSync() {
 
   const deleteCloud = useCallback(async () => {
     if (!auth.user) return false;
+    const generation = ownerGeneration.current;
+    const ownerUserId = auth.user.id;
     setStatus("syncing");
     try {
       const response = await fetch("/api/personalization/themes/sync", {
         method: "DELETE",
         credentials: "same-origin",
       });
+      if (generation !== ownerGeneration.current || auth.user?.id !== ownerUserId) return false;
       if (!response.ok) throw new Error("Bulut tema verisi silinemedi.");
       setRemote(null);
       updatePreferences({
@@ -331,7 +370,13 @@ export function useThemeCloudSync() {
   ), [appearance.preferences.theme, customThemes.themes]);
 
   useEffect(() => {
-    if (!hydrated || !preferences.enabled || !auth.user || initialCheckStarted.current) return;
+    if (
+      !hydrated
+      || !preferences.enabled
+      || !auth.user
+      || hydratedOwnerKey !== `user:${auth.user.id}`
+      || initialCheckStarted.current
+    ) return;
     initialCheckStarted.current = true;
     void fetchRemote().then((state) => {
       if (!state) return;
@@ -350,6 +395,7 @@ export function useThemeCloudSync() {
     auth.user,
     fetchRemote,
     hydrated,
+    hydratedOwnerKey,
     preferences.enabled,
     preferences.lastRemoteRevision,
     preferences.pendingLocalChanges,
@@ -358,7 +404,13 @@ export function useThemeCloudSync() {
   ]);
 
   useEffect(() => {
-    if (!hydrated || !preferences.enabled || !auth.user || !remote) return;
+    if (
+      !hydrated
+      || !preferences.enabled
+      || !auth.user
+      || hydratedOwnerKey !== `user:${auth.user.id}`
+      || !remote
+    ) return;
     if (lastSyncedSignature.current === null) {
       lastSyncedSignature.current = signature;
       return;
@@ -372,6 +424,7 @@ export function useThemeCloudSync() {
   }, [
     auth.user,
     hydrated,
+    hydratedOwnerKey,
     preferences.enabled,
     preferences.lastRemoteRevision,
     remote,
@@ -381,13 +434,15 @@ export function useThemeCloudSync() {
     updatePreferences,
   ]);
 
+  const ownerReady = Boolean(auth.user && hydratedOwnerKey === `user:${auth.user.id}`);
+
   return {
     auth,
-    preferences,
-    remote,
-    status,
-    message,
-    showInitialChoice,
+    preferences: ownerReady ? preferences : DEFAULT_THEME_CLOUD_SYNC_PREFERENCES,
+    remote: ownerReady ? remote : null,
+    status: ownerReady ? status : "idle",
+    message: ownerReady ? message : "Tema senkronizasyonu bu hesap icin kapali.",
+    showInitialChoice: ownerReady && showInitialChoice,
     recommendedInitialChoice: initialThemeSyncChoice(
       customThemes.themes.length,
       remote?.customThemes.length ?? 0,

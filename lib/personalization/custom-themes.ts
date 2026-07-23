@@ -7,6 +7,14 @@ import type {
   CustomThemeDefinition,
   CustomThemeInputs,
 } from "./types";
+import type { StorageWriteResult } from "../local-data-storage";
+import type { LocalOwnerScope } from "../local-owner-scope";
+import {
+  readPersonalData,
+  writePersonalData,
+  type PersonalDataCodec,
+  type PersonalDataReadResult,
+} from "../personal-data-storage";
 
 export const CUSTOM_THEMES_STORAGE_KEY = "mediaTracker:customThemes:v1";
 export const CUSTOM_THEMES_VERSION = 1 as const;
@@ -88,6 +96,40 @@ export function normalizeCustomThemeCollection(value: unknown): CustomThemeColle
     if (themes.length === MAX_CUSTOM_THEMES) break;
   }
   return { version: CUSTOM_THEMES_VERSION, themes };
+}
+
+export const customThemeCollectionCodec: PersonalDataCodec<CustomThemeCollection> = (value) => {
+  if (
+    typeof value !== "object"
+    || value === null
+    || Array.isArray(value)
+    || (value as { version?: unknown }).version !== CUSTOM_THEMES_VERSION
+    || !Array.isArray((value as { themes?: unknown }).themes)
+  ) {
+    return { ok: false, message: "Custom theme katalog formati gecersiz." };
+  }
+  return { ok: true, value: normalizeCustomThemeCollection(value) };
+};
+
+export function readScopedCustomThemes(
+  scope: LocalOwnerScope,
+  storage?: CustomThemesStorage,
+): PersonalDataReadResult<CustomThemeCollection> {
+  return readPersonalData(scope, "customThemes", customThemeCollectionCodec, storage);
+}
+
+export function writeScopedCustomThemes(
+  scope: LocalOwnerScope,
+  value: unknown,
+  storage?: CustomThemesStorage,
+): StorageWriteResult {
+  return writePersonalData(
+    scope,
+    "customThemes",
+    normalizeCustomThemeCollection(value),
+    customThemeCollectionCodec,
+    storage,
+  );
 }
 
 export function readCustomThemes(storage: CustomThemesStorage): CustomThemeCollection {

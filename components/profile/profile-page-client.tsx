@@ -33,17 +33,27 @@ export function ProfilePageClient({ initialMode = "view" }: { initialMode?: "vie
   const { profilePreferences, setProfilePreferences } = usePersistedPreferences();
   const mode = initialMode;
   const [heroData, setHeroData] = useState<OwnProfileHeroData>();
+  const [heroOwnerId, setHeroOwnerId] = useState<string | null>(null);
   const [cloudState, setCloudState] = useState<"idle" | "loading" | "ready" | "offline">(auth.user ? "loading" : "idle");
   const [localProgression, setLocalProgression] = useState<UserProgression>(EMPTY_PROGRESSION);
   const { progression, summary } = useXpProgression(auth.user?.id ?? null, localProgression);
 
   useEffect(() => {
     if (!auth.configured || !auth.user) {
-      queueMicrotask(() => { setCloudState("idle"); setHeroData(undefined); });
+      queueMicrotask(() => {
+        setHeroOwnerId(null);
+        setCloudState("idle");
+        setHeroData(undefined);
+      });
       return;
     }
+    const ownerId = auth.user.id;
     const controller = new AbortController();
-    queueMicrotask(() => setCloudState("loading"));
+    queueMicrotask(() => {
+      setHeroOwnerId(ownerId);
+      setHeroData(undefined);
+      setCloudState("loading");
+    });
     fetch("/api/social/profile/hero", { cache: "no-store", signal: controller.signal })
       .then(async (response) => {
         if (!response.ok) throw new Error("profile_hero_unavailable");
@@ -60,14 +70,17 @@ export function ProfilePageClient({ initialMode = "view" }: { initialMode?: "vie
 
   const fallbackName = resolveProfileDisplayName(profilePreferences, auth.user);
   const selectedTitle = resolveSelectedTitle(profilePreferences, progression.title);
+  const visibleHeroData = auth.user && heroOwnerId === auth.user.id
+    ? heroData
+    : undefined;
   const identity = resolveProfileIdentity({
     authenticated: Boolean(auth.user),
     localPreferences: profilePreferences,
-    socialProfile: heroData,
+    socialProfile: visibleHeroData,
     fallbackName,
     automaticTitle: progression.title,
   });
-  const presentation = heroData?.presentation ?? defaultProfilePresentationPreferences();
+  const presentation = visibleHeroData?.presentation ?? defaultProfilePresentationPreferences();
   const heroProgression = useMemo(() => ({
     level: progression.level,
     totalXp: progression.totalXp,
@@ -93,10 +106,10 @@ export function ProfilePageClient({ initialMode = "view" }: { initialMode?: "vie
         presentation={presentation}
         localPreferences={profilePreferences}
         progression={heroProgression}
-        visibilityLabel={heroData?.visibilityMode ?? "Yerel profil"}
-        publicProfileHref={heroData?.username ? `/u/${heroData.username}` : undefined}
+        visibilityLabel={visibleHeroData?.visibilityMode ?? "Yerel profil"}
+        publicProfileHref={visibleHeroData?.username ? `/u/${visibleHeroData.username}` : undefined}
         onEdit={() => changeMode("edit")}
-        setupMessage={auth.user && cloudState === "ready" && !heroData?.username ? "Cloud sosyal profil henüz oluşturulmadı. Yerel kimliğin korunuyor; düzenle bölümünden kontrollü olarak oluşturabilirsin." : undefined}
+        setupMessage={auth.user && cloudState === "ready" && !visibleHeroData?.username ? "Cloud sosyal profil henüz oluşturulmadı. Yerel kimliğin korunuyor; düzenle bölümünden kontrollü olarak oluşturabilirsin." : undefined}
       />
       {identity.bio && <section className="app-card rounded-2xl border p-5"><h2 className="text-sm font-semibold">Hakkında</h2><p className="mt-2 whitespace-pre-wrap text-sm text-[var(--app-text-secondary)]">{identity.bio}</p></section>}
       {mode === "edit" ? (

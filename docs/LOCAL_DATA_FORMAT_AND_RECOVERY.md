@@ -156,7 +156,9 @@ Scoped key ile envelope `ownerScope` uyuşmazlığı `owner_mismatch` sonucudur 
 
 ## Bilinen sınırlamalar
 
-- Local profile, custom theme ve AI state namespace'i D1B.2B kapsamıdır.
+- Local profile, custom theme ve AI state namespace'i D1B.2B ile
+  [LOCAL_PERSONAL_DATA_OWNERSHIP.md](./LOCAL_PERSONAL_DATA_OWNERSHIP.md)
+  sözleşmesine taşınmıştır.
 - Checksum, taşınabilir backup manifesti ve restore UI D1E kapsamıdır.
 - Quarantine görüntüleme/retention ve integrity repair D1D/D1F kapsamıdır.
 - Canonical identity ve duplicate çözümü D1C kapsamıdır.

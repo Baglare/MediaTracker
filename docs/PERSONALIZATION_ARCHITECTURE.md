@@ -205,6 +205,14 @@ P5A `LayoutPreferences` yalnız stable widget görünürlüğü/sırasını taş
 
 ## P6 Gelişmiş Tema Stüdyosu
 
+> D1B.2B sahiplik güncellemesi: preset registry ve density/effects/chart
+> tercihleri device-scoped kalır. Kullanıcı tarafından oluşturulan custom tema
+> kataloğu, aktif custom tema referansı ve theme cloud-sync local metadata'sı
+> `LocalOwnerScope` ile guest/user namespace'lerine ayrılır. Owner bilinmeden
+> custom cookie snapshot uygulanmaz; doğrulanmış owner hydration'ı tamamlanana
+> kadar güvenli device preset kullanılır. Ayrıntılar:
+> [LOCAL_PERSONAL_DATA_OWNERSHIP.md](./LOCAL_PERSONAL_DATA_OWNERSHIP.md).
+
 ### Preset + custom seçim modeli
 
 `AppAppearancePreferences version: 3`, kapalı `baseTheme` alanı yerine ayrışmış `ThemeSelection` kullanır. Preset seçimleri `system`, `obsidian`, `porcelain`, `ocean`, `dusty_rose`, `forest`, `lavender`, `polar` ve `sepia` kimliklerini taşır; custom seçim yalnız güvenli `ct_*` kimliğine işaret eder. v1/v2 kayıtları alan bazında normalize edilir; accent, density, effects, chart palette ve world-aware completed seçimi korunur. Silinmiş veya bulunamayan custom kimliği Obsidyen'e düşer.
@@ -225,11 +233,11 @@ Kullanıcı yalnız `colorScheme`, `background`, `surface`, `accent` ve `seconda
 
 ### Persistence, runtime ve ilk paint
 
-Custom katalog `mediaTracker:customThemes:v1` anahtarında local-first saklanır. Runtime validation bozuk JSON/version/kayıtları atar, yinelenen kimlikleri temizler ve en fazla 20 temayı kabul eder. Tema adı 1–40 karakterdir; ID Web Crypto ile üretilir. Preset kayıtları düzenlenmez veya silinmez.
+Custom katalog `mediaTracker:personal:v1:<scope>:customThemes` anahtarında owner-scoped local-first saklanır. Eski `mediaTracker:customThemes:v1` yalnız explicit ownership migration kaynağıdır. Runtime validation bozuk JSON/version/kayıtları atar, yinelenen kimlikleri temizler ve owner başına en fazla 20 temayı kabul eder. Tema adı 1–40 karakterdir; ID Web Crypto ile üretilir. Preset kayıtları düzenlenmez veya silinmez.
 
 Root runtime custom temada `data-theme-source="custom"`, `data-theme="custom"` ve `data-custom-theme-id` uygular. Inline style yalnız `APP_THEME_TOKEN_CSS_VARIABLES` allowlist'indeki semantic property'leri kullanır; preset'e dönüldüğünde bu inline tokenlar temizlenir ve CSS `[data-theme]` scope'ları yeniden source of truth olur. World accent seçimi custom surface'i korur: `theme` custom accent'i, sabit Doğu/Kadraj/Arşiv world registry rengini kullanır.
 
-İlk paint için bütün custom katalog cookie'ye yazılmaz. Yalnız aktif custom temanın normalize edilmiş dört ana girdisi, renk karakteri, güvenli düzeltmeleri ve accent modu kompakt cookie snapshot'ında mirror edilir. Root layout aynı saf token üreticisini server tarafında kullanarak ilk HTML'e allowlist inline semantic tokenları yazar. Cookie parser tüm kimlik ve renkleri allowlist/HEX doğrulamasından geçirir; invalid snapshot güvenli Obsidyen fallback'ine düşer.
+İlk paint sırasında server owner scope'u doğrulayamadığı için custom cookie snapshot uygulanmaz. Root layout cookie'deki güvenli device preset ve accent kimliğini kullanır; owner-scoped custom seçim client hydration sonrasında katalog/owner eşleşmesi doğrulanınca uygulanır. Eski custom cookie parse edilebilse de başka owner'a inline token olarak taşınmaz ve client mirror yalnız device preset'i yazar.
 
 ### Tema Stüdyosu, güvenlik ve performans
 
@@ -257,7 +265,7 @@ ID çakışması sessiz overwrite üretmez: kullanıcı **Atla**, **Mevcut temay
 
 ### Cihaz tercihi, ilk sync ve offline davranış
 
-Senkronizasyon açık/kapalı tercihi `mediaTracker:themeCloudSync:v1` içinde cihaz bazlıdır ve varsayılan kapalıdır. Girişsiz kullanıcı import/export kullanabilir; cloud kontrolleri giriş gereksinimini açıkça belirtir. İlk etkinleştirmede local/cloud sayıları karşılaştırılır: cihaz, bulut, birleştir veya vazgeç kararı alınmadan iki dolu katalog birbirini ezmez.
+Senkronizasyon açık/kapalı tercihi ve revision/pending/error metadata'sı `mediaTracker:personal:v1:<user-scope>:themeCloudSync` içinde kullanıcı bazlıdır ve varsayılan kapalıdır. Eski `mediaTracker:themeCloudSync:v1` revision/error değerleri migrate edilmez. Girişsiz kullanıcı import/export kullanabilir fakat guest cloud sync yapamaz. İlk etkinleştirmede local/cloud sayıları karşılaştırılır: cihaz, bulut, birleştir veya vazgeç kararı alınmadan iki dolu katalog birbirini ezmez.
 
 Birleştirme stable ID üzerinden yapılır. Tek taraftaki kayıt eklenir, aynı ID ve aynı içerik tek kalır, aynı ID ve farklı içerikte yerel kayıt ID'sini korurken cloud kayıt yeni güvenli ID ile “Bulut Kopyası” olur. 20 tema sınırı merge öncesi ve sırasında korunur. Aktif tema uyuşmazlığı ayrıca görünür conflict olarak raporlanır.
 

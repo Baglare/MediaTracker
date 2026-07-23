@@ -7,6 +7,14 @@ import {
 import { sameThemeContent, validateCanonicalThemeList } from "./theme-bundle";
 import { normalizeThemeSelection } from "./validation";
 import type { CustomThemeDefinition, ThemeSelection } from "./types";
+import type { StorageWriteResult } from "../local-data-storage";
+import type { LocalOwnerScope } from "../local-owner-scope";
+import {
+  readPersonalData,
+  writePersonalData,
+  type PersonalDataCodec,
+  type PersonalDataReadResult,
+} from "../personal-data-storage";
 
 export const THEME_CLOUD_SYNC_STORAGE_KEY = "mediaTracker:themeCloudSync:v1";
 
@@ -75,6 +83,46 @@ export function normalizeThemeCloudSyncPreferences(value: unknown): ThemeCloudSy
     lastError,
     pendingLocalChanges: value.pendingLocalChanges === true,
   };
+}
+
+export const themeCloudSyncPreferencesCodec: PersonalDataCodec<ThemeCloudSyncPreferences> = (
+  value,
+) => {
+  if (
+    !isRecord(value)
+    || value.version !== 1
+    || typeof value.enabled !== "boolean"
+    || typeof value.pendingLocalChanges !== "boolean"
+  ) {
+    return { ok: false, message: "Theme cloud sync metadata formati gecersiz." };
+  }
+  return { ok: true, value: normalizeThemeCloudSyncPreferences(value) };
+};
+
+export function readScopedThemeCloudSyncPreferences(
+  scope: LocalOwnerScope,
+  storage?: CustomThemesStorage,
+): PersonalDataReadResult<ThemeCloudSyncPreferences> {
+  return readPersonalData(
+    scope,
+    "themeCloudSync",
+    themeCloudSyncPreferencesCodec,
+    storage,
+  );
+}
+
+export function writeScopedThemeCloudSyncPreferences(
+  scope: LocalOwnerScope,
+  value: unknown,
+  storage?: CustomThemesStorage,
+): StorageWriteResult {
+  return writePersonalData(
+    scope,
+    "themeCloudSync",
+    normalizeThemeCloudSyncPreferences(value),
+    themeCloudSyncPreferencesCodec,
+    storage,
+  );
 }
 
 export function readThemeCloudSyncPreferences(

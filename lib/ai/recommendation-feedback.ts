@@ -1,4 +1,9 @@
 import type { RecommendationFeedbackEvent } from "@/lib/ai/types";
+import type { LocalOwnerScope } from "@/lib/local-owner-scope";
+import {
+  readAiFeedbackState,
+  writeAiFeedbackState,
+} from "@/lib/ai/local-state";
 
 const RECOMMENDATION_FEEDBACK_KEY = "media-tracker-ai-recommendation-feedback";
 const MAX_RECOMMENDATION_FEEDBACK_EVENTS = 1000;
@@ -93,4 +98,64 @@ export function clearDismissedRecommendationFeedback(): void {
   } catch {
     // localStorage erişimi yoksa aktif oturum state'i çalışmaya devam eder.
   }
+}
+
+export function readScopedRecommendationFeedbackEvents(
+  scope: LocalOwnerScope,
+): RecommendationFeedbackEvent[] {
+  const read = readAiFeedbackState(scope);
+  return read.status === "valid" ? read.data.recommendationEvents : [];
+}
+
+export function appendScopedRecommendationFeedbackEvent(
+  scope: LocalOwnerScope,
+  input: FeedbackEventInput,
+): RecommendationFeedbackEvent | null {
+  const event: RecommendationFeedbackEvent = {
+    ...input,
+    id: input.id || createFeedbackId(),
+    createdAt: input.createdAt || new Date().toISOString(),
+  };
+  const current = readAiFeedbackState(scope);
+  const state = current.status === "valid"
+    ? current.data
+    : { version: 1 as const, dismissedSignals: {}, recommendationEvents: [] };
+  const result = writeAiFeedbackState(scope, {
+    ...state,
+    recommendationEvents: [...state.recommendationEvents, event]
+      .slice(-MAX_RECOMMENDATION_FEEDBACK_EVENTS),
+  });
+  return result.ok ? event : null;
+}
+
+export function removeScopedDismissedRecommendationFeedback(
+  scope: LocalOwnerScope,
+  target: {
+    title: string;
+    mediaType: RecommendationFeedbackEvent["mediaType"];
+    externalSource?: string;
+    externalId?: string;
+  },
+): void {
+  const current = readAiFeedbackState(scope);
+  if (current.status !== "valid") return;
+  writeAiFeedbackState(scope, {
+    ...current.data,
+    recommendationEvents: current.data.recommendationEvents.filter(
+      (event) => event.action !== "dismissed" || !sameRecommendation(event, target),
+    ),
+  });
+}
+
+export function clearScopedDismissedRecommendationFeedback(
+  scope: LocalOwnerScope,
+): void {
+  const current = readAiFeedbackState(scope);
+  if (current.status !== "valid") return;
+  writeAiFeedbackState(scope, {
+    ...current.data,
+    recommendationEvents: current.data.recommendationEvents.filter(
+      (event) => event.action !== "dismissed",
+    ),
+  });
 }

@@ -111,12 +111,12 @@ Bu aşamada aşağıdakiler cihaz ayarıdır ve auth değişiminde resetlenmez:
 
 Bu karar, D1B.2B'ye bırakılan kişisel verilerle aynı değildir.
 
-## D1B.2B planı
+## D1B.2B durumu
 
-- Local profile preference ve avatar data URL fallback'i
-- Custom theme kataloğu ve theme cloud sync metadata'sı
-- AI advisor session, feedback ve preference state'i
-- Diğer kişisel local cache'lerin ownership sınıflandırması
+Local profile/avatar fallback'i, custom theme kataloğu/seçimi, theme cloud-sync
+metadata'sı ve AI advisor session/feedback/consent state'i owner scope'a
+taşınmıştır. Device-scoped alanlar ve ayrıntılı privacy/migration kararları
+[LOCAL_PERSONAL_DATA_OWNERSHIP.md](./LOCAL_PERSONAL_DATA_OWNERSHIP.md) belgesindedir.
 
 ## D2 sınırları
 
@@ -141,3 +141,12 @@ Supabase composite primary key, revision, tombstone, field-level merge ve confli
 - Quarantine retention ve merkezi inceleme D1D/D1F kapsamındadır.
 - Foreign XP/social outbox öğeleri otomatik silinmez; uzun süre birikebilir.
 - Browser iki-hesap smoke testi unit testlerin yerine geçmez ve ayrıca raporlanmalıdır.
+
+## D1B.2B kişisel veri entegrasyonu
+
+Yerel profil/avatar fallback'i, custom tema kataloğu ve seçimi, theme cloud-sync
+metadata'sı ile AI session/feedback/consent state'i artık aynı `LocalOwnerScope`
+modelini kullanır. Device appearance/layout/startup alanları device-scoped
+kalmaya devam eder. Format, privacy, legacy sahiplik kararları ve ilk-paint
+trade-off'u için [LOCAL_PERSONAL_DATA_OWNERSHIP.md](./LOCAL_PERSONAL_DATA_OWNERSHIP.md)
+belgesine bakın.

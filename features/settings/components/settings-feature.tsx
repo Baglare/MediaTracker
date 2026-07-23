@@ -11,6 +11,7 @@ import PageHeader from "@/components/page-header";
 import AppearanceSettingsCard from "@/components/personalization/appearance-settings-card";
 import LayoutSettingsCard from "@/components/personalization/layout-settings-card";
 import StartupSettingsCard from "@/components/personalization/startup-settings-card";
+import { PersonalDataOwnershipPanel } from "@/components/personal-data-ownership-panel";
 import type { useLayoutPreferences } from "@/hooks/use-layout-preferences";
 import type { MediaItem, ProgressLog } from "@/lib/types";
 
@@ -45,6 +46,7 @@ export default function SettingsFeature({
         subtitle="Hesap, cloud sync, veri yönetimi ve uygulama bilgisi"
       />
       <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2 lg:gap-5">
+        <PersonalDataOwnershipPanel />
         <AppearanceSettingsCard onConfirm={onConfirm} />
         <LayoutSettingsCard
           preferences={layout.preferences}

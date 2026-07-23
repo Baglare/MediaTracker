@@ -14,7 +14,6 @@ import {
   themeTokensToCssVariables,
 } from "@/lib/personalization/appearance-runtime";
 import { DEFAULT_APP_APPEARANCE_PREFERENCES } from "@/lib/personalization/defaults";
-import type { CustomThemeDefinition } from "@/lib/personalization/types";
 import type { CSSProperties } from "react";
 import "./globals.css";
 
@@ -33,22 +32,14 @@ export default async function RootLayout({
   const initialIdentity = parseAppearanceCookie(
     cookieStore.get(APPEARANCE_COOKIE_NAME)?.value,
   );
-  const initialCustomTheme: CustomThemeDefinition | undefined = initialIdentity.customTheme
-    ? {
-        version: 1,
-        id: initialIdentity.customTheme.id,
-        name: "Aktif özel tema",
-        createdAt: "1970-01-01T00:00:00.000Z",
-        updatedAt: "1970-01-01T00:00:00.000Z",
-        inputs: initialIdentity.customTheme.inputs,
-        corrections: initialIdentity.customTheme.corrections,
-      }
-    : undefined;
+  const safeInitialTheme = initialIdentity.theme.kind === "preset"
+    ? initialIdentity.theme
+    : { kind: "preset" as const, id: "obsidian" as const };
   const initialAttributes = resolveRootAppearanceAttributes({
     ...DEFAULT_APP_APPEARANCE_PREFERENCES,
-    theme: initialIdentity.theme,
+    theme: safeInitialTheme,
     accentMode: initialIdentity.accentMode,
-  }, "neutral", initialIdentity.resolvedTheme !== "porcelain", initialCustomTheme);
+  }, "neutral", initialIdentity.resolvedTheme !== "porcelain");
   const rootStyle = {
     colorScheme: initialAttributes.colorScheme,
     ...themeTokensToCssVariables(initialAttributes.inlineTokens),
