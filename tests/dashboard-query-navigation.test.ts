@@ -22,14 +22,15 @@ describe("dashboard query navigation", () => {
   });
 
   it("builds canonical dashboard hrefs", () => {
-    expect(dashboardTabHref("dashboard")).toBe("/");
+    expect(dashboardTabHref("dashboard")).toBe("/?tab=dashboard");
     expect(dashboardTabHref("settings")).toBe("/?tab=settings");
     expect(dashboardTabHref("library")).toBe("/?tab=library");
   });
 
   it("derives page content from live search params instead of mount-only state", () => {
     expect(dashboardPage).toContain("const searchParams = useSearchParams()");
-    expect(dashboardPage).toContain('const activeTab = parseDashboardTab(searchParams.get("tab"))');
+    expect(dashboardPage).toContain("const explicitTab = searchParams.get(\"tab\")");
+    expect(dashboardPage).toContain("startup.preferences.defaultDashboardTab");
     expect(dashboardPage).not.toContain("useState<TabType>");
     expect(dashboardPage).not.toContain("new URLSearchParams(window.location.search)");
   });
@@ -40,7 +41,7 @@ describe("dashboard query navigation", () => {
   });
 
   it("uses the same parser for shell active state and back-forward updates", () => {
-    expect(routeShell).toContain('if (pathname === "/") return parseDashboardTab(tab)');
+    expect(routeShell).toContain('if (pathname === "/") return parseDashboardTab(tab, defaultTab)');
     expect(routeShell).toContain('searchParams.get("tab")');
   });
 

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   APPEARANCE_PREFERENCES_STORAGE_KEY,
+  LEGACY_APPEARANCE_PREFERENCES_STORAGE_KEY,
   readAppearancePreferences,
   resetStoredAppearancePreferences,
   writeAppearancePreferences,
@@ -26,11 +27,13 @@ function memoryStorage(initial?: string): AppearancePreferencesStorage & { value
 describe("appearance preferences", () => {
   it("defaults to the current Obsidian appearance", () => {
     expect(DEFAULT_APP_APPEARANCE_PREFERENCES).toEqual({
-      version: 1,
+      version: 2,
       baseTheme: "obsidian",
       accentMode: "auto",
       effectsLevel: "subtle",
       density: "comfortable",
+      chartPaletteId: "standard",
+      followWorldCompletedColor: true,
     });
   });
 
@@ -39,7 +42,7 @@ describe("appearance preferences", () => {
   });
 
   it("falls back for an unknown preference version", () => {
-    expect(normalizeAppearancePreferences({ version: 2, baseTheme: "ocean" })).toEqual(DEFAULT_APP_APPEARANCE_PREFERENCES);
+    expect(normalizeAppearancePreferences({ version: 99, baseTheme: "ocean" })).toEqual(DEFAULT_APP_APPEARANCE_PREFERENCES);
   });
 
   it("normalizes a partial preference object field by field", () => {
@@ -50,12 +53,47 @@ describe("appearance preferences", () => {
     });
   });
 
+  it("falls back only invalid chart, density and effects fields", () => {
+    expect(normalizeAppearancePreferences({
+      version: 2,
+      baseTheme: "ocean",
+      accentMode: "arch",
+      chartPaletteId: "not-a-palette",
+      density: "dense",
+      effectsLevel: "cinematic",
+      followWorldCompletedColor: false,
+    })).toEqual({
+      ...DEFAULT_APP_APPEARANCE_PREFERENCES,
+      baseTheme: "ocean",
+      accentMode: "arch",
+      followWorldCompletedColor: false,
+    });
+  });
+
   it("writes only the normalized preference contract", () => {
     const storage = memoryStorage();
     writeAppearancePreferences(storage, { version: 1, baseTheme: "porcelain", extra: "ignored" });
     expect(JSON.parse(storage.values.get(APPEARANCE_PREFERENCES_STORAGE_KEY) ?? "null")).toEqual({
       ...DEFAULT_APP_APPEARANCE_PREFERENCES,
       baseTheme: "porcelain",
+    });
+  });
+
+  it("migrates the legacy v1 key without losing existing appearance choices", () => {
+    const storage = memoryStorage();
+    storage.values.set(LEGACY_APPEARANCE_PREFERENCES_STORAGE_KEY, JSON.stringify({
+      version: 1,
+      baseTheme: "porcelain",
+      accentMode: "screen",
+      density: "compact",
+      effectsLevel: "off",
+    }));
+    expect(readAppearancePreferences(storage)).toEqual({
+      ...DEFAULT_APP_APPEARANCE_PREFERENCES,
+      baseTheme: "porcelain",
+      accentMode: "screen",
+      density: "compact",
+      effectsLevel: "off",
     });
   });
 

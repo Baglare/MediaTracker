@@ -27,8 +27,9 @@ describe("appearance settings view model", () => {
     expect(settingsSource).not.toContain("Vazgeç");
   });
 
-  it("does not expose unfinished appearance controls", () => {
-    expect(settingsSource).not.toMatch(/Chart palette|Avatar frame|Banner style|Yoğunluk|Efekt seviyesi/);
+  it("exposes chart, density and effects while keeping profile presentation controls separate", () => {
+    expect(settingsSource).toMatch(/Grafik renkleri|Görünüm yoğunluğu|Görsel efektler/);
+    expect(settingsSource).not.toMatch(/Avatar frame|Banner style/);
   });
 });
 

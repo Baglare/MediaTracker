@@ -27,7 +27,7 @@ export function StatCard({
   tone?: StatCardTone;
 }) {
   return (
-    <article className={`rounded-2xl border bg-[var(--app-card-bg)] p-4 ${TONE_CLASSES[tone]}`}>
+    <article className={`density-card rounded-2xl border bg-[var(--app-card-bg)] ${TONE_CLASSES[tone]}`}>
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs font-medium text-[var(--app-text-muted)]">{label}</p>

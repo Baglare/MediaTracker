@@ -54,11 +54,13 @@ import {
 import type { LayoutWidgetPreference } from "@/lib/personalization/layout-types";
 import { visibleWidgetIds } from "@/lib/personalization/layout-preferences";
 import {
-  STANDARD_CHART_STATUS_PRESENTATION,
+  resolveChartPaletteStatuses,
 } from "@/lib/personalization/chart-palette-registry";
 import type {
+  ChartPaletteId,
   ChartStatusKey,
   ChartStatusPresentation,
+  WorldThemeKey,
 } from "@/lib/personalization/types";
 import {
   formatProgressLogAction,
@@ -73,6 +75,9 @@ interface RightRailProps {
   stats: DashboardStats;
   preferences: Array<LayoutWidgetPreference<RightRailWidgetId>>;
   isLayoutHydrated: boolean;
+  chartPaletteId: ChartPaletteId;
+  followWorldCompletedColor: boolean;
+  chartWorld: WorldThemeKey;
   progression: UserProgression;
   // R15: Aktif Dünya. Bu component için tek scope sinyali; type/status/search
   // filtrelerine bilinçli olarak duyarsızız.
@@ -120,7 +125,7 @@ function Widget({
         ? "text-emerald-300"
         : "text-[var(--w-primary-strong)]";
   return (
-    <div className="app-card rounded-xl border p-3.5">
+    <div className="app-card density-card rounded-xl border">
       <div className="flex items-center justify-between mb-2.5">
         <div className="flex items-center gap-1.5 text-[11.5px] font-semibold text-zinc-200 tracking-tight">
           <Icon className={`w-3.5 h-3.5 ${iconClass}`} />
@@ -147,9 +152,9 @@ interface SliceMeta {
   label: string;
   description: string;
   color: string;
-  dotClass: string;
-  rowActiveClass: string;
-  rowTextClass: string;
+  dotColor: string;
+  rowActiveSurface: string;
+  rowTextColor: string;
 }
 
 function toSliceMeta(presentation: ChartStatusPresentation): SliceMeta {
@@ -157,19 +162,11 @@ function toSliceMeta(presentation: ChartStatusPresentation): SliceMeta {
     label: presentation.label,
     description: presentation.description,
     color: presentation.segmentColor,
-    dotClass: presentation.dotTone,
-    rowActiveClass: presentation.rowActiveSurface,
-    rowTextClass: presentation.textTone,
+    dotColor: presentation.dotTone,
+    rowActiveSurface: presentation.rowActiveSurface,
+    rowTextColor: presentation.textTone,
   };
 }
-
-const SLICE_META: Record<StatusSlice, SliceMeta> = {
-  completed: toSliceMeta(STANDARD_CHART_STATUS_PRESENTATION.completed),
-  inProgress: toSliceMeta(STANDARD_CHART_STATUS_PRESENTATION.inProgress),
-  planning: toSliceMeta(STANDARD_CHART_STATUS_PRESENTATION.planning),
-  paused: toSliceMeta(STANDARD_CHART_STATUS_PRESENTATION.paused),
-  dropped: toSliceMeta(STANDARD_CHART_STATUS_PRESENTATION.dropped),
-};
 
 const STATUS_ORDER: StatusSlice[] = [
   "completed",
@@ -224,9 +221,11 @@ function bucketByStatus(items: MediaItem[]): Record<StatusSlice, SliceBucket> {
 function OverallWidget({
   scopedItems,
   worldLabel,
+  statusPresentations,
 }: {
   scopedItems: MediaItem[];
   worldLabel: string;
+  statusPresentations: Record<ChartStatusKey, ChartStatusPresentation>;
 }) {
   const buckets = useMemo(() => bucketByStatus(scopedItems), [scopedItems]);
   const total = scopedItems.length;
@@ -234,6 +233,13 @@ function OverallWidget({
   const completedPct = total > 0 ? Math.round((completed / total) * 100) : 0;
 
   const [hovered, setHovered] = useState<StatusSlice | null>(null);
+  const sliceMeta = useMemo<Record<StatusSlice, SliceMeta>>(() => ({
+    completed: toSliceMeta(statusPresentations.completed),
+    inProgress: toSliceMeta(statusPresentations.inProgress),
+    planning: toSliceMeta(statusPresentations.planning),
+    paused: toSliceMeta(statusPresentations.paused),
+    dropped: toSliceMeta(statusPresentations.dropped),
+  }), [statusPresentations]);
 
   // SVG ring ölçüleri.
   const size = 78;
@@ -259,9 +265,9 @@ function OverallWidget({
       const arc = Math.max(0, fullArc - GAP);
       const offset = -cumulative;
       cumulative += fullArc;
-      return { key, arc, offset, color: SLICE_META[key].color };
+      return { key, arc, offset, color: sliceMeta[key].color };
     }).filter((s): s is NonNullable<typeof s> => s !== null);
-  }, [buckets, c, total]);
+  }, [buckets, c, sliceMeta, total]);
 
   return (
     <Widget title="Genel İlerleme" icon={Target} eyebrow={worldLabel}>
@@ -307,7 +313,7 @@ function OverallWidget({
                   const opacity = hovered && !isActive ? 0.45 : 1;
                   // Completed dilimine ekstra glow (drop-shadow var(--w-primary)).
                   const filter = isCompleted
-                    ? `drop-shadow(0 0 ${isActive ? 6 : 4}px var(--w-primary))`
+                    ? `drop-shadow(0 0 ${isActive ? 6 : 4}px ${seg.color})`
                     : isActive
                       ? `drop-shadow(0 0 5px ${seg.color})`
                       : undefined;
@@ -355,7 +361,7 @@ function OverallWidget({
                 tone="zinc"
               />
               {STATUS_ORDER.map((key) => {
-                const meta = SLICE_META[key];
+                const meta = sliceMeta[key];
                 const count = buckets[key].count;
                 const isActive = hovered === key;
                 return (
@@ -380,6 +386,7 @@ function OverallWidget({
             hovered={hovered}
             buckets={buckets}
             total={total}
+            sliceMeta={sliceMeta}
           />
         </>
       )}
@@ -436,30 +443,25 @@ function SliceRow({
 }) {
   // R15: Tamamlanan satırı her zaman vurgulu (font-semibold + world primary
   // tonu). Diğer satırlar count===0 durumunda zinc-700'e düşer.
-  const isCompleted = sliceKey === "completed";
   const dim = count === 0 && !active;
-  const valueClass = active
-    ? meta.rowTextClass
-    : isCompleted
-      ? "text-[var(--w-primary-strong)] font-semibold"
-      : dim
-        ? "text-zinc-700"
-        : "text-zinc-300";
   return (
     <div
       onMouseEnter={() => onHover(sliceKey)}
-      className={`flex items-center justify-between gap-2 px-1.5 py-0.5 rounded transition-colors cursor-default ${
-        active ? meta.rowActiveClass : ""
-      }`}
+      className="flex cursor-default items-center justify-between gap-2 rounded px-1.5 py-0.5 transition-colors"
+      style={active ? { background: meta.rowActiveSurface } : undefined}
     >
       <span className="flex items-center gap-1.5 text-zinc-500">
         <span
           aria-hidden="true"
-          className={`w-1.5 h-1.5 rounded-full ${meta.dotClass}`}
+          className="h-1.5 w-1.5 rounded-full"
+          style={{ backgroundColor: meta.dotColor }}
         />
         {label}
       </span>
-      <span className={`font-mono tabular-nums font-medium ${valueClass}`}>
+      <span
+        className={`font-mono tabular-nums font-medium ${dim ? "text-zinc-700" : ""}`}
+        style={!dim ? { color: active || sliceKey === "completed" ? meta.rowTextColor : undefined } : undefined}
+      >
         {count}
       </span>
     </div>
@@ -470,10 +472,12 @@ function SliceDetail({
   hovered,
   buckets,
   total,
+  sliceMeta,
 }: {
   hovered: StatusSlice | null;
   buckets: Record<StatusSlice, SliceBucket>;
   total: number;
+  sliceMeta: Record<StatusSlice, SliceMeta>;
 }) {
   if (!hovered) {
     return (
@@ -484,7 +488,7 @@ function SliceDetail({
       </div>
     );
   }
-  const meta = SLICE_META[hovered];
+  const meta = sliceMeta[hovered];
   const bucket = buckets[hovered];
   const pct = total > 0 ? Math.round((bucket.count / total) * 100) : 0;
   const samples = bucket.items.slice(0, 3);
@@ -494,9 +498,10 @@ function SliceDetail({
         <div className="flex items-center gap-1.5">
           <span
             aria-hidden="true"
-            className={`w-1.5 h-1.5 rounded-full ${meta.dotClass}`}
+            className="h-1.5 w-1.5 rounded-full"
+            style={{ backgroundColor: meta.dotColor }}
           />
-          <span className={`text-[11px] font-semibold ${meta.rowTextClass}`}>
+          <span className="text-[11px] font-semibold" style={{ color: meta.rowTextColor }}>
             {meta.label}
           </span>
         </div>
@@ -973,7 +978,7 @@ function RatingSummaryWidget({ items }: { items: MediaItem[] }) {
 function MiniBarRows({
   rows,
 }: {
-  rows: { label: string; value: number; className: string }[];
+  rows: { label: string; value: number; className?: string; color?: string }[];
 }) {
   const max = Math.max(1, ...rows.map((row) => row.value));
   return (
@@ -989,7 +994,10 @@ function MiniBarRows({
               </span>
             </div>
             <div className="h-1.5 overflow-hidden rounded-full bg-zinc-800/80">
-              <div className={`h-full rounded-full ${row.className}`} style={{ width: `${width}%` }} />
+              <div
+                className={`h-full rounded-full ${row.className ?? ""}`}
+                style={{ width: `${width}%`, ...(row.color ? { backgroundColor: row.color } : {}) }}
+              />
             </div>
           </div>
         );
@@ -1020,7 +1028,13 @@ function WorldDistributionWidget({ items }: { items: MediaItem[] }) {
   );
 }
 
-function StatusDistributionWidget({ items }: { items: MediaItem[] }) {
+function StatusDistributionWidget({
+  items,
+  statusPresentations,
+}: {
+  items: MediaItem[];
+  statusPresentations: Record<ChartStatusKey, ChartStatusPresentation>;
+}) {
   const counts = {
     completed: items.filter((item) => item.status === "completed").length,
     active: items.filter((item) => item.status === "watching" || item.status === "reading").length,
@@ -1033,11 +1047,11 @@ function StatusDistributionWidget({ items }: { items: MediaItem[] }) {
     <Widget title="Durum Dağılımı" icon={BarChart3}>
       <MiniBarRows
         rows={[
-          { label: "Tamamlanan", value: counts.completed, className: "bg-emerald-400" },
-          { label: "Devam", value: counts.active, className: "bg-violet-400" },
-          { label: "Planlanan", value: counts.planning, className: "bg-sky-400" },
-          { label: "Duraklatılan", value: counts.paused, className: "bg-orange-400" },
-          { label: "Bırakılan", value: counts.dropped, className: "bg-rose-400" },
+          { label: statusPresentations.completed.label, value: counts.completed, color: statusPresentations.completed.segmentColor },
+          { label: statusPresentations.inProgress.label, value: counts.active, color: statusPresentations.inProgress.segmentColor },
+          { label: statusPresentations.planning.label, value: counts.planning, color: statusPresentations.planning.segmentColor },
+          { label: statusPresentations.paused.label, value: counts.paused, color: statusPresentations.paused.segmentColor },
+          { label: statusPresentations.dropped.label, value: counts.dropped, color: statusPresentations.dropped.segmentColor },
         ]}
       />
     </Widget>
@@ -1083,6 +1097,9 @@ export default function RightRail({
   stats,
   preferences,
   isLayoutHydrated,
+  chartPaletteId,
+  followWorldCompletedColor,
+  chartWorld,
   progression,
   themeFilter,
   onOpenDetail,
@@ -1135,12 +1152,21 @@ export default function RightRail({
     () => getDisplayProgressLogs(scopedLogs, 5),
     [scopedLogs],
   );
+  const statusPresentations = useMemo(
+    () => resolveChartPaletteStatuses(
+      chartPaletteId,
+      chartWorld,
+      followWorldCompletedColor,
+    ),
+    [chartPaletteId, chartWorld, followWorldCompletedColor],
+  );
 
   const widgetRenderers: Record<RightRailWidgetId, () => React.ReactNode> = {
     overallProgress: () => (
       <OverallWidget
         scopedItems={scopedItems}
         worldLabel={WORLD_LABEL[themeFilter]}
+        statusPresentations={statusPresentations}
       />
     ),
     dailyGoal: () => (
@@ -1162,7 +1188,12 @@ export default function RightRail({
     ),
     ratingSummary: () => <RatingSummaryWidget items={scopedItems} />,
     worldDistribution: () => <WorldDistributionWidget items={mediaList} />,
-    statusDistribution: () => <StatusDistributionWidget items={scopedItems} />,
+    statusDistribution: () => (
+      <StatusDistributionWidget
+        items={scopedItems}
+        statusPresentations={statusPresentations}
+      />
+    ),
     journeyMini: () => <JourneyMiniWidget progression={progression} />,
     plannedItems: () => (
       <ItemListWidget
@@ -1199,7 +1230,7 @@ export default function RightRail({
 
   return (
     <aside
-      className="app-panel hidden xl:flex sticky top-0 h-screen w-[18rem] shrink-0 flex-col gap-3 border-l px-4 py-5 overflow-y-auto shadow-none"
+      className="app-panel hidden xl:flex sticky top-0 h-screen w-[18rem] shrink-0 flex-col gap-[var(--app-control-gap)] border-l px-[var(--app-panel-padding)] py-5 overflow-y-auto shadow-none"
       aria-label="Sağ panel"
     >
       <div className="flex items-center justify-between gap-2 px-1">
@@ -1217,13 +1248,13 @@ export default function RightRail({
       </div>
 
       {!isLayoutHydrated && (
-        <div className="app-card rounded-xl border p-4 text-xs text-[var(--app-text-muted)]" aria-busy="true">
+        <div className="app-card density-card rounded-xl border text-xs text-[var(--app-text-muted)]" aria-busy="true">
           Panel düzeni yükleniyor...
         </div>
       )}
 
       {isLayoutHydrated && visibleIds.length === 0 && (
-        <div className="app-card rounded-xl border p-4">
+        <div className="app-card density-card rounded-xl border">
           <p className="text-sm font-medium text-[var(--app-text-primary)]">Sağ panel boş</p>
           <p className="mt-1 text-xs leading-relaxed text-[var(--app-text-muted)]">
             İstersen Ayarlar içinden yardımcı panelleri tekrar gösterebilirsin.

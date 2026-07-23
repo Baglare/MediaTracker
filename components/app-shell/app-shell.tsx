@@ -50,12 +50,13 @@ function PublicTopbar() {
   );
 }
 
-export function AppShell({ mode, activeNavigationId = "dashboard", onChangeTab, profileName, profileTagline, profilePreferences, socialAvatarUrl, avatarTransform, progression, journeyTitle, world = "neutral", rightRail, children, contentClassName = "px-4 py-6 sm:px-6 lg:px-8 lg:py-8" }: AppShellProps) {
+export function AppShell({ mode, activeNavigationId = "dashboard", onChangeTab, profileName, profileTagline, profilePreferences, socialAvatarUrl, avatarTransform, progression, journeyTitle, world = "neutral", rightRail, children, contentClassName }: AppShellProps) {
+  const resolvedContentClassName = contentClassName ?? "app-content";
   if (mode === "public") {
     return (
       <AppearanceWorldScope world={world} className="app-page min-h-screen" data-app-shell="public">
         <PublicTopbar />
-        <main className={`mx-auto w-full max-w-7xl ${contentClassName}`}>{children}</main>
+        <main className={`mx-auto w-full max-w-7xl ${resolvedContentClassName}`}>{children}</main>
       </AppearanceWorldScope>
     );
   }
@@ -69,7 +70,7 @@ export function AppShell({ mode, activeNavigationId = "dashboard", onChangeTab, 
       <AppSidebar activeNavigationId={activeNavigationId} onChange={onChangeTab} profileName={profileName} profileTagline={profileTagline} profilePreferences={profilePreferences} socialAvatarUrl={socialAvatarUrl} avatarTransform={avatarTransform} progression={progression} journeyTitle={journeyTitle} />
       <div className="flex min-w-0 flex-1 flex-col">
         <AppTopbar activeNavigationId={activeNavigationId} onChangeTab={onChangeTab} profileName={profileName} profilePreferences={profilePreferences} socialAvatarUrl={socialAvatarUrl} avatarTransform={avatarTransform} />
-        <main className={`relative min-w-0 flex-1 ${contentClassName}`}>{children}</main>
+        <main className={`relative min-w-0 flex-1 ${resolvedContentClassName}`}>{children}</main>
       </div>
       {rightRail}
     </AppearanceWorldScope>

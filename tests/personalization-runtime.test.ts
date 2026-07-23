@@ -96,6 +96,24 @@ describe("appearance root runtime", () => {
     expect(root.style.colorScheme).toBe("dark");
   });
 
+  it("applies compact density and full effects as root presentation attributes", () => {
+    const root = { dataset: {}, style: { colorScheme: "" } };
+    const attributes = resolveRootAppearanceAttributes(
+      {
+        ...DEFAULT_APP_APPEARANCE_PREFERENCES,
+        density: "compact",
+        effectsLevel: "full",
+      },
+      "neutral",
+      true,
+    );
+    applyRootAppearanceAttributes(root, attributes);
+    expect(root.dataset).toMatchObject({
+      density: "compact",
+      effects: "full",
+    });
+  });
+
   it("responds to system theme changes and removes the exact listener", () => {
     let listener: ((event: { matches: boolean }) => void) | undefined;
     const addEventListener = vi.fn((_type: "change", next: (event: { matches: boolean }) => void) => { listener = next; });

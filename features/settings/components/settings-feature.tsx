@@ -10,6 +10,7 @@ import DataManagementPanel from "@/components/data-management-panel";
 import PageHeader from "@/components/page-header";
 import AppearanceSettingsCard from "@/components/personalization/appearance-settings-card";
 import LayoutSettingsCard from "@/components/personalization/layout-settings-card";
+import StartupSettingsCard from "@/components/personalization/startup-settings-card";
 import type { useLayoutPreferences } from "@/hooks/use-layout-preferences";
 import type { MediaItem, ProgressLog } from "@/lib/types";
 
@@ -59,6 +60,7 @@ export default function SettingsFeature({
             layout.resetAll,
           )}
         />
+        <StartupSettingsCard />
         <div className="space-y-4 lg:space-y-5">
           <AuthPanel />
           <CloudSyncStatusCard />
@@ -80,7 +82,7 @@ export default function SettingsFeature({
             onConfirm={onConfirm}
           />
         </div>
-        <div className="app-panel rounded-2xl border p-6 lg:col-span-2">
+        <div className="app-panel rounded-2xl border p-[var(--app-panel-padding)] lg:col-span-2">
           <div className="mb-4 flex items-center gap-2.5">
             <Image
               src="/brand/media-tracker-mark.svg"

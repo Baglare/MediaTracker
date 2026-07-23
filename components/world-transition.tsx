@@ -17,6 +17,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import type { EffectsLevel } from "@/lib/personalization/types";
 
 export type WorldKey = "east" | "screen" | "arch" | "neutral";
 
@@ -30,6 +31,7 @@ export interface WorldTransitionTrigger {
 interface WorldTransitionProps {
   // null → henüz hiç tetikleme olmamış. Component oynamaz.
   trigger: WorldTransitionTrigger | null;
+  effectsLevel: EffectsLevel;
 }
 
 // Süreler 700–1400ms aralığında. Loop yok.
@@ -42,9 +44,10 @@ const PLAY_MS: Record<Exclude<WorldKey, "neutral">, number> = {
 interface PlayState {
   token: number;
   world: Exclude<WorldKey, "neutral">;
+  effectsLevel: Exclude<EffectsLevel, "off">;
 }
 
-export default function WorldTransition({ trigger }: WorldTransitionProps) {
+export default function WorldTransition({ trigger, effectsLevel }: WorldTransitionProps) {
   // Son işlenen token'ı tutuyoruz; aynı token tekrar gelirse no-op.
   const lastTokenRef = useRef<number | null>(null);
   const reducedMotionRef = useRef(false);
@@ -71,10 +74,11 @@ export default function WorldTransition({ trigger }: WorldTransitionProps) {
 
     // Neutral'a geçişte oynatmıyoruz (Tümü/Settings için sade kalsın — brief).
     if (trigger.world === "neutral") return;
+    if (effectsLevel === "off") return;
     if (reducedMotionRef.current) return;
 
-    setPlay({ token: trigger.token, world: trigger.world });
-  }, [trigger]);
+    setPlay({ token: trigger.token, world: trigger.world, effectsLevel });
+  }, [effectsLevel, trigger]);
 
   // Animasyon süresi dolunca DOM'dan kaldır.
   useEffect(() => {
@@ -84,7 +88,7 @@ export default function WorldTransition({ trigger }: WorldTransitionProps) {
     return () => window.clearTimeout(t);
   }, [play]);
 
-  if (!play) return null;
+  if (!play || effectsLevel === "off") return null;
 
   return (
     // z-[45]: app-topbar (z-40) üstünde — macro burst ekran ortasından net
@@ -95,32 +99,39 @@ export default function WorldTransition({ trigger }: WorldTransitionProps) {
       aria-hidden="true"
       className="pointer-events-none fixed inset-0 z-[45] overflow-hidden"
     >
-      <Overlay world={play.world} />
+      <Overlay world={play.world} effectsLevel={play.effectsLevel} />
     </div>
   );
 }
 
-function Overlay({ world }: { world: Exclude<WorldKey, "neutral"> }) {
+function Overlay({
+  world,
+  effectsLevel,
+}: {
+  world: Exclude<WorldKey, "neutral">;
+  effectsLevel: Exclude<EffectsLevel, "off">;
+}) {
+  const full = effectsLevel === "full";
   switch (world) {
     case "east":
       return (
         <>
           <div className="r13-east-tint" />
-          <div className="r13-east-slash" />
+          {full && <div className="r13-east-slash" />}
         </>
       );
     case "screen":
       return (
         <>
-          <div className="r13-screen-aperture" />
           <div className="r13-screen-beam" />
+          {full && <div className="r13-screen-aperture" />}
         </>
       );
     case "arch":
       return (
         <>
           <div className="r13-arch-ink" />
-          <div className="r13-arch-seal" />
+          {full && <div className="r13-arch-seal" />}
         </>
       );
   }

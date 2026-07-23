@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { AppShell, type AppShellMode } from "@/components/app-shell/app-shell";
+import { useStartupRuntime } from "@/components/personalization/startup-runtime";
 import {
   dashboardTabHref,
   parseDashboardTab,
@@ -27,8 +28,12 @@ function authFallbackName(user: ReturnType<typeof useAuth>["user"]): string {
   return typeof value === "string" && value.trim() ? value.trim() : "Baglare";
 }
 
-function activeNavigation(pathname: string, tab: string | null): AppNavigationId | DashboardTabId {
-  if (pathname === "/") return parseDashboardTab(tab);
+function activeNavigation(
+  pathname: string,
+  tab: string | null,
+  defaultTab: DashboardTabId,
+): AppNavigationId | DashboardTabId {
+  if (pathname === "/") return parseDashboardTab(tab, defaultTab);
   return resolveActiveNavigation(pathname) ?? "dashboard";
 }
 
@@ -36,6 +41,7 @@ export function RouteAppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const router = useRouter();
+  const startup = useStartupRuntime();
   const auth = useAuth();
   const [localPreferences, setLocalPreferences] = useState<ProfilePreferences>(DEFAULT_PROFILE_PREFERENCES);
   const [cloudIdentity, setCloudIdentity] = useState<OwnProfileSummary>();
@@ -93,7 +99,11 @@ export function RouteAppShell({ children }: { children: ReactNode }) {
   return (
     <AppShell
       mode="authenticated"
-      activeNavigationId={activeNavigation(pathname, searchParams.get("tab"))}
+      activeNavigationId={activeNavigation(
+        pathname,
+        searchParams.get("tab"),
+        startup.preferences.defaultDashboardTab,
+      )}
       onChangeTab={navigateTab}
       profileName={identity.displayName}
       profileTagline={identity.tagline}

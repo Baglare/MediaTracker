@@ -9,6 +9,7 @@ import type {
   DashboardWidgetId,
   LayoutWidgetPreference,
 } from "@/lib/personalization/layout-types";
+import type { ChartPaletteId, WorldThemeKey } from "@/lib/personalization/types";
 import type { MediaItem, ProgressLog } from "@/lib/types";
 
 interface DashboardFeatureProps {
@@ -24,6 +25,9 @@ interface DashboardFeatureProps {
   onUpdateRating: (id: string, rating: number | null) => void;
   widgetPreferences: Array<LayoutWidgetPreference<DashboardWidgetId>>;
   isLayoutHydrated: boolean;
+  chartPaletteId: ChartPaletteId;
+  followWorldCompletedColor: boolean;
+  chartWorld: WorldThemeKey;
 }
 
 export default function DashboardFeature({

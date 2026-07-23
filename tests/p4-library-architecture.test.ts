@@ -207,7 +207,7 @@ describe("P4 frontend architecture contracts", () => {
 
   it("preserves the persistent AppShell and URL query contracts", () => {
     expect(read("app/layout.tsx")).toContain("<RouteAppShell>{children}</RouteAppShell>");
-    expect(page).toContain('parseDashboardTab(searchParams.get("tab"))');
+    expect(page).toContain("startup.preferences.defaultDashboardTab");
     expect(page).toContain("router.push(dashboardTabHref(tab))");
     expect(page).not.toContain("<AppShell");
   });

@@ -10,11 +10,13 @@ export type EffectsLevel = "off" | "subtle" | "full";
 export type AppDensity = "comfortable" | "compact";
 
 export interface AppAppearancePreferences {
-  version: 1;
+  version: 2;
   baseTheme: BaseThemeId;
   accentMode: AccentMode;
   effectsLevel: EffectsLevel;
   density: AppDensity;
+  chartPaletteId: ChartPaletteId;
+  followWorldCompletedColor: boolean;
 }
 
 export interface BaseThemeTokens {
@@ -132,6 +134,7 @@ export interface ChartStatusPresentation {
 export interface ChartPaletteDefinition {
   id: ChartPaletteId;
   label: string;
+  description: string;
   followWorldCompletedColor: boolean;
   statuses: Record<ChartStatusKey, ChartStatusPresentation>;
 }

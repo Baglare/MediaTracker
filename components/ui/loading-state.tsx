@@ -8,7 +8,7 @@ export function LoadingState({
   rows?: number;
 }) {
   return (
-    <div role="status" aria-busy="true" className={`rounded-2xl border border-[var(--app-border)] bg-[var(--app-panel-bg)] ${compact ? "p-4" : "p-5"}`}>
+    <div role="status" aria-busy="true" className={`rounded-2xl border border-[var(--app-border)] bg-[var(--app-panel-bg)] ${compact ? "p-4" : "p-[var(--app-panel-padding)]"}`}>
       <span className="sr-only">{label}</span>
       <div className="space-y-3" aria-hidden="true">
         {Array.from({ length: rows }, (_, index) => (

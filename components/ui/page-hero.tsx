@@ -46,7 +46,7 @@ export function PageHero({
     <header
       data-page-hero-tone={tone}
       data-world={WORLD_BY_TONE[tone]}
-      className="page-hero relative mb-6 overflow-hidden rounded-3xl border border-[var(--app-border)] px-5 py-5 shadow-[0_16px_42px_var(--app-shadow)] sm:px-7 sm:py-6"
+      className="page-hero relative overflow-hidden rounded-3xl border border-[var(--app-border)] shadow-[0_16px_42px_var(--app-shadow)]"
     >
       <span className="page-hero-motif pointer-events-none absolute inset-0" aria-hidden="true" />
       <div className="relative z-10">

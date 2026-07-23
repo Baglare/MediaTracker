@@ -45,7 +45,7 @@ Public profil görsel kimliğidir: palette, banner mode/position, overlay, avata
 
 ### Chart palette
 
-Chart palette tamamlanan, devam eden, planlanan, duraklatılan ve bırakılan durumları için segment, aktif satır yüzeyi, metin ve dot tonu tanımlar. `standard` mevcut Right Rail renklerini temsil eder. `followWorldCompletedColor`, tamamlanan renginin dünya tokenını izlediğini açıkça belirtir. P0 chart palette seçimi için UI eklemez.
+Chart palette tamamlanan, devam eden, planlanan, duraklatılan ve bırakılan durumları için segment, aktif satır yüzeyi, metin ve dot tonu tanımlar. `standard` mevcut Right Rail renklerini temsil eder. P5B ile `standard`, `ocean`, `pastel`, `high_contrast`, `monochrome` ve `world_aware` registry kayıtları kullanıcı tarafından seçilebilir hâle gelmiştir. `followWorldCompletedColor`, tamamlanan renginin dünya `chartPrimary` değerini izlemesini ayrı bir uygulama tercihi olarak yönetir; diğer segmentler seçili palette kalır.
 
 ## Veri sahipliği
 
@@ -58,7 +58,8 @@ Chart palette tamamlanan, devam eden, planlanan, duraklatılan ve bırakılan du
 | Birleşik profil identity | Cloud-backed ana kaynak | Public/protected/personal politikasına bağlı | Eksik alanda local cache, auth metadata, güvenli default |
 | Profile presentation | Cloud-backed | Public loader görünürlük politikasına bağlı | Sade normalize edilmiş default |
 | Connection color | Cloud-backed sosyal ilişki | İlişki görünümü | `neutral` |
-| Chart palette | Gelecekte local-only app preference | Private/device | `standard` |
+| Chart palette | Local-only app appearance preference | Private/device | `standard` |
+| Startup preference | Local-only `localStorage` | Private/device | Dashboard |
 
 ## Tema matrisi
 
@@ -94,7 +95,7 @@ Root layout ilk HTML'de `data-theme`, `data-base-theme`, `data-accent-mode`, `da
 
 ### Persistence ve cookie mirror
 
-`mediaTracker:appearancePreferences:v1` ana kaynak olmaya devam eder. Cookie yalnız `baseTheme`, çözülmüş tema ve `accentMode` kimliklerini taşır; profil, medya veya kullanıcı verisi içermez. Root layout allowlist parser ile cookie'yi okuyarak ilk HTML'i doğru temayla üretir. Client hydration sonrasında localStorage varsa önceliklidir; yoksa güvenli cookie kimliği kullanılır ve storage'a yazılır. Cookie client runtime tarafından aynı allowlist formatında mirror edilir.
+`mediaTracker:appearancePreferences:v2` ana kaynaktır. Eski `v1` kaydı yalnız yeni anahtar yoksa okunur; tema, accent, yoğunluk ve efekt seçimleri korunurken yeni chart alanları default ile tamamlanır. Cookie yalnız `baseTheme`, çözülmüş tema ve `accentMode` kimliklerini taşır; profil, medya veya kullanıcı verisi içermez. Root layout allowlist parser ile cookie'yi okuyarak ilk HTML'i doğru temayla üretir. Client hydration sonrasında localStorage varsa önceliklidir; yoksa güvenli cookie kimliği kullanılır ve storage'a yazılır. Cookie client runtime tarafından aynı allowlist formatında mirror edilir.
 
 ### System tema davranışı
 
@@ -110,7 +111,7 @@ Gerçek tema renklerinin source of truth'u `app/globals.css` içindeki `[data-th
 
 ### Tema ayar UI
 
-Ayarlar içindeki Görünüm kartı Sistem, Obsidyen, Porselen ve Okyanus için ad, açıklama, token preview ve seçili durum gösterir. Dünya vurgusu Otomatik, Tema rengi, Doğu, Kadraj, Arşiv ve Nötr seçeneklerini ayrı sunar. Model anında kaydetmedir; seçim canlı uygulanır, sessiz durum mesajı gösterilir ve Varsayılana dön aksiyonu Obsidyen + Otomatik default'una döner. Density, effects, profile presentation ve chart palette P1 UI'ında gösterilmez.
+Ayarlar içindeki Görünüm kartı Sistem, Obsidyen, Porselen ve Okyanus için ad, açıklama, token preview ve seçili durum gösterir. Dünya vurgusu Otomatik, Tema rengi, Doğu, Kadraj, Arşiv ve Nötr seçeneklerini ayrı sunar. P5B aynı anında-kaydet modeline grafik palette'i, dünya rengini izleme, Rahat/Kompakt yoğunluk ve Kapalı/Hafif/Tam efekt kontrollerini ekler. Varsayılana dön görünüm modelinin bütün alanlarını güvenli P5B default'una döndürür; profile presentation ayrı kalır.
 
 ### Erişilebilirlik
 
@@ -190,12 +191,24 @@ Eski `media-tracker-right-rail-preferences` anahtarı yalnız yeni P5A kaydı yo
 
 P5A, chart palette, density, effects veya varsayılan açılış tabını layout modeline eklemez; bunlar P5B'nin ayrı preference alanlarıdır. RGB/HEX, custom theme, Tozpembe/Orman veya tema import/export da layout modelinden bağımsız P6 registry/token katmanında kalır.
 
+## P5B grafik, yoğunluk, efekt ve başlangıç tercihleri
+
+`AppAppearancePreferences` `version: 2` ile `chartPaletteId` ve `followWorldCompletedColor` alanlarını taşır; mevcut `density` ve `effectsLevel` alanları root runtime tarafından aktif olarak uygulanır. Chart registry renk sunumunun tek kaynağıdır. Right Rail donut ve status listesi ile Dashboard durum dağılımı aynı resolver sonucunu tüketir. Grafik palette'i hata, başarı, recommendation lifecycle, notification severity, favori veya `connectionColor` anlamlarını değiştirmez.
+
+Yoğunluk `data-density="comfortable|compact"` üzerinden yalnız ortak spacing tokenlarını değiştirir: sayfa/section aralığı, panel/card padding, toolbar gap ve list row padding. Compact mod fontları, poster oranlarını, modal formlarını veya erişilebilir kontrol hedeflerini küçültmez. Ortak primitive'ler, Dashboard composition, Right Rail, Feed/Öneriler kartları ve Bildirimler/Kullanıcı Ara satırları bu tokenları tüketir; eski tekil feature yüzeyleri kademeli olarak mevcut spacing'ini korur.
+
+Efekt seviyesi `data-effects="off|subtle|full"` ile dekoratif motif, glow, yüzey gölgesi ve tek seferlik dünya geçişini kontrol eder. `off` dekoratif katmanları kaldırır, `subtle` önceki dengeli davranışa yakındır, `full` motifi ve gölgeyi kontrollü artırır. Sürekli loop eklenmez. `prefers-reduced-motion: reduce`, seçili seviye Full olsa bile animasyonu kapatır; focus ve loading geri bildirimi korunur.
+
+Başlangıç tercihi appearance veya layout modeline eklenmez. `StartupPreferences version: 1`, `mediaTracker:startupPreferences:v1` içinde yalnız Dashboard, Kütüphane, Keşfet, Takvim veya Ayarlar default'unu saklar. Açık `?tab=` query her zaman preference'tan önceliklidir. Sidebar Dashboard bağlantısı `/?tab=dashboard`, gear `/?tab=settings` üretir; bu nedenle default tercih açık navigasyon niyetini ezmez. Bare `/` hydration sırasında yanlış feature'ı kısa süre göstermemek için startup state çözülene kadar yalnız içerik sınırını bekletir; kalıcı AppShell remount edilmez.
+
+P5A `LayoutPreferences` yalnız stable widget görünürlüğü/sırasını taşımaya devam eder. P5B chart/spacing/motion/startup alanlarını layout anahtarına yazmaz. P6 RGB/HEX, custom theme, Tozpembe, Orman ve import/export özellikleri base theme registry/token katmanında kalacaktır; chart palette ve startup modelleri tema kimliği veya ham CSS kabul etmez.
+
 ## Gelecek aşamalar
 
 - **P1 Tema motoru:** Tamamlandı; root runtime, cookie mirror, aktif tema/accent UI ve shared semantic uyumluluk eklendi.
 - **P2 Birleşik profil ve ProfileHero:** Tamamlandı; canonical shell, `/profile`, ortak hero, cloud presentation ve local fallback/cache bağlandı.
 - **P3.1 Ortak sayfa tasarım sistemi:** Tamamlandı; sosyal feature sayfaları, progression ve profil alt modülleri ortak hero/section/stat/filter/state diline geçirildi.
-- **P3 Grafik ve düzen kişiselleştirmesi:** Chart palette ve layout seçeneklerini UI/persistence ile bağlama.
+- **P5B Grafik, yoğunluk, efekt ve başlangıç:** Tamamlandı; chart palette UI/runtime, root density/effects ve ayrı startup preference bağlandı.
 - **P5A Dashboard ve panel düzeni:** Tamamlandı; stable widget registry, local-first görünürlük/sıra ve erişilebilir Ayarlar editörü bağlandı.
 - **P4 Ana sayfa ve kütüphane refactor'ı:** Tamamlandı; composition root, feature sınırları, saf library selector'ları, command/modal orchestration ve lazy tab sınırları [FRONTEND_ARCHITECTURE.md](./FRONTEND_ARCHITECTURE.md) içinde tanımlandı.
 
@@ -206,4 +219,4 @@ P5A, chart palette, density, effects veya varsayılan açılış tabını layout
 - P2 migration uygulanmış kabul edilir; P3.0 transform migration'ı için remote Supabase işlemi veya migration apply yapılmamıştır.
 - Dashboard internal sekmeleri route'a taşınmamıştır; P4 yalnız mevcut `/?tab=` sözleşmesini koruyarak feature sınırlarını ayırmıştır.
 - Public profil modüllerinin veri/visibility davranışı yeniden tasarlanmamış; P3.1 yalnız ortak surface ve state dilini uygular.
-- Chart palette, density/effects ve varsayılan açılış alanı P5B; custom RGB/tema sistemi P6 kapsamındadır.
+- Custom RGB/HEX tema üreticisi, Tozpembe/Orman ve tema import/export P6 kapsamındadır.

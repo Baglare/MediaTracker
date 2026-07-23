@@ -67,7 +67,7 @@ export const APP_NAVIGATION_SECTION_LABELS: Record<AppNavigationSection, string>
 };
 
 export function dashboardTabHref(tab: DashboardTabId): string {
-  return tab === "dashboard" ? "/" : `/?tab=${tab}`;
+  return `/?tab=${tab}`;
 }
 
 function dashboardItem(
@@ -109,11 +109,14 @@ export const APP_NAVIGATION_ITEMS: readonly AppNavigationItem[] = [
   dashboardItem("settings", "Ayarlar", Settings, "assistants"),
 ] as const;
 
-export function parseDashboardTab(value: string | null): DashboardTabId {
+export function parseDashboardTab(
+  value: string | null,
+  fallback: DashboardTabId = "dashboard",
+): DashboardTabId {
   const item = APP_NAVIGATION_ITEMS.find(
     (candidate) => candidate.destination.kind === "dashboard-tab" && candidate.destination.tab === value,
   );
-  return item?.destination.kind === "dashboard-tab" ? item.destination.tab : "dashboard";
+  return item?.destination.kind === "dashboard-tab" ? item.destination.tab : fallback;
 }
 
 export const APP_NAVIGATION_SECTIONS: readonly AppNavigationSection[] = [

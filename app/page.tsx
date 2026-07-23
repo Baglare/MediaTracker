@@ -3,7 +3,11 @@
 import dynamic from "next/dynamic";
 import { useCallback, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AppearanceWorldScope } from "@/components/personalization/appearance-runtime";
+import {
+  AppearanceWorldScope,
+  useAppearanceRuntime,
+} from "@/components/personalization/appearance-runtime";
+import { useStartupRuntime } from "@/components/personalization/startup-runtime";
 import RightRail from "@/components/right-rail";
 import WorldTransition from "@/components/world-transition";
 import {
@@ -61,7 +65,13 @@ const PERSONAL_TABS = new Set<DashboardTabId>([
 export default function HomePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const activeTab = parseDashboardTab(searchParams.get("tab"));
+  const startup = useStartupRuntime();
+  const appearance = useAppearanceRuntime();
+  const explicitTab = searchParams.get("tab");
+  const activeTab = parseDashboardTab(
+    explicitTab,
+    startup.preferences.defaultDashboardTab,
+  );
   const { user, configured } = useAuth();
   const library = useMediaLibrary(user?.id ?? null);
   const preferences = usePersistedPreferences();
@@ -164,10 +174,12 @@ export default function HomePage() {
     [navigateToTab],
   );
 
-  if (!library.isLoaded) {
+  if (!library.isLoaded || (!startup.hydrated && explicitTab === null)) {
     return (
       <div className="grid min-h-64 place-items-center" aria-busy="true">
-        <p className="text-sm text-[var(--app-text-muted)]">Kütüphane yükleniyor...</p>
+        <p className="text-sm text-[var(--app-text-muted)]">
+          {!library.isLoaded ? "Kütüphane yükleniyor..." : "Başlangıç tercihi yükleniyor..."}
+        </p>
       </div>
     );
   }
@@ -190,6 +202,9 @@ export default function HomePage() {
           onUpdateRating={commands.mutations.updateRating}
           widgetPreferences={layout.preferences.dashboard}
           isLayoutHydrated={layout.isHydrated}
+          chartPaletteId={appearance.preferences.chartPaletteId}
+          followWorldCompletedColor={appearance.preferences.followWorldCompletedColor}
+          chartWorld={world}
         />
       );
     }
@@ -282,11 +297,14 @@ export default function HomePage() {
   return (
     <AppearanceWorldScope world={world} className="flex min-w-0 overflow-x-clip">
       <div
-        className={`relative w-full min-w-0 px-4 py-6 sm:px-6 lg:px-8 lg:py-8 ${
+        className={`relative w-full min-w-0 px-4 py-[var(--app-page-gap)] sm:px-6 lg:px-8 ${
           showRightRail ? "xl:px-6" : "xl:px-8 2xl:px-10"
         }`}
       >
-        <WorldTransition trigger={preferences.worldTransition} />
+        <WorldTransition
+          trigger={preferences.worldTransition}
+          effectsLevel={appearance.preferences.effectsLevel}
+        />
         {content}
         <MediaCommandHost commands={commands} mediaList={library.mediaList} />
       </div>
@@ -299,6 +317,9 @@ export default function HomePage() {
           isLayoutHydrated={layout.isHydrated}
           progression={progression}
           themeFilter={preferences.themeFilter}
+          chartPaletteId={appearance.preferences.chartPaletteId}
+          followWorldCompletedColor={appearance.preferences.followWorldCompletedColor}
+          chartWorld={world}
           onOpenDetail={commands.openDetail}
         />
       )}

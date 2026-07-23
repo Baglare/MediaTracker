@@ -160,7 +160,7 @@ export default function LibraryFeature({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-[var(--app-section-gap)]">
       <LibraryControlBar
         searchQuery={searchQuery}
         onSearchChange={onSearchChange}
@@ -192,7 +192,7 @@ export default function LibraryFeature({
           </p>
         </div>
       ) : (
-        <div className="space-y-8">
+        <div className="space-y-[var(--app-section-gap)]">
           {model.continueItems.length > 0 && (
             <section aria-label="Devam Ettiklerim">
               <SectionHeading

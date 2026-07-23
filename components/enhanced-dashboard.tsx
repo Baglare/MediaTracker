@@ -17,6 +17,11 @@ import type {
   DashboardWidgetId,
   LayoutWidgetPreference,
 } from "@/lib/personalization/layout-types";
+import { resolveChartPaletteStatuses } from "@/lib/personalization/chart-palette-registry";
+import type {
+  ChartPaletteId,
+  WorldThemeKey,
+} from "@/lib/personalization/types";
 import {
   formatProgressLogAction,
   formatProgressLogDateTime,
@@ -37,6 +42,9 @@ interface EnhancedDashboardProps {
   onDeleteMedia: (id: string) => void;
   onUpdateRating?: (id: string, rating: number | null) => void;
   widgetPreferences: Array<LayoutWidgetPreference<DashboardWidgetId>>;
+  chartPaletteId: ChartPaletteId;
+  followWorldCompletedColor: boolean;
+  chartWorld: WorldThemeKey;
 }
 
 type SegmentTone = "amber" | "emerald" | "violet" | "sky" | "rose" | "zinc";
@@ -70,7 +78,7 @@ function DashboardMetric({
               : "text-zinc-100";
 
   return (
-    <div className="rounded-xl border border-zinc-800/60 bg-zinc-950/35 px-4 py-3 min-w-0">
+    <div className="density-card min-w-0 rounded-xl border border-zinc-800/60 bg-zinc-950/35">
       <div className="text-[10px] uppercase tracking-[0.14em] text-zinc-500 font-semibold truncate">
         {label}
       </div>
@@ -116,11 +124,13 @@ function MiniBar({
   value,
   total,
   tone = "amber",
+  color,
 }: {
   label: string;
   value: number;
   total: number;
   tone?: SegmentTone;
+  color?: string;
 }) {
   const width = total > 0 ? Math.max(value > 0 ? 4 : 0, Math.round((value / total) * 100)) : 0;
   const toneClass =
@@ -143,7 +153,10 @@ function MiniBar({
         <span className="text-xs font-mono tabular-nums text-zinc-500 shrink-0">{value}</span>
       </div>
       <div className="h-2 rounded-full bg-zinc-800/70 overflow-hidden">
-        <div className={`h-full rounded-full ${toneClass}`} style={{ width: `${width}%` }} />
+        <div
+          className={`h-full rounded-full ${color ? "" : toneClass}`}
+          style={{ width: `${width}%`, ...(color ? { backgroundColor: color } : {}) }}
+        />
       </div>
     </div>
   );
@@ -175,6 +188,9 @@ export default function EnhancedDashboard({
   onDeleteMedia,
   onUpdateRating,
   widgetPreferences,
+  chartPaletteId,
+  followWorldCompletedColor,
+  chartWorld,
 }: EnhancedDashboardProps) {
   if (mediaList.length === 0) return <EmptyDashboard />;
 
@@ -226,12 +242,17 @@ export default function EnhancedDashboard({
     .slice(0, 3);
   const recentLogs = getDisplayProgressLogs(progressLogs, 8);
 
+  const chartStatuses = resolveChartPaletteStatuses(
+    chartPaletteId,
+    chartWorld,
+    followWorldCompletedColor,
+  );
   const statusRows = [
-    { label: "Devam", value: stats.inProgressItems, tone: "amber" as const },
-    { label: "Tamam", value: stats.completedItems, tone: "emerald" as const },
-    { label: "Plan", value: stats.planningItems, tone: "sky" as const },
-    { label: "Durak", value: stats.pausedItems, tone: "violet" as const },
-    { label: "Bırak", value: stats.droppedItems, tone: "rose" as const },
+    { label: chartStatuses.inProgress.label, value: stats.inProgressItems, color: chartStatuses.inProgress.segmentColor },
+    { label: chartStatuses.completed.label, value: stats.completedItems, color: chartStatuses.completed.segmentColor },
+    { label: chartStatuses.planning.label, value: stats.planningItems, color: chartStatuses.planning.segmentColor },
+    { label: chartStatuses.paused.label, value: stats.pausedItems, color: chartStatuses.paused.segmentColor },
+    { label: chartStatuses.dropped.label, value: stats.droppedItems, color: chartStatuses.dropped.segmentColor },
   ];
 
   const worldCounts = mediaList.reduce(
@@ -272,14 +293,14 @@ export default function EnhancedDashboard({
   });
 
   return (
-    <div className="grid min-w-0 grid-cols-1 gap-8 xl:grid-cols-3">
+    <div className="grid min-w-0 grid-cols-1 gap-[var(--app-section-gap)] xl:grid-cols-3">
       {isWidgetVisible("summary") && (
       <section
         className="overflow-hidden rounded-2xl border border-zinc-800/60 bg-zinc-900/30 xl:col-span-3"
         style={widgetOrder("summary")}
         data-dashboard-widget="summary"
       >
-        <div className="p-5 sm:p-6 lg:p-7">
+        <div className="p-[var(--app-panel-padding)]">
           <div className="grid grid-cols-1 xl:grid-cols-[1.2fr_0.8fr] gap-6">
             <div className="min-w-0">
               <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.16em] text-amber-300/80 font-semibold">
@@ -369,7 +390,7 @@ export default function EnhancedDashboard({
         <div className="contents">
           {isWidgetVisible("recent-activity") && (
           <section
-            className="rounded-2xl border border-zinc-800/60 bg-zinc-900/30 p-4 xl:col-span-1"
+            className="density-card rounded-2xl border border-zinc-800/60 bg-zinc-900/30 xl:col-span-1"
             style={widgetOrder("recent-activity")}
             data-dashboard-widget="recent-activity"
           >
@@ -402,7 +423,7 @@ export default function EnhancedDashboard({
 
           {isWidgetVisible("world-distribution") && (
           <section
-            className="rounded-2xl border border-zinc-800/60 bg-zinc-900/30 p-4 xl:col-span-1"
+            className="density-card rounded-2xl border border-zinc-800/60 bg-zinc-900/30 xl:col-span-1"
             style={widgetOrder("world-distribution")}
             data-dashboard-widget="world-distribution"
           >
@@ -420,14 +441,14 @@ export default function EnhancedDashboard({
 
           {isWidgetVisible("status-distribution") && (
           <section
-            className="rounded-2xl border border-zinc-800/60 bg-zinc-900/30 p-4 xl:col-span-1"
+            className="density-card rounded-2xl border border-zinc-800/60 bg-zinc-900/30 xl:col-span-1"
             style={widgetOrder("status-distribution")}
             data-dashboard-widget="status-distribution"
           >
             <SectionTitle icon={Clock} title="Durum Dağılımı" count={stats.totalItems} />
             <div className="mt-4 space-y-3">
               {statusRows.map((row) => (
-                <MiniBar key={row.label} label={row.label} value={row.value} total={stats.totalItems} tone={row.tone} />
+                <MiniBar key={row.label} label={row.label} value={row.value} total={stats.totalItems} color={row.color} />
               ))}
             </div>
           </section>

@@ -41,10 +41,21 @@ describe("world theme registry", () => {
 });
 
 describe("chart palette registry", () => {
+  it("registers every selectable P5B palette", () => {
+    expect(Object.keys(CHART_PALETTE_REGISTRY)).toEqual([
+      "standard",
+      "ocean",
+      "pastel",
+      "high_contrast",
+      "monochrome",
+      "world_aware",
+    ]);
+  });
+
   it("models the current Right Rail colors as the standard palette", () => {
     expect(CHART_PALETTE_REGISTRY.standard.followWorldCompletedColor).toBe(true);
     expect(STANDARD_CHART_STATUS_PRESENTATION).toMatchObject({
-      completed: { segmentColor: "var(--w-primary)", dotTone: "bg-[var(--w-primary)]" },
+      completed: { segmentColor: "#34d399", dotTone: "#34d399" },
       inProgress: { segmentColor: "#a78bfa" },
       planning: { segmentColor: "#7dd3fc" },
       paused: { segmentColor: "#fb923c" },
@@ -70,5 +81,10 @@ describe("chart palette registry", () => {
 
   it("uses the selected world completed color when requested", () => {
     expect(resolveChartStatusPresentation("world_aware", "completed", "screen").segmentColor).toBe(WORLD_THEME_REGISTRY.screen.chartPrimary);
+  });
+
+  it("can keep completed inside the selected palette when world following is disabled", () => {
+    expect(resolveChartStatusPresentation("world_aware", "completed", "screen", false).segmentColor)
+      .toBe(CHART_PALETTE_REGISTRY.world_aware.statuses.completed.segmentColor);
   });
 });

@@ -114,6 +114,24 @@
    bu tokenlar onun üstüne ek bir katman; kasıtlı çakıştırma yok. UI bileşen-
    leri henüz bu utility'leri tüketmiyor — sonraki turlarda dokunulacak. */
 
+:root {
+  --app-page-gap: 2rem;
+  --app-section-gap: 1.5rem;
+  --app-panel-padding: 1.5rem;
+  --app-card-padding: 1rem;
+  --app-control-gap: 0.75rem;
+  --app-list-row-padding: 0.75rem;
+}
+
+[data-density="compact"] {
+  --app-page-gap: 1.25rem;
+  --app-section-gap: 1rem;
+  --app-panel-padding: 1rem;
+  --app-card-padding: 0.75rem;
+  --app-control-gap: 0.5rem;
+  --app-list-row-padding: 0.625rem;
+}
+
 :root,
 [data-theme="obsidian"] {
   /* P1: CSS gerçek tema renklerinin source of truth'udur. */
@@ -422,6 +440,10 @@ body {
   color: var(--app-text-primary);
 }
 
+.app-content {
+  padding: var(--app-page-gap);
+}
+
 .app-panel {
   background: var(--app-surface-1);
   color: var(--app-text-primary);
@@ -439,17 +461,22 @@ body {
   background: var(--app-panel-bg);
   color: var(--app-text-primary);
   box-shadow: 0 10px 28px color-mix(in srgb, var(--app-shadow) 68%, transparent);
+  padding: var(--app-panel-padding);
 }
 
 .app-toolbar {
   background: var(--app-panel-bg);
   color: var(--app-text-primary);
+  gap: var(--app-control-gap);
+  padding: var(--app-card-padding);
 }
 
 .page-hero {
   background:
     linear-gradient(135deg, var(--w-soft), transparent 58%),
     var(--app-hero-bg);
+  margin-bottom: var(--app-section-gap);
+  padding: var(--app-panel-padding);
 }
 
 .page-hero-motif {
@@ -460,6 +487,58 @@ body {
 .world-identity-motif {
   opacity: 0.52;
   mask-image: linear-gradient(to left, black, transparent 76%);
+}
+
+.density-card {
+  padding: var(--app-card-padding);
+}
+
+.density-list-row {
+  padding: var(--app-list-row-padding);
+}
+
+[data-effects="off"] .page-hero-motif,
+[data-effects="off"] .world-identity-motif {
+  opacity: 0;
+}
+
+[data-effects="subtle"] .page-hero-motif { opacity: 0.46; }
+[data-effects="subtle"] .world-identity-motif { opacity: 0.34; }
+[data-effects="full"] .page-hero-motif { opacity: 0.82; }
+[data-effects="full"] .world-identity-motif { opacity: 0.62; }
+
+[data-effects="off"] .app-panel,
+[data-effects="off"] .app-section {
+  box-shadow: none;
+}
+
+[data-effects="full"] .app-panel,
+[data-effects="full"] .app-section {
+  box-shadow: 0 14px 38px color-mix(in srgb, var(--app-shadow) 82%, transparent);
+}
+
+[data-effects="off"] [class*="group-hover:scale"],
+[data-effects="off"] [class*="hover:scale"] {
+  transform: none !important;
+}
+
+[data-effects="off"] .r14-hero-glyph-enter,
+[data-effects="off"] .r14-hero-text-enter,
+[data-effects="off"] .r14-hero-pills-enter,
+[data-effects="off"] .v5a-slash-anim,
+[data-effects="off"] .v5a-slash-anim path,
+[data-effects="off"] .v5a-yin-anim,
+[data-effects="off"] .v5a-ink-anim,
+[data-effects="off"] .v5a-ink-anim path,
+[data-effects="off"] .r13-east-tint,
+[data-effects="off"] .r13-east-slash,
+[data-effects="off"] .r13-screen-aperture,
+[data-effects="off"] .r13-screen-beam,
+[data-effects="off"] .r13-arch-ink,
+[data-effects="off"] .r13-arch-seal {
+  animation: none !important;
+  filter: none !important;
+  transform: none !important;
 }
 
 [data-world="east"] > .world-identity-motif {

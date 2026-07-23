@@ -7,6 +7,7 @@ import type {
   AppAppearancePreferences,
   AppDensity,
   BaseThemeId,
+  ChartPaletteId,
   EffectsLevel,
   ProfileAvatarFrame,
   ProfileBannerMode,
@@ -23,6 +24,14 @@ const BASE_THEMES = new Set<BaseThemeId>(["system", "obsidian", "porcelain", "oc
 const ACCENT_MODES = new Set<AccentMode>(["auto", "theme", "east", "screen", "arch", "neutral"]);
 const EFFECTS_LEVELS = new Set<EffectsLevel>(["off", "subtle", "full"]);
 const DENSITIES = new Set<AppDensity>(["comfortable", "compact"]);
+const CHART_PALETTES = new Set<ChartPaletteId>([
+  "standard",
+  "ocean",
+  "pastel",
+  "high_contrast",
+  "monochrome",
+  "world_aware",
+]);
 export const PROFILE_PALETTE_IDS = ["neutral", "east", "screen", "arch", "ocean"] as const satisfies readonly ProfilePaletteId[];
 export const PROFILE_BANNER_MODES = ["none", "gradient", "world", "image"] as const satisfies readonly ProfileBannerMode[];
 export const PROFILE_BANNER_POSITIONS = ["top", "center", "bottom"] as const satisfies readonly ProfileBannerPosition[];
@@ -48,14 +57,18 @@ function readKnown<T extends string>(value: unknown, known: ReadonlySet<T>, fall
 
 export function normalizeAppearancePreferences(value: unknown): AppAppearancePreferences {
   const fallback = defaultAppearancePreferences();
-  if (!isRecord(value) || value.version !== 1) return fallback;
+  if (!isRecord(value) || (value.version !== 1 && value.version !== 2)) return fallback;
 
   return {
-    version: 1,
+    version: 2,
     baseTheme: readKnown(value.baseTheme, BASE_THEMES, fallback.baseTheme),
     accentMode: readKnown(value.accentMode, ACCENT_MODES, fallback.accentMode),
     effectsLevel: readKnown(value.effectsLevel, EFFECTS_LEVELS, fallback.effectsLevel),
     density: readKnown(value.density, DENSITIES, fallback.density),
+    chartPaletteId: readKnown(value.chartPaletteId, CHART_PALETTES, fallback.chartPaletteId),
+    followWorldCompletedColor: typeof value.followWorldCompletedColor === "boolean"
+      ? value.followWorldCompletedColor
+      : fallback.followWorldCompletedColor,
   };
 }
 

@@ -21,7 +21,7 @@ export function PageSection({
 }: PageSectionProps) {
   const labelled = Boolean(title);
   return (
-    <Component className={`app-section rounded-2xl border border-[var(--app-border)] p-4 sm:p-5 ${className}`}>
+    <Component className={`app-section rounded-2xl border border-[var(--app-border)] ${className}`}>
       {(title || description || action || count !== undefined) && (
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>

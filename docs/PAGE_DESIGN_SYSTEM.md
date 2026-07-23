@@ -88,6 +88,12 @@ PageHero aksiyonları wrap olur. Segmented tabs yatay taşabilir ve klavye ile g
 
 Heading hiyerarşisi, breadcrumb nav, `role=tablist/tab`, `aria-selected`, `aria-expanded`, `aria-busy`, okunmamış “Yeni” metni ve `focus-visible` yüzükleri ortak sözleşmedir. Renk, unread/selected/connection/status bilgisinin tek kaynağı değildir. Motifler screen reader ağacından çıkarılır. Reduced-motion altında ortak yüzey geçişleri kapanır.
 
+## Yoğunluk ve efekt kuralları
+
+Ortak spacing, `--app-page-gap`, `--app-section-gap`, `--app-panel-padding`, `--app-card-padding`, `--app-control-gap` ve `--app-list-row-padding` tokenlarından gelir. `data-density="compact"` yalnız bu aralıkları kontrollü azaltır. Primitive veya feature bileşenleri tema adına ya da density değerine göre ayrı class tablosu kurmaz; `app-section`, `app-toolbar`, `density-card` ve `density-list-row` rollerini kullanır. Font boyutu, poster oranı, modal form alanı ve minimum erişilebilir kontrol hedefi density ile küçültülmez.
+
+`data-effects` dekoratif sunumu yönetir. Kapalı mod motif/glow ve gereksiz hover hareketini kaldırır; Hafif mevcut dengeli sunumdur; Tam yalnız statik glow ve tek seferlik geçişleri belirginleştirir. Focus, loading ve durum geri bildirimi efekt tercihiyle kapatılmaz. `prefers-reduced-motion` her seviyeden önceliklidir ve loop animasyonu tasarım sistemine kabul edilmez.
+
 ## Performance sınırları
 
 - AppShell route sayfalarında yeniden render edilmez.
@@ -99,4 +105,4 @@ Heading hiyerarşisi, breadcrumb nav, `role=tablist/tab`, `aria-selected`, `aria
 
 ## Sonraki migration planı
 
-P3.1 Feed, Öneriler, Bildirimler, Kullanıcı Ara, İlerleme ve profil alt modüllerini ortak dile taşıdı. P4, Dashboard/Kütüphane composition ve domain sınırlarını görsel redesign yapmadan ayırdı. Feature veri akışı, selector, command ve lazy-loading kuralları için [FRONTEND_ARCHITECTURE.md](./FRONTEND_ARCHITECTURE.md) belgesine bakın. Chart/layout kişiselleştirmesi ve widget düzenleme sonraki ayrı turlardır.
+P3.1 Feed, Öneriler, Bildirimler, Kullanıcı Ara, İlerleme ve profil alt modüllerini ortak dile taşıdı. P4, Dashboard/Kütüphane composition ve domain sınırlarını görsel redesign yapmadan ayırdı. P5A widget görünürlüğü/sırasını, P5B ise chart palette ile ortak density/effects tokenlarını bağladı. Feature veri akışı, selector, command ve lazy-loading kuralları için [FRONTEND_ARCHITECTURE.md](./FRONTEND_ARCHITECTURE.md); preference ayrımları için [PERSONALIZATION_ARCHITECTURE.md](./PERSONALIZATION_ARCHITECTURE.md) belgesine bakın.

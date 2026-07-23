@@ -2,11 +2,13 @@ import type { AppAppearancePreferences, ProfilePresentationPreferences } from ".
 import { DEFAULT_IMAGE_TRANSFORM } from "./image-transform";
 
 export const DEFAULT_APP_APPEARANCE_PREFERENCES: AppAppearancePreferences = {
-  version: 1,
+  version: 2,
   baseTheme: "obsidian",
   accentMode: "auto",
   effectsLevel: "subtle",
   density: "comfortable",
+  chartPaletteId: "standard",
+  followWorldCompletedColor: true,
 };
 
 export const DEFAULT_PROFILE_PRESENTATION_PREFERENCES: ProfilePresentationPreferences = {

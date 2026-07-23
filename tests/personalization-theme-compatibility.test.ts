@@ -81,12 +81,12 @@ describe("theme registry and CSS compatibility", () => {
 });
 
 describe("P1 separation contract", () => {
-  it("keeps cloud, profile presentation, chart and relationship concerns out of appearance runtime", () => {
-    const combined = `${runtime}\n${settings}`;
-    expect(combined).not.toMatch(/supabase|connectionColor|ProfilePresentation|ChartPalette/);
+  it("keeps cloud, profile presentation and relationship concerns out of appearance runtime", () => {
+    expect(`${runtime}\n${settings}`).not.toMatch(/supabase|connectionColor|ProfilePresentation/);
   });
 
-  it("does not expose density or effects controls", () => {
-    expect(settings).not.toMatch(/updatePreference\("density"|updatePreference\("effectsLevel"/);
+  it("exposes the now-active density and effects controls through appearance preferences", () => {
+    expect(settings).toMatch(/updatePreference\("density"|selectDensity/);
+    expect(settings).toMatch(/updatePreference\("effectsLevel"|selectEffects/);
   });
 });

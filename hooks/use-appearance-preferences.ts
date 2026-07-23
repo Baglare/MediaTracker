@@ -8,7 +8,8 @@ import {
 import type { AppAppearancePreferences } from "@/lib/personalization/types";
 import { normalizeAppearancePreferences } from "@/lib/personalization/validation";
 
-export const APPEARANCE_PREFERENCES_STORAGE_KEY = "mediaTracker:appearancePreferences:v1";
+export const APPEARANCE_PREFERENCES_STORAGE_KEY = "mediaTracker:appearancePreferences:v2";
+export const LEGACY_APPEARANCE_PREFERENCES_STORAGE_KEY = "mediaTracker:appearancePreferences:v1";
 
 export interface AppearancePreferencesStorage {
   getItem(key: string): string | null;
@@ -22,7 +23,11 @@ export function readAppearancePreferences(
 ): AppAppearancePreferences {
   try {
     const raw = storage.getItem(APPEARANCE_PREFERENCES_STORAGE_KEY);
-    return raw ? normalizeAppearancePreferences(JSON.parse(raw)) : normalizeAppearancePreferences(fallback);
+    if (raw) return normalizeAppearancePreferences(JSON.parse(raw));
+    const legacy = storage.getItem(LEGACY_APPEARANCE_PREFERENCES_STORAGE_KEY);
+    return legacy
+      ? normalizeAppearancePreferences(JSON.parse(legacy))
+      : normalizeAppearancePreferences(fallback);
   } catch {
     return normalizeAppearancePreferences(fallback);
   }
@@ -47,6 +52,7 @@ export function resetStoredAppearancePreferences(
   const defaults = defaultAppearancePreferences();
   try {
     storage.removeItem(APPEARANCE_PREFERENCES_STORAGE_KEY);
+    storage.removeItem(LEGACY_APPEARANCE_PREFERENCES_STORAGE_KEY);
   } catch {
     // Depolama erişimi olmasa da reset çağrısı default state döndürür.
   }
