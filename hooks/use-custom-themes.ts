@@ -6,6 +6,7 @@ import {
   appendCustomTheme,
   createCustomThemeDefinition,
   deleteCustomTheme,
+  normalizeCustomThemeCollection,
   readCustomThemes,
   replaceCustomTheme,
   resetStoredCustomThemes,
@@ -16,7 +17,7 @@ import {
 } from "@/lib/personalization/custom-themes";
 import type { CustomThemeDefinition } from "@/lib/personalization/types";
 
-function secureCustomThemeId(): string {
+export function createSecureCustomThemeId(): string {
   if (typeof crypto.randomUUID === "function") return `ct_${crypto.randomUUID()}`;
   const bytes = new Uint8Array(16);
   crypto.getRandomValues(bytes);
@@ -43,7 +44,7 @@ export function useCustomThemes() {
 
   const create = useCallback((draft: CustomThemeDraftValue): CustomThemeDefinition => {
     if (collection.themes.length >= MAX_CUSTOM_THEMES) throw new Error("custom_theme_limit");
-    const theme = createCustomThemeDefinition(secureCustomThemeId(), isoNow(), draft);
+    const theme = createCustomThemeDefinition(createSecureCustomThemeId(), isoNow(), draft);
     setCollection((current) => appendCustomTheme(current, theme));
     return theme;
   }, [collection.themes.length]);
@@ -85,6 +86,10 @@ export function useCustomThemes() {
     setCollection(resetStoredCustomThemes(window.localStorage));
   }, []);
 
+  const replaceAll = useCallback((themes: readonly CustomThemeDefinition[]) => {
+    setCollection(normalizeCustomThemeCollection({ version: 1, themes }));
+  }, []);
+
   return {
     themes: collection.themes,
     hydrated,
@@ -94,5 +99,6 @@ export function useCustomThemes() {
     rename,
     remove,
     reset,
+    replaceAll,
   };
 }

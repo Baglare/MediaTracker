@@ -239,6 +239,30 @@ Tema değişimi network, route reload, AppShell remount, local library parse vey
 
 Chart palette, public `profilePaletteId`, banner/avatar sunumu ve Yin/Yang `connectionColor` ayrı sahipliklerini korur; custom app theme bu alanlara yazmaz.
 
+## P6.1 tema import/export ve opsiyonel cloud senkronizasyonu
+
+### Bundle formatı ve yerel aktarım
+
+Tema aktarımının canonical biçimi `mediatracker-theme-bundle`, `version: 1` JSON nesnesidir. Bundle yalnız custom tema ana girdilerini, güvenli metadata'yı ve isteğe bağlı aktif custom tema referansını taşır. Türetilmiş semantic tokenlar, cookie snapshot, preset registry, layout/startup/chart/profile tercihleri ve `connectionColor` dosyaya yazılmaz. Import sonrasında tokenlar mevcut saf P6 üreticisiyle yeniden türetilir.
+
+Import 256 KB ile sınırlıdır. JSON plain-object, format/version, allowlist alanları, 1–20 tema, güvenli `ct_*` kimliği, 1–40 karakter ad, ISO tarih ve canonical HEX kurallarıyla doğrulanır. Raw CSS, URL, gradient, alpha, `style`, `className`, `backgroundImage` ve prototype-pollution anahtarları reddedilir. Geçerli ve bozuk kayıtların birlikte bulunduğu bundle önizlemede aday bazında ayrılır; yalnız kullanıcı tarafından onaylanan geçerli kayıtlar yazılır.
+
+ID çakışması sessiz overwrite üretmez: kullanıcı **Atla**, **Mevcut temayı değiştir** veya **Yeni kopya olarak ekle** seçer. İsim eşitliği tek başına overwrite nedeni değildir. Bundle içindeki aktif tema ancak kullanıcı ayrı “Dosyada seçili olan temayı uygula” seçeneğini açarsa appearance preference ve ilk-paint cookie snapshot'ına uygulanır. Export/import tamamen local canonical katalog üzerinden çalışır ve network gerektirmez.
+
+### Private cloud modeli ve revision concurrency
+
+`20260722130000_theme_cloud_sync.sql`, yalnız kullanıcıya ait `user_theme_preferences` tablosunu ekler. Tablo canonical aktif tema seçimini, custom tema listesini, schema version ve artan revision değerini saklar; türetilmiş CSS tokenı veya cookie snapshot saklamaz. RLS select'i `user_id = auth.uid()` ile sınırlar. Direct client mutation izni yoktur; save/delete yalnız authenticated, fixed-search-path RPC sınırından geçer ve kullanıcı kimliği `auth.uid()` içinden alınır.
+
+`save_theme_sync_state` client'ın verdiği `expectedRevision` ile mevcut revision'ı karşılaştırır. Eşleşmeyen yazım genel hata yerine conflict sonucu üretir; client daha yeni cloud durumunu inceleme, birleştirme veya açık onayla cihazı kullanma seçeneği sunar. API route private/no-store yanıt verir, payload'ı TypeScript runtime katmanında da doğrular ve SQL/stack trace sızdırmaz. Public profil loader'ları bu tabloyu okumaz.
+
+### Cihaz tercihi, ilk sync ve offline davranış
+
+Senkronizasyon açık/kapalı tercihi `mediaTracker:themeCloudSync:v1` içinde cihaz bazlıdır ve varsayılan kapalıdır. Girişsiz kullanıcı import/export kullanabilir; cloud kontrolleri giriş gereksinimini açıkça belirtir. İlk etkinleştirmede local/cloud sayıları karşılaştırılır: cihaz, bulut, birleştir veya vazgeç kararı alınmadan iki dolu katalog birbirini ezmez.
+
+Birleştirme stable ID üzerinden yapılır. Tek taraftaki kayıt eklenir, aynı ID ve aynı içerik tek kalır, aynı ID ve farklı içerikte yerel kayıt ID'sini korurken cloud kayıt yeni güvenli ID ile “Bulut Kopyası” olur. 20 tema sınırı merge öncesi ve sırasında korunur. Aktif tema uyuşmazlığı ayrıca görünür conflict olarak raporlanır.
+
+Tema mutasyonu önce localStorage ve root runtime'a uygulanır. Cloud save başarısızlığı local temayı geri almaz, aktif temayı Obsidyen'e düşürmez ve uygulama açılışını bekletmez; cihaz tercihi pending/error durumunu saklar. Kaydedilmiş tema veya aktif seçim değişiklikleri kısa debounce ile toplu gönderilebilir; RGB draft keystroke'ları ve geçici preview senkronize edilmez. Ayrıntılı dosya formatı, conflict örnekleri ve manuel doğrulama için [THEME_IMPORT_EXPORT_AND_SYNC.md](./THEME_IMPORT_EXPORT_AND_SYNC.md) belgesine bakın.
+
 ## Gelecek aşamalar
 
 - **P1 Tema motoru:** Tamamlandı; root runtime, cookie mirror, aktif tema/accent UI ve shared semantic uyumluluk eklendi.
@@ -255,4 +279,4 @@ Chart palette, public `profilePaletteId`, banner/avatar sunumu ve Yin/Yang `conn
 - P2 migration uygulanmış kabul edilir; P3.0 transform migration'ı için remote Supabase işlemi veya migration apply yapılmamıştır.
 - Dashboard internal sekmeleri route'a taşınmamıştır; P4 yalnız mevcut `/?tab=` sözleşmesini koruyarak feature sınırlarını ayırmıştır.
 - Public profil modüllerinin veri/visibility davranışı yeniden tasarlanmamış; P3.1 yalnız ortak surface ve state dilini uygular.
-- Cloud tema sync, tema marketi ve import/export bu sürümde yoktur; P6.1 için değerlendirilebilir.
+- Tema marketi ve public tema paylaşımı yoktur. P6.1 import/export ile private, opsiyonel cloud sync ekler; cloud sync kullanılabilmesi için yeni migration ayrıca uygulanmalıdır.

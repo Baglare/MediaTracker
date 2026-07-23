@@ -18,6 +18,34 @@ export type Json =
 export interface Database {
   public: {
     Tables: {
+      user_theme_preferences: {
+        Row: {
+          user_id: string;
+          schema_version: number;
+          active_theme_selection: Json;
+          custom_themes: Json;
+          revision: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          schema_version?: number;
+          active_theme_selection?: Json;
+          custom_themes?: Json;
+          revision?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          schema_version?: number;
+          active_theme_selection?: Json;
+          custom_themes?: Json;
+          revision?: number;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       profiles: {
         Row: {
           id: string;
@@ -285,6 +313,9 @@ export interface Database {
     };
     Views: Record<string, never>;
     Functions: {
+      get_theme_sync_state: { Args: Record<string, never>; Returns: Json };
+      save_theme_sync_state: { Args: { p_expected_revision: number; p_active_theme_selection: Json; p_custom_themes: Json }; Returns: Json };
+      delete_theme_sync_state: { Args: Record<string, never>; Returns: Json };
       get_social_profile: { Args: { p_username: string }; Returns: Json };
       get_unified_social_profile: { Args: { p_username: string }; Returns: Json };
       search_social_profiles: { Args: { p_query: string; p_offset?: number; p_limit?: number }; Returns: Json };

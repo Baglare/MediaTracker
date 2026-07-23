@@ -64,6 +64,8 @@ Uygulamanın ana veri kaynağı tarayıcıdaki `localStorage` alanıdır. Supaba
   - Cloud -> Yerel indirme
   - Cloud verisini yerel veriyle birleştirme
   - Mutasyonlar için sync queue ve online durumda flush altyapısı
+  - Özel temalar için güvenli JSON import/export ve kullanıcı onaylı, revision kontrollü opsiyonel cloud senkronizasyonu
+  - Tema aktarım/senkronizasyon ayrıntıları: [`docs/THEME_IMPORT_EXPORT_AND_SYNC.md`](docs/THEME_IMPORT_EXPORT_AND_SYNC.md)
 - Sosyal profil:
   - `/u/[username]` public/protected/personal profil route’u ve `/people` kullanıcı araması
   - Asimetrik takip/istek, karşılıklı Yin/Yang durumu ve engelleme RPC’leri
@@ -217,7 +219,7 @@ Güvenlik notu: `SUPABASE_SERVICE_ROLE_KEY` yalnızca server-side kullanılmalı
 Cloud özelliklerini kullanmak istiyorsan:
 
 1. Supabase projesi oluştur.
-2. Yeni kurulumda `supabase/schema.sql` dosyasındaki SQL'i Supabase SQL Editor içinde çalıştır. Mevcut projede 14 haneli migration’ları sırayla uygula; Sosyal Faz 2 için son dosya `supabase/migrations/20260721130000_social_interactions_recommendations.sql` olur. Bu tur migration’ı uzak projeye otomatik uygulamaz.
+2. Yeni kurulumda `supabase/schema.sql` dosyasındaki SQL'i Supabase SQL Editor içinde çalıştır. Mevcut projede 14 haneli migration’ları sırayla uygula; opsiyonel tema senkronizasyonu için `supabase/migrations/20260722130000_theme_cloud_sync.sql` dosyası da uygulanmalıdır. Bu tur migration’ı uzak projeye otomatik uygulamaz.
 3. Supabase Project Settings -> API bölümünden URL ve anon key değerlerini al.
 4. `.env.local` içine şunları ekle:
 

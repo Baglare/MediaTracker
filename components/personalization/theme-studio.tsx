@@ -4,7 +4,9 @@ import { Check, Copy, Edit3, Plus, ShieldAlert, Trash2, X } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { ColorField } from "./color-field";
+import { ThemeCloudSyncPanel } from "./theme-cloud-sync-panel";
 import { ThemePreview } from "./theme-preview";
+import { ThemeTransferPanel } from "./theme-transfer-panel";
 import { useAppearanceRuntime } from "./appearance-runtime";
 import { useCustomThemesRuntime } from "./custom-themes-runtime";
 import {
@@ -301,6 +303,9 @@ export function ThemeStudio({ onConfirm }: { onConfirm: ConfirmAction }) {
           </div>
         </section>
       )}
+
+      <ThemeTransferPanel />
+      <ThemeCloudSyncPanel onConfirm={onConfirm} />
 
       <p className="mt-4 text-xs text-[var(--app-text-muted)]" role="status" aria-live="polite">{message}</p>
     </div>
