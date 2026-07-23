@@ -14,6 +14,7 @@
 import { useMemo, useState } from "react";
 import Image from "next/image";
 import { X, Save, Layers, FolderPlus, FolderInput, FolderMinus, Pencil } from "lucide-react";
+import { generateManualGroupId, type ManualGroupAction } from "@/features/library/domain/group-types";
 import { MediaItem, SeriesRelationType } from "@/lib/types";
 
 const RELATION_LABELS: Record<SeriesRelationType, string> = {
@@ -47,34 +48,6 @@ const RELATION_OPTIONS: SeriesRelationType[] = [
   "prequel",
   "other",
 ];
-
-export type ManualGroupAction =
-  | {
-      kind: "create";
-      itemId: string;
-      groupTitle: string;
-      relationType?: SeriesRelationType;
-      seasonNumber?: number;
-      orderIndex?: number;
-    }
-  | {
-      kind: "join";
-      itemId: string;
-      groupId: string;
-      groupTitle: string;
-      relationType?: SeriesRelationType;
-      seasonNumber?: number;
-      orderIndex?: number;
-    }
-  | {
-      kind: "leave";
-      itemId: string;
-    }
-  | {
-      kind: "rename";
-      groupId: string;
-      newTitle: string;
-    };
 
 interface ManualGroupModalProps {
   isOpen: boolean;
@@ -112,14 +85,6 @@ function buildGroupOptions(mediaList: MediaItem[]): GroupOption[] {
   return Array.from(map.values()).sort((a, b) =>
     a.title.localeCompare(b.title, "tr")
   );
-}
-
-function generateManualGroupId(): string {
-  const rand =
-    typeof crypto !== "undefined" && "randomUUID" in crypto
-      ? crypto.randomUUID().slice(0, 8)
-      : Math.random().toString(36).slice(2, 10);
-  return `manual-series:${Date.now().toString(36)}-${rand}`;
 }
 
 export default function ManualGroupModal({
@@ -517,3 +482,4 @@ function SeriesFields({
 }
 
 export { generateManualGroupId };
+export type { ManualGroupAction };

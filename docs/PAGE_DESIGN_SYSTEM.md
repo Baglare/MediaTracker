@@ -99,4 +99,4 @@ Heading hiyerarşisi, breadcrumb nav, `role=tablist/tab`, `aria-selected`, `aria
 
 ## Sonraki migration planı
 
-P3.1 yalnız Feed, Öneriler, Bildirimler, Kullanıcı Ara, İlerleme ve profil alt modüllerini ortak dile taşır. Dashboard `app/page.tsx`, büyük Kütüphane dönüşümü, chart/layout kişiselleştirmesi ve widget düzenleme daha sonraki, ayrı kapsamlı turlardır.
+P3.1 Feed, Öneriler, Bildirimler, Kullanıcı Ara, İlerleme ve profil alt modüllerini ortak dile taşıdı. P4, Dashboard/Kütüphane composition ve domain sınırlarını görsel redesign yapmadan ayırdı. Feature veri akışı, selector, command ve lazy-loading kuralları için [FRONTEND_ARCHITECTURE.md](./FRONTEND_ARCHITECTURE.md) belgesine bakın. Chart/layout kişiselleştirmesi ve widget düzenleme sonraki ayrı turlardır.

@@ -185,13 +185,13 @@ Tarayıcı smoke sırasında `/feed → /profile`, `/recommendations → /profil
 - **P2 Birleşik profil ve ProfileHero:** Tamamlandı; canonical shell, `/profile`, ortak hero, cloud presentation ve local fallback/cache bağlandı.
 - **P3.1 Ortak sayfa tasarım sistemi:** Tamamlandı; sosyal feature sayfaları, progression ve profil alt modülleri ortak hero/section/stat/filter/state diline geçirildi.
 - **P3 Grafik ve düzen kişiselleştirmesi:** Chart palette ve layout seçeneklerini UI/persistence ile bağlama.
-- **P4 Ana sayfa ve kütüphane refactor'ı:** Dashboard ile kütüphaneyi ayrı, kontrollü turlarda ortak primitive'lere taşıma.
+- **P4 Ana sayfa ve kütüphane refactor'ı:** Tamamlandı; composition root, feature sınırları, saf library selector'ları, command/modal orchestration ve lazy tab sınırları [FRONTEND_ARCHITECTURE.md](./FRONTEND_ARCHITECTURE.md) içinde tanımlandı.
 
 ## Bilinçli sınırlamalar
 
 - Client preference modellerinde ham CSS ve sınırsız renk seçici yoktur.
 - P1'de tema seçimi aktiftir; bütün `zinc` sınıfları mekanik olarak dönüştürülmemiştir.
 - P2 migration uygulanmış kabul edilir; P3.0 transform migration'ı için remote Supabase işlemi veya migration apply yapılmamıştır.
-- Dashboard'un diğer internal sekmeleri route'a taşınmamış, kütüphane/dashboard genel refactor'ı yapılmamıştır.
+- Dashboard internal sekmeleri route'a taşınmamıştır; P4 yalnız mevcut `/?tab=` sözleşmesini koruyarak feature sınırlarını ayırmıştır.
 - Public profil modüllerinin veri/visibility davranışı yeniden tasarlanmamış; P3.1 yalnız ortak surface ve state dilini uygular.
 - Chart palette, density/effects ve dashboard layout UI hâlâ P3 kapsamındadır.
