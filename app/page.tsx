@@ -19,6 +19,7 @@ import { useMediaCommands } from "@/features/library/hooks/use-media-commands";
 import { useDiscoveryController } from "@/features/discovery/hooks/use-discovery-controller";
 import { useAuth } from "@/hooks/use-auth";
 import { useMediaLibrary } from "@/hooks/use-media-library";
+import { useLayoutPreferences } from "@/hooks/use-layout-preferences";
 import { usePersistedPreferences } from "@/hooks/use-persisted-preferences";
 import { useXpProgression } from "@/hooks/use-xp-progression";
 import { calculateDashboardStats } from "@/lib/dashboard-stats";
@@ -64,6 +65,7 @@ export default function HomePage() {
   const { user, configured } = useAuth();
   const library = useMediaLibrary(user?.id ?? null);
   const preferences = usePersistedPreferences();
+  const layout = useLayoutPreferences();
   const [searchQuery, setSearchQuery] = useState("");
   const [discoverPrefill, setDiscoverPrefill] = useState<{
     query: string;
@@ -186,6 +188,8 @@ export default function HomePage() {
           onToggleFavorite={commands.mutations.toggleFavorite}
           onDeleteMedia={commands.requestDelete}
           onUpdateRating={commands.mutations.updateRating}
+          widgetPreferences={layout.preferences.dashboard}
+          isLayoutHydrated={layout.isHydrated}
         />
       );
     }
@@ -265,8 +269,7 @@ export default function HomePage() {
           configured={configured}
           mediaList={library.mediaList}
           progressLogs={library.progressLogs}
-          rightRailPreferences={preferences.rightRailPreferences}
-          onRightRailPreferencesChange={preferences.setRightRailPreferences}
+          layout={layout}
           onReplaceData={library.importMedia}
           onReset={commands.requestReset}
           onConfirm={commands.openConfirmation}
@@ -292,7 +295,8 @@ export default function HomePage() {
           mediaList={library.mediaList}
           progressLogs={library.progressLogs}
           stats={dashboardStats}
-          preferences={preferences.rightRailPreferences}
+          preferences={layout.preferences.rightRail}
+          isLayoutHydrated={layout.isHydrated}
           progression={progression}
           themeFilter={preferences.themeFilter}
           onOpenDetail={commands.openDetail}

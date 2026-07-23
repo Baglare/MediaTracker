@@ -87,9 +87,13 @@ Feature component'leri tema kimliği switch'i taşımaz; `--app-*` ve `--w-*` se
 
 P4, RGB/HEX seçici, custom theme UI, Tozpembe veya Orman teması eklemez. P6 kontrast denetimi registry/token katmanına eklenebilir.
 
-## P5 layout personalization hazırlığı
+## P5A widget composition ve görünürlük
 
-Dashboard için `DASHBOARD_WIDGET_IDS` sabit kimlikleri tanımlanmıştır. Feature sınırları Dashboard, Right Rail ve library presentation'ı birbirinden ayırır. P5 görünürlük/sıra/density/effects tercihleri bu kimlikler ve dar adapter'lar üzerinden uygulanabilir; P4 herhangi bir reorder UI veya yeni preference alanı açmaz.
+Dashboard'un gerçek sunum bölümleri ve Right Rail widget'ları `lib/personalization/widget-registry.ts` içindeki stable domain kimlikleriyle tanımlanır. `useLayoutPreferences` yalnız versioned layout hydration, visibility, reorder ve reset işlemlerini yönetir; medya selector'ı, Supabase, tema, chart palette, density veya effects bilmez. `app/page.tsx` dar preference listelerini ilgili feature'a geçirir; component render eşlemesi registry'nin domain metadata'sına gömülmez.
+
+Dashboard görünür widget'ları ortak responsive grid içinde preference sırasıyla yerleştirir; feature config'teki desktop span bilgisi persistence alanı değildir. Sağ panel aynı modelin `rightRail` yüzeyini tüketir ve dünya scope selector'larını korur. Görünür widget kalmazsa kontrollü özelleştirme durumu gösterilir. Eski Right Rail storage modeli yalnız migration adapter'ı olarak kalır; yeni UI ikinci bir preference kaynağı yazmaz.
+
+Bu sınır P5B'deki chart/density/effects alanlarının ve P6'daki custom theme registry'sinin layout sırası ile birleşmesini engeller. Widget kimlikleri tema adı veya component export adı değildir.
 
 ## Test stratejisi
 
@@ -105,7 +109,7 @@ Statik mimari kontroller runtime performans ölçümü veya tarayıcı görsel r
 - Internal tab URL'leri route'a çevrilmemiştir.
 - `useMediaLibrary` mevcut local-first domain controller'ı olarak korunmuştur; yeni repository/command bus/factory sistemi kurulmamıştır.
 - Dashboard ve MediaCard görsel olarak yeniden tasarlanmamıştır.
-- Chart palette, widget reorder, density/effects ve custom theme UI kapsam dışıdır.
+- Chart palette, density/effects ve custom theme UI kapsam dışıdır; widget görünürlük ve sırası P5A ile eklenmiştir.
 - Bu tur DB migration, dependency, remote işlem veya cloud veri modeli değişikliği içermez.
 
 İlgili belgeler: [PAGE_DESIGN_SYSTEM.md](./PAGE_DESIGN_SYSTEM.md) ve [PERSONALIZATION_ARCHITECTURE.md](./PERSONALIZATION_ARCHITECTURE.md).

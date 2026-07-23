@@ -13,6 +13,10 @@ import {
 } from "lucide-react";
 import MediaCard from "./media-card";
 import { DashboardStats } from "@/lib/dashboard-stats";
+import type {
+  DashboardWidgetId,
+  LayoutWidgetPreference,
+} from "@/lib/personalization/layout-types";
 import {
   formatProgressLogAction,
   formatProgressLogDateTime,
@@ -32,6 +36,7 @@ interface EnhancedDashboardProps {
   onToggleFavorite: (id: string) => void;
   onDeleteMedia: (id: string) => void;
   onUpdateRating?: (id: string, rating: number | null) => void;
+  widgetPreferences: Array<LayoutWidgetPreference<DashboardWidgetId>>;
 }
 
 type SegmentTone = "amber" | "emerald" | "violet" | "sky" | "rose" | "zinc";
@@ -169,6 +174,7 @@ export default function EnhancedDashboard({
   onToggleFavorite,
   onDeleteMedia,
   onUpdateRating,
+  widgetPreferences,
 }: EnhancedDashboardProps) {
   if (mediaList.length === 0) return <EmptyDashboard />;
 
@@ -256,10 +262,23 @@ export default function EnhancedDashboard({
       onUpdateRating={onUpdateRating}
     />
   );
+  const widgetPreference = new Map(
+    widgetPreferences.map((preference) => [preference.id, preference]),
+  );
+  const isWidgetVisible = (id: DashboardWidgetId) =>
+    widgetPreference.get(id)?.visible ?? false;
+  const widgetOrder = (id: DashboardWidgetId) => ({
+    order: widgetPreference.get(id)?.order ?? Number.MAX_SAFE_INTEGER,
+  });
 
   return (
-    <div className="space-y-8 min-w-0">
-      <section className="rounded-2xl border border-zinc-800/60 bg-zinc-900/30 overflow-hidden">
+    <div className="grid min-w-0 grid-cols-1 gap-8 xl:grid-cols-3">
+      {isWidgetVisible("summary") && (
+      <section
+        className="overflow-hidden rounded-2xl border border-zinc-800/60 bg-zinc-900/30 xl:col-span-3"
+        style={widgetOrder("summary")}
+        data-dashboard-widget="summary"
+      >
         <div className="p-5 sm:p-6 lg:p-7">
           <div className="grid grid-cols-1 xl:grid-cols-[1.2fr_0.8fr] gap-6">
             <div className="min-w-0">
@@ -303,11 +322,16 @@ export default function EnhancedDashboard({
           </div>
         </div>
       </section>
+      )}
 
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(300px,0.45fr)] 2xl:grid-cols-[minmax(0,1.45fr)_minmax(360px,0.55fr)] gap-8">
-        <div className="space-y-8 min-w-0">
-          {startedOpenItems.length > 0 && (
-            <section className="space-y-3">
+      <div className="contents">
+        <div className="contents">
+          {isWidgetVisible("continue") && startedOpenItems.length > 0 && (
+            <section
+              className="space-y-3 xl:col-span-2"
+              style={widgetOrder("continue")}
+              data-dashboard-widget="continue"
+            >
               <SectionTitle icon={PlayCircle} title="Devam Ettiklerin" count={startedOpenItems.length} hint="Son aktiviteye göre" />
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
                 {startedOpenItems.slice(0, 6).map((item) => renderCard(item, `continue-${item.id}`))}
@@ -315,8 +339,12 @@ export default function EnhancedDashboard({
             </section>
           )}
 
-          {nearCompletion.length > 0 && (
-            <section className="space-y-3">
+          {isWidgetVisible("near-completion") && nearCompletion.length > 0 && (
+            <section
+              className="space-y-3 xl:col-span-2"
+              style={widgetOrder("near-completion")}
+              data-dashboard-widget="near-completion"
+            >
               <SectionTitle icon={CheckCircle} title="Bitirmeye Yakın" count={nearCompletion.length} hint="%75 ve üzeri" />
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
                 {nearCompletion.slice(0, 6).map((item) => renderCard(item, `near-${item.id}`))}
@@ -324,8 +352,12 @@ export default function EnhancedDashboard({
             </section>
           )}
 
-          {highRated.length > 0 && (
-            <section className="space-y-3">
+          {isWidgetVisible("high-rated") && highRated.length > 0 && (
+            <section
+              className="space-y-3 xl:col-span-2"
+              style={widgetOrder("high-rated")}
+              data-dashboard-widget="high-rated"
+            >
               <SectionTitle icon={Star} title="Puanı Yüksekler" count={highRated.length} hint="En yüksek puanlar" />
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
                 {highRated.map((item) => renderCard(item, `rated-${item.id}`))}
@@ -334,8 +366,13 @@ export default function EnhancedDashboard({
           )}
         </div>
 
-        <div className="space-y-6 min-w-0">
-          <section className="rounded-2xl border border-zinc-800/60 bg-zinc-900/30 p-4">
+        <div className="contents">
+          {isWidgetVisible("recent-activity") && (
+          <section
+            className="rounded-2xl border border-zinc-800/60 bg-zinc-900/30 p-4 xl:col-span-1"
+            style={widgetOrder("recent-activity")}
+            data-dashboard-widget="recent-activity"
+          >
             <SectionTitle icon={Activity} title="Son Aktiviteler" count={recentLogs.length} />
             {recentLogs.length === 0 ? (
               <p className="mt-4 text-sm text-zinc-500">Henüz aktivite kaydı yok.</p>
@@ -361,8 +398,14 @@ export default function EnhancedDashboard({
               </div>
             )}
           </section>
+          )}
 
-          <section className="rounded-2xl border border-zinc-800/60 bg-zinc-900/30 p-4">
+          {isWidgetVisible("world-distribution") && (
+          <section
+            className="rounded-2xl border border-zinc-800/60 bg-zinc-900/30 p-4 xl:col-span-1"
+            style={widgetOrder("world-distribution")}
+            data-dashboard-widget="world-distribution"
+          >
             <SectionTitle icon={BookOpen} title="Dünya Dağılımı" count={stats.totalItems} />
             <div className="mt-4 space-y-3">
               <MiniBar label="Doğu" value={worldCounts.east} total={stats.totalItems} tone="rose" />
@@ -373,8 +416,14 @@ export default function EnhancedDashboard({
               )}
             </div>
           </section>
+          )}
 
-          <section className="rounded-2xl border border-zinc-800/60 bg-zinc-900/30 p-4">
+          {isWidgetVisible("status-distribution") && (
+          <section
+            className="rounded-2xl border border-zinc-800/60 bg-zinc-900/30 p-4 xl:col-span-1"
+            style={widgetOrder("status-distribution")}
+            data-dashboard-widget="status-distribution"
+          >
             <SectionTitle icon={Clock} title="Durum Dağılımı" count={stats.totalItems} />
             <div className="mt-4 space-y-3">
               {statusRows.map((row) => (
@@ -382,9 +431,14 @@ export default function EnhancedDashboard({
               ))}
             </div>
           </section>
+          )}
 
-          {favoritePick.length > 0 && (
-            <section className="space-y-3">
+          {isWidgetVisible("favorite-showcase") && favoritePick.length > 0 && (
+            <section
+              className="space-y-3 xl:col-span-1"
+              style={widgetOrder("favorite-showcase")}
+              data-dashboard-widget="favorite-showcase"
+            >
               <SectionTitle icon={Heart} title="Favorilerden Seçki" count={favoritePick.length} />
               <div className="grid grid-cols-1 gap-4 items-start">
                 {favoritePick.map((item) => renderCard(item, `favorite-${item.id}`))}

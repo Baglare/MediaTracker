@@ -9,17 +9,18 @@ import CloudSyncStatusCard from "@/components/cloud-sync-status-card";
 import DataManagementPanel from "@/components/data-management-panel";
 import PageHeader from "@/components/page-header";
 import AppearanceSettingsCard from "@/components/personalization/appearance-settings-card";
-import RightRailSettingsCard from "@/components/right-rail-settings-card";
-import type { RightRailPreferences } from "@/lib/right-rail-preferences";
+import LayoutSettingsCard from "@/components/personalization/layout-settings-card";
+import type { useLayoutPreferences } from "@/hooks/use-layout-preferences";
 import type { MediaItem, ProgressLog } from "@/lib/types";
+
+type LayoutController = ReturnType<typeof useLayoutPreferences>;
 
 interface SettingsFeatureProps {
   user: User | null;
   configured: boolean;
   mediaList: MediaItem[];
   progressLogs: ProgressLog[];
-  rightRailPreferences: RightRailPreferences;
-  onRightRailPreferencesChange: (preferences: RightRailPreferences) => void;
+  layout: LayoutController;
   onReplaceData: (items: MediaItem[], logs: ProgressLog[]) => void;
   onReset: () => void;
   onConfirm: (title: string, message: string, onOk: () => void) => void;
@@ -30,8 +31,7 @@ export default function SettingsFeature({
   configured,
   mediaList,
   progressLogs,
-  rightRailPreferences,
-  onRightRailPreferencesChange,
+  layout,
   onReplaceData,
   onReset,
   onConfirm,
@@ -45,13 +45,23 @@ export default function SettingsFeature({
       />
       <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2 lg:gap-5">
         <AppearanceSettingsCard />
+        <LayoutSettingsCard
+          preferences={layout.preferences}
+          isHydrated={layout.isHydrated}
+          statusMessage={layout.statusMessage}
+          onVisibilityChange={layout.updateVisibility}
+          onMove={layout.moveWidget}
+          onResetDashboard={layout.resetDashboard}
+          onResetRightRail={layout.resetRightRail}
+          onResetAll={() => onConfirm(
+            "Tüm düzeni sıfırla",
+            "Dashboard ve sağ panel görünürlüğü ile sırası varsayılana dönecek.",
+            layout.resetAll,
+          )}
+        />
         <div className="space-y-4 lg:space-y-5">
           <AuthPanel />
           <CloudSyncStatusCard />
-          <RightRailSettingsCard
-            preferences={rightRailPreferences}
-            onChange={onRightRailPreferencesChange}
-          />
         </div>
         <div className="space-y-4 lg:space-y-5">
           <CloudDataStatusCard

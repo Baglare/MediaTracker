@@ -10,12 +10,6 @@ import {
   type ProfilePreferences,
 } from "@/lib/profile-preferences";
 import {
-  DEFAULT_RIGHT_RAIL_PREFERENCES,
-  loadRightRailPreferences,
-  saveRightRailPreferences,
-  type RightRailPreferences,
-} from "@/lib/right-rail-preferences";
-import {
   DEFAULT_UI_PREFERENCES,
   loadUIPreferences,
   saveUIPreferences,
@@ -30,12 +24,8 @@ export type WorldTransitionState = {
 export function usePersistedPreferences() {
   const [uiPrefsLoaded, setUiPrefsLoaded] = useState(false);
   const [profilePrefsLoaded, setProfilePrefsLoaded] = useState(false);
-  const [rightRailPrefsLoaded, setRightRailPrefsLoaded] = useState(false);
   const [profilePreferences, setProfilePreferences] = useState<ProfilePreferences>(
     DEFAULT_PROFILE_PREFERENCES
-  );
-  const [rightRailPreferences, setRightRailPreferences] = useState<RightRailPreferences>(
-    DEFAULT_RIGHT_RAIL_PREFERENCES
   );
   const [typeFilter, setTypeFilter] = useState<MediaType | "all">(
     DEFAULT_UI_PREFERENCES.typeFilter
@@ -108,12 +98,6 @@ export function usePersistedPreferences() {
   }, []);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-only localStorage hydration
-    setRightRailPreferences(loadRightRailPreferences());
-    setRightRailPrefsLoaded(true);
-  }, []);
-
-  useEffect(() => {
     if (!uiPrefsLoaded) return;
     saveUIPreferences({
       themeFilter,
@@ -141,15 +125,9 @@ export function usePersistedPreferences() {
     if (profilePrefsLoaded) saveProfilePreferences(profilePreferences);
   }, [profilePrefsLoaded, profilePreferences]);
 
-  useEffect(() => {
-    if (rightRailPrefsLoaded) saveRightRailPreferences(rightRailPreferences);
-  }, [rightRailPrefsLoaded, rightRailPreferences]);
-
   return {
     profilePreferences,
     setProfilePreferences,
-    rightRailPreferences,
-    setRightRailPreferences,
     typeFilter,
     setTypeFilter,
     statusFilter,

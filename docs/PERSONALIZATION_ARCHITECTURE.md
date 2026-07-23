@@ -52,6 +52,7 @@ Chart palette tamamlanan, devam eden, planlanan, duraklatılan ve bırakılan du
 | Alan | Sahiplik | Görünürlük | Fallback |
 | --- | --- | --- | --- |
 | App appearance | Local-only `localStorage` | Private/device | Obsidyen default |
+| Dashboard/Right Rail layout | Local-only `localStorage` | Private/device | Registry sırası ve görünürlüğü |
 | Kütüphane filtreleri | Local-only mevcut UI preferences | Private/device | Mevcut filtre defaultları |
 | Yerel profil/cache | Local-only mevcut profile preferences | Private/device | Girişsiz kullanım, offline/eksik cloud fallback |
 | Birleşik profil identity | Cloud-backed ana kaynak | Public/protected/personal politikasına bağlı | Eksik alanda local cache, auth metadata, güvenli default |
@@ -179,12 +180,23 @@ Cloud veri aksiyonları ve durum filtreleri için sınırlı `--app-action-succe
 
 Tarayıcı smoke sırasında `/feed → /profile`, `/recommendations → /profile`, `/profile` yenileme ve doğrudan edit modu; ardından banner/avatar drag, zoom, reset ve self/public/sidebar tutarlılığı kontrol edilmelidir. Remote migration uygulanmadan cloud transform save testi tamamlanamaz. Bu tur ortak P3 sayfa tasarım sistemi, feed/people/progression redesign'ı veya chart/layout kişiselleştirmesi değildir.
 
+## P5A düzen ve panel kişiselleştirmesi
+
+`LayoutPreferences` Dashboard ve Right Rail için stable widget kimliği, görünürlük ve normalize edilmiş sıra taşır. Model `version: 1` ile `mediaTracker:layoutPreferences:v1` anahtarında local-first saklanır. Runtime normalization bilinmeyen ve yinelenen kimlikleri atar, eksik yeni widget'ları registry varsayılanından tamamlar, sıra değerlerini kesintisiz hâle getirir ve zorunlu Dashboard özetinin gizlenmesine izin vermez. Giriş durumu veya tema seçimi bu modele dahil değildir.
+
+Dashboard ve Right Rail metadata'sının source of truth'u `lib/personalization/widget-registry.ts` dosyasıdır. Registry label, açıklama, varsayılan sıra/görünürlük, zorunluluk, yüzey ve sunum span metadata'sı taşır; React state, render fonksiyonu, network veya tema kimliği taşımaz. Component eşlemesi presentation katmanında kalır. Görünmez Dashboard bölümleri ve Right Rail widget'ları render listesine girmez; preference hydration sırasında varsayılan widget'ların kısa süre görünüp kaybolması yerine sınırlı bir düzen loading durumu gösterilir.
+
+Eski `media-tracker-right-rail-preferences` anahtarı yalnız yeni P5A kaydı yoksa bir defalık backward-compatible okuma kaynağıdır. Yeni değişiklikler tek P5A anahtarına yazılır; eski veya başka preference anahtarları silinmez. Merkezi Ayarlar içindeki **Düzen ve Paneller** alanı ile Dashboard/Right Rail bağlamsal bağlantıları aynı hook ve modele gider. Yukarı, aşağı, en üste ve en alta kontrolleri klavye ile çalışır; görünürlük label'lı checkbox ile, sıra değişimi `aria-live` mesajıyla açıklanır. Sağ panelin mobilde görünmediği UI içinde belirtilir.
+
+P5A, chart palette, density, effects veya varsayılan açılış tabını layout modeline eklemez; bunlar P5B'nin ayrı preference alanlarıdır. RGB/HEX, custom theme, Tozpembe/Orman veya tema import/export da layout modelinden bağımsız P6 registry/token katmanında kalır.
+
 ## Gelecek aşamalar
 
 - **P1 Tema motoru:** Tamamlandı; root runtime, cookie mirror, aktif tema/accent UI ve shared semantic uyumluluk eklendi.
 - **P2 Birleşik profil ve ProfileHero:** Tamamlandı; canonical shell, `/profile`, ortak hero, cloud presentation ve local fallback/cache bağlandı.
 - **P3.1 Ortak sayfa tasarım sistemi:** Tamamlandı; sosyal feature sayfaları, progression ve profil alt modülleri ortak hero/section/stat/filter/state diline geçirildi.
 - **P3 Grafik ve düzen kişiselleştirmesi:** Chart palette ve layout seçeneklerini UI/persistence ile bağlama.
+- **P5A Dashboard ve panel düzeni:** Tamamlandı; stable widget registry, local-first görünürlük/sıra ve erişilebilir Ayarlar editörü bağlandı.
 - **P4 Ana sayfa ve kütüphane refactor'ı:** Tamamlandı; composition root, feature sınırları, saf library selector'ları, command/modal orchestration ve lazy tab sınırları [FRONTEND_ARCHITECTURE.md](./FRONTEND_ARCHITECTURE.md) içinde tanımlandı.
 
 ## Bilinçli sınırlamalar
@@ -194,4 +206,4 @@ Tarayıcı smoke sırasında `/feed → /profile`, `/recommendations → /profil
 - P2 migration uygulanmış kabul edilir; P3.0 transform migration'ı için remote Supabase işlemi veya migration apply yapılmamıştır.
 - Dashboard internal sekmeleri route'a taşınmamıştır; P4 yalnız mevcut `/?tab=` sözleşmesini koruyarak feature sınırlarını ayırmıştır.
 - Public profil modüllerinin veri/visibility davranışı yeniden tasarlanmamış; P3.1 yalnız ortak surface ve state dilini uygular.
-- Chart palette, density/effects ve dashboard layout UI hâlâ P3 kapsamındadır.
+- Chart palette, density/effects ve varsayılan açılış alanı P5B; custom RGB/tema sistemi P6 kapsamındadır.

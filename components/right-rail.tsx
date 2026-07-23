@@ -21,6 +21,7 @@
 //
 // xl (≥1280px) altında gizli; main column daha rahat nefes alsın.
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import {
   Target,
@@ -36,6 +37,7 @@ import {
   PauseCircle,
   NotebookPen,
   Trophy,
+  SlidersHorizontal,
 } from "lucide-react";
 import { MediaItem, ProgressLog, ProgressLogAction, withMediaClassification } from "@/lib/types";
 import { DashboardStats } from "@/lib/dashboard-stats";
@@ -47,9 +49,10 @@ import {
 } from "@/lib/world-scope";
 import {
   RIGHT_RAIL_WIDGET_IDS,
-  type RightRailPreferences,
   type RightRailWidgetId,
-} from "@/lib/right-rail-preferences";
+} from "@/lib/personalization/layout-types";
+import type { LayoutWidgetPreference } from "@/lib/personalization/layout-types";
+import { visibleWidgetIds } from "@/lib/personalization/layout-preferences";
 import {
   STANDARD_CHART_STATUS_PRESENTATION,
 } from "@/lib/personalization/chart-palette-registry";
@@ -68,7 +71,8 @@ interface RightRailProps {
   mediaList: MediaItem[];
   progressLogs: ProgressLog[];
   stats: DashboardStats;
-  preferences: RightRailPreferences;
+  preferences: Array<LayoutWidgetPreference<RightRailWidgetId>>;
+  isLayoutHydrated: boolean;
   progression: UserProgression;
   // R15: Aktif Dünya. Bu component için tek scope sinyali; type/status/search
   // filtrelerine bilinçli olarak duyarsızız.
@@ -1078,6 +1082,7 @@ export default function RightRail({
   progressLogs,
   stats,
   preferences,
+  isLayoutHydrated,
   progression,
   themeFilter,
   onOpenDetail,
@@ -1188,9 +1193,8 @@ export default function RightRail({
     ),
   };
 
-  const visibleWidgetIds = preferences.order.filter(
-    (id): id is RightRailWidgetId =>
-      RIGHT_RAIL_WIDGET_IDS.includes(id) && preferences.enabled[id],
+  const visibleIds = visibleWidgetIds(preferences).filter((id) =>
+    RIGHT_RAIL_WIDGET_IDS.includes(id),
   );
 
   return (
@@ -1198,11 +1202,42 @@ export default function RightRail({
       className="app-panel hidden xl:flex sticky top-0 h-screen w-[18rem] shrink-0 flex-col gap-3 border-l px-4 py-5 overflow-y-auto shadow-none"
       aria-label="Sağ panel"
     >
-      <div className="text-[10px] font-semibold tracking-[0.16em] text-zinc-600 uppercase px-1">
-        Bakış · {WORLD_LABEL[themeFilter]}
+      <div className="flex items-center justify-between gap-2 px-1">
+        <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--app-text-muted)]">
+          Bakış · {WORLD_LABEL[themeFilter]}
+        </div>
+        <Link
+          href="/?tab=settings#layout"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[var(--app-text-muted)] transition-colors hover:bg-[var(--app-hover)] hover:text-[var(--app-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-focus)]"
+          aria-label="Sağ panel düzenini özelleştir"
+          title="Düzeni özelleştir"
+        >
+          <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+        </Link>
       </div>
 
-      {visibleWidgetIds.map((id) => (
+      {!isLayoutHydrated && (
+        <div className="app-card rounded-xl border p-4 text-xs text-[var(--app-text-muted)]" aria-busy="true">
+          Panel düzeni yükleniyor...
+        </div>
+      )}
+
+      {isLayoutHydrated && visibleIds.length === 0 && (
+        <div className="app-card rounded-xl border p-4">
+          <p className="text-sm font-medium text-[var(--app-text-primary)]">Sağ panel boş</p>
+          <p className="mt-1 text-xs leading-relaxed text-[var(--app-text-muted)]">
+            İstersen Ayarlar içinden yardımcı panelleri tekrar gösterebilirsin.
+          </p>
+          <Link
+            href="/?tab=settings#layout"
+            className="mt-3 inline-flex min-h-9 items-center rounded-lg border border-[var(--app-border)] px-3 text-xs font-medium text-[var(--app-text-secondary)] hover:bg-[var(--app-hover)] hover:text-[var(--app-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-focus)]"
+          >
+            Panelleri düzenle
+          </Link>
+        </div>
+      )}
+
+      {isLayoutHydrated && visibleIds.map((id) => (
         <div key={id}>{widgetRenderers[id]()}</div>
       ))}
     </aside>
