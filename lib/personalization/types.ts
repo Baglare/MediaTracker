@@ -1,3 +1,5 @@
+import type { ImageTransform } from "./image-transform";
+
 export type BaseThemeId = "system" | "obsidian" | "porcelain" | "ocean";
 
 export type ResolvedBaseThemeId = Exclude<BaseThemeId, "system">;
@@ -104,6 +106,8 @@ export interface ProfilePresentationPreferences {
   avatarFrame: ProfileAvatarFrame;
   surfaceStyle: ProfileSurfaceStyle;
   motifIntensity: ProfileMotifIntensity;
+  bannerTransform: ImageTransform;
+  avatarTransform: ImageTransform;
 }
 
 export type ChartPaletteId =

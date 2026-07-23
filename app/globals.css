@@ -144,6 +144,18 @@
   --app-input-bg: #09090b;
   --app-hover: #27272a;
   --app-selected: rgba(139, 92, 246, 0.16);
+  --app-action-success-text: #6ee7b7;
+  --app-action-success-bg: rgba(16, 185, 129, 0.12);
+  --app-action-success-border: rgba(52, 211, 153, 0.38);
+  --app-action-accent-text: #c4b5fd;
+  --app-action-accent-bg: rgba(139, 92, 246, 0.14);
+  --app-action-accent-border: rgba(167, 139, 250, 0.40);
+  --app-selected-text: #fafafa;
+  --app-selected-bg: rgba(139, 92, 246, 0.18);
+  --app-selected-border: rgba(167, 139, 250, 0.48);
+  --app-disabled-text: #a1a1aa;
+  --app-disabled-bg: #18181b;
+  --app-disabled-border: #3f3f46;
 }
 
 [data-theme="porcelain"] {
@@ -174,6 +186,18 @@
   --app-input-bg: #fafaf9;
   --app-hover: #e7e5e4;
   --app-selected: rgba(124, 58, 237, 0.12);
+  --app-action-success-text: #065f46;
+  --app-action-success-bg: rgba(5, 150, 105, 0.12);
+  --app-action-success-border: #6ee7b7;
+  --app-action-accent-text: #5b21b6;
+  --app-action-accent-bg: rgba(124, 58, 237, 0.10);
+  --app-action-accent-border: #a78bfa;
+  --app-selected-text: #4c1d95;
+  --app-selected-bg: #ede9fe;
+  --app-selected-border: #8b5cf6;
+  --app-disabled-text: #57534e;
+  --app-disabled-bg: #e7e5e4;
+  --app-disabled-border: #c4b8b0;
 
   /* Mevcut zinc utility'lerini açık temada semantik role eşle. */
   --color-zinc-950: var(--app-bg);
@@ -234,6 +258,18 @@
   --app-input-bg: #071827;
   --app-hover: #10263d;
   --app-selected: rgba(34, 211, 238, 0.14);
+  --app-action-success-text: #99f6e4;
+  --app-action-success-bg: rgba(45, 212, 191, 0.12);
+  --app-action-success-border: rgba(94, 234, 212, 0.38);
+  --app-action-accent-text: #bae6fd;
+  --app-action-accent-bg: rgba(14, 165, 233, 0.14);
+  --app-action-accent-border: rgba(56, 189, 248, 0.42);
+  --app-selected-text: #ecfeff;
+  --app-selected-bg: rgba(34, 211, 238, 0.18);
+  --app-selected-border: rgba(103, 232, 249, 0.50);
+  --app-disabled-text: #7dd3fc;
+  --app-disabled-bg: #0b1b2d;
+  --app-disabled-border: #164e63;
 
   --color-zinc-950: var(--app-bg);
   --color-zinc-900: var(--app-surface-1);

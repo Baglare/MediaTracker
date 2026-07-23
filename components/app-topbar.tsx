@@ -11,6 +11,7 @@ import {
 } from "@/components/app-shell/app-navigation";
 import { NotificationBadge } from "@/components/social/notification-badge";
 import type { ProfilePreferences } from "@/lib/profile-preferences";
+import type { ImageTransform } from "@/lib/personalization/image-transform";
 import AppTabs from "./app-tabs";
 import CloudModeBadge from "./cloud-mode-badge";
 import { ProfileAvatar } from "./sidebar-profile-card";
@@ -21,15 +22,16 @@ interface AppTopbarProps {
   profileName: string;
   profilePreferences: ProfilePreferences;
   socialAvatarUrl?: string;
+  avatarTransform?: ImageTransform;
 }
 
-export default function AppTopbar({ activeNavigationId, onChangeTab, profileName, profilePreferences, socialAvatarUrl }: AppTopbarProps) {
+export default function AppTopbar({ activeNavigationId, onChangeTab, profileName, profilePreferences, socialAvatarUrl, avatarTransform }: AppTopbarProps) {
   const activeLabel = getAppNavigationItem(activeNavigationId)?.label ?? "MediaTracker";
   return (
     <header className="sticky top-0 z-40 border-b border-[var(--app-border)] bg-[color-mix(in_srgb,var(--app-bg)_82%,transparent)] backdrop-blur-md" role="banner">
       <div className="flex h-14 items-center gap-4 px-4 sm:px-6 lg:px-6">
         <Link href="/profile" className="flex min-w-0 items-center gap-2 rounded-lg text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-focus)] lg:hidden" aria-label="Profili aç">
-          <ProfileAvatar profileName={profileName} preferences={profilePreferences} socialAvatarUrl={socialAvatarUrl} size="sm" />
+          <ProfileAvatar profileName={profileName} preferences={profilePreferences} socialAvatarUrl={socialAvatarUrl} imageTransform={avatarTransform} size="sm" />
           <Image src="/brand/media-tracker-mark.svg" alt="" aria-hidden="true" width={24} height={24} className="h-6 w-6 shrink-0 object-contain" />
           <div className="min-w-0">
             <span className="block truncate text-sm font-semibold tracking-tight text-[var(--app-text-primary)]">MediaTracker</span>

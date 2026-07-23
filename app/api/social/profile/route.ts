@@ -61,6 +61,12 @@ export async function POST(request: Request) {
       p_avatar_frame: profile.presentation.avatarFrame,
       p_surface_style: profile.presentation.surfaceStyle,
       p_motif_intensity: profile.presentation.motifIntensity,
+      p_banner_focal_x: profile.presentation.bannerTransform.focalX,
+      p_banner_focal_y: profile.presentation.bannerTransform.focalY,
+      p_banner_zoom: profile.presentation.bannerTransform.zoom,
+      p_avatar_focal_x: profile.presentation.avatarTransform.focalX,
+      p_avatar_focal_y: profile.presentation.avatarTransform.focalY,
+      p_avatar_zoom: profile.presentation.avatarTransform.zoom,
     });
     return error ? failure("Profil kaydedilemedi. Kullanıcı adı veya değişiklik süresi kuralını kontrol et.", 409) : NextResponse.json(data);
   }

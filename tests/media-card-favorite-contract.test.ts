@@ -16,7 +16,8 @@ describe("media card favorite ribbon", () => {
 
   it("uses the previous clipped bookmark notch instead of a square button", () => {
     expect(favorite).toContain("clipPath");
-    expect(favorite).toContain("polygon(0 0, 100% 0, 100% 100%, 50% 72%, 0 100%)");
+    expect(favorite).toContain("polygon(0 0, 100% 0, 100% 100%, 50% 58%, 0 100%)");
+    expect(favorite).toContain("drop-shadow-[0_2px_2px_var(--app-shadow)]");
     expect(favorite).not.toContain("rounded-lg border");
     expect(favorite).not.toContain("right-2 top-2");
   });

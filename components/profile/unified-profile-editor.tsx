@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 
 import ProfileSettingsCard from "@/components/profile-settings-card";
+import { ImagePositionEditor } from "@/components/profile/image-position-editor";
 import { ProfileHero } from "@/components/profile/profile-hero";
 import { SocialLayoutEditor } from "@/components/social/social-layout-editor";
 import { SocialPreferencesPanel } from "@/components/social/social-preferences-panel";
@@ -17,6 +18,7 @@ import {
   PROFILE_SURFACE_STYLES,
 } from "@/lib/personalization/validation";
 import { resolveProfileIdentity } from "@/lib/personalization/profile-identity";
+import { defaultImageTransform } from "@/lib/personalization/image-transform";
 import type { ProfilePresentationPreferences } from "@/lib/personalization/types";
 import type { ProfilePreferences } from "@/lib/profile-preferences";
 import { defaultProfileModules, mergeModuleDefaults } from "@/lib/social/grid";
@@ -110,7 +112,11 @@ export function UnifiedProfileEditor({ initialData, authConfigured, authenticate
       if (!response.ok) throw new Error(result.message ?? "Banner yüklenemedi.");
       if (!result.url) throw new Error("Banner kaydedildi ancak güvenli önizleme bağlantısı üretilemedi.");
       setData((current) => current.profile ? { ...current, profile: { ...current.profile, bannerUrl: result.url } } : current);
-      setForm((current) => updatePresentation(current, "bannerMode", "image"));
+      setForm((current) => updatePresentation(
+        updatePresentation(current, "bannerMode", "image"),
+        "bannerTransform",
+        defaultImageTransform(),
+      ));
       setError("");
       setMessage("Banner yüklendi ve görsel modu seçildi. Kalıcı görünüm için değişiklikleri kaydet.");
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Banner yüklenemedi."); }
@@ -136,7 +142,10 @@ export function UnifiedProfileEditor({ initialData, authConfigured, authenticate
         </div>
       </section>
 
-      <ProfileSettingsCard preferences={localPreferences} profileName={form.displayName || profileName} automaticTitle={selectedTitle} onChange={onLocalPreferencesChange} authenticated={authenticated} userId={userId} hasSocialProfile={cloudReady} socialAvatarUrl={data.profile?.avatarUrl ?? socialAvatarUrl} onSocialAvatarChanged={() => void refreshFromParent()} showIdentityFields={false} />
+      <ProfileSettingsCard preferences={localPreferences} profileName={form.displayName || profileName} automaticTitle={selectedTitle} onChange={onLocalPreferencesChange} authenticated={authenticated} userId={userId} hasSocialProfile={cloudReady} socialAvatarUrl={data.profile?.avatarUrl ?? socialAvatarUrl} avatarTransform={form.presentation.avatarTransform} onSocialAvatarChanged={(avatarUrl) => {
+        setData((current) => current.profile ? { ...current, profile: { ...current.profile, avatarUrl } } : current);
+        setForm((current) => ({ ...current, presentation: { ...current.presentation, avatarTransform: defaultImageTransform() } }));
+      }} showIdentityFields={false} />
 
       {!localOnly && <section className="app-panel rounded-2xl border p-4 sm:p-5">
         <h2 className="font-semibold">Profil sunumu</h2><p className="mt-1 text-xs text-[var(--app-text-muted)]">Palette yalnız ProfileHero ve profil modül vurgularını etkiler; uygulama temasını değiştirmez.</p>
@@ -150,6 +159,12 @@ export function UnifiedProfileEditor({ initialData, authConfigured, authenticate
           <label className="text-xs text-[var(--app-text-muted)]">Motif yoğunluğu<select value={form.presentation.motifIntensity} onChange={(event) => setForm((current) => updatePresentation(current, "motifIntensity", event.target.value as ProfilePresentationPreferences["motifIntensity"]))} className={INPUT_CLASS}>{PROFILE_MOTIF_INTENSITIES.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
           {cloudReady && <label className="text-xs text-[var(--app-text-muted)]">Banner görseli<span className="mt-1 flex min-h-10 items-center rounded-lg border border-[var(--app-border)] px-3"><input type="file" accept="image/jpeg,image/png,image/webp" aria-label="Banner görseli yükle" onChange={(event) => void uploadBanner(event.target.files?.[0])} /></span></label>}
         </div>
+        {cloudReady && (data.profile?.bannerUrl || data.profile?.avatarUrl || socialAvatarUrl) && (
+          <div className="mt-5 grid gap-5 lg:grid-cols-2">
+            {data.profile?.bannerUrl && <div><h3 className="mb-2 text-sm font-semibold text-[var(--app-text-primary)]">Banner odağı ve zoom</h3><ImagePositionEditor kind="banner" src={data.profile.bannerUrl} value={form.presentation.bannerTransform} onChange={(value) => setForm((current) => updatePresentation(current, "bannerTransform", value))} /></div>}
+            {(data.profile?.avatarUrl ?? socialAvatarUrl) && <div><h3 className="mb-2 text-sm font-semibold text-[var(--app-text-primary)]">Profil fotoğrafı odağı ve zoom</h3><ImagePositionEditor kind="avatar" src={(data.profile?.avatarUrl ?? socialAvatarUrl) as string} value={form.presentation.avatarTransform} onChange={(value) => setForm((current) => updatePresentation(current, "avatarTransform", value))} /></div>}
+          </div>
+        )}
       </section>}
 
       {!localOnly && <section className="app-panel rounded-2xl border p-4 sm:p-5"><h2 className="font-semibold">Sosyal ve gizlilik</h2><div className="mt-4 grid gap-4 sm:grid-cols-2"><label className="text-xs text-[var(--app-text-muted)]">Profil görünürlüğü<select value={form.visibilityMode} onChange={(event) => update("visibilityMode", event.target.value as SocialProfileInput["visibilityMode"])} className={INPUT_CLASS}>{PROFILE_VISIBILITIES.map((mode) => <option key={mode} value={mode}>{mode}</option>)}</select></label><label className="text-xs text-[var(--app-text-muted)]">Yin/Yang bağlantı rengi<select value={form.connectionColor} onChange={(event) => update("connectionColor", event.target.value as SocialProfileInput["connectionColor"])} className={INPUT_CLASS}>{CONNECTION_COLORS.map((color) => <option key={color} value={color}>{color}</option>)}</select></label></div><p className="mt-3 text-xs text-[var(--app-text-muted)]">Bağlantı rengi yalnız sosyal ilişki gösteriminde kullanılır; palette, banner veya uygulama accent’i değildir.</p></section>}

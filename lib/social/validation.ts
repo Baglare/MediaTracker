@@ -1,5 +1,6 @@
 import type { MediaType } from "@/lib/types";
 import { DEFAULT_PROFILE_PRESENTATION_PREFERENCES } from "@/lib/personalization/defaults";
+import { bannerPositionFallback, isValidImageTransform } from "@/lib/personalization/image-transform";
 import {
   PROFILE_AVATAR_FRAMES,
   PROFILE_BANNER_MODES,
@@ -127,15 +128,20 @@ export function validateCloudProfilePresentation(value: unknown): ValidationResu
   if (!PROFILE_AVATAR_FRAMES.includes(record.avatarFrame as ProfilePresentationPreferences["avatarFrame"])) return { ok: false, error: "Avatar çerçevesi geçersiz." };
   if (!PROFILE_SURFACE_STYLES.includes(record.surfaceStyle as ProfilePresentationPreferences["surfaceStyle"])) return { ok: false, error: "Profil yüzeyi geçersiz." };
   if (!PROFILE_MOTIF_INTENSITIES.includes(record.motifIntensity as ProfilePresentationPreferences["motifIntensity"])) return { ok: false, error: "Motif yoğunluğu geçersiz." };
+  if (record.bannerTransform !== undefined && !isValidImageTransform(record.bannerTransform)) return { ok: false, error: "Banner konumlandırma değeri geçersiz." };
+  if (record.avatarTransform !== undefined && !isValidImageTransform(record.avatarTransform)) return { ok: false, error: "Avatar konumlandırma değeri geçersiz." };
+  const bannerPosition = record.bannerPosition as ProfilePresentationPreferences["bannerPosition"];
   return { ok: true, value: {
     version: 1,
     paletteId: record.paletteId as ProfilePresentationPreferences["paletteId"],
     bannerMode: record.bannerMode as ProfilePresentationPreferences["bannerMode"],
-    bannerPosition: record.bannerPosition as ProfilePresentationPreferences["bannerPosition"],
+    bannerPosition,
     overlayStrength: record.overlayStrength as ProfilePresentationPreferences["overlayStrength"],
     avatarFrame: record.avatarFrame as ProfilePresentationPreferences["avatarFrame"],
     surfaceStyle: record.surfaceStyle as ProfilePresentationPreferences["surfaceStyle"],
     motifIntensity: record.motifIntensity as ProfilePresentationPreferences["motifIntensity"],
+    bannerTransform: record.bannerTransform === undefined ? bannerPositionFallback(bannerPosition) : record.bannerTransform,
+    avatarTransform: record.avatarTransform === undefined ? { ...DEFAULT_PROFILE_PRESENTATION_PREFERENCES.avatarTransform } : record.avatarTransform,
   } };
 }
 

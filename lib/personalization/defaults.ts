@@ -1,4 +1,5 @@
 import type { AppAppearancePreferences, ProfilePresentationPreferences } from "./types";
+import { DEFAULT_IMAGE_TRANSFORM } from "./image-transform";
 
 export const DEFAULT_APP_APPEARANCE_PREFERENCES: AppAppearancePreferences = {
   version: 1,
@@ -17,6 +18,8 @@ export const DEFAULT_PROFILE_PRESENTATION_PREFERENCES: ProfilePresentationPrefer
   avatarFrame: "subtle",
   surfaceStyle: "solid",
   motifIntensity: "none",
+  bannerTransform: { ...DEFAULT_IMAGE_TRANSFORM },
+  avatarTransform: { ...DEFAULT_IMAGE_TRANSFORM },
 };
 
 export function defaultAppearancePreferences(): AppAppearancePreferences {
@@ -24,5 +27,9 @@ export function defaultAppearancePreferences(): AppAppearancePreferences {
 }
 
 export function defaultProfilePresentationPreferences(): ProfilePresentationPreferences {
-  return { ...DEFAULT_PROFILE_PRESENTATION_PREFERENCES };
+  return {
+    ...DEFAULT_PROFILE_PRESENTATION_PREFERENCES,
+    bannerTransform: { ...DEFAULT_PROFILE_PRESENTATION_PREFERENCES.bannerTransform },
+    avatarTransform: { ...DEFAULT_PROFILE_PRESENTATION_PREFERENCES.avatarTransform },
+  };
 }

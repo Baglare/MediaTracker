@@ -145,13 +145,37 @@ Banner modu `none`, `gradient`, `world` veya `image` olabilir. Kullanıcı banne
 
 ### Migration ve güvenlik
 
-`20260722110000_unified_profile_presentation.sql`, `profiles` tablosuna `tagline`, `profile_palette_id`, `banner_mode`, `banner_position`, `overlay_strength`, `avatar_frame`, `surface_style` ve `motif_intensity` alanlarını ekler. SQL constraint'leri P0 TypeScript allowlist'leriyle aynıdır. `social_save_unified_profile` kimliği `auth.uid()` içinden alır; client başka kullanıcı id'si seçemez. Direct profile insert/update kapalı kalır, mevcut avatar/banner asset kolon izni korunur. `get_unified_social_profile`, presentation alanlarını mevcut görünürlük güvenli loader sonucu `available` ise ekler. Migration yalnız repoda oluşturulmuştur; remote'a uygulanmamıştır.
+`20260722110000_unified_profile_presentation.sql`, `profiles` tablosuna `tagline`, `profile_palette_id`, `banner_mode`, `banner_position`, `overlay_strength`, `avatar_frame`, `surface_style` ve `motif_intensity` alanlarını ekler. SQL constraint'leri P0 TypeScript allowlist'leriyle aynıdır. `social_save_unified_profile` kimliği `auth.uid()` içinden alır; client başka kullanıcı id'si seçemez. Direct profile insert/update kapalı kalır, mevcut avatar/banner asset kolon izni korunur. `get_unified_social_profile`, presentation alanlarını mevcut görünürlük güvenli loader sonucu `available` ise ekler. P2 migration'ı uygulanmış kabul edilir; P3.0 transform migration'ı bu turda yalnız repoya eklenir.
 
 `connectionColor` değişmeden Yin/Yang ilişki sunumuna aittir. Profile palette, banner, app base theme, accent veya RLS kararında kullanılmaz.
 
 ### Manuel doğrulama matrisi
 
 Uygulama çalıştırıldığında Dashboard, Feed, Öneriler, Bildirimler, Kullanıcı Ara, İlerleme, `/profile` ve `/u/[username]` arasında shell sürekliliği; kendi/diğer/anonim viewer aksiyonları; Obsidyen/Porselen/Okyanus altında banner kontrastı; offline fallback ve kompakt favori kontrolü birlikte kontrol edilmelidir. Statik kontrat testleri screenshot regression veya canlı RLS testi değildir.
+
+## P3.0 profil stabilizasyonu
+
+### Hero-first yükleme ve editör sınırı
+
+`/profile` ilk görünümünde local kimlikten üretilen ortak `ProfileHero` hemen render edilir. Cloud tarafında yalnız kimlik, banner/avatar referansları, presentation ve kısa hero alanlarını taşıyan `/api/social/profile/hero` yüklenir. Favoriler, aktivite ve yerel kütüphane kendi client sınırında hazırlanır. Tam profil editor payload'ı, `SocialLayoutEditor`, `SocialSharingEditor`, `SocialPreferencesPanel` ve görsel konumlandırma UI'ı yalnız `mode=edit` olduğunda dynamic import ile yüklenir. Shell ve hero bu yüklemeyi beklemez. Eşzamanlı XP özet istekleri kullanıcı kimliği bazında tek in-flight promise üzerinden birleştirilir.
+
+### Non-destructive görsel transform modeli
+
+Banner ve avatarın orijinal cloud asset'i korunur; fiziksel crop veya her ayarda tekrar upload yapılmaz. Sunum metadata'sı `focalX`/`focalY` için 0–100, `zoom` için 1–3 aralığındadır ve varsayılanı `50/50/1` değeridir. Aynı saf render helper'ı self/public/preview hero banner'ında ve ortak avatar üzerinden sidebar, mobil topbar ve kullanıcı kartlarında kullanılır. Eski kayıtlarda banner transform yoksa `banner_position` top/center/bottom fallback'i korunur.
+
+`ImagePositionEditor` pointer/touch sürükleme, yön tuşları ve görünür nudge butonları, zoom slider/butonları ve merkeze sıfırlama sunar. Yeni upload draft transformunu merkeze döndürür; transform ancak birleşik profil save ile kalıcılaşır. `Vazgeç`, son kaydedilmiş transformu geri getirir.
+
+### Cloud persistence ve migration
+
+`20260722120000_profile_image_transforms.sql`, banner/avatar için focal X/Y ve zoom kolonlarını, DB aralık constraint'lerini ve `auth.uid()` bağlı save RPC genişlemesini ekler. Public loader ve kişi özetleri yalnız izin verilen transform metadata'sını döndürür. Önceki `20260722110000_unified_profile_presentation.sql` değiştirilmez. Yeni migration remote'a bu turda uygulanmaz.
+
+### Porselen kontrast tokenları
+
+Cloud veri aksiyonları ve durum filtreleri için sınırlı `--app-action-success-*`, `--app-action-accent-*`, `--app-selected-*` ve `--app-disabled-*` tokenları tanımlanır. Disabled kartlarda bütün metni solduran parent opacity kullanılmaz; metin, border ve yüzey rolleri ayrı kalır. Aktif status pill'i okunabilir selected text, focus ring, `aria-pressed` ve görünür check işareti taşır. Bu düzenleme domain/status renklerini tek generic accent'e dönüştürmez.
+
+### Manuel testler ve bilinen sınırlamalar
+
+Tarayıcı smoke sırasında `/feed → /profile`, `/recommendations → /profile`, `/profile` yenileme ve doğrudan edit modu; ardından banner/avatar drag, zoom, reset ve self/public/sidebar tutarlılığı kontrol edilmelidir. Remote migration uygulanmadan cloud transform save testi tamamlanamaz. Bu tur ortak P3 sayfa tasarım sistemi, feed/people/progression redesign'ı veya chart/layout kişiselleştirmesi değildir.
 
 ## Gelecek aşamalar
 
@@ -164,7 +188,7 @@ Uygulama çalıştırıldığında Dashboard, Feed, Öneriler, Bildirimler, Kull
 
 - Client preference modellerinde ham CSS ve sınırsız renk seçici yoktur.
 - P1'de tema seçimi aktiftir; bütün `zinc` sınıfları mekanik olarak dönüştürülmemiştir.
-- P2 migration dosyası oluşturulmuştur; remote Supabase işlemi veya migration apply yapılmamıştır.
+- P2 migration uygulanmış kabul edilir; P3.0 transform migration'ı için remote Supabase işlemi veya migration apply yapılmamıştır.
 - Dashboard'un diğer internal sekmeleri route'a taşınmamış, kütüphane/dashboard genel refactor'ı yapılmamıştır.
 - Public profil modülleri ve sosyal feature'lar yeniden tasarlanmamış; header ve shell sınırları birleştirilmiştir.
 - Chart palette, density/effects ve dashboard layout UI hâlâ P3 kapsamındadır.

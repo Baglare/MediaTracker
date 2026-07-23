@@ -17,6 +17,7 @@ import type {
   ProfilePresentationPreferences,
   ProfileSurfaceStyle,
 } from "./types";
+import { bannerPositionFallback, normalizeImageTransform } from "./image-transform";
 
 const BASE_THEMES = new Set<BaseThemeId>(["system", "obsidian", "porcelain", "ocean"]);
 const ACCENT_MODES = new Set<AccentMode>(["auto", "theme", "east", "screen", "arch", "neutral"]);
@@ -62,14 +63,17 @@ export function normalizeProfilePresentationPreferences(value: unknown): Profile
   const fallback = defaultProfilePresentationPreferences();
   if (!isRecord(value) || value.version !== 1) return fallback;
 
+  const bannerPosition = readKnown(value.bannerPosition, BANNER_POSITIONS, fallback.bannerPosition);
   return {
     version: 1,
     paletteId: readKnown(value.paletteId, PROFILE_PALETTES, fallback.paletteId),
     bannerMode: readKnown(value.bannerMode, BANNER_MODES, fallback.bannerMode),
-    bannerPosition: readKnown(value.bannerPosition, BANNER_POSITIONS, fallback.bannerPosition),
+    bannerPosition,
     overlayStrength: readKnown(value.overlayStrength, OVERLAY_STRENGTHS, fallback.overlayStrength),
     avatarFrame: readKnown(value.avatarFrame, AVATAR_FRAMES, fallback.avatarFrame),
     surfaceStyle: readKnown(value.surfaceStyle, SURFACE_STYLES, fallback.surfaceStyle),
     motifIntensity: readKnown(value.motifIntensity, MOTIF_INTENSITIES, fallback.motifIntensity),
+    bannerTransform: normalizeImageTransform(value.bannerTransform, bannerPositionFallback(bannerPosition)),
+    avatarTransform: normalizeImageTransform(value.avatarTransform, fallback.avatarTransform),
   };
 }

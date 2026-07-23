@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { ImagePlus, Trash2 } from "lucide-react";
+import type { ImageTransform } from "@/lib/personalization/image-transform";
 import type {
   AvatarAccent,
   AvatarMode,
@@ -22,6 +23,7 @@ interface ProfileSettingsCardProps {
   userId: string | null;
   hasSocialProfile: boolean;
   socialAvatarUrl?: string;
+  avatarTransform?: ImageTransform;
   onSocialAvatarChanged: (url: string | undefined) => void;
   showIdentityFields?: boolean;
 }
@@ -120,6 +122,7 @@ export default function ProfileSettingsCard({
   userId,
   hasSocialProfile,
   socialAvatarUrl,
+  avatarTransform,
   onSocialAvatarChanged,
   showIdentityFields = true,
 }: ProfileSettingsCardProps) {
@@ -226,7 +229,7 @@ export default function ProfileSettingsCard({
         <div className="min-w-0 flex-1">
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
             <div className="flex min-w-0 items-center gap-3">
-              <ProfileAvatar profileName={profileName} preferences={preferences} socialAvatarUrl={socialAvatarUrl} size="sm" />
+              <ProfileAvatar profileName={profileName} preferences={preferences} socialAvatarUrl={socialAvatarUrl} imageTransform={avatarTransform} size="sm" />
               <div className="min-w-0">
                 <h3 className="text-sm font-semibold text-zinc-100 tracking-tight">Profil fotoğrafı</h3>
                 <p className="mt-1 text-xs text-zinc-500">

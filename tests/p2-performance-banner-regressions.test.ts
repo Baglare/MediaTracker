@@ -5,6 +5,7 @@ const read = (path: string) => readFileSync(path, "utf8");
 const rootLayout = read("app/layout.tsx");
 const routeShell = read("components/app-shell/route-app-shell.tsx");
 const profilePage = read("components/profile/profile-page-client.tsx");
+const editorPanel = read("components/profile/profile-editor-panel.tsx");
 const editor = read("components/profile/unified-profile-editor.tsx");
 const hero = read("components/profile/profile-hero.tsx");
 const socialServer = read("lib/social/server.ts");
@@ -62,7 +63,9 @@ describe("P2 shell performance contracts", () => {
   });
 
   it("does not fetch the editor profile twice during /profile mount", () => {
-    expect(profilePage.match(/fetch\("\/api\/social\/profile"/g)).toHaveLength(1);
+    expect(profilePage).toContain('fetch("/api/social/profile/hero"');
+    expect(profilePage).not.toContain('fetch("/api/social/profile",');
+    expect(editorPanel.match(/fetch\("\/api\/social\/profile"/g)).toHaveLength(1);
     expect(editor).not.toContain('fetch("/api/social/profile", { cache: "no-store" })');
   });
 
@@ -104,7 +107,8 @@ describe("P2 banner regression contracts", () => {
 
   it("renders image banners with position, overlay and gradient fallback", () => {
     expect(hero).toContain("<img src={imageBannerUrl}");
-    expect(hero).toContain("BANNER_POSITION_CLASSES[presentation.bannerPosition]");
+    expect(hero).toContain("resolveImageTransformStyle(presentation.bannerTransform");
+    expect(hero).toContain("bannerPositionFallback(presentation.bannerPosition)");
     expect(hero).toContain("OVERLAY_CLASSES[presentation.overlayStrength]");
     expect(hero).toContain("bannerGradient(presentation.paletteId)");
   });

@@ -122,13 +122,14 @@ export function StatusFilterRow({ activeStatus, onStatusChange }: StatusFilterRo
               key={opt.value}
               type="button"
               onClick={() => onStatusChange(opt.value)}
-              className={`shrink-0 inline-flex items-center px-2.5 h-8 sm:h-auto sm:py-1 rounded-md text-[11.5px] font-medium transition-colors cursor-pointer whitespace-nowrap ${
+              className={`inline-flex h-8 shrink-0 items-center gap-1 px-2.5 text-[11.5px] font-medium whitespace-nowrap rounded-md transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-focus)] sm:h-auto sm:py-1 ${
                 isActive
-                  ? "bg-fuchsia-500/15 text-fuchsia-200 ring-1 ring-fuchsia-500/40"
-                  : "bg-zinc-900/40 text-zinc-400 ring-1 ring-zinc-800 hover:bg-zinc-800/50 hover:text-zinc-200"
+                  ? "border border-[var(--app-selected-border)] bg-[var(--app-selected-bg)] text-[var(--app-selected-text)] shadow-sm"
+                  : "border border-[var(--app-border)] bg-[var(--app-surface-1)] text-[var(--app-text-muted)] hover:bg-[var(--app-hover)] hover:text-[var(--app-text-primary)]"
               }`}
               aria-pressed={isActive}
             >
+              {isActive && <span aria-hidden="true" className="font-bold">✓</span>}
               {opt.label}
             </button>
           );

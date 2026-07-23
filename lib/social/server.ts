@@ -21,7 +21,7 @@ import { socialRecord, validateActivityVisibility, validateSocialMediaSnapshot, 
 import { validateActivityType } from "@/lib/social/interactions-validation";
 import { parsePublicXpSummary } from "@/lib/xp/validation";
 import { normalizeProfilePresentationPreferences } from "@/lib/personalization/validation";
-import type { OwnProfileSummary } from "@/lib/social/profile-summary";
+import type { OwnProfileHeroData, OwnProfileSummary } from "@/lib/social/profile-summary";
 
 const BUCKET = "profile-assets";
 type SocialServerClient = NonNullable<Awaited<ReturnType<typeof getSupabaseServerClient>>>;
@@ -185,6 +185,7 @@ export async function searchSocialPeople(query: string, offset = 0): Promise<Soc
     visibilityMode: profile.visibilityMode,
     connectionColor: profile.connectionColor,
     avatarUrl: await createSignedSocialAssetUrl(record.avatarPath),
+    avatarTransform: profile.presentation.avatarTransform,
     relationship: relationshipOf(record, profile.connectionColor),
   })));
 }
@@ -204,6 +205,7 @@ export async function loadSocialPersonSummary(targetId: string): Promise<SocialP
     visibilityMode: profile.visibilityMode,
     connectionColor: profile.connectionColor,
     avatarUrl: await createSignedSocialAssetUrl(record.avatarPath),
+    avatarTransform: profile.presentation.avatarTransform,
     relationship: relationshipOf(record, profile.connectionColor),
   };
 }
@@ -214,7 +216,7 @@ export async function loadOwnSocialEditorData(): Promise<SocialProfileEditorData
   const { data: auth } = await client.auth.getUser();
   if (!auth.user) return { configured: true, authenticated: false, modules: [], favorites: [], current: [], sharedNotes: [], blockedAccounts: [] };
   const [profileResult, modulesResult, showcaseResult, notesResult, blocksResult] = await Promise.all([
-    client.from("profiles").select("username,display_name,tagline,bio,location,language,visibility_mode,connection_color,avatar_path,banner_path,selected_title,profile_palette_id,banner_mode,banner_position,overlay_strength,avatar_frame,surface_style,motif_intensity,username_changed_at").eq("id", auth.user.id).maybeSingle(),
+    client.from("profiles").select("username,display_name,tagline,bio,location,language,visibility_mode,connection_color,avatar_path,banner_path,selected_title,profile_palette_id,banner_mode,banner_position,overlay_strength,avatar_frame,surface_style,motif_intensity,banner_focal_x,banner_focal_y,banner_zoom,avatar_focal_x,avatar_focal_y,avatar_zoom,username_changed_at").eq("id", auth.user.id).maybeSingle(),
     client.from("profile_modules").select("module_key,enabled,visibility,grid_x,grid_y,grid_width,grid_height,mobile_order,config").eq("user_id", auth.user.id).order("mobile_order"),
     client.from("profile_media_showcase").select("showcase_kind,title,media_type,external_source,external_id,cover_url,world,sort_order").eq("user_id", auth.user.id).order("sort_order"),
     client.from("profile_shared_notes").select("id,media_title,media_type,external_source,external_id,content,contains_spoiler,visibility,created_at,updated_at").eq("user_id", auth.user.id).order("created_at", { ascending: false }),
@@ -250,6 +252,8 @@ export async function loadOwnSocialEditorData(): Promise<SocialProfileEditorData
         avatarFrame: row.avatar_frame,
         surfaceStyle: row.surface_style,
         motifIntensity: row.motif_intensity,
+        bannerTransform: { focalX: row.banner_focal_x, focalY: row.banner_focal_y, zoom: row.banner_zoom },
+        avatarTransform: { focalX: row.avatar_focal_x, focalY: row.avatar_focal_y, zoom: row.avatar_zoom },
       }),
       avatarUrl,
       bannerUrl,
@@ -275,7 +279,7 @@ export async function loadOwnSocialProfileSummary(): Promise<OwnProfileSummary> 
   if (!auth.user) return {};
   const { data } = await client
     .from("profiles")
-    .select("display_name,tagline,avatar_path,selected_title")
+    .select("display_name,tagline,avatar_path,selected_title,avatar_focal_x,avatar_focal_y,avatar_zoom")
     .eq("id", auth.user.id)
     .maybeSingle();
   if (!data) return {};
@@ -284,6 +288,48 @@ export async function loadOwnSocialProfileSummary(): Promise<OwnProfileSummary> 
     tagline: data.tagline ?? undefined,
     avatarUrl: await createSignedSocialAssetUrlWithClient(client, data.avatar_path),
     selectedTitle: data.selected_title ?? undefined,
+    avatarTransform: normalizeProfilePresentationPreferences({ version: 1, avatarTransform: { focalX: data.avatar_focal_x, focalY: data.avatar_focal_y, zoom: data.avatar_zoom } }).avatarTransform,
+  };
+}
+
+export async function loadOwnProfileHeroData(): Promise<OwnProfileHeroData> {
+  const client = await getSupabaseServerClient();
+  if (!client) return {};
+  const { data: auth } = await client.auth.getUser();
+  if (!auth.user) return {};
+  const { data } = await client
+    .from("profiles")
+    .select("username,display_name,tagline,bio,visibility_mode,avatar_path,banner_path,selected_title,profile_palette_id,banner_mode,banner_position,overlay_strength,avatar_frame,surface_style,motif_intensity,banner_focal_x,banner_focal_y,banner_zoom,avatar_focal_x,avatar_focal_y,avatar_zoom")
+    .eq("id", auth.user.id)
+    .maybeSingle();
+  if (!data) return {};
+  const [avatarUrl, bannerUrl] = await Promise.all([
+    createSignedSocialAssetUrlWithClient(client, data.avatar_path),
+    createSignedSocialAssetUrlWithClient(client, data.banner_path),
+  ]);
+  const presentation = normalizeProfilePresentationPreferences({
+    version: 1,
+    paletteId: data.profile_palette_id,
+    bannerMode: data.banner_mode,
+    bannerPosition: data.banner_position,
+    overlayStrength: data.overlay_strength,
+    avatarFrame: data.avatar_frame,
+    surfaceStyle: data.surface_style,
+    motifIntensity: data.motif_intensity,
+    bannerTransform: { focalX: data.banner_focal_x, focalY: data.banner_focal_y, zoom: data.banner_zoom },
+    avatarTransform: { focalX: data.avatar_focal_x, focalY: data.avatar_focal_y, zoom: data.avatar_zoom },
+  });
+  return {
+    username: data.username ?? undefined,
+    displayName: data.display_name ?? data.username ?? undefined,
+    tagline: data.tagline ?? undefined,
+    bio: data.bio ?? undefined,
+    visibilityMode: data.visibility_mode,
+    avatarUrl,
+    bannerUrl,
+    selectedTitle: data.selected_title ?? undefined,
+    avatarTransform: presentation.avatarTransform,
+    presentation,
   };
 }
 

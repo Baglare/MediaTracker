@@ -4,6 +4,7 @@ import { Archive, BookOpen, Clapperboard, Settings, Sparkles, UserRound } from "
 import Link from "next/link";
 import { useState } from "react";
 import { dashboardTabHref } from "@/components/app-shell/app-navigation";
+import { resolveImageTransformStyle, type ImageTransform } from "@/lib/personalization/image-transform";
 import { DEFAULT_PROFILE_PREFERENCES, type AvatarAccent, type PresetAvatar, type ProfilePreferences } from "@/lib/profile-preferences";
 import { resolveAvatarSource } from "@/lib/social/avatar";
 import CloudModeBadge from "./cloud-mode-badge";
@@ -13,6 +14,7 @@ interface SidebarProfileCardProps {
   tagline: string;
   preferences: ProfilePreferences;
   socialAvatarUrl?: string;
+  avatarTransform?: ImageTransform;
 }
 
 interface ProfileAvatarProps {
@@ -23,6 +25,7 @@ interface ProfileAvatarProps {
   size?: "sm" | "md" | "lg" | "social" | "xl";
   shape?: "rounded" | "circle";
   ariaLabel?: string;
+  imageTransform?: ImageTransform;
 }
 
 const ACCENT_CLASSES: Record<AvatarAccent, string> = {
@@ -64,6 +67,7 @@ export function ProfileAvatar({
   size = "md",
   shape = "rounded",
   ariaLabel,
+  imageTransform,
 }: ProfileAvatarProps) {
   const effectivePreferences = preferences ?? DEFAULT_PROFILE_PREFERENCES;
   const [failedSocialUrl, setFailedSocialUrl] = useState<string>();
@@ -78,13 +82,16 @@ export function ProfileAvatar({
     return (
       // next/image data URL avatar için anlamlı bir kazanç sağlamıyor (boyut tipi olarak runtime'da değişken,
       // remote pattern yok). Klasik <img> bilinçli tercih.
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={resolved.imageUrl}
-        alt={ariaLabel ?? ""}
-        onError={resolved.source === "social" ? () => setFailedSocialUrl(socialAvatarUrl) : undefined}
-        className={`${sizeClass} ${shapeClass} shrink-0 object-cover shadow-sm shadow-black/30 ring-1 ring-[var(--app-border-strong)]`}
-      />
+      <span className={`${sizeClass} ${shapeClass} relative block shrink-0 overflow-hidden shadow-sm shadow-black/30 ring-1 ring-[var(--app-border-strong)]`} role={ariaLabel ? "img" : undefined} aria-label={ariaLabel}>
+        {/* eslint-disable-next-line @next/next/no-img-element -- signed/data URL avatar; shared transform metadata is applied directly. */}
+        <img
+          src={resolved.imageUrl}
+          alt=""
+          onError={resolved.source === "social" ? () => setFailedSocialUrl(socialAvatarUrl) : undefined}
+          className="absolute inset-0 h-full w-full object-cover"
+          style={resolveImageTransformStyle(imageTransform, "avatar")}
+        />
+      </span>
     );
   }
 
@@ -110,6 +117,7 @@ export default function SidebarProfileCard({
   tagline,
   preferences,
   socialAvatarUrl,
+  avatarTransform,
 }: SidebarProfileCardProps) {
   return (
     <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-2)] p-3 shadow-sm shadow-black/20">
@@ -120,7 +128,7 @@ export default function SidebarProfileCard({
           aria-label="Profili aç"
           title="Profili aç"
         >
-          <ProfileAvatar profileName={profileName} preferences={preferences} socialAvatarUrl={socialAvatarUrl} />
+          <ProfileAvatar profileName={profileName} preferences={preferences} socialAvatarUrl={socialAvatarUrl} imageTransform={avatarTransform} />
         </Link>
 
         <div className="min-w-0 flex-1">

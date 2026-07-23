@@ -13,6 +13,7 @@ import {
 } from "@/components/app-shell/app-navigation";
 import { NotificationBadge } from "@/components/social/notification-badge";
 import type { ProfilePreferences } from "@/lib/profile-preferences";
+import type { ImageTransform } from "@/lib/personalization/image-transform";
 import type { UserProgression, UserProgressionTier, UserProgressionWorld } from "@/lib/user-progression";
 import SidebarProfileCard from "./sidebar-profile-card";
 
@@ -23,6 +24,7 @@ interface AppSidebarProps {
   profileTagline: string;
   profilePreferences: ProfilePreferences;
   socialAvatarUrl?: string;
+  avatarTransform?: ImageTransform;
   progression: UserProgression;
   journeyTitle: string;
 }
@@ -113,7 +115,7 @@ function JourneyCard({ progression, journeyTitle, active, onClick }: { progressi
   );
 }
 
-export default function AppSidebar({ activeNavigationId, onChange, profileName, profileTagline, profilePreferences, socialAvatarUrl, progression, journeyTitle }: AppSidebarProps) {
+export default function AppSidebar({ activeNavigationId, onChange, profileName, profileTagline, profilePreferences, socialAvatarUrl, avatarTransform, progression, journeyTitle }: AppSidebarProps) {
   return (
     <aside className="app-panel hidden h-screen w-64 shrink-0 flex-col gap-3 border-r px-4 py-4 shadow-none lg:sticky lg:top-0 lg:flex" aria-label="Birincil navigasyon">
       <Link href="/" className="flex h-9 min-w-0 items-center gap-2 rounded px-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-focus)]">
@@ -121,7 +123,7 @@ export default function AppSidebar({ activeNavigationId, onChange, profileName, 
         <span className="truncate text-base font-semibold tracking-tight text-[var(--app-text-primary)]">MediaTracker</span>
       </Link>
 
-      <SidebarProfileCard profileName={profileName} tagline={profileTagline} preferences={profilePreferences} socialAvatarUrl={socialAvatarUrl} />
+      <SidebarProfileCard profileName={profileName} tagline={profileTagline} preferences={profilePreferences} socialAvatarUrl={socialAvatarUrl} avatarTransform={avatarTransform} />
 
       <nav className="-mx-1 flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-1">
         {APP_NAVIGATION_SECTIONS.map((section) => (

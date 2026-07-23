@@ -14,7 +14,7 @@ import {
 } from "@/components/app-shell/app-navigation";
 import { useAuth } from "@/hooks/use-auth";
 import { useXpProgression } from "@/hooks/use-xp-progression";
-import { resolveProfileIdentity, type SocialProfileIdentityInput } from "@/lib/personalization/profile-identity";
+import { resolveProfileIdentity } from "@/lib/personalization/profile-identity";
 import { DEFAULT_PROFILE_PREFERENCES, loadProfilePreferences, type ProfilePreferences } from "@/lib/profile-preferences";
 import { PROFILE_SUMMARY_EVENT, type OwnProfileSummary } from "@/lib/social/profile-summary";
 import { calculateUserProgression } from "@/lib/user-progression";
@@ -38,7 +38,7 @@ export function RouteAppShell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const auth = useAuth();
   const [localPreferences, setLocalPreferences] = useState<ProfilePreferences>(DEFAULT_PROFILE_PREFERENCES);
-  const [cloudIdentity, setCloudIdentity] = useState<SocialProfileIdentityInput>();
+  const [cloudIdentity, setCloudIdentity] = useState<OwnProfileSummary>();
   const summaryUserId = useRef<string | null>(null);
 
   useEffect(() => {
@@ -99,6 +99,7 @@ export function RouteAppShell({ children }: { children: ReactNode }) {
       profileTagline={identity.tagline}
       profilePreferences={localPreferences}
       socialAvatarUrl={identity.avatarUrl}
+      avatarTransform={cloudIdentity?.avatarTransform}
       progression={progression}
       journeyTitle={identity.selectedTitle || progression.title}
       contentClassName={pathname === "/" ? "p-0" : undefined}

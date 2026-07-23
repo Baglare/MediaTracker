@@ -41,7 +41,7 @@ describe("shared ProfileHero", () => {
 
   it("uses an image element rather than interpolating user content into CSS", () => {
     expect(hero).toContain("<img src={imageBannerUrl}");
-    expect(hero).toContain("BANNER_POSITION_CLASSES");
+    expect(hero).toContain("resolveImageTransformStyle");
     expect(hero).toContain("onBannerError?.()");
     expect(hero).not.toContain("backgroundImage:");
   });

@@ -38,6 +38,12 @@ export interface Database {
           avatar_frame: "none" | "subtle" | "world" | "tier";
           surface_style: "solid" | "soft_glass" | "textured";
           motif_intensity: "none" | "subtle" | "full";
+          banner_focal_x: number;
+          banner_focal_y: number;
+          banner_zoom: number;
+          avatar_focal_x: number;
+          avatar_focal_y: number;
+          avatar_zoom: number;
           selected_title: string | null;
           follow_list_visibility: "public" | "followers" | "mutual" | "self";
           layout_mode: string;
@@ -67,6 +73,12 @@ export interface Database {
           avatar_frame?: "none" | "subtle" | "world" | "tier";
           surface_style?: "solid" | "soft_glass" | "textured";
           motif_intensity?: "none" | "subtle" | "full";
+          banner_focal_x?: number;
+          banner_focal_y?: number;
+          banner_zoom?: number;
+          avatar_focal_x?: number;
+          avatar_focal_y?: number;
+          avatar_zoom?: number;
           selected_title?: string | null;
           follow_list_visibility?: "public" | "followers" | "mutual" | "self";
           layout_mode?: string;
@@ -96,6 +108,12 @@ export interface Database {
           avatar_frame?: "none" | "subtle" | "world" | "tier";
           surface_style?: "solid" | "soft_glass" | "textured";
           motif_intensity?: "none" | "subtle" | "full";
+          banner_focal_x?: number;
+          banner_focal_y?: number;
+          banner_zoom?: number;
+          avatar_focal_x?: number;
+          avatar_focal_y?: number;
+          avatar_zoom?: number;
           selected_title?: string | null;
           follow_list_visibility?: "public" | "followers" | "mutual" | "self";
           layout_mode?: string;
@@ -272,7 +290,7 @@ export interface Database {
       search_social_profiles: { Args: { p_query: string; p_offset?: number; p_limit?: number }; Returns: Json };
       list_social_connections: { Args: { p_owner: string; p_kind: string; p_query?: string; p_offset?: number; p_limit?: number }; Returns: Json };
       social_save_profile: { Args: { p_username: string; p_display_name: string; p_bio: string; p_location: string; p_language: string; p_visibility_mode: string; p_connection_color: string; p_selected_title: string }; Returns: Json };
-      social_save_unified_profile: { Args: { p_username: string; p_display_name: string; p_tagline: string; p_bio: string; p_location: string; p_language: string; p_visibility_mode: string; p_connection_color: string; p_selected_title: string; p_profile_palette_id: string; p_banner_mode: string; p_banner_position: string; p_overlay_strength: string; p_avatar_frame: string; p_surface_style: string; p_motif_intensity: string }; Returns: Json };
+      social_save_unified_profile: { Args: { p_username: string; p_display_name: string; p_tagline: string; p_bio: string; p_location: string; p_language: string; p_visibility_mode: string; p_connection_color: string; p_selected_title: string; p_profile_palette_id: string; p_banner_mode: string; p_banner_position: string; p_overlay_strength: string; p_avatar_frame: string; p_surface_style: string; p_motif_intensity: string; p_banner_focal_x: number; p_banner_focal_y: number; p_banner_zoom: number; p_avatar_focal_x: number; p_avatar_focal_y: number; p_avatar_zoom: number }; Returns: Json };
       social_follow: { Args: { p_target: string }; Returns: Json };
       social_follow_action: { Args: { p_action: string; p_other: string }; Returns: Json };
       social_block: { Args: { p_target: string }; Returns: Json };

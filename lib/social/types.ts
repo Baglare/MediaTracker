@@ -170,6 +170,7 @@ export interface SocialPersonSummary {
   visibilityMode: ProfileVisibility;
   connectionColor: ConnectionColor;
   avatarUrl?: string;
+  avatarTransform?: ProfilePresentationPreferences["avatarTransform"];
   relationship: SocialRelationshipSummary;
   status?: FollowStatus;
 }

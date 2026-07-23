@@ -10,6 +10,7 @@ import AppSidebar from "@/components/app-sidebar";
 import AppTopbar from "@/components/app-topbar";
 import type { AppNavigationId, DashboardTabId } from "@/components/app-shell/app-navigation";
 import type { ProfilePreferences } from "@/lib/profile-preferences";
+import type { ImageTransform } from "@/lib/personalization/image-transform";
 import type { UserProgression } from "@/lib/user-progression";
 import type { WorldThemeKey } from "@/lib/personalization/types";
 
@@ -23,6 +24,7 @@ interface AppShellProps {
   profileTagline?: string;
   profilePreferences?: ProfilePreferences;
   socialAvatarUrl?: string;
+  avatarTransform?: ImageTransform;
   progression?: UserProgression;
   journeyTitle?: string;
   world?: WorldThemeKey;
@@ -48,7 +50,7 @@ function PublicTopbar() {
   );
 }
 
-export function AppShell({ mode, activeNavigationId = "dashboard", onChangeTab, profileName, profileTagline, profilePreferences, socialAvatarUrl, progression, journeyTitle, world = "neutral", rightRail, children, contentClassName = "px-4 py-6 sm:px-6 lg:px-8 lg:py-8" }: AppShellProps) {
+export function AppShell({ mode, activeNavigationId = "dashboard", onChangeTab, profileName, profileTagline, profilePreferences, socialAvatarUrl, avatarTransform, progression, journeyTitle, world = "neutral", rightRail, children, contentClassName = "px-4 py-6 sm:px-6 lg:px-8 lg:py-8" }: AppShellProps) {
   if (mode === "public") {
     return (
       <AppearanceWorldScope world={world} className="app-page min-h-screen" data-app-shell="public">
@@ -64,9 +66,9 @@ export function AppShell({ mode, activeNavigationId = "dashboard", onChangeTab, 
 
   return (
     <AppearanceWorldScope world={world} className="app-page flex min-h-screen overflow-x-clip" data-app-shell="authenticated">
-      <AppSidebar activeNavigationId={activeNavigationId} onChange={onChangeTab} profileName={profileName} profileTagline={profileTagline} profilePreferences={profilePreferences} socialAvatarUrl={socialAvatarUrl} progression={progression} journeyTitle={journeyTitle} />
+      <AppSidebar activeNavigationId={activeNavigationId} onChange={onChangeTab} profileName={profileName} profileTagline={profileTagline} profilePreferences={profilePreferences} socialAvatarUrl={socialAvatarUrl} avatarTransform={avatarTransform} progression={progression} journeyTitle={journeyTitle} />
       <div className="flex min-w-0 flex-1 flex-col">
-        <AppTopbar activeNavigationId={activeNavigationId} onChangeTab={onChangeTab} profileName={profileName} profilePreferences={profilePreferences} socialAvatarUrl={socialAvatarUrl} />
+        <AppTopbar activeNavigationId={activeNavigationId} onChangeTab={onChangeTab} profileName={profileName} profilePreferences={profilePreferences} socialAvatarUrl={socialAvatarUrl} avatarTransform={avatarTransform} />
         <main className={`relative min-w-0 flex-1 ${contentClassName}`}>{children}</main>
       </div>
       {rightRail}

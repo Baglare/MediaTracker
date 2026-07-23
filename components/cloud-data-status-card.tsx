@@ -261,7 +261,7 @@ export default function CloudDataStatusCard({
           type="button"
           onClick={() => void refresh()}
           disabled={busy !== null}
-          className="text-xs inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-zinc-800/60 text-zinc-300 ring-1 ring-zinc-700/40 hover:bg-zinc-800 transition-colors disabled:opacity-50 cursor-pointer"
+          className="inline-flex items-center gap-1.5 rounded-md border border-[var(--app-border)] bg-[var(--app-surface-2)] px-2.5 py-1.5 text-xs text-[var(--app-text-secondary)] transition-colors hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:border-[var(--app-disabled-border)] disabled:bg-[var(--app-disabled-bg)] disabled:text-[var(--app-disabled-text)]"
           title="Cloud sayılarını yenile"
         >
           {busy === "refresh" ? (
@@ -316,19 +316,20 @@ export default function CloudDataStatusCard({
           type="button"
           onClick={doMerge}
           disabled={busy !== null || state.kind !== "ready"}
-          className="text-left p-3 rounded-xl bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30 hover:bg-emerald-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+          aria-busy={busy === "merge"}
+          className="cursor-pointer rounded-xl border border-[var(--app-action-success-border)] bg-[var(--app-action-success-bg)] p-3 text-left text-[var(--app-action-success-text)] transition-colors hover:bg-[color-mix(in_srgb,var(--app-action-success-bg)_72%,var(--app-hover))] disabled:cursor-not-allowed disabled:border-[var(--app-disabled-border)] disabled:bg-[var(--app-disabled-bg)] disabled:text-[var(--app-disabled-text)]"
         >
           <div className="flex items-center gap-2 mb-1">
             {busy === "merge" ? (
-              <Loader2 className="w-4 h-4 animate-spin text-emerald-300" />
+              <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              <GitMerge className="w-4 h-4 text-emerald-300" />
+              <GitMerge className="h-4 w-4" />
             )}
-            <span className="text-xs font-semibold text-emerald-100">
+            <span className="text-xs font-semibold">
               Cloud&apos;dan Yerel&apos;e Birleştir
             </span>
           </div>
-          <p className="text-[11px] leading-relaxed text-emerald-200/80">
+          <p className="text-[11px] leading-relaxed opacity-90">
             Cloud&apos;da olup yerelde olmayan kayıtları yerel verine ekler.
             Yerel verini silmez. Cloud&apos;a upload yapmaz.
           </p>
@@ -338,17 +339,18 @@ export default function CloudDataStatusCard({
           type="button"
           onClick={doDownload}
           disabled={busy !== null || state.kind !== "ready"}
-          className="text-left p-3 rounded-xl bg-zinc-800/60 text-zinc-200 ring-1 ring-zinc-700/50 hover:bg-zinc-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+          aria-busy={busy === "download"}
+          className="cursor-pointer rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-2)] p-3 text-left text-[var(--app-text-secondary)] transition-colors hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:border-[var(--app-disabled-border)] disabled:bg-[var(--app-disabled-bg)] disabled:text-[var(--app-disabled-text)]"
         >
           <div className="flex items-center gap-2 mb-1">
             {busy === "download" ? (
-              <Loader2 className="w-4 h-4 animate-spin text-zinc-300" />
+              <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              <ArrowDownToLine className="w-4 h-4 text-zinc-300" />
+              <ArrowDownToLine className="h-4 w-4" />
             )}
-            <span className="text-xs font-semibold text-zinc-100">Cloud → Yerel</span>
+            <span className="text-xs font-semibold">Cloud → Yerel</span>
           </div>
-          <p className="text-[11px] leading-relaxed text-zinc-400">
+          <p className="text-[11px] leading-relaxed">
             Cloud verilerini indirir ve yerel verilerinin yerine koyar.
           </p>
         </button>
@@ -357,17 +359,18 @@ export default function CloudDataStatusCard({
           type="button"
           onClick={doUpload}
           disabled={busy !== null}
-          className="text-left p-3 rounded-xl bg-violet-500/15 text-violet-200 ring-1 ring-violet-500/40 hover:bg-violet-500/25 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+          aria-busy={busy === "upload"}
+          className="cursor-pointer rounded-xl border border-[var(--app-action-accent-border)] bg-[var(--app-action-accent-bg)] p-3 text-left text-[var(--app-action-accent-text)] transition-colors hover:bg-[color-mix(in_srgb,var(--app-action-accent-bg)_72%,var(--app-hover))] disabled:cursor-not-allowed disabled:border-[var(--app-disabled-border)] disabled:bg-[var(--app-disabled-bg)] disabled:text-[var(--app-disabled-text)]"
         >
           <div className="flex items-center gap-2 mb-1">
             {busy === "upload" ? (
-              <Loader2 className="w-4 h-4 animate-spin text-violet-300" />
+              <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              <ArrowUpFromLine className="w-4 h-4 text-violet-300" />
+              <ArrowUpFromLine className="h-4 w-4" />
             )}
-            <span className="text-xs font-semibold text-violet-100">Yerel → Cloud</span>
+            <span className="text-xs font-semibold">Yerel → Cloud</span>
           </div>
-          <p className="text-[11px] leading-relaxed text-violet-200/80">
+          <p className="text-[11px] leading-relaxed opacity-90">
             Yerel verilerini cloud&apos;a gönderir. Aynı kayıtlar tekrar oluşturulmaz.
           </p>
         </button>

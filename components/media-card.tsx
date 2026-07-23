@@ -222,9 +222,9 @@ export default function MediaCard({
           className={`inline-flex h-9 w-6 items-start justify-center transition-colors duration-200 ${
             isFavorite
               ? "bg-gradient-to-b from-rose-400 to-rose-600 text-white drop-shadow-[0_2px_5px_rgba(190,18,60,0.28)]"
-              : "bg-[color-mix(in_srgb,var(--app-surface-elevated)_88%,transparent)] text-[var(--app-text-secondary)] shadow-[inset_0_0_0_1px_var(--app-border-strong),0_2px_5px_rgba(0,0,0,0.18)] hover:text-rose-500"
+              : "bg-[color-mix(in_srgb,var(--app-surface-elevated)_88%,transparent)] text-[var(--app-text-secondary)] shadow-[inset_0_0_0_1px_var(--app-border-strong),0_2px_5px_rgba(0,0,0,0.18)] drop-shadow-[0_2px_2px_var(--app-shadow)] hover:text-rose-500"
           }`}
-          style={{ clipPath: "polygon(0 0, 100% 0, 100% 100%, 50% 72%, 0 100%)" }}
+          style={{ clipPath: "polygon(0 0, 100% 0, 100% 100%, 50% 58%, 0 100%)" }}
           aria-hidden="true"
         >
           <Heart

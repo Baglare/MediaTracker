@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 import { useState } from "react";
 
 import { ProfileAvatar } from "@/components/sidebar-profile-card";
+import { bannerPositionFallback, resolveImageTransformStyle } from "@/lib/personalization/image-transform";
 import type { ResolvedProfileIdentity } from "@/lib/personalization/profile-identity";
 import type { ProfilePresentationPreferences } from "@/lib/personalization/types";
 import type { ProfilePreferences } from "@/lib/profile-preferences";
@@ -34,12 +35,6 @@ const FRAME_CLASSES: Record<ProfilePresentationPreferences["avatarFrame"], strin
   subtle: "ring-4 ring-[var(--app-surface-1)] shadow-lg",
   world: "ring-4 ring-[var(--profile-primary)] shadow-lg",
   tier: "ring-4 ring-[var(--profile-strong)] shadow-xl",
-};
-
-const BANNER_POSITION_CLASSES: Record<ProfilePresentationPreferences["bannerPosition"], string> = {
-  top: "object-top",
-  center: "object-center",
-  bottom: "object-bottom",
 };
 
 const SURFACE_CLASSES: Record<ProfilePresentationPreferences["surfaceStyle"], string> = {
@@ -87,14 +82,14 @@ export function ProfileHero({ variant, identity, presentation, localPreferences,
       <div className={`relative ${compact ? "min-h-44" : showBanner ? "min-h-64 sm:min-h-72" : "min-h-48"} ${showBanner ? `bg-gradient-to-br ${bannerGradient(presentation.paletteId)}` : "bg-[var(--app-surface-2)]"}`}>
         {imageBannerUrl && (
           // eslint-disable-next-line @next/next/no-img-element -- signed cloud asset URL; decorative responsive crop.
-          <img src={imageBannerUrl} alt="" onError={() => { setFailedBannerUrl(imageBannerUrl); onBannerError?.(); }} className={`absolute inset-0 h-full w-full object-cover ${BANNER_POSITION_CLASSES[presentation.bannerPosition]}`} />
+          <img src={imageBannerUrl} alt="" onError={() => { setFailedBannerUrl(imageBannerUrl); onBannerError?.(); }} className="absolute inset-0 h-full w-full object-cover" style={resolveImageTransformStyle(presentation.bannerTransform, "banner", bannerPositionFallback(presentation.bannerPosition))} />
         )}
         {showBanner && <div aria-hidden="true" className={`absolute inset-0 bg-gradient-to-t ${OVERLAY_CLASSES[presentation.overlayStrength]}`} />}
         {presentation.motifIntensity !== "none" && <div aria-hidden="true" className={`absolute right-6 top-6 h-28 w-28 rounded-full border border-white/15 bg-[radial-gradient(circle,var(--profile-soft),transparent_68%)] ${presentation.motifIntensity === "full" ? "opacity-90" : "opacity-45"}`} />}
 
         <div className="relative flex h-full flex-col justify-end gap-5 p-5 sm:flex-row sm:items-end sm:p-7">
           <div className={`shrink-0 rounded-full ${FRAME_CLASSES[presentation.avatarFrame]}`}>
-            <ProfileAvatar profileName={identity.displayName} preferences={localPreferences} socialAvatarUrl={identity.avatarUrl} allowLocalFallback size="xl" shape="circle" ariaLabel={`${identity.displayName} avatarı`} />
+            <ProfileAvatar profileName={identity.displayName} preferences={localPreferences} socialAvatarUrl={identity.avatarUrl} allowLocalFallback size="xl" shape="circle" ariaLabel={`${identity.displayName} avatarı`} imageTransform={presentation.avatarTransform} />
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
