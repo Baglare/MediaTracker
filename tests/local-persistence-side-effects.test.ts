@@ -3,9 +3,10 @@ import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import type { MediaItem } from "@/lib/types";
 
 const mocks = vi.hoisted(() => ({
-  loadMediaList: vi.fn(),
-  loadProgressLogs: vi.fn(),
-  saveLibrarySnapshot: vi.fn(),
+  loadScopedMediaList: vi.fn(),
+  loadScopedProgressLogs: vi.fn(),
+  saveScopedLibrarySnapshot: vi.fn(),
+  setOwnerScope: vi.fn(),
   enqueueMediaUpsert: vi.fn(),
   enqueueProgressLog: vi.fn(),
   queueXpMediaState: vi.fn(),
@@ -17,13 +18,14 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/storage", () => ({
-  loadMediaList: mocks.loadMediaList,
-  loadProgressLogs: mocks.loadProgressLogs,
-  saveLibrarySnapshot: mocks.saveLibrarySnapshot,
+  loadScopedMediaList: mocks.loadScopedMediaList,
+  loadScopedProgressLogs: mocks.loadScopedProgressLogs,
+  saveScopedLibrarySnapshot: mocks.saveScopedLibrarySnapshot,
 }));
 vi.mock("@/lib/sync-manager", () => ({
   enqueueMediaUpsert: mocks.enqueueMediaUpsert,
   enqueueProgressLog: mocks.enqueueProgressLog,
+  setOwnerScope: mocks.setOwnerScope,
 }));
 vi.mock("@/lib/xp/outbox", () => ({
   queueXpMediaState: mocks.queueXpMediaState,
@@ -52,9 +54,9 @@ beforeEach(() => {
   vi.stubGlobal("CustomEvent", class CustomEvent {
     constructor(public type: string) {}
   });
-  mocks.loadMediaList.mockReturnValue({ status: "empty", data: [], sourceKey: "media", issues: [] });
-  mocks.loadProgressLogs.mockReturnValue({ status: "empty", data: [], sourceKey: "logs", issues: [] });
-  mocks.saveLibrarySnapshot.mockReturnValue({
+  mocks.loadScopedMediaList.mockReturnValue({ status: "empty", data: [], sourceKey: "media", issues: [] });
+  mocks.loadScopedProgressLogs.mockReturnValue({ status: "empty", data: [], sourceKey: "logs", issues: [] });
+  mocks.saveScopedLibrarySnapshot.mockReturnValue({
     ok: true,
     writtenAt: "2026-07-23T10:00:00.000Z",
     backupCreated: true,
@@ -67,7 +69,7 @@ afterEach(() => {
 
 describe("persist-before-side-effect ordering", () => {
   it("does not enqueue cloud, XP or social work after a failed local write", async () => {
-    mocks.saveLibrarySnapshot.mockReturnValue({
+    mocks.saveScopedLibrarySnapshot.mockReturnValue({
       ok: false,
       code: "quota_exceeded",
       message: "quota",
@@ -88,7 +90,7 @@ describe("persist-before-side-effect ordering", () => {
     const result = addRecommendationToLocalLibrary(item, "user-1");
 
     expect(result).toMatchObject({ ok: true, alreadyPresent: false });
-    expect(mocks.saveLibrarySnapshot).toHaveBeenCalledTimes(1);
+    expect(mocks.saveScopedLibrarySnapshot).toHaveBeenCalledTimes(1);
     expect(mocks.enqueueMediaUpsert).toHaveBeenCalledTimes(1);
     expect(mocks.enqueueProgressLog).toHaveBeenCalledTimes(1);
     expect(mocks.queueXpMediaState).toHaveBeenCalledTimes(1);
@@ -96,12 +98,12 @@ describe("persist-before-side-effect ordering", () => {
   });
 
   it("treats a repeated recommendation add as already present without duplicate effects", async () => {
-    mocks.loadMediaList.mockReturnValue({ status: "valid", data: [item], sourceKey: "media", issues: [] });
+    mocks.loadScopedMediaList.mockReturnValue({ status: "valid", data: [item], sourceKey: "media", issues: [] });
     const { addRecommendationToLocalLibrary } = await import("@/lib/recommendation-library-adapter");
     const result = addRecommendationToLocalLibrary(item, "user-1");
 
     expect(result).toMatchObject({ ok: true, alreadyPresent: true });
-    expect(mocks.saveLibrarySnapshot).not.toHaveBeenCalled();
+    expect(mocks.saveScopedLibrarySnapshot).not.toHaveBeenCalled();
     expect(mocks.enqueueMediaUpsert).not.toHaveBeenCalled();
     expect(mocks.queueXpMediaState).not.toHaveBeenCalled();
   });

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { enqueueXpOutbox, flushXpOutbox, loadXpOutbox, queueXpMediaState, XP_OUTBOX_KEY, type XpOutboxItem, type XpStorageLike } from "@/lib/xp/outbox";
+import { enqueueXpOutbox, flushXpOutbox, loadXpOutbox, queueXpMediaState, XP_OUTBOX_KEY, XP_OUTBOX_QUARANTINE_KEY, type XpOutboxItem, type XpStorageLike } from "@/lib/xp/outbox";
 import type { MediaItem } from "@/lib/types";
 
 function storage(initial: Record<string,string> = {}): XpStorageLike & { data: Record<string,string> } { const data={...initial}; return {data,getItem:(key)=>data[key]??null,setItem:(key,value)=>{data[key]=value;}}; }
@@ -7,6 +7,7 @@ const planning:MediaItem={id:"m1",title:"Dune",type:"book",status:"planning",cov
 
 describe("XP desired-state outbox",()=>{
   it("uses the stable storage key and corrupt data falls back safely",()=>{expect(XP_OUTBOX_KEY).toBe("media-tracker-xp-outbox");expect(loadXpOutbox(storage({[XP_OUTBOX_KEY]:"{"}))).toEqual([]);});
+  it("quarantines ownerless legacy records instead of adopting them",()=>{const store=storage({[XP_OUTBOX_KEY]:JSON.stringify([{id:"legacy"}])});expect(loadXpOutbox(store)).toEqual([]);expect(store.getItem(XP_OUTBOX_QUARANTINE_KEY)).toContain("owner_missing_or_invalid");expect(store.getItem(XP_OUTBOX_KEY)).toContain("legacy");});
   it("stores a safe current state without amount, full media, private note or data URL",()=>{const store=storage();const item=queueXpMediaState({...planning,coverImage:"data:image/png;base64,secret"},"u",false,store);expect(item?.safeMediaState).toMatchObject({status:"planning",progress:0,totalProgress:500,hasRating:false,deleted:false});expect(item).not.toHaveProperty("amount");expect(JSON.stringify(item)).not.toContain("private");expect(JSON.stringify(item)).not.toContain("data:image");});
   it("coalesces by user and canonical media so the latest state wins",()=>{const store=storage();const first=queueXpMediaState(planning,"u",false,store);const latest=queueXpMediaState({...planning,status:"completed",currentProgress:500},"u",false,store);expect(first).not.toBeNull();expect(loadXpOutbox(store)).toHaveLength(1);expect(loadXpOutbox(store)[0]).toMatchObject({id:latest?.id,deleted:false,safeMediaState:{status:"completed"}});});
   it("keeps an offline delete tombstone",()=>{const store=storage();queueXpMediaState(planning,"u",true,store);expect(loadXpOutbox(store)[0]).toMatchObject({deleted:true,safeMediaState:{deleted:true}});});

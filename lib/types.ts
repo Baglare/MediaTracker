@@ -299,11 +299,10 @@ export interface SyncQueueItem {
   createdAt: string;
   retryCount: number;
   lastError?: string;
+  ownerScope: string;
   /**
-   * Item'ı oluşturan kullanıcının id'si.
-   * - string: bu kullanıcıya aitse flush edilir.
-   * - null/undefined: anonim (login öncesi); login olunca o kullanıcıya adopte edilir.
-   * - başka bir userId: orphan; mevcut kullanıcının flush'ında atlanır.
+   * Authenticated owner için Supabase user id. Guest öğesinde bulunmaz ve
+   * login sonrasında başka bir owner'a yeniden etiketlenmez.
    */
-  userId?: string | null;
+  userId?: string;
 }

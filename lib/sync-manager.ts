@@ -13,7 +13,15 @@ import type {
   SyncOperation,
   SyncQueueItem,
 } from "./types";
-import { loadSyncQueue, saveSyncQueue } from "./sync-queue";
+import {
+  loadSyncQueue,
+  quarantineLegacyOwnerlessQueue,
+  saveSyncQueue,
+} from "./sync-queue";
+import {
+  createUserOwnerScope,
+  type LocalOwnerScope,
+} from "./local-owner-scope";
 import {
   deleteMediaItem,
   uploadMediaItems,
@@ -21,9 +29,9 @@ import {
 } from "./supabase/cloud-repository";
 
 export interface SyncSnapshot {
-  /** Mevcut kullanıcı için flush edilebilecek item sayısı (kendi + anonim). */
+  /** Aktif owner scope'taki bekleyen item sayısı. Guest öğeleri flush edilmez. */
   pending: number;
-  /** Başka kullanıcıya ait, mevcut kullanıcıyla flush edilemeyecek item sayısı. */
+  /** Aktif scoped key içinde owner doğrulamasını geçemeyen öğe sayısı. */
   orphaned: number;
   syncing: boolean;
   online: boolean;
@@ -35,7 +43,8 @@ export interface SyncSnapshot {
 type Listener = () => void;
 
 // ---- Modül durumu ----
-let userId: string | null = null;
+let ownerScope: LocalOwnerScope | null = null;
+let ownerGeneration = 0;
 let syncing = false;
 let lastError: string | null = null;
 let lastSyncAt: string | null = null;
@@ -56,18 +65,17 @@ const serverSnapshot: SyncSnapshot = {
 
 function isFlushableForCurrentUser(item: SyncQueueItem): boolean {
   // Anonim (login öncesi) → her zaman adopte edilebilir
-  if (!item.userId) return true;
+  if (!ownerScope || ownerScope.kind !== "user") return false;
   // Kullanıcı yoksa hiçbir şey flush edilmez
-  if (!userId) return false;
-  return item.userId === userId;
+  return item.ownerScope === ownerScope.key && item.userId === ownerScope.userId;
 }
 
 function computeSnapshot(): SyncSnapshot {
-  const queue = loadSyncQueue();
+  const queue = ownerScope ? loadSyncQueue(ownerScope) : [];
   let pending = 0;
   let orphaned = 0;
   for (const it of queue) {
-    if (!userId) {
+    if (!ownerScope || ownerScope.kind === "guest") {
       // Login yok → hepsi "bekliyor" sayılır, orphan kavramı uygulanmaz
       pending++;
     } else if (isFlushableForCurrentUser(it)) {
@@ -83,7 +91,7 @@ function computeSnapshot(): SyncSnapshot {
     online,
     lastError,
     lastSyncAt,
-    hasUser: !!userId,
+    hasUser: ownerScope?.kind === "user",
   };
 }
 
@@ -129,10 +137,16 @@ export function subscribe(l: Listener): () => void {
 }
 
 export function setUserId(id: string | null): void {
-  if (userId === id) return;
-  userId = id;
+  setOwnerScope(id ? createUserOwnerScope(id) : null);
+}
+
+export function setOwnerScope(scope: LocalOwnerScope | null): void {
+  if (ownerScope?.key === scope?.key) return;
+  ownerScope = scope;
+  ownerGeneration += 1;
+  quarantineLegacyOwnerlessQueue();
   notify();
-  if (userId && online) void flush();
+  if (ownerScope?.kind === "user" && online) void flush();
 }
 
 // ---- Enqueue helpers (coalescing'le) ----
@@ -160,6 +174,7 @@ function coalesceQueue(queue: SyncQueueItem[], fresh: SyncQueueItem): SyncQueueI
   if (!freshPayloadId) return [...queue, fresh];
 
   const filtered = queue.filter((existing) => {
+    if (existing.ownerScope !== fresh.ownerScope) return true;
     if (existing.entity !== fresh.entity) return true;
     const existingId = payloadId(existing);
     if (existingId !== freshPayloadId) return true;
@@ -173,6 +188,7 @@ function enqueueRaw(input: {
   operation: SyncOperation;
   payload: unknown;
 }): void {
+  if (!ownerScope) return;
   const item: SyncQueueItem = {
     id: generateQueueId(),
     entity: input.entity,
@@ -181,12 +197,13 @@ function enqueueRaw(input: {
     createdAt: new Date().toISOString(),
     retryCount: 0,
     // Login varsa kullanıcıya bağla; yoksa anonim — sonradan adopte edilir.
-    userId: userId,
+    ownerScope: ownerScope.key,
+    userId: ownerScope.kind === "user" ? ownerScope.userId : undefined,
   };
-  const next = coalesceQueue(loadSyncQueue(), item);
-  saveSyncQueue(next);
+  const next = coalesceQueue(loadSyncQueue(ownerScope), item);
+  saveSyncQueue(ownerScope, next);
   notify();
-  if (userId && online && !syncing) {
+  if (ownerScope.kind === "user" && online && !syncing) {
     void flush();
   }
 }
@@ -201,6 +218,22 @@ export function enqueueMediaDelete(id: string): void {
 
 export function enqueueProgressLog(log: ProgressLog): void {
   enqueueRaw({ entity: "progress_log", operation: "upsert", payload: log });
+}
+
+export function enqueueOwnedSnapshotSyncPlan(
+  scope: LocalOwnerScope,
+  mediaItems: MediaItem[],
+  progressLogs: ProgressLog[],
+): boolean {
+  if (
+    scope.kind !== "user"
+    || ownerScope?.key !== scope.key
+  ) {
+    return false;
+  }
+  mediaItems.forEach(enqueueMediaUpsert);
+  progressLogs.forEach(enqueueProgressLog);
+  return true;
 }
 
 // ---- Flush ----
@@ -240,13 +273,15 @@ function shortenError(msg: string): string {
 
 export async function flush(): Promise<void> {
   if (syncing) return;
-  if (!userId) return;
+  if (!ownerScope || ownerScope.kind !== "user") return;
   if (!online) return;
 
-  const snapshot = loadSyncQueue();
-  // Yalnızca mevcut kullanıcıya ait + anonim item'ları işle.
-  // Başka userId'ye ait item'lar (orphan) bu flush'ta dokunulmaz.
-  const eligible = snapshot.filter(isFlushableForCurrentUser);
+  const flushScope = ownerScope;
+  const flushGeneration = ownerGeneration;
+  const snapshot = loadSyncQueue(flushScope);
+  const eligible = snapshot.filter((item) =>
+    item.ownerScope === flushScope.key && item.userId === flushScope.userId
+  );
   if (eligible.length === 0) return;
 
   syncing = true;
@@ -258,7 +293,7 @@ export async function flush(): Promise<void> {
 
   for (const item of eligible) {
     try {
-      const res = await processItem(userId, item);
+      const res = await processItem(flushScope.userId, item);
       if (res.ok) {
         successIds.add(item.id);
       } else {
@@ -277,19 +312,26 @@ export async function flush(): Promise<void> {
   }
 
   // Flush sırasında yeni item eklenmiş olabilir → güncel kuyruğu yeniden yükle
-  const current = loadSyncQueue();
+  const current = loadSyncQueue(flushScope);
   const next = current
     .filter((i) => !successIds.has(i.id))
     .map((i) => {
       const f = failures.get(i.id);
       if (f) return { ...i, retryCount: f.retryCount, lastError: f.lastError };
-      // Anonim item başarıyla adopte edildiyse userId'sini etiketle
-      if (!i.userId && successIds.has(i.id)) return { ...i, userId };
       return i;
     });
-  saveSyncQueue(next);
+  try {
+    saveSyncQueue(flushScope, next);
+  } catch {
+    failures.set("queue-write", { retryCount: 1, lastError: "Sync queue kaydedilemedi." });
+  }
 
   syncing = false;
+  if (flushGeneration !== ownerGeneration) {
+    notify();
+    if (ownerScope?.kind === "user" && online) void flush();
+    return;
+  }
   if (failures.size > 0) {
     const last = Array.from(failures.values()).pop();
     lastError = last?.lastError ?? "Senkron hatası.";
@@ -300,20 +342,9 @@ export async function flush(): Promise<void> {
   notify();
 }
 
-/**
- * Mevcut kullanıcıyla flush edilemeyen orphan item'ları kuyruktan siler.
- * Login değişimi sonrası kullanıcı tarafından manuel tetiklenir.
- */
+/** Scoped queue modeli foreign kayıt silmez; legacy ownerless veri quarantine'de korunur. */
 export function clearOrphanedQueue(): number {
-  if (!userId) return 0;
-  const all = loadSyncQueue();
-  const kept = all.filter(isFlushableForCurrentUser);
-  const removed = all.length - kept.length;
-  if (removed > 0) {
-    saveSyncQueue(kept);
-    notify();
-  }
-  return removed;
+  return 0;
 }
 
 /**

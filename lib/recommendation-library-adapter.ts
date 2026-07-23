@@ -1,12 +1,13 @@
 import { getProgressUnit } from "./progress";
 import {
-  loadMediaList,
-  loadProgressLogs,
-  saveLibrarySnapshot,
+  loadScopedMediaList,
+  loadScopedProgressLogs,
+  saveScopedLibrarySnapshot,
   type StorageWriteResult,
 } from "./storage";
+import { createUserOwnerScope } from "./local-owner-scope";
 import type { MediaItem, ProgressLog } from "./types";
-import { enqueueMediaUpsert, enqueueProgressLog } from "./sync-manager";
+import { enqueueMediaUpsert, enqueueProgressLog, setOwnerScope } from "./sync-manager";
 import {
   flushSocialOutbox,
   queueMediaSocialEvents,
@@ -33,8 +34,9 @@ export function addRecommendationToLocalLibrary(
   item: MediaItem,
   userId: string,
 ): RecommendationLibraryWriteResult {
-  const mediaRead = loadMediaList();
-  const logsRead = loadProgressLogs();
+  const scope = createUserOwnerScope(userId);
+  const mediaRead = loadScopedMediaList(scope);
+  const logsRead = loadScopedProgressLogs(scope);
   if (!readable(mediaRead) || !readable(logsRead)) {
     return { ok: false, message: "Yerel kütüphane recovery gerektirdiği için öneri eklenemedi." };
   }
@@ -62,14 +64,17 @@ export function addRecommendationToLocalLibrary(
     newProgress: item.currentProgress,
     createdAt: new Date().toISOString(),
   };
-  const writeResult = saveLibrarySnapshot(
+  const writeResult = saveScopedLibrarySnapshot(
+    scope,
     [...currentMedia, item],
     [...currentLogs, addedLog],
+    "user",
   );
   if (!writeResult.ok) {
     return { ok: false, message: writeResult.message, writeResult };
   }
 
+  setOwnerScope(scope);
   enqueueMediaUpsert(item);
   enqueueProgressLog(addedLog);
   queueXpMediaState(item, userId);

@@ -12,7 +12,8 @@ import { StatCard } from "@/components/ui/stat-card";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { WORLD_THEME_REGISTRY } from "@/lib/personalization/world-theme-registry";
 import { guardXpFullSync } from "@/lib/library-hydration";
-import { loadMediaList } from "@/lib/storage";
+import { createUserOwnerScope } from "@/lib/local-owner-scope";
+import { loadScopedMediaList } from "@/lib/storage";
 import { buildSafeMediaState, earnedWorldTitles, xpEventLabel, XP_TRUST_LABELS } from "@/lib/xp/progression";
 import type { XpDashboardSummary, XpWorldKey } from "@/lib/xp/types";
 import { parseXpDashboard } from "@/lib/xp/validation";
@@ -20,7 +21,7 @@ import { parseXpDashboard } from "@/lib/xp/validation";
 const BRANCH_LABELS = { tracker: "İz Sürücü", explorer: "Kaşif", critic: "Eleştirmen", curator: "Küratör", connector: "Bağ Kurucu" } as const;
 const WORLD_ICONS = { east: Swords, screen: Clapperboard, arch: BookOpen } as const;
 
-export function ProgressionDashboard() {
+export function ProgressionDashboard({ userId }: { userId: string }) {
   const [summary, setSummary] = useState<XpDashboardSummary>();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>();
@@ -50,7 +51,7 @@ export function ProgressionDashboard() {
 
   async function synchronizeLibrary() {
     setMessage(undefined);
-    const guard = guardXpFullSync(loadMediaList());
+    const guard = guardXpFullSync(loadScopedMediaList(createUserOwnerScope(userId)));
     if (!guard.allowed) {
       setMessage(
         guard.reason === "library_data_corrupt"

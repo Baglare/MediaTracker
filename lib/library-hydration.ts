@@ -1,10 +1,15 @@
 import type { MediaItem, ProgressLog } from "./types";
-import type { StorageReadResult, StorageReadStatus } from "./local-data-storage";
+import type {
+  LocalDatasetOrigin,
+  StorageReadResult,
+  StorageReadStatus,
+} from "./local-data-storage";
 
 export type LibraryIntegrity =
   | "pending"
   | "valid"
   | "corrupt"
+  | "owner_mismatch"
   | "unsupported_version"
   | "migration_failed"
   | "storage_unavailable";
@@ -14,6 +19,7 @@ export interface LibraryHydrationResult {
   mediaItems: MediaItem[];
   progressLogs: ProgressLog[];
   usedDemoData: boolean;
+  datasetOrigin: LocalDatasetOrigin;
   requiresInitialWrite: boolean;
   mediaReadStatus: StorageReadStatus;
   progressReadStatus: StorageReadStatus;
@@ -33,6 +39,7 @@ function blockingIntegrity(
   status: StorageReadStatus,
 ): Exclude<LibraryIntegrity, "pending" | "valid"> | null {
   if (status === "corrupt") return "corrupt";
+  if (status === "owner_mismatch") return "owner_mismatch";
   if (status === "unsupported_version") return "unsupported_version";
   if (status === "migration_failed") return "migration_failed";
   if (status === "storage_unavailable") return "storage_unavailable";
@@ -43,6 +50,7 @@ export function resolveLibraryHydration(args: {
   media: StorageReadResult<MediaItem[]>;
   progressLogs: StorageReadResult<ProgressLog[]>;
   demoItems: MediaItem[];
+  allowDemoData?: boolean;
 }): LibraryHydrationResult {
   const blocked = blockingIntegrity(args.media.status) ?? blockingIntegrity(args.progressLogs.status);
   const issues = [...args.media.issues, ...args.progressLogs.issues].map((entry) => entry.message);
@@ -52,6 +60,7 @@ export function resolveLibraryHydration(args: {
       mediaItems: [],
       progressLogs: [],
       usedDemoData: false,
+      datasetOrigin: "user",
       requiresInitialWrite: false,
       mediaReadStatus: args.media.status,
       progressReadStatus: args.progressLogs.status,
@@ -61,11 +70,16 @@ export function resolveLibraryHydration(args: {
 
   const mediaMissing = args.media.status === "missing";
   const logsMissing = args.progressLogs.status === "missing";
+  const useDemoData = mediaMissing && args.allowDemoData !== false;
+  const datasetOrigin = useDemoData
+    ? "demo"
+    : args.media.datasetOrigin ?? args.progressLogs.datasetOrigin ?? "user";
   return {
     integrity: "valid",
-    mediaItems: mediaMissing ? args.demoItems : args.media.data ?? [],
+    mediaItems: useDemoData ? args.demoItems : args.media.data ?? [],
     progressLogs: args.progressLogs.data ?? [],
-    usedDemoData: mediaMissing,
+    usedDemoData: useDemoData,
+    datasetOrigin,
     requiresInitialWrite: mediaMissing || logsMissing,
     mediaReadStatus: args.media.status,
     progressReadStatus: args.progressLogs.status,
@@ -86,4 +100,15 @@ export function guardXpFullSync(
     return { allowed: false, reason: "library_migration_required" };
   }
   return { allowed: false, reason: "library_data_unavailable" };
+}
+
+export function materializeDemoDatasetMutation(
+  demoItems: MediaItem[],
+  nextItems: MediaItem[],
+): MediaItem[] {
+  const demoById = new Map(demoItems.map((item) => [item.id, JSON.stringify(item)]));
+  return nextItems.filter((item) => {
+    const original = demoById.get(item.id);
+    return original === undefined || original !== JSON.stringify(item);
+  });
 }

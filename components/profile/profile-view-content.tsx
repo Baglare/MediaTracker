@@ -11,7 +11,7 @@ import { useMediaLibrary } from "@/hooks/use-media-library";
 import { calculateUserProgression, type UserProgression } from "@/lib/user-progression";
 
 export function ProfileViewContent({ userId, remoteProgression, onLocalProgression }: {
-  userId: string | null;
+  userId: string | null | undefined;
   remoteProgression?: UserProgression;
   onLocalProgression?: (progression: UserProgression) => void;
 }) {

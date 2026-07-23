@@ -12,7 +12,7 @@ import { calculateUserProgression, type UserProgression } from "@/lib/user-progr
 export function ProfileEditorPanel({ authConfigured, authenticated, userId, localPreferences, onLocalPreferencesChange, profileName, selectedTitle, progression, onClose }: {
   authConfigured: boolean;
   authenticated: boolean;
-  userId: string | null;
+  userId: string | null | undefined;
   localPreferences: ProfilePreferences;
   onLocalPreferencesChange: (value: ProfilePreferences) => void;
   profileName: string;
@@ -50,7 +50,7 @@ export function ProfileEditorPanel({ authConfigured, authenticated, userId, loca
       <div className="flex items-center justify-between gap-3"><div><h2 className="text-xl font-bold">Profili düzenle</h2><p className="mt-1 text-sm text-[var(--app-text-muted)]">Kimlik, sunum ve paylaşım ayarları yalnız bu modda yüklenir.</p></div><button type="button" onClick={onClose} className="rounded-xl border border-[var(--app-border)] px-4 py-2 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-focus)]">Profile dön</button></div>
       {state === "loading" && <div className="app-panel h-64 animate-pulse rounded-3xl" aria-label="Profil editörü yükleniyor" />}
       {state === "offline" && <p role="alert" className="rounded-xl border border-[var(--app-warning)] bg-[var(--app-warning-soft)] px-4 py-3 text-sm text-[var(--app-warning)]">Cloud editör verileri şu anda yüklenemedi. Yerel kimlik düzenleme alanı kullanılabilir.</p>}
-      {state !== "loading" && isLoaded && <UnifiedProfileEditor initialData={cloud} authConfigured={authConfigured} authenticated={authenticated} userId={userId} localPreferences={localPreferences} onLocalPreferencesChange={onLocalPreferencesChange} profileName={profileName} selectedTitle={selectedTitle} media={mediaList} progression={progression ?? fallbackProgression} socialAvatarUrl={cloud?.profile?.avatarUrl} onProfileChanged={loadCloud} />}
+      {state !== "loading" && isLoaded && <UnifiedProfileEditor initialData={cloud} authConfigured={authConfigured} authenticated={authenticated} userId={userId ?? null} localPreferences={localPreferences} onLocalPreferencesChange={onLocalPreferencesChange} profileName={profileName} selectedTitle={selectedTitle} media={mediaList} progression={progression ?? fallbackProgression} socialAvatarUrl={cloud?.profile?.avatarUrl} onProfileChanged={loadCloud} />}
       {state !== "loading" && !isLoaded && <div className="app-panel h-40 animate-pulse rounded-2xl" aria-label="Yerel profil verileri yükleniyor" />}
     </div>
   );

@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { ProfileAvatar } from "@/components/sidebar-profile-card";
-import { loadMediaList } from "@/lib/storage";
+import { loadScopedMediaList } from "@/lib/storage";
+import { createUserOwnerScope } from "@/lib/local-owner-scope";
 import { mediaToSocialSnapshot, type SocialMediaEntitySnapshot } from "@/lib/social/interactions";
 import { recipientRelationshipLabel, recipientSelectionMode } from "@/lib/social/recommendation-presentation";
 import type { SocialPersonSummary } from "@/lib/social/types";
@@ -14,7 +15,7 @@ export function storeRecommendationDraft(media: MediaItem): void {
   if (typeof window !== "undefined") sessionStorage.setItem(DRAFT_KEY, JSON.stringify(mediaToSocialSnapshot(media)));
 }
 
-export function RecommendationComposer({ initialRecipientId, onSent, onCancel }: { initialRecipientId?: string; onSent?: () => void; onCancel?: () => void }) {
+export function RecommendationComposer({ userId, initialRecipientId, onSent, onCancel }: { userId: string; initialRecipientId?: string; onSent?: () => void; onCancel?: () => void }) {
   const [recipient, setRecipient] = useState<SocialPersonSummary>();
   const [initialRecipientResolved, setInitialRecipientResolved] = useState(false);
   const [query, setQuery] = useState("");
@@ -28,14 +29,14 @@ export function RecommendationComposer({ initialRecipientId, onSent, onCancel }:
 
   useEffect(() => {
     void Promise.resolve().then(() => {
-      const read = loadMediaList();
+      const read = loadScopedMediaList(createUserOwnerScope(userId));
       setMedia(read.status === "valid" || read.status === "empty" ? read.data ?? [] : []);
       try {
         const raw = sessionStorage.getItem(DRAFT_KEY);
         if (raw) { setDraft(JSON.parse(raw) as SocialMediaEntitySnapshot); sessionStorage.removeItem(DRAFT_KEY); }
       } catch { /* Invalid draft is ignored. */ }
     });
-  }, []);
+  }, [userId]);
 
   useEffect(() => {
     if (!initialRecipientId || initialRecipientResolved) return;

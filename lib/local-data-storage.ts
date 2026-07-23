@@ -4,13 +4,19 @@ import {
   decodeProgressLogs,
   type RecordCodecIssue,
 } from "./local-data-codec";
+import {
+  isLocalOwnerScope,
+  type LocalOwnerScope,
+} from "./local-owner-scope";
 
 export type LocalDataDomain = "media-library" | "progress-logs";
+export type LocalDatasetOrigin = "demo" | "user" | "legacy";
 export type StorageReadStatus =
   | "missing"
   | "valid"
   | "empty"
   | "corrupt"
+  | "owner_mismatch"
   | "unsupported_version"
   | "migration_failed"
   | "storage_unavailable";
@@ -30,13 +36,27 @@ export interface StorageReadResult<T> {
   schemaVersion?: number;
   issues: StorageReadIssue[];
   rawBackupKey?: string;
+  ownerScope?: string;
+  datasetOrigin?: LocalDatasetOrigin;
+}
+
+export interface LegacyLocalDataEnvelope<T> {
+  format: "mediatracker-local-data";
+  domain: LocalDataDomain;
+  schemaVersion: 1;
+  writerVersion: "D1B.1";
+  writtenAt: string;
+  recordCount: number;
+  records: T[];
 }
 
 export interface LocalDataEnvelope<T> {
   format: "mediatracker-local-data";
   domain: LocalDataDomain;
-  schemaVersion: 1;
-  writerVersion: "D1B.1";
+  schemaVersion: 2;
+  writerVersion: "D1B.2A";
+  ownerScope: string;
+  datasetOrigin: LocalDatasetOrigin;
   writtenAt: string;
   recordCount: number;
   records: T[];
@@ -76,13 +96,28 @@ export interface LocalStorageLike {
 }
 
 export const LOCAL_DATA_FORMAT = "mediatracker-local-data" as const;
-export const LOCAL_DATA_SCHEMA_VERSION = 1 as const;
+export const LOCAL_DATA_SCHEMA_VERSION = 2 as const;
+export const UNSCOPED_LOCAL_DATA_SCHEMA_VERSION = 1 as const;
 
 /**
- * D1B.2 kullanıcı namespace'i bu builder'a eklenecek. D1B.1 anahtarlarında
- * bilinçli olarak user id bulunmaz.
+ * Scope verilmediğinde yalnız sahipliği belirsiz D1B.1 migration kaynağını,
+ * scope verildiğinde aktif D1B.2A current/temp/backup slotlarını üretir.
  */
-export function buildLocalDataKeys(domain: LocalDataDomain): LocalDataKeySet {
+export function buildLocalDataKeys(
+  domain: LocalDataDomain,
+  scope?: LocalOwnerScope,
+): LocalDataKeySet {
+  if (scope) {
+    const domainKey = domain === "media-library" ? "media" : "progressLogs";
+    const base = `mediaTracker:data:v2:${scope.storageKey}:${domainKey}`;
+    return {
+      current: base,
+      temp: `${base}:temp`,
+      backup: `${base}:backup`,
+      legacy: domain === "media-library" ? "media-tracker-list" : "media-tracker-logs",
+      legacyRawBackup: `mediaTracker:legacyBackup:${scope.storageKey}:${domain}:v1`,
+    };
+  }
   if (domain === "media-library") {
     return {
       current: "mediaTracker:data:media:v1",
@@ -147,12 +182,27 @@ function createEnvelope<T>(
   domain: LocalDataDomain,
   records: T[],
   writtenAt = new Date().toISOString(),
-): LocalDataEnvelope<T> {
+  scope?: LocalOwnerScope,
+  datasetOrigin: LocalDatasetOrigin = "user",
+): LocalDataEnvelope<T> | LegacyLocalDataEnvelope<T> {
+  if (!scope) {
+    return {
+      format: LOCAL_DATA_FORMAT,
+      domain,
+      schemaVersion: UNSCOPED_LOCAL_DATA_SCHEMA_VERSION,
+      writerVersion: "D1B.1",
+      writtenAt,
+      recordCount: records.length,
+      records,
+    };
+  }
   return {
     format: LOCAL_DATA_FORMAT,
     domain,
     schemaVersion: LOCAL_DATA_SCHEMA_VERSION,
-    writerVersion: "D1B.1",
+    writerVersion: "D1B.2A",
+    ownerScope: scope.key,
+    datasetOrigin,
     writtenAt,
     recordCount: records.length,
     records,
@@ -180,6 +230,9 @@ type EnvelopeDecode =
       ok: true;
       records: MediaItem[] | ProgressLog[];
       writtenAt: string;
+      schemaVersion: number;
+      ownerScope?: string;
+      datasetOrigin?: LocalDatasetOrigin;
       issues: StorageReadIssue[];
     }
   | {
@@ -188,7 +241,11 @@ type EnvelopeDecode =
       issues: StorageReadIssue[];
     };
 
-function decodeEnvelopeRaw(raw: string, expectedDomain: LocalDataDomain): EnvelopeDecode {
+function decodeEnvelopeRaw(
+  raw: string,
+  expectedDomain: LocalDataDomain,
+  expectedScope?: LocalOwnerScope,
+): EnvelopeDecode {
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
@@ -227,7 +284,10 @@ function decodeEnvelopeRaw(raw: string, expectedDomain: LocalDataDomain): Envelo
       issues: [{ code: "invalid_schema_version", message: "Local data schemaVersion geçersiz." }],
     };
   }
-  if (parsed.schemaVersion > LOCAL_DATA_SCHEMA_VERSION) {
+  const expectedVersion = expectedScope
+    ? LOCAL_DATA_SCHEMA_VERSION
+    : UNSCOPED_LOCAL_DATA_SCHEMA_VERSION;
+  if (parsed.schemaVersion > expectedVersion) {
     return {
       ok: false,
       status: "unsupported_version",
@@ -237,7 +297,7 @@ function decodeEnvelopeRaw(raw: string, expectedDomain: LocalDataDomain): Envelo
       }],
     };
   }
-  if (parsed.schemaVersion < LOCAL_DATA_SCHEMA_VERSION) {
+  if (parsed.schemaVersion < expectedVersion) {
     return {
       ok: false,
       status: "migration_failed",
@@ -246,6 +306,36 @@ function decodeEnvelopeRaw(raw: string, expectedDomain: LocalDataDomain): Envelo
         message: `Local data schema v${parsed.schemaVersion} için migration bulunamadı.`,
       }],
     };
+  }
+  let ownerScope: string | undefined;
+  let datasetOrigin: LocalDatasetOrigin | undefined;
+  if (expectedScope) {
+    if (typeof parsed.ownerScope !== "string" || parsed.ownerScope !== expectedScope.key) {
+      return {
+        ok: false,
+        status: "owner_mismatch",
+        issues: [{
+          code: "owner_scope_mismatch",
+          message: "Local data envelope farkli bir owner scope'a ait.",
+        }],
+      };
+    }
+    if (
+      parsed.datasetOrigin !== "demo"
+      && parsed.datasetOrigin !== "user"
+      && parsed.datasetOrigin !== "legacy"
+    ) {
+      return {
+        ok: false,
+        status: "corrupt",
+        issues: [{
+          code: "invalid_dataset_origin",
+          message: "Local data datasetOrigin degeri gecersiz.",
+        }],
+      };
+    }
+    ownerScope = parsed.ownerScope;
+    datasetOrigin = parsed.datasetOrigin;
   }
   if (!Array.isArray(parsed.records)) {
     return {
@@ -276,6 +366,9 @@ function decodeEnvelopeRaw(raw: string, expectedDomain: LocalDataDomain): Envelo
     ok: true,
     records: decoded.records,
     writtenAt: parsed.writtenAt,
+    schemaVersion: parsed.schemaVersion,
+    ownerScope,
+    datasetOrigin,
     issues: decoded.repairs.map((entry) => ({
       code: entry.code,
       message: entry.message,
@@ -325,8 +418,9 @@ function readCurrent<T>(
   raw: string,
   sourceKey: string,
   target: LocalStorageLike,
+  scope?: LocalOwnerScope,
 ): StorageReadResult<T> {
-  const decoded = decodeEnvelopeRaw(raw, domain);
+  const decoded = decodeEnvelopeRaw(raw, domain, scope);
   if (!decoded.ok) {
     const rawBackupKey = decoded.status === "corrupt"
       ? quarantineRaw(target, domain, sourceKey, raw, decoded.issues)
@@ -334,7 +428,11 @@ function readCurrent<T>(
     return {
       status: decoded.status,
       sourceKey,
-      schemaVersion: decoded.status === "unsupported_version" ? undefined : LOCAL_DATA_SCHEMA_VERSION,
+      schemaVersion: decoded.status === "unsupported_version"
+        ? undefined
+        : scope
+          ? LOCAL_DATA_SCHEMA_VERSION
+          : UNSCOPED_LOCAL_DATA_SCHEMA_VERSION,
       issues: decoded.issues,
       rawBackupKey,
     };
@@ -344,7 +442,9 @@ function readCurrent<T>(
     status: decoded.records.length === 0 ? "empty" : "valid",
     data,
     sourceKey,
-    schemaVersion: LOCAL_DATA_SCHEMA_VERSION,
+    schemaVersion: decoded.schemaVersion,
+    ownerScope: decoded.ownerScope,
+    datasetOrigin: decoded.datasetOrigin,
     issues: decoded.issues,
   };
 }
@@ -352,8 +452,9 @@ function readCurrent<T>(
 function readDomain<T>(
   domain: LocalDataDomain,
   target: LocalStorageLike | null,
+  scope?: LocalOwnerScope,
 ): StorageReadResult<T> {
-  const keys = buildLocalDataKeys(domain);
+  const keys = buildLocalDataKeys(domain, scope);
   if (!target) {
     return {
       status: "storage_unavailable",
@@ -372,7 +473,11 @@ function readDomain<T>(
       issues: [{ code: "storage_read_failed", message: "Local data okunamadı." }],
     };
   }
-  if (currentRaw !== null) return readCurrent<T>(domain, currentRaw, keys.current, target);
+  if (currentRaw !== null) return readCurrent<T>(domain, currentRaw, keys.current, target, scope);
+
+  if (scope) {
+    return { status: "missing", sourceKey: keys.current, issues: [], ownerScope: scope.key };
+  }
 
   let legacyRaw: string | null;
   try {
@@ -449,7 +554,7 @@ function readDomain<T>(
     status: decoded.records.length === 0 ? "empty" : "valid",
     data: decoded.records as T,
     sourceKey: keys.current,
-    schemaVersion: LOCAL_DATA_SCHEMA_VERSION,
+    schemaVersion: UNSCOPED_LOCAL_DATA_SCHEMA_VERSION,
     issues: decoded.repairs.map((entry) => ({
       code: entry.code,
       message: entry.message,
@@ -487,6 +592,8 @@ function writeDomain<T>(
   domain: LocalDataDomain,
   records: T[],
   target: LocalStorageLike | null,
+  scope?: LocalOwnerScope,
+  datasetOrigin: LocalDatasetOrigin = "user",
 ): StorageWriteResult {
   if (!target) {
     return {
@@ -496,11 +603,11 @@ function writeDomain<T>(
       recoverable: true,
     };
   }
-  const keys = buildLocalDataKeys(domain);
+  const keys = buildLocalDataKeys(domain, scope);
   const writtenAt = new Date().toISOString();
   let serialized: string;
   try {
-    serialized = JSON.stringify(createEnvelope(domain, records, writtenAt));
+    serialized = JSON.stringify(createEnvelope(domain, records, writtenAt, scope, datasetOrigin));
   } catch {
     return {
       ok: false,
@@ -522,7 +629,7 @@ function writeDomain<T>(
     removeQuietly(target, keys.temp);
     return writeFailure(error, "Temp local data doğrulanamadı; mevcut veri korundu.");
   }
-  if (tempRaw === null || !decodeEnvelopeRaw(tempRaw, domain).ok) {
+  if (tempRaw === null || !decodeEnvelopeRaw(tempRaw, domain, scope).ok) {
     removeQuietly(target, keys.temp);
     return {
       ok: false,
@@ -541,7 +648,7 @@ function writeDomain<T>(
   }
   let backupCreated = false;
   if (previousCurrent !== null) {
-    if (!decodeEnvelopeRaw(previousCurrent, domain).ok) {
+    if (!decodeEnvelopeRaw(previousCurrent, domain, scope).ok) {
       removeQuietly(target, keys.temp);
       return {
         ok: false,
@@ -553,7 +660,7 @@ function writeDomain<T>(
     try {
       target.setItem(keys.backup, previousCurrent);
       const backupRaw = target.getItem(keys.backup);
-      if (backupRaw !== previousCurrent || !decodeEnvelopeRaw(backupRaw, domain).ok) {
+      if (backupRaw !== previousCurrent || !decodeEnvelopeRaw(backupRaw, domain, scope).ok) {
         removeQuietly(target, keys.temp);
         return {
           ok: false,
@@ -572,7 +679,7 @@ function writeDomain<T>(
   try {
     target.setItem(keys.current, serialized);
     const currentRaw = target.getItem(keys.current);
-    if (currentRaw !== serialized || !decodeEnvelopeRaw(currentRaw, domain).ok) {
+    if (currentRaw !== serialized || !decodeEnvelopeRaw(currentRaw, domain, scope).ok) {
       if (!restoreRaw(target, keys.current, previousCurrent)) {
         return {
           ok: false,
@@ -604,10 +711,24 @@ export function loadMediaList(
   return readDomain<MediaItem[]>("media-library", target);
 }
 
+export function loadScopedMediaList(
+  scope: LocalOwnerScope,
+  target: LocalStorageLike | null = browserStorage(),
+): StorageReadResult<MediaItem[]> {
+  return readDomain<MediaItem[]>("media-library", target, scope);
+}
+
 export function loadProgressLogs(
   target: LocalStorageLike | null = browserStorage(),
 ): StorageReadResult<ProgressLog[]> {
   return readDomain<ProgressLog[]>("progress-logs", target);
+}
+
+export function loadScopedProgressLogs(
+  scope: LocalOwnerScope,
+  target: LocalStorageLike | null = browserStorage(),
+): StorageReadResult<ProgressLog[]> {
+  return readDomain<ProgressLog[]>("progress-logs", target, scope);
 }
 
 export function saveMediaList(
@@ -642,10 +763,64 @@ export function saveProgressLogs(
   return writeDomain("progress-logs", decoded.records, target);
 }
 
-export function saveLibrarySnapshot(
+export function saveScopedMediaList(
+  scope: LocalOwnerScope,
+  list: MediaItem[],
+  datasetOrigin: LocalDatasetOrigin,
+  target: LocalStorageLike | null = browserStorage(),
+): StorageWriteResult {
+  if (!isLocalOwnerScope(scope)) {
+    return {
+      ok: false,
+      code: "verification_failed",
+      message: "Local owner scope gecersiz.",
+      recoverable: false,
+    };
+  }
+  const decoded = decodeMediaItems(list);
+  if (!decoded.ok) {
+    return {
+      ok: false,
+      code: "verification_failed",
+      message: `Media kayitlari runtime codec dogrulamasini gecemedi (${decoded.issues.length} sorun).`,
+      recoverable: true,
+    };
+  }
+  return writeDomain("media-library", decoded.records, target, scope, datasetOrigin);
+}
+
+export function saveScopedProgressLogs(
+  scope: LocalOwnerScope,
+  logs: ProgressLog[],
+  datasetOrigin: LocalDatasetOrigin,
+  target: LocalStorageLike | null = browserStorage(),
+): StorageWriteResult {
+  if (!isLocalOwnerScope(scope)) {
+    return {
+      ok: false,
+      code: "verification_failed",
+      message: "Local owner scope gecersiz.",
+      recoverable: false,
+    };
+  }
+  const decoded = decodeProgressLogs(logs);
+  if (!decoded.ok) {
+    return {
+      ok: false,
+      code: "verification_failed",
+      message: `Progress log kayitlari runtime codec dogrulamasini gecemedi (${decoded.issues.length} sorun).`,
+      recoverable: true,
+    };
+  }
+  return writeDomain("progress-logs", decoded.records, target, scope, datasetOrigin);
+}
+
+function saveLibrarySnapshotInternal(
   mediaItems: MediaItem[],
   progressLogs: ProgressLog[],
-  target: LocalStorageLike | null = browserStorage(),
+  target: LocalStorageLike | null,
+  scope?: LocalOwnerScope,
+  datasetOrigin: LocalDatasetOrigin = "user",
 ): StorageWriteResult {
   if (!target) {
     return {
@@ -667,17 +842,30 @@ export function saveLibrarySnapshot(
   }
 
   let previousMedia: string | null;
+  const mediaKeys = buildLocalDataKeys("media-library", scope);
   try {
-    previousMedia = target.getItem(MEDIA_DATA_KEYS.current);
+    previousMedia = target.getItem(mediaKeys.current);
   } catch (error) {
     return writeFailure(error, "Mevcut media current slot okunamadı.");
   }
-  const mediaWrite = writeDomain("media-library", mediaDecoded.records, target);
+  const mediaWrite = writeDomain(
+    "media-library",
+    mediaDecoded.records,
+    target,
+    scope,
+    datasetOrigin,
+  );
   if (!mediaWrite.ok) return mediaWrite;
 
-  const logsWrite = writeDomain("progress-logs", logsDecoded.records, target);
+  const logsWrite = writeDomain(
+    "progress-logs",
+    logsDecoded.records,
+    target,
+    scope,
+    datasetOrigin,
+  );
   if (!logsWrite.ok) {
-    if (!restoreRaw(target, MEDIA_DATA_KEYS.current, previousMedia)) {
+    if (!restoreRaw(target, mediaKeys.current, previousMedia)) {
       return {
         ok: false,
         code: "verification_failed",
@@ -692,6 +880,38 @@ export function saveLibrarySnapshot(
     writtenAt: logsWrite.writtenAt,
     backupCreated: mediaWrite.backupCreated || logsWrite.backupCreated,
   };
+}
+
+export function saveLibrarySnapshot(
+  mediaItems: MediaItem[],
+  progressLogs: ProgressLog[],
+  target: LocalStorageLike | null = browserStorage(),
+): StorageWriteResult {
+  return saveLibrarySnapshotInternal(mediaItems, progressLogs, target);
+}
+
+export function saveScopedLibrarySnapshot(
+  scope: LocalOwnerScope,
+  mediaItems: MediaItem[],
+  progressLogs: ProgressLog[],
+  datasetOrigin: LocalDatasetOrigin,
+  target: LocalStorageLike | null = browserStorage(),
+): StorageWriteResult {
+  if (!isLocalOwnerScope(scope)) {
+    return {
+      ok: false,
+      code: "verification_failed",
+      message: "Local owner scope gecersiz.",
+      recoverable: false,
+    };
+  }
+  return saveLibrarySnapshotInternal(
+    mediaItems,
+    progressLogs,
+    target,
+    scope,
+    datasetOrigin,
+  );
 }
 
 export function clearMediaList(

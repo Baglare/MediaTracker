@@ -100,9 +100,9 @@ export function ProfilePageClient({ initialMode = "view" }: { initialMode?: "vie
       />
       {identity.bio && <section className="app-card rounded-2xl border p-5"><h2 className="text-sm font-semibold">Hakkında</h2><p className="mt-2 whitespace-pre-wrap text-sm text-[var(--app-text-secondary)]">{identity.bio}</p></section>}
       {mode === "edit" ? (
-        <ProfileEditorPanel authConfigured={auth.configured} authenticated={Boolean(auth.user)} userId={auth.user?.id ?? null} localPreferences={profilePreferences} onLocalPreferencesChange={setProfilePreferences} profileName={identity.displayName} selectedTitle={selectedTitle} progression={summary ? progression : undefined} onClose={() => changeMode("view")} />
+        <ProfileEditorPanel authConfigured={auth.configured} authenticated={Boolean(auth.user)} userId={auth.loading ? undefined : auth.user?.id ?? null} localPreferences={profilePreferences} onLocalPreferencesChange={setProfilePreferences} profileName={identity.displayName} selectedTitle={selectedTitle} progression={summary ? progression : undefined} onClose={() => changeMode("view")} />
       ) : (
-        <ProfileViewContent userId={auth.user?.id ?? null} remoteProgression={summary ? progression : undefined} onLocalProgression={updateLocalProgression} />
+        <ProfileViewContent userId={auth.loading ? undefined : auth.user?.id ?? null} remoteProgression={summary ? progression : undefined} onLocalProgression={updateLocalProgression} />
       )}
     </div>
   );

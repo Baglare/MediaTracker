@@ -2,7 +2,7 @@
 
 ## Kapsam
 
-Bu belge D1B.1 local media library ve progress-log persistence sözleşmesini tanımlar. Kullanıcı namespace'i, canonical identity, duplicate birleştirme, cloud revision/tombstone, trash UI ve taşınabilir backup formatı bu sözleşmenin parçası değildir.
+Bu belge D1B.1 local media library ve progress-log persistence sözleşmesini tanımlar. D1B.2A owner namespace entegrasyonu, auth geçişi ve queue izolasyonu [LOCAL_DATA_OWNERSHIP_AND_NAMESPACES.md](./LOCAL_DATA_OWNERSHIP_AND_NAMESPACES.md) belgesinde tanımlanır. Canonical identity, duplicate birleştirme, cloud revision/tombstone, trash UI ve taşınabilir backup formatı bu sözleşmenin parçası değildir.
 
 ## Envelope formatı
 
@@ -148,9 +148,15 @@ Bu kapı bozuk local payload'ın boş library olarak yorumlanıp cloud XP entitl
 
 Recommendation inbox artık legacy media key'e doğrudan yazmaz. Küçük domain adapter'ı aynı codec ve media+log snapshot protokolünü kullanır. Cloud/XP/social side-effect'leri yalnız başarılı local write sonrasında üretilir; tekrar ekleme ID/external identity üzerinden idempotent davranır.
 
+## D1B.2A namespace entegrasyonu
+
+D1B.1 unscoped schema v1 anahtarları artık sahipliği belirsiz migration kaynağıdır. Aktif media/log persistence, owner metadata ve `datasetOrigin` taşıyan scoped schema v2 envelope kullanır. Unscoped kaynak authenticated kullanıcıya otomatik verilmez; guest migration veya explicit ownership gate kararından önce kaynak ve raw backup korunur.
+
+Scoped key ile envelope `ownerScope` uyuşmazlığı `owner_mismatch` sonucudur ve corrupt/quarantine akışına dönüştürülmez. Safe-write current/temp/backup protokolü her owner scope içinde aynı şekilde uygulanır.
+
 ## Bilinen sınırlamalar
 
-- Anahtarlar henüz user-scoped değildir; D1B.2 kapsamıdır.
+- Local profile, custom theme ve AI state namespace'i D1B.2B kapsamıdır.
 - Checksum, taşınabilir backup manifesti ve restore UI D1E kapsamıdır.
 - Quarantine görüntüleme/retention ve integrity repair D1D/D1F kapsamıdır.
 - Canonical identity ve duplicate çözümü D1C kapsamıdır.

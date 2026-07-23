@@ -1,7 +1,12 @@
 import { deriveActivityEvents, mediaToSocialSnapshot, type ActivityEventType, type ActivityPreferences, type SocialMediaEntitySnapshot } from "@/lib/social/interactions";
+import {
+  createUserOwnerScope,
+  type LocalOwnerScope,
+} from "@/lib/local-owner-scope";
 import type { MediaItem } from "@/lib/types";
 
 export const SOCIAL_OUTBOX_KEY = "media-tracker-social-outbox";
+export const SOCIAL_OUTBOX_QUARANTINE_KEY = "mediaTracker:quarantine:social-outbox:ownerless";
 export const SOCIAL_RECOMMENDATION_LINKS_KEY = "media-tracker-social-recommendation-links";
 const SOCIAL_PREFERENCES_CACHE_KEY = "media-tracker-social-preferences";
 
@@ -53,6 +58,14 @@ interface CachedPreferences { userId: string; configured: boolean; activity: Act
 
 function browserStorage(): StorageLike | null { return typeof window === "undefined" ? null : window.localStorage; }
 
+export function buildRecommendationLinksKeyForScope(scope: LocalOwnerScope): string {
+  return `mediaTracker:cache:v1:${scope.storageKey}:recommendationLinks`;
+}
+
+export function buildRecommendationLinksKey(userId: string): string {
+  return buildRecommendationLinksKeyForScope(createUserOwnerScope(userId));
+}
+
 function parseArray<T>(raw: string | null, guard: (value: unknown) => value is T): T[] {
   if (!raw) return [];
   try { const value = JSON.parse(raw) as unknown; return Array.isArray(value) ? value.filter(guard) : []; }
@@ -72,7 +85,29 @@ function isLocalLink(value: unknown): value is RecommendationLocalLink {
 }
 
 export function loadSocialOutbox(storage: StorageLike | null = browserStorage()): SocialOutboxItem[] {
-  return storage ? parseArray(storage.getItem(SOCIAL_OUTBOX_KEY), isOutboxItem) : [];
+  if (!storage) return [];
+  const raw = storage.getItem(SOCIAL_OUTBOX_KEY);
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    const valid = parsed.filter(isOutboxItem);
+    const invalid = parsed.filter((item) => !isOutboxItem(item));
+    if (invalid.length > 0) {
+      try {
+        storage.setItem(SOCIAL_OUTBOX_QUARANTINE_KEY, JSON.stringify({
+          version: 1,
+          sourceKey: SOCIAL_OUTBOX_KEY,
+          capturedAt: new Date().toISOString(),
+          reason: "owner_missing_or_invalid",
+          records: invalid,
+        }));
+      } catch { /* Preserve the original outbox if quarantine storage is unavailable. */ }
+    }
+    return valid;
+  } catch {
+    return [];
+  }
 }
 
 export function saveSocialOutbox(items: SocialOutboxItem[], storage: StorageLike | null = browserStorage()): void {
@@ -92,13 +127,28 @@ export async function flushSocialOutbox(
   send: (item: SocialOutboxItem) => Promise<void>,
   storage: StorageLike | null = browserStorage(),
 ): Promise<SocialOutboxItem[]> {
-  const items = loadSocialOutbox(storage);
-  const next: SocialOutboxItem[] = [];
-  for (const item of items) {
-    if (item.userId !== userId) { next.push(item); continue; }
-    try { await send(item); }
-    catch (error) { next.push({ ...item, retryCount: item.retryCount + 1, lastError: error instanceof Error ? error.message.slice(0, 240) : "Sosyal olay gönderilemedi." }); }
+  const own = loadSocialOutbox(storage).filter((item) => item.userId === userId);
+  const successfulIds = new Set<string>();
+  const failures = new Map<string, string>();
+  for (const item of own) {
+    try {
+      await send(item);
+      successfulIds.add(item.id);
+    } catch (error) {
+      failures.set(
+        item.id,
+        error instanceof Error ? error.message.slice(0, 240) : "Sosyal olay gönderilemedi.",
+      );
+    }
   }
+  const next = loadSocialOutbox(storage)
+    .filter((item) => !successfulIds.has(item.id))
+    .map((item) => {
+      const failure = failures.get(item.id);
+      return failure
+        ? { ...item, retryCount: item.retryCount + 1, lastError: failure }
+        : item;
+    });
   saveSocialOutbox(next, storage);
   return next;
 }
@@ -154,7 +204,10 @@ export async function sendSocialOutboxItem(item: SocialOutboxItem): Promise<void
 }
 
 export function loadRecommendationLinks(userId: string, storage: StorageLike | null = browserStorage()): RecommendationLocalLink[] {
-  return storage ? parseArray(storage.getItem(SOCIAL_RECOMMENDATION_LINKS_KEY), isLocalLink).filter((link) => link.userId === userId) : [];
+  return storage
+    ? parseArray(storage.getItem(buildRecommendationLinksKey(userId)), isLocalLink)
+      .filter((link) => link.userId === userId)
+    : [];
 }
 
 export function validRecommendationLinkIds(userId: string, media: MediaItem[], storage: StorageLike | null = browserStorage()): string[] {
@@ -164,9 +217,10 @@ export function validRecommendationLinkIds(userId: string, media: MediaItem[], s
 
 export function saveRecommendationLink(link: RecommendationLocalLink, storage: StorageLike | null = browserStorage()): RecommendationLocalLink[] {
   if (!storage) return [];
-  const all = parseArray(storage.getItem(SOCIAL_RECOMMENDATION_LINKS_KEY), isLocalLink);
+  const key = buildRecommendationLinksKey(link.userId);
+  const all = parseArray(storage.getItem(key), isLocalLink);
   const next = [...all.filter((item) => !(item.userId === link.userId && item.recommendationId === link.recommendationId)), link];
-  storage.setItem(SOCIAL_RECOMMENDATION_LINKS_KEY, JSON.stringify(next));
+  storage.setItem(key, JSON.stringify(next));
   return next.filter((item) => item.userId === link.userId);
 }
 

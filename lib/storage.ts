@@ -12,11 +12,17 @@ export {
   clearMediaList,
   loadMediaList,
   loadProgressLogs,
+  loadScopedMediaList,
+  loadScopedProgressLogs,
   saveLibrarySnapshot,
   saveMediaList,
   saveProgressLogs,
+  saveScopedLibrarySnapshot,
+  saveScopedMediaList,
+  saveScopedProgressLogs,
 } from "./local-data-storage";
 export type {
+  LocalDatasetOrigin,
   LocalDataEnvelope,
   LocalDataDomain,
   StorageReadIssue,

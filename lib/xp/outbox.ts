@@ -3,6 +3,7 @@ import { buildSafeMediaState } from "@/lib/xp/progression";
 import type { XpSafeMediaState } from "@/lib/xp/types";
 
 export const XP_OUTBOX_KEY = "media-tracker-xp-outbox";
+export const XP_OUTBOX_QUARANTINE_KEY = "mediaTracker:quarantine:xp-outbox:ownerless";
 
 export interface XpStorageLike { getItem(key: string): string | null; setItem(key: string, value: string): void }
 export interface XpOutboxItem {
@@ -27,7 +28,24 @@ function isItem(value: unknown): value is XpOutboxItem {
 
 export function loadXpOutbox(target: XpStorageLike | null = storage()): XpOutboxItem[] {
   if (!target) return [];
-  try { const parsed = JSON.parse(target.getItem(XP_OUTBOX_KEY) ?? "[]") as unknown; return Array.isArray(parsed) ? parsed.filter(isItem) : []; } catch { return []; }
+  try {
+    const parsed = JSON.parse(target.getItem(XP_OUTBOX_KEY) ?? "[]") as unknown;
+    if (!Array.isArray(parsed)) return [];
+    const valid = parsed.filter(isItem);
+    const invalid = parsed.filter((item) => !isItem(item));
+    if (invalid.length > 0) {
+      try {
+        target.setItem(XP_OUTBOX_QUARANTINE_KEY, JSON.stringify({
+          version: 1,
+          sourceKey: XP_OUTBOX_KEY,
+          capturedAt: new Date().toISOString(),
+          reason: "owner_missing_or_invalid",
+          records: invalid,
+        }));
+      } catch { /* Original outbox remains untouched when quarantine cannot be written. */ }
+    }
+    return valid;
+  } catch { return []; }
 }
 
 export function saveXpOutbox(items: XpOutboxItem[], target: XpStorageLike | null = storage()): void { target?.setItem(XP_OUTBOX_KEY, JSON.stringify(items)); }

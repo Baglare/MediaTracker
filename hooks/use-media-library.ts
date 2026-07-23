@@ -1,14 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { mockMediaList } from "@/lib/mock-media";
 import {
-  loadMediaList,
-  loadProgressLogs,
-  saveLibrarySnapshot,
+  loadScopedMediaList,
+  loadScopedProgressLogs,
+  saveScopedLibrarySnapshot,
+  type LocalDatasetOrigin,
   type StorageWriteResult,
 } from "@/lib/storage";
 import {
+  materializeDemoDatasetMutation,
   resolveLibraryHydration,
   type LibraryIntegrity,
 } from "@/lib/library-hydration";
@@ -17,8 +19,24 @@ import {
   enqueueMediaDelete,
   enqueueMediaUpsert,
   enqueueProgressLog,
-  setUserId as setSyncUserId,
+  enqueueOwnedSnapshotSyncPlan,
+  setOwnerScope as setSyncOwnerScope,
 } from "@/lib/sync-manager";
+import {
+  assignUnscopedLibraryToUser,
+  deferUnscopedOwnership,
+  keepExistingUserLibrary,
+  keepUnscopedLibraryAsGuest,
+  prepareScopedLibrary,
+  type LocalOwnershipCandidate,
+  type OwnershipActionResult,
+} from "@/lib/local-data-ownership";
+import {
+  isCurrentOwnerGeneration,
+  isHydratedOwnerVisible,
+  resolveLocalOwnerScope,
+  type LocalOwnerScope,
+} from "@/lib/local-owner-scope";
 import {
   getIncrementAmount,
   getProgressLabel,
@@ -98,7 +116,9 @@ function appendProgressLog(
   return { logs: [...progressLogs, nextLog], persistedLog: nextLog };
 }
 
-export function useMediaLibrary(userId: string | null) {
+export function useMediaLibrary(userId: string | null | undefined) {
+  const scope = useMemo(() => resolveLocalOwnerScope(userId), [userId]);
+  const scopeKey = scope?.key ?? null;
   const [mediaList, setMediaList] = useState<MediaItem[]>([]);
   const [progressLogs, setProgressLogs] = useState<ProgressLog[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -108,15 +128,25 @@ export function useMediaLibrary(userId: string | null) {
     media: "missing",
     progressLogs: "missing",
   });
+  const [datasetOrigin, setDatasetOrigin] = useState<LocalDatasetOrigin>("user");
+  const [hydratedScopeKey, setHydratedScopeKey] = useState<string | null>(null);
+  const [ownershipCandidate, setOwnershipCandidate] = useState<LocalOwnershipCandidate | null>(null);
+  const [deferredOwnershipCandidate, setDeferredOwnershipCandidate] =
+    useState<LocalOwnershipCandidate | null>(null);
+  const [hydrationNonce, setHydrationNonce] = useState(0);
   const mediaRef = useRef<MediaItem[]>([]);
   const logsRef = useRef<ProgressLog[]>([]);
   const integrityRef = useRef<LibraryIntegrity>("pending");
+  const scopeRef = useRef<LocalOwnerScope | null>(scope);
+  const originRef = useRef<LocalDatasetOrigin>("user");
+  const hydrationGenerationRef = useRef(0);
 
   const applyPersistedSnapshot = useCallback((
     nextMedia: MediaItem[],
     nextLogs: ProgressLog[],
   ): StorageWriteResult => {
-    if (integrityRef.current !== "valid") {
+    const activeScope = scopeRef.current;
+    if (integrityRef.current !== "valid" || !activeScope) {
       const result: StorageWriteResult = {
         ok: false,
         code: "storage_unavailable",
@@ -126,59 +156,104 @@ export function useMediaLibrary(userId: string | null) {
       setStorageError(result.message);
       return result;
     }
-    const result = saveLibrarySnapshot(nextMedia, nextLogs);
+    const nextOrigin = originRef.current === "demo" ? "user" : originRef.current;
+    const persistedMedia = originRef.current === "demo"
+      ? materializeDemoDatasetMutation(mockMediaList, nextMedia)
+      : nextMedia;
+    const result = saveScopedLibrarySnapshot(
+      activeScope,
+      persistedMedia,
+      nextLogs,
+      nextOrigin,
+    );
     if (!result.ok) {
       setStorageError(result.message);
       return result;
     }
-    mediaRef.current = nextMedia;
+    mediaRef.current = persistedMedia;
     logsRef.current = nextLogs;
-    setMediaList(nextMedia);
+    originRef.current = nextOrigin;
+    setMediaList(persistedMedia);
     setProgressLogs(nextLogs);
+    setDatasetOrigin(nextOrigin);
     setStorageError(null);
     return result;
   }, []);
 
   useEffect(() => {
-    const mediaRead = loadMediaList();
-    const logsRead = loadProgressLogs();
-    const hydration = resolveLibraryHydration({
-      media: mediaRead,
-      progressLogs: logsRead,
-      demoItems: mockMediaList,
-    });
-    let integrity: LibraryIntegrity = hydration.integrity;
-    let error = hydration.integrity === "valid" ? "" : hydration.issues.join(" ");
+    const generation = ++hydrationGenerationRef.current;
+    scopeRef.current = scope;
+    mediaRef.current = [];
+    logsRef.current = [];
+    integrityRef.current = "pending";
+    setSyncOwnerScope(null);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- owner switch must hide stale data before hydration.
+    setMediaList([]);
+    setProgressLogs([]);
+    setLibraryIntegrity("pending");
+    setHydratedScopeKey(null);
+    setIsLoaded(false);
+    setOwnershipCandidate(null);
+    setDeferredOwnershipCandidate(null);
+    if (!scope) return;
 
-    if (hydration.integrity === "valid" && hydration.requiresInitialWrite) {
-      const initialWrite = saveLibrarySnapshot(hydration.mediaItems, hydration.progressLogs);
-      if (!initialWrite.ok) {
-        integrity = "storage_unavailable";
-        error = initialWrite.message;
+    void Promise.resolve().then(() => {
+      const prepared = prepareScopedLibrary(scope);
+      if (!isCurrentOwnerGeneration(generation, hydrationGenerationRef.current)) return;
+      const hydration = resolveLibraryHydration({
+        media: prepared.media,
+        progressLogs: prepared.progressLogs,
+        demoItems: mockMediaList,
+        allowDemoData: scope.kind === "guest",
+      });
+      let integrity: LibraryIntegrity = hydration.integrity;
+      let error = hydration.integrity === "valid" ? "" : hydration.issues.join(" ");
+
+      if (hydration.integrity === "valid" && hydration.requiresInitialWrite) {
+        const initialWrite = saveScopedLibrarySnapshot(
+          scope,
+          hydration.mediaItems,
+          hydration.progressLogs,
+          hydration.datasetOrigin,
+        );
+        if (!initialWrite.ok) {
+          integrity = "storage_unavailable";
+          error = initialWrite.message;
+        }
       }
-    }
-
-    const safeMedia = integrity === "valid" ? hydration.mediaItems : [];
-    const safeLogs = integrity === "valid" ? hydration.progressLogs : [];
-    mediaRef.current = safeMedia;
-    logsRef.current = safeLogs;
-    integrityRef.current = integrity;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-only localStorage hydration
-    setMediaList(safeMedia);
-    setProgressLogs(safeLogs);
-    setLibraryIntegrity(integrity);
-    setStorageError(error || null);
-    setStorageReadStatuses({
-      media: hydration.mediaReadStatus,
-      progressLogs: hydration.progressReadStatus,
+      if (!isCurrentOwnerGeneration(generation, hydrationGenerationRef.current)) return;
+      const safeMedia = integrity === "valid" ? hydration.mediaItems : [];
+      const safeLogs = integrity === "valid" ? hydration.progressLogs : [];
+      mediaRef.current = safeMedia;
+      logsRef.current = safeLogs;
+      integrityRef.current = integrity;
+      originRef.current = hydration.datasetOrigin;
+      setMediaList(safeMedia);
+      setProgressLogs(safeLogs);
+      setDatasetOrigin(hydration.datasetOrigin);
+      setLibraryIntegrity(integrity);
+      setStorageError(error || null);
+      setStorageReadStatuses({
+        media: hydration.mediaReadStatus,
+        progressLogs: hydration.progressReadStatus,
+      });
+      setOwnershipCandidate(prepared.ownershipCandidate ?? null);
+      setDeferredOwnershipCandidate(prepared.deferredCandidate ?? null);
+      setHydratedScopeKey(scope.key);
+      setIsLoaded(true);
+      setSyncOwnerScope(integrity === "valid" ? scope : null);
     });
-    setIsLoaded(true);
-  }, []);
+    return () => {
+      hydrationGenerationRef.current += 1;
+      setSyncOwnerScope(null);
+    };
+  }, [hydrationNonce, scope]);
 
   useEffect(() => {
     const reload = () => {
-      const mediaRead = loadMediaList();
-      const logsRead = loadProgressLogs();
+      if (!scope || hydratedScopeKey !== scope.key) return;
+      const mediaRead = loadScopedMediaList(scope);
+      const logsRead = loadScopedProgressLogs(scope);
       if (
         (mediaRead.status !== "valid" && mediaRead.status !== "empty")
         || (logsRead.status !== "valid" && logsRead.status !== "empty")
@@ -194,22 +269,28 @@ export function useMediaLibrary(userId: string | null) {
     };
     window.addEventListener("media-tracker:local-library-changed", reload);
     return () => window.removeEventListener("media-tracker:local-library-changed", reload);
-  }, []);
+  }, [hydratedScopeKey, scope]);
 
   useEffect(() => {
-    setSyncUserId(libraryIntegrity === "valid" ? userId : null);
-  }, [libraryIntegrity, userId]);
-
-  useEffect(() => {
-    if (!userId || libraryIntegrity !== "valid") return;
+    if (
+      !userId
+      || libraryIntegrity !== "valid"
+      || datasetOrigin === "demo"
+      || hydratedScopeKey !== scopeKey
+    ) return;
     void flushXpOutbox(userId, sendXpOutboxBatch);
     const flush = () => { void flushXpOutbox(userId, sendXpOutboxBatch); };
     window.addEventListener("online", flush);
     return () => window.removeEventListener("online", flush);
-  }, [libraryIntegrity, userId]);
+  }, [datasetOrigin, hydratedScopeKey, libraryIntegrity, scopeKey, userId]);
 
   useEffect(() => {
-    if (!userId || libraryIntegrity !== "valid") return;
+    if (
+      !userId
+      || libraryIntegrity !== "valid"
+      || datasetOrigin === "demo"
+      || hydratedScopeKey !== scopeKey
+    ) return;
     let active = true;
     fetch("/api/social/preferences", { cache: "no-store" })
       .then(async (response) => {
@@ -232,7 +313,7 @@ export function useMediaLibrary(userId: string | null) {
       active = false;
       window.removeEventListener("online", flush);
     };
-  }, [libraryIntegrity, userId]);
+  }, [datasetOrigin, hydratedScopeKey, libraryIntegrity, scopeKey, userId]);
 
   const queueSocialMutation = useCallback((previous: MediaItem | undefined, next: MediaItem) => {
     if (!userId) return;
@@ -456,13 +537,75 @@ export function useMediaLibrary(userId: string | null) {
     if (userId) void flushXpOutbox(userId, sendXpOutboxBatch);
   }, [applyPersistedSnapshot, queueXpMutation, userId]);
 
+  const finishOwnershipAction = useCallback((result: OwnershipActionResult) => {
+    if (!result.ok) {
+      setStorageError(result.message);
+      return false;
+    }
+    if (result.syncPlan && scope?.kind === "user") {
+      setSyncOwnerScope(scope);
+      enqueueOwnedSnapshotSyncPlan(
+        scope,
+        result.syncPlan.mediaItems,
+        result.syncPlan.progressLogs,
+      );
+    }
+    setOwnershipCandidate(null);
+    setDeferredOwnershipCandidate(null);
+    setStorageError(null);
+    setHydrationNonce((value) => value + 1);
+    return true;
+  }, [scope]);
+
+  const assignLegacyToCurrentUser = useCallback(() => {
+    if (!scope || !ownershipCandidate) return false;
+    return finishOwnershipAction(assignUnscopedLibraryToUser(
+      scope,
+      ownershipCandidate.sourceFingerprint,
+    ));
+  }, [finishOwnershipAction, ownershipCandidate, scope]);
+
+  const keepLegacyAsGuest = useCallback(() => {
+    if (!scope || !ownershipCandidate) return false;
+    return finishOwnershipAction(keepUnscopedLibraryAsGuest(
+      scope,
+      ownershipCandidate.sourceFingerprint,
+    ));
+  }, [finishOwnershipAction, ownershipCandidate, scope]);
+
+  const deferLegacyOwnership = useCallback(() => {
+    if (!scope || !ownershipCandidate) return false;
+    return finishOwnershipAction(deferUnscopedOwnership(scope, ownershipCandidate));
+  }, [finishOwnershipAction, ownershipCandidate, scope]);
+
+  const keepCurrentUserLibrary = useCallback(() => {
+    if (!scope || !ownershipCandidate) return false;
+    return finishOwnershipAction(keepExistingUserLibrary(scope, ownershipCandidate));
+  }, [finishOwnershipAction, ownershipCandidate, scope]);
+
+  const reopenDeferredOwnership = useCallback(() => {
+    if (!deferredOwnershipCandidate) return;
+    setOwnershipCandidate({ ...deferredOwnershipCandidate, deferred: false });
+  }, [deferredOwnershipCandidate]);
+
+  const scopeReady = isHydratedOwnerVisible(scopeKey, hydratedScopeKey);
+
   return {
-    mediaList,
-    progressLogs,
-    isLoaded,
+    mediaList: scopeReady ? mediaList : [],
+    progressLogs: scopeReady ? progressLogs : [],
+    isLoaded: scopeReady && isLoaded,
     libraryIntegrity,
+    datasetOrigin,
+    ownerScope: scope,
     storageError,
     storageReadStatuses,
+    ownershipCandidate,
+    deferredOwnershipCandidate,
+    assignLegacyToCurrentUser,
+    keepLegacyAsGuest,
+    deferLegacyOwnership,
+    keepCurrentUserLibrary,
+    reopenDeferredOwnership,
     incrementMedia,
     completeMedia,
     saveMedia,

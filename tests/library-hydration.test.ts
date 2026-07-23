@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { guardXpFullSync, resolveLibraryHydration } from "@/lib/library-hydration";
+import { guardXpFullSync, materializeDemoDatasetMutation, resolveLibraryHydration } from "@/lib/library-hydration";
 import type { StorageReadResult, StorageReadStatus } from "@/lib/local-data-storage";
 import type { MediaItem, ProgressLog } from "@/lib/types";
 
@@ -28,8 +28,32 @@ describe("library hydration state", () => {
       integrity: "valid",
       mediaItems: [{ id: "demo" }],
       usedDemoData: true,
+      datasetOrigin: "demo",
       requiresInitialWrite: true,
     });
+  });
+
+  it("opens an authenticated missing namespace as a real empty library", () => {
+    const result = resolveLibraryHydration({
+      media: read<MediaItem[]>("missing"),
+      progressLogs: read<ProgressLog[]>("missing"),
+      demoItems: [demo],
+      allowDemoData: false,
+    });
+    expect(result).toMatchObject({
+      integrity: "valid",
+      mediaItems: [],
+      usedDemoData: false,
+      datasetOrigin: "user",
+      requiresInitialWrite: true,
+    });
+  });
+
+  it("keeps only real or changed records when a demo dataset is first mutated", () => {
+    const changed = { ...demo, favorite: true };
+    const real = { ...demo, id: "real", title: "Real" };
+    expect(materializeDemoDatasetMutation([demo], [changed, real])).toEqual([changed, real]);
+    expect(materializeDemoDatasetMutation([demo], [demo, real])).toEqual([real]);
   });
 
   it("keeps an intentionally empty library empty", () => {

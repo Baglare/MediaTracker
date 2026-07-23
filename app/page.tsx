@@ -11,6 +11,10 @@ import { useStartupRuntime } from "@/components/personalization/startup-runtime"
 import RightRail from "@/components/right-rail";
 import WorldTransition from "@/components/world-transition";
 import {
+  DeferredOwnershipNotice,
+  LocalOwnershipGate,
+} from "@/components/local-ownership-gate";
+import {
   dashboardTabHref,
   parseDashboardTab,
   type DashboardTabId,
@@ -72,8 +76,8 @@ export default function HomePage() {
     explicitTab,
     startup.preferences.defaultDashboardTab,
   );
-  const { user, configured } = useAuth();
-  const library = useMediaLibrary(user?.id ?? null);
+  const { user, configured, loading: authLoading } = useAuth();
+  const library = useMediaLibrary(authLoading ? undefined : user?.id ?? null);
   const preferences = usePersistedPreferences();
   const layout = useLayoutPreferences();
   const [searchQuery, setSearchQuery] = useState("");
@@ -184,11 +188,29 @@ export default function HomePage() {
     );
   }
 
+  if (library.ownershipCandidate && user) {
+    return (
+      <main className="px-4 py-10">
+        <LocalOwnershipGate
+          candidate={library.ownershipCandidate}
+          accountLabel={user.email ?? "Bu hesap"}
+          onAssignToUser={() => { library.assignLegacyToCurrentUser(); }}
+          onKeepAsGuest={() => { library.keepLegacyAsGuest(); }}
+          onKeepCurrent={() => { library.keepCurrentUserLibrary(); }}
+          onDefer={() => { library.deferLegacyOwnership(); }}
+          message={library.storageError}
+        />
+      </main>
+    );
+  }
+
   if (library.libraryIntegrity !== "valid") {
     const recoveryMessage =
       library.libraryIntegrity === "corrupt"
         ? "Yerel kütüphane verisi bozuk görünüyor. Veri korunarak karantinaya alındı; üzerine demo veya boş veri yazılmadı."
-        : library.libraryIntegrity === "unsupported_version"
+        : library.libraryIntegrity === "owner_mismatch"
+          ? "Yerel kütüphane envelope sahibi aktif hesapla eşleşmiyor. Yabancı veri açılmadı veya üzerine yazılmadı."
+          : library.libraryIntegrity === "unsupported_version"
           ? "Yerel kütüphane bu uygulamanın desteklemediği daha yeni bir veri sürümü kullanıyor."
           : library.libraryIntegrity === "migration_failed"
             ? "Eski yerel verinin güvenli migration işlemi tamamlanamadı. Kaynak veri korunuyor."
@@ -337,6 +359,9 @@ export default function HomePage() {
           trigger={preferences.worldTransition}
           effectsLevel={appearance.preferences.effectsLevel}
         />
+        {library.deferredOwnershipCandidate && (
+          <DeferredOwnershipNotice onReopen={library.reopenDeferredOwnership} />
+        )}
         {library.storageError && (
           <p
             role="alert"
