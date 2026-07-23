@@ -1,9 +1,14 @@
 "use client";
 
+import { Bell, CheckCheck, Inbox } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { ProfileAvatar } from "@/components/sidebar-profile-card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ErrorState } from "@/components/ui/error-state";
+import { LoadingState } from "@/components/ui/loading-state";
+import { StatCard } from "@/components/ui/stat-card";
 import { notificationHref, type CursorPage, type SocialNotification } from "@/lib/social/interactions";
 import { publishNotificationChange } from "@/lib/social/notification-sync";
 
@@ -58,5 +63,19 @@ export function NotificationCenter() {
     router.push(notificationHref(item));
   }
 
-  return <div className="space-y-4"><div className="flex items-center justify-between"><p className="text-sm text-zinc-400">{unread} okunmamış bildirim</p>{unread > 0 && <button type="button" onClick={() => void mark("read_all")} className="rounded-lg border border-zinc-700 px-3 py-2 text-sm">Tümünü okundu yap</button>}</div>{message && <p role="status" className="rounded-lg bg-zinc-900 p-3 text-sm text-zinc-400">{message}</p>}<div className="space-y-2">{items.map((item) => <Link key={item.id} href={notificationHref(item)} onClick={(event) => { event.preventDefault(); void openNotification(item); }} className={`flex items-center gap-3 rounded-xl border p-3 ${item.readAt ? "border-zinc-800 bg-zinc-900/40" : "border-violet-500/30 bg-violet-500/[0.07]"}`}><ProfileAvatar profileName={item.actor?.displayName ?? "MediaTracker"} socialAvatarUrl={item.actor?.avatarUrl} allowLocalFallback={false} size="social" shape="circle"/><div className="min-w-0 flex-1"><p className="text-sm"><strong>{item.actor?.displayName ?? "MediaTracker"}</strong> {LABELS[item.type]}</p>{typeof item.payload.title === "string" && <p className="truncate text-xs text-zinc-400">{item.payload.title}</p>}<p className="mt-1 text-xs text-zinc-600">{new Date(item.createdAt).toLocaleString("tr-TR")}</p></div>{!item.readAt && <span className="h-2 w-2 shrink-0 rounded-full bg-violet-400" aria-label="Okunmamış"/>}</Link>)}</div>{!loading && items.length === 0 && <div className="rounded-2xl border border-dashed border-zinc-800 p-8 text-center text-zinc-500">Henüz bildirim yok.</div>}{loading && <p className="text-sm text-zinc-500">Bildirimler yükleniyor…</p>}{nextCursor && <button type="button" onClick={() => void load(true, nextCursor)} className="rounded-lg border border-zinc-700 px-4 py-2 text-sm">Daha fazla göster</button>}</div>;
+  return <div className="space-y-4">
+    <div className="grid gap-3 sm:grid-cols-2">
+      <StatCard label="Okunmamış" value={unread} supportingText="İlgini bekleyen bildirimler" tone={unread > 0 ? "accent" : "neutral"} icon={<Bell className="h-5 w-5" aria-hidden="true"/>}/>
+      <StatCard label="Yüklenen bildirim" value={items.length} supportingText="Bu görünümdeki toplam" icon={<Inbox className="h-5 w-5" aria-hidden="true"/>}/>
+    </div>
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <Link href="/?tab=settings" className="text-sm text-[var(--app-accent-strong)] hover:underline">Bildirim tercihleri</Link>
+      {unread > 0 && <button type="button" onClick={() => void mark("read_all")} className="inline-flex items-center gap-2 rounded-lg border border-[var(--app-border-strong)] bg-[var(--app-surface-1)] px-3 py-2 text-sm text-[var(--app-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-focus)]"><CheckCheck className="h-4 w-4" aria-hidden="true"/>Tümünü okundu yap</button>}
+    </div>
+    {message && (items.length === 0 ? <ErrorState compact title="Bildirimler yüklenemedi" description={message} onRetry={() => void load(false)}/> : <p role="status" className="rounded-xl border border-[var(--app-border)] bg-[var(--app-panel-bg)] p-3 text-sm text-[var(--app-text-secondary)]">{message}</p>)}
+    <div className="space-y-2">{items.map((item) => <Link key={item.id} href={notificationHref(item)} onClick={(event) => { event.preventDefault(); void openNotification(item); }} className={`flex items-center gap-3 rounded-xl border p-3 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-focus)] ${item.readAt ? "border-[var(--app-border)] bg-[var(--app-panel-bg)] hover:bg-[var(--app-card-hover)]" : "border-[var(--app-selected-border)] bg-[var(--app-selected-bg)]"}`}><ProfileAvatar profileName={item.actor?.displayName ?? "MediaTracker"} socialAvatarUrl={item.actor?.avatarUrl} allowLocalFallback={false} size="social" shape="circle"/><div className="min-w-0 flex-1"><p className="text-sm text-[var(--app-text-primary)]"><strong>{item.actor?.displayName ?? "MediaTracker"}</strong> {LABELS[item.type]}</p>{typeof item.payload.title === "string" && <p className="truncate text-xs text-[var(--app-text-secondary)]">{item.payload.title}</p>}<p className="mt-1 text-xs text-[var(--app-text-muted)]">{new Date(item.createdAt).toLocaleString("tr-TR")}</p></div>{!item.readAt && <span className="inline-flex shrink-0 items-center gap-1.5 text-xs font-medium text-[var(--app-selected-text)]"><span className="h-2 w-2 rounded-full bg-[var(--app-accent)]" aria-hidden="true"/>Yeni</span>}</Link>)}</div>
+    {!loading && !message && items.length === 0 && <EmptyState title="Bildirimlerin temiz" description="Yeni takip, yorum, tepki ve öneri olayları geldiğinde burada görünecek." icon={<CheckCheck className="h-5 w-5" aria-hidden="true"/>}/>}
+    {loading && items.length === 0 && <LoadingState label="Bildirimler yükleniyor…" rows={4}/>}
+    {nextCursor && <button type="button" onClick={() => void load(true, nextCursor)} className="rounded-lg border border-[var(--app-border-strong)] bg-[var(--app-surface-1)] px-4 py-2 text-sm text-[var(--app-text-secondary)]">Daha fazla göster</button>}
+  </div>;
 }

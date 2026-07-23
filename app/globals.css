@@ -156,6 +156,12 @@
   --app-disabled-text: #a1a1aa;
   --app-disabled-bg: #18181b;
   --app-disabled-border: #3f3f46;
+  --app-hero-bg: linear-gradient(135deg, #18181b 0%, #111113 100%);
+  --app-panel-bg: #18181b;
+  --app-card-bg: #27272a;
+  --app-card-hover: #303034;
+  --app-section-divider: #27272a;
+  --app-subtle-highlight: rgba(161, 161, 170, 0.06);
 }
 
 [data-theme="porcelain"] {
@@ -198,6 +204,12 @@
   --app-disabled-text: #57534e;
   --app-disabled-bg: #e7e5e4;
   --app-disabled-border: #c4b8b0;
+  --app-hero-bg: linear-gradient(135deg, #fffdfa 0%, #f1efec 100%);
+  --app-panel-bg: #fafaf9;
+  --app-card-bg: #fffdfa;
+  --app-card-hover: #f1efec;
+  --app-section-divider: #d6d3d1;
+  --app-subtle-highlight: rgba(120, 113, 108, 0.06);
 
   /* Mevcut zinc utility'lerini açık temada semantik role eşle. */
   --color-zinc-950: var(--app-bg);
@@ -270,6 +282,12 @@
   --app-disabled-text: #7dd3fc;
   --app-disabled-bg: #0b1b2d;
   --app-disabled-border: #164e63;
+  --app-hero-bg: linear-gradient(135deg, #0e2238 0%, #081827 100%);
+  --app-panel-bg: #0b1b2d;
+  --app-card-bg: #10263d;
+  --app-card-hover: #16344f;
+  --app-section-divider: #164e63;
+  --app-subtle-highlight: rgba(125, 211, 252, 0.06);
 
   --color-zinc-950: var(--app-bg);
   --color-zinc-900: var(--app-surface-1);
@@ -417,6 +435,87 @@ body {
   border-color: var(--app-border);
 }
 
+.app-section {
+  background: var(--app-panel-bg);
+  color: var(--app-text-primary);
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--app-shadow) 68%, transparent);
+}
+
+.app-toolbar {
+  background: var(--app-panel-bg);
+  color: var(--app-text-primary);
+}
+
+.page-hero {
+  background:
+    linear-gradient(135deg, var(--w-soft), transparent 58%),
+    var(--app-hero-bg);
+}
+
+.page-hero-motif {
+  opacity: 0.72;
+  mask-image: linear-gradient(to left, black 0%, black 42%, transparent 78%);
+}
+
+.world-identity-motif {
+  opacity: 0.52;
+  mask-image: linear-gradient(to left, black, transparent 76%);
+}
+
+[data-world="east"] > .world-identity-motif {
+  background: linear-gradient(120deg, transparent 68%, color-mix(in srgb, var(--w-secondary) 28%, transparent) 69% 70%, transparent 71%);
+}
+
+[data-world="screen"] > .world-identity-motif {
+  background:
+    radial-gradient(circle at 88% 50%, transparent 0 22px, color-mix(in srgb, var(--w-primary) 32%, transparent) 23px 25px, transparent 26px),
+    repeating-linear-gradient(90deg, transparent 0 10px, color-mix(in srgb, var(--w-primary) 18%, transparent) 11px 18px, transparent 19px 29px);
+  background-size: auto, 180px 10px;
+  background-position: center, right 10px bottom 9px;
+  background-repeat: no-repeat;
+}
+
+[data-world="arch"] > .world-identity-motif {
+  background:
+    radial-gradient(circle at 90% 52%, color-mix(in srgb, var(--w-secondary) 24%, transparent) 0 15px, transparent 16px),
+    repeating-linear-gradient(90deg, transparent 0 12px, color-mix(in srgb, var(--w-primary) 22%, transparent) 13px 16px, transparent 17px 26px);
+}
+
+[data-page-hero-tone="social"] .page-hero-motif {
+  background:
+    radial-gradient(circle at 82% 28%, color-mix(in srgb, var(--app-accent) 32%, transparent) 0 3px, transparent 4px),
+    radial-gradient(circle at 91% 64%, color-mix(in srgb, var(--app-accent) 22%, transparent) 0 4px, transparent 5px),
+    linear-gradient(118deg, transparent 70%, color-mix(in srgb, var(--app-accent) 14%, transparent) 70.5% 71%, transparent 71.5%);
+}
+
+[data-page-hero-tone="progression"] .page-hero-motif {
+  background:
+    radial-gradient(circle at 86% 50%, transparent 0 48px, color-mix(in srgb, var(--app-warning) 24%, transparent) 49px 51px, transparent 52px),
+    conic-gradient(from 45deg at 86% 50%, transparent 0 11%, color-mix(in srgb, var(--app-warning) 16%, transparent) 12% 13%, transparent 14% 36%, color-mix(in srgb, var(--app-warning) 16%, transparent) 37% 38%, transparent 39%);
+}
+
+[data-page-hero-tone="east"] .page-hero-motif {
+  background:
+    linear-gradient(118deg, transparent 67%, color-mix(in srgb, var(--w-secondary) 30%, transparent) 67.5% 68.2%, transparent 68.8%),
+    linear-gradient(122deg, transparent 76%, color-mix(in srgb, var(--w-primary) 34%, transparent) 76.4% 77%, transparent 77.6%);
+}
+
+[data-page-hero-tone="screen"] .page-hero-motif {
+  background:
+    radial-gradient(circle at 86% 50%, transparent 0 38px, color-mix(in srgb, var(--w-primary) 28%, transparent) 39px 42px, transparent 43px 54px, color-mix(in srgb, var(--w-secondary) 20%, transparent) 55px 57px, transparent 58px),
+    repeating-linear-gradient(90deg, transparent 0 15px, color-mix(in srgb, var(--w-primary) 16%, transparent) 16px 27px, transparent 28px 43px);
+  background-size: auto, 260px 16px;
+  background-position: center, right 24px bottom 20px;
+  background-repeat: no-repeat;
+}
+
+[data-page-hero-tone="arch"] .page-hero-motif {
+  background:
+    radial-gradient(circle at 89% 54%, color-mix(in srgb, var(--w-secondary) 22%, transparent) 0 24px, transparent 25px),
+    repeating-linear-gradient(90deg, transparent 0 18px, color-mix(in srgb, var(--w-primary) 18%, transparent) 19px 23px, transparent 24px 38px),
+    linear-gradient(0deg, transparent 0 28%, color-mix(in srgb, var(--w-primary) 22%, transparent) 29% 31%, transparent 32% 62%, color-mix(in srgb, var(--w-primary) 18%, transparent) 63% 65%, transparent 66%);
+}
+
 .app-input {
   background: var(--app-input-bg);
   color: var(--app-text-primary);
@@ -442,7 +541,9 @@ body,
 .app-page,
 .app-panel,
 .app-card,
-.app-input {
+.app-input,
+.app-section,
+.app-toolbar {
   transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
 }
 
@@ -478,7 +579,9 @@ body,
   .app-page,
   .app-panel,
   .app-card,
-  .app-input {
+  .app-input,
+  .app-section,
+  .app-toolbar {
     transition: none;
   }
 }

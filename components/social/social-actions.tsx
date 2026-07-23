@@ -23,15 +23,15 @@ export function SocialActions({ targetId, state, viewerFollowsOwner, ownerFollow
   }
 
   if (state === "self") return null;
-  if (state === "anonymous") return <p className="text-xs text-zinc-500">Takip etmek için ana uygulamadan giriş yap.</p>;
+  if (state === "anonymous") return <p className="text-xs text-[var(--app-text-muted)]">Takip etmek için ana uygulamadan giriş yap.</p>;
   const primary = viewerFollowsOwner === "pending" || state === "outbound_pending" ? ["cancel", "İsteği iptal et"] : viewerFollowsOwner === "accepted" || state === "viewer_follows" || state === "mutual" ? ["unfollow", "Takibi bırak"] : ["follow", "Takip et"];
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <button type="button" disabled={busy} onClick={() => act(primary[0])} className="rounded-lg bg-violet-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50">{primary[1]}</button>
-      <Link href={`/recommendations?to=${encodeURIComponent(targetId)}`} className="rounded-lg border border-violet-700 px-3 py-2 text-sm text-violet-200">İçerik öner</Link>
-      {(ownerFollowsViewer === "pending" || state === "inbound_pending") && <><button type="button" disabled={busy} onClick={() => act("accept")} className="rounded-lg border border-emerald-700 px-3 py-2 text-sm text-emerald-300">Kabul et</button><button type="button" disabled={busy} onClick={() => act("reject")} className="rounded-lg border border-zinc-700 px-3 py-2 text-sm text-zinc-300">Reddet</button></>}
-      <button type="button" disabled={busy} onClick={() => act("block")} className="rounded-lg border border-red-950 px-3 py-2 text-xs text-red-400">Engelle</button>
-      {message && <span role="status" className="text-xs text-zinc-400">{message}</span>}
+      <button type="button" disabled={busy} onClick={() => act(primary[0])} className="app-primary-action rounded-lg px-3 py-2 text-sm font-medium disabled:border-[var(--app-disabled-border)] disabled:bg-[var(--app-disabled-bg)] disabled:text-[var(--app-disabled-text)]">{primary[1]}</button>
+      <Link href={`/recommendations?to=${encodeURIComponent(targetId)}`} className="rounded-lg border border-[var(--app-selected-border)] bg-[var(--app-selected-bg)] px-3 py-2 text-sm text-[var(--app-selected-text)]">İçerik öner</Link>
+      {(ownerFollowsViewer === "pending" || state === "inbound_pending") && <><button type="button" disabled={busy} onClick={() => act("accept")} className="rounded-lg border border-[var(--app-action-success-border)] bg-[var(--app-action-success-bg)] px-3 py-2 text-sm text-[var(--app-action-success-text)]">Kabul et</button><button type="button" disabled={busy} onClick={() => act("reject")} className="rounded-lg border border-[var(--app-border-strong)] px-3 py-2 text-sm text-[var(--app-text-secondary)]">Reddet</button></>}
+      <button type="button" disabled={busy} onClick={() => act("block")} className="rounded-lg border border-[color-mix(in_srgb,var(--app-danger)_42%,transparent)] bg-[var(--app-danger-soft)] px-3 py-2 text-xs text-[var(--app-danger)]">Engelle</button>
+      {message && <span role="status" className="text-xs text-[var(--app-text-secondary)]">{message}</span>}
     </div>
   );
 }

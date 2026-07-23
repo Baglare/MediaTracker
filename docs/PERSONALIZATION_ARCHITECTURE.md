@@ -1,5 +1,7 @@
 # Kişiselleştirme Mimarisi
 
+> P3.1 ortak sayfa primitive'leri, surface hiyerarşisi ve dünya motif kuralları için [PAGE_DESIGN_SYSTEM.md](./PAGE_DESIGN_SYSTEM.md) belgesine bakın.
+
 ## Amaç
 
 Bu belge MediaTracker'ın temel uygulama görünümünü, dünya vurgusunu, cihaz tercihlerini ve public profil sunumunu birbirinden ayıran P0 sınırlarını; P1 tema motorunu ve P2 birleşik uygulama kabuğu/profil kimliği katmanını tanımlar. Bu aşamalar sayfa redesign'i değildir; mevcut özellikleri ortak, test edilebilir sınırlar altında toplar.
@@ -181,8 +183,9 @@ Tarayıcı smoke sırasında `/feed → /profile`, `/recommendations → /profil
 
 - **P1 Tema motoru:** Tamamlandı; root runtime, cookie mirror, aktif tema/accent UI ve shared semantic uyumluluk eklendi.
 - **P2 Birleşik profil ve ProfileHero:** Tamamlandı; canonical shell, `/profile`, ortak hero, cloud presentation ve local fallback/cache bağlandı.
+- **P3.1 Ortak sayfa tasarım sistemi:** Tamamlandı; sosyal feature sayfaları, progression ve profil alt modülleri ortak hero/section/stat/filter/state diline geçirildi.
 - **P3 Grafik ve düzen kişiselleştirmesi:** Chart palette ve layout seçeneklerini UI/persistence ile bağlama.
-- **P4 Ortak sayfa tasarım sistemi ve ana sayfa refactor'ı:** Semantik yüzey primitive'leriyle kontrollü sayfa dönüşümü.
+- **P4 Ana sayfa ve kütüphane refactor'ı:** Dashboard ile kütüphaneyi ayrı, kontrollü turlarda ortak primitive'lere taşıma.
 
 ## Bilinçli sınırlamalar
 
@@ -190,5 +193,5 @@ Tarayıcı smoke sırasında `/feed → /profile`, `/recommendations → /profil
 - P1'de tema seçimi aktiftir; bütün `zinc` sınıfları mekanik olarak dönüştürülmemiştir.
 - P2 migration uygulanmış kabul edilir; P3.0 transform migration'ı için remote Supabase işlemi veya migration apply yapılmamıştır.
 - Dashboard'un diğer internal sekmeleri route'a taşınmamış, kütüphane/dashboard genel refactor'ı yapılmamıştır.
-- Public profil modülleri ve sosyal feature'lar yeniden tasarlanmamış; header ve shell sınırları birleştirilmiştir.
+- Public profil modüllerinin veri/visibility davranışı yeniden tasarlanmamış; P3.1 yalnız ortak surface ve state dilini uygular.
 - Chart palette, density/effects ve dashboard layout UI hâlâ P3 kapsamındadır.

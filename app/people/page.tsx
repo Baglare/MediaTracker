@@ -1,3 +1,5 @@
+import { Users } from "lucide-react";
+
 import { PeopleSearch } from "@/components/social/people-search";
 import { SocialPageShell } from "@/components/social/social-page-shell";
 
@@ -5,5 +7,5 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Kullanıcı Ara · MediaTracker", description: "MediaTracker public ve korumalı sosyal profillerini ara." };
 
 export default async function PeoplePage() {
-  return <SocialPageShell title="Kullanıcı Ara" subtitle="Public ve korumalı profilleri kullanıcı adı veya görünen adla bul."><PeopleSearch /></SocialPageShell>;
+  return <SocialPageShell eyebrow="Keşif" title="Kullanıcı Ara" subtitle="Public ve korumalı profilleri kullanıcı adı veya görünen adla bul." icon={<Users className="h-5 w-5" aria-hidden="true"/>}><PeopleSearch /></SocialPageShell>;
 }

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { ProfileHero } from "@/components/profile/profile-hero";
+import { LoadingState } from "@/components/ui/loading-state";
 import { useAuth } from "@/hooks/use-auth";
 import { usePersistedPreferences } from "@/hooks/use-persisted-preferences";
 import { useXpProgression } from "@/hooks/use-xp-progression";
@@ -18,12 +19,12 @@ const EMPTY_PROGRESSION = calculateUserProgression([], []);
 
 const ProfileViewContent = dynamic(
   () => import("@/components/profile/profile-view-content").then((module) => module.ProfileViewContent),
-  { loading: () => <div className="grid gap-5 xl:grid-cols-2" aria-label="Profil modülleri hazırlanıyor"><div className="app-card h-52 animate-pulse rounded-2xl" /><div className="app-card h-52 animate-pulse rounded-2xl" /></div> },
+  { loading: () => <div className="grid gap-5 xl:grid-cols-2"><LoadingState label="Favoriler hazırlanıyor…" rows={4}/><LoadingState label="Aktiviteler hazırlanıyor…" rows={4}/></div> },
 );
 
 const ProfileEditorPanel = dynamic(
   () => import("@/components/profile/profile-editor-panel").then((module) => module.ProfileEditorPanel),
-  { loading: () => <div className="app-panel h-64 animate-pulse rounded-3xl" aria-label="Profil editörü hazırlanıyor" /> },
+  { loading: () => <LoadingState label="Profil editörü hazırlanıyor…" rows={6}/> },
 );
 
 export function ProfilePageClient({ initialMode = "view" }: { initialMode?: "view" | "edit" }) {

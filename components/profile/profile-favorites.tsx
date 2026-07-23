@@ -1,11 +1,14 @@
+import { Heart } from "lucide-react";
+
+import { EmptyState } from "@/components/ui/empty-state";
+import { PageSection } from "@/components/ui/page-section";
 import type { MediaItem } from "@/lib/types";
 
 export function ProfileFavorites({ items, onOpen }: { items: MediaItem[]; onOpen?: (item: MediaItem) => void }) {
   const favorites = items.filter((item) => item.favorite).slice().sort((a, b) => a.title.localeCompare(b.title, "tr")).slice(0, 10);
   return (
-    <section className="app-card rounded-2xl border p-4 sm:p-5">
-      <div className="mb-4 flex items-end justify-between gap-3"><div><h2 className="text-sm font-semibold">Favori Vitrini</h2><p className="mt-1 text-xs text-[var(--app-text-muted)]">Öne çıkan favori içerikler</p></div><span className="text-xs tabular-nums text-[var(--app-text-muted)]">{favorites.length}</span></div>
-      {favorites.length === 0 ? <p className="rounded-xl border border-dashed border-[var(--app-border)] px-4 py-8 text-center text-sm text-[var(--app-text-muted)]">Henüz favori vitrin yok.</p> : (
+    <PageSection title="Favori Vitrini" description="Öne çıkan favori içerikler" count={favorites.length}>
+      {favorites.length === 0 ? <EmptyState compact title="Henüz favori vitrin yok" description="Favori olarak işaretlediğin medyalar burada sergilenecek." icon={<Heart className="h-5 w-5" aria-hidden="true"/>}/> : (
         <div className="grid grid-cols-3 gap-3 sm:grid-cols-5">
           {favorites.map((item) => (
             <button key={item.id} type="button" onClick={() => onOpen?.(item)} className="group min-w-0 cursor-pointer rounded-xl text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-focus)]" title={item.title}>
@@ -18,7 +21,6 @@ export function ProfileFavorites({ items, onOpen }: { items: MediaItem[]; onOpen
           ))}
         </div>
       )}
-    </section>
+    </PageSection>
   );
 }
-

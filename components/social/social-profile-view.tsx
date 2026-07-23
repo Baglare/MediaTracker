@@ -4,11 +4,13 @@ import { ProfileHero } from "@/components/profile/profile-hero";
 import { ProfileGrid } from "@/components/social/profile-grid";
 import { SocialActions } from "@/components/social/social-actions";
 import { YinYangConnection } from "@/components/social/yin-yang-connection";
+import { EmptyState } from "@/components/ui/empty-state";
+import { PageSection } from "@/components/ui/page-section";
 import { resolveProfileIdentity } from "@/lib/personalization/profile-identity";
 import type { SocialProfilePayload } from "@/lib/social/types";
 
 function StateCard({ title, text }: { title: string; text: string }) {
-  return <div className="mx-auto grid min-h-[55vh] max-w-3xl place-items-center"><div className="app-panel rounded-2xl border p-8 text-center"><h1 className="text-xl font-semibold">{title}</h1><p className="mt-2 text-sm text-[var(--app-text-muted)]">{text}</p><Link href="/people" className="mt-5 inline-block text-sm text-[var(--app-accent-strong)]">Kullanıcı aramaya dön</Link></div></div>;
+  return <div className="mx-auto grid min-h-[55vh] max-w-3xl place-items-center"><EmptyState title={title} description={text} primaryAction={<Link href="/people" className="app-primary-action rounded-lg px-3 py-2 text-sm font-medium">Kullanıcı aramaya dön</Link>}/></div>;
 }
 
 export function SocialProfileView({ payload }: { payload: SocialProfilePayload }) {
@@ -36,7 +38,7 @@ export function SocialProfileView({ payload }: { payload: SocialProfilePayload }
   return (
     <div data-profile-palette={profile.presentation.paletteId} className="mx-auto w-full max-w-6xl space-y-5">
       <ProfileHero variant="public" identity={identity} presentation={profile.presentation} progression={progression} visibilityLabel={profile.visibilityMode === "protected" ? "Korumalı" : "Herkese açık"} location={profile.location} language={profile.language} joinedAt={`Katılım ${new Date(profile.joinedAt).toLocaleDateString("tr-TR")}`} actions={publicActions} />
-      {identity.bio && <section className="app-card rounded-2xl border p-5"><h2 className="text-sm font-semibold">Hakkında</h2><p className="mt-2 whitespace-pre-wrap text-sm text-[var(--app-text-secondary)]">{identity.bio}</p></section>}
+      {identity.bio && <PageSection title="Hakkında"><p className="whitespace-pre-wrap text-sm text-[var(--app-text-secondary)]">{identity.bio}</p></PageSection>}
       {payload.relationship.self && <YinYangConnection relationship={payload.relationship} following={profile.followingCount} followers={profile.followerCount} />}
       <ProfileGrid payload={payload} />
     </div>

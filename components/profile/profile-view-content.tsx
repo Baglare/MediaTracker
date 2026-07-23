@@ -6,6 +6,7 @@ import MediaDetailModal from "@/components/media-detail-modal";
 import { ProfileActivity } from "@/components/profile/profile-activity";
 import { ProfileFavorites } from "@/components/profile/profile-favorites";
 import { ProfileProgressionSummary } from "@/components/profile/profile-progression-summary";
+import { LoadingState } from "@/components/ui/loading-state";
 import { useMediaLibrary } from "@/hooks/use-media-library";
 import { calculateUserProgression, type UserProgression } from "@/lib/user-progression";
 
@@ -24,7 +25,7 @@ export function ProfileViewContent({ userId, remoteProgression, onLocalProgressi
   }, [isLoaded, localProgression, onLocalProgression]);
 
   if (!isLoaded) {
-    return <div className="grid gap-5 xl:grid-cols-2" aria-label="Profil modülleri yükleniyor"><div className="app-card h-52 animate-pulse rounded-2xl" /><div className="app-card h-52 animate-pulse rounded-2xl" /></div>;
+    return <div className="grid gap-5 xl:grid-cols-2"><LoadingState label="Favori vitrini yükleniyor…" rows={4}/><LoadingState label="Aktiviteler yükleniyor…" rows={4}/></div>;
   }
 
   const detail = mediaList.find((item) => item.id === detailId) ?? null;
