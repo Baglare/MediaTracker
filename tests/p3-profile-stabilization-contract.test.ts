@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { BASE_THEME_REGISTRY } from "@/lib/personalization/theme-registry";
 
 const read = (path: string) => readFileSync(path, "utf8");
 const profilePage = read("components/profile/profile-page-client.tsx");
@@ -69,8 +70,9 @@ describe("P3.0 image positioning contracts", () => {
 });
 
 describe("P3.0 porcelain contrast contracts", () => {
-  it.each(["--app-action-success-text", "--app-action-accent-text", "--app-selected-text", "--app-disabled-text"])("defines %s in all three theme scopes", (token) => {
-    expect(css.match(new RegExp(token, "g"))).toHaveLength(3);
+  it.each(["--app-action-success-text", "--app-action-accent-text", "--app-selected-text", "--app-disabled-text"])("defines %s in every active preset theme scope", (token) => {
+    const activeThemeCount = Object.keys(BASE_THEME_REGISTRY).filter((id) => id !== "system").length;
+    expect(css.match(new RegExp(token, "g"))).toHaveLength(activeThemeCount);
   });
 
   it("keeps cloud actions readable without fading the whole card", () => {

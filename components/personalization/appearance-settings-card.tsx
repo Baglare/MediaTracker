@@ -4,25 +4,17 @@ import { BarChart3, Check, Gauge, Palette, RotateCcw, Sparkles } from "lucide-re
 import { useState } from "react";
 
 import { useAppearanceRuntime } from "./appearance-runtime";
+import { ThemeStudio } from "./theme-studio";
 import { CHART_PALETTE_REGISTRY } from "@/lib/personalization/chart-palette-registry";
-import { BASE_THEME_REGISTRY, getBaseThemeDefinition } from "@/lib/personalization/theme-registry";
+import { BASE_THEME_REGISTRY } from "@/lib/personalization/theme-registry";
 import type {
   AccentMode,
   AppDensity,
-  BaseThemeId,
   ChartPaletteId,
   ChartStatusKey,
   EffectsLevel,
-  ResolvedBaseThemeId,
 } from "@/lib/personalization/types";
 import { WORLD_THEME_REGISTRY } from "@/lib/personalization/world-theme-registry";
-
-export interface AppearanceThemeOption {
-  id: BaseThemeId;
-  label: string;
-  description: string;
-  previewThemes: readonly ResolvedBaseThemeId[];
-}
 
 export interface AppearanceAccentOption {
   id: AccentMode;
@@ -31,15 +23,7 @@ export interface AppearanceAccentOption {
   preview: string;
 }
 
-export const APPEARANCE_THEME_OPTIONS: readonly AppearanceThemeOption[] =
-  Object.values(BASE_THEME_REGISTRY).map<AppearanceThemeOption>((theme) => ({
-    id: theme.id,
-    label: theme.label,
-    description: theme.description,
-    previewThemes: theme.id === "system"
-      ? ["obsidian", "porcelain"]
-      : [theme.id],
-  }));
+export const APPEARANCE_THEME_OPTIONS = Object.values(BASE_THEME_REGISTRY);
 
 export const APPEARANCE_ACCENT_OPTIONS: readonly AppearanceAccentOption[] = [
   { id: "auto", label: "Otomatik", description: "Aktif içerik dünyasını izler.", preview: "linear-gradient(90deg, #e8b86a, #6fb0e0, #b8956a)" },
@@ -69,21 +53,13 @@ const EFFECT_OPTIONS: readonly { id: EffectsLevel; label: string; description: s
   { id: "full", label: "Tam", description: "Dünya motiflerini ve geçişlerini kontrollü biçimde belirginleştirir." },
 ];
 
-function themePreviewColors(option: AppearanceThemeOption): string[] {
-  return option.previewThemes.flatMap((themeId) => {
-    const definition = getBaseThemeDefinition(themeId);
-    return [definition.tokens.background, definition.tokens.surface2, definition.tokens.accent];
-  });
-}
-
-export default function AppearanceSettingsCard() {
-  const { preferences, hydrated, updatePreference, resetToDefaults, resolvedTheme } = useAppearanceRuntime();
+export default function AppearanceSettingsCard({
+  onConfirm,
+}: {
+  onConfirm: (title: string, message: string, onOk: () => void) => void;
+}) {
+  const { preferences, hydrated, updatePreference, resetToDefaults } = useAppearanceRuntime();
   const [message, setMessage] = useState("Görünüm seçimleri bu cihazda anında kaydedilir.");
-
-  const selectTheme = (theme: BaseThemeId) => {
-    updatePreference("baseTheme", theme);
-    setMessage("Tema seçimi kaydedildi.");
-  };
 
   const selectAccent = (accent: AccentMode) => {
     updatePreference("accentMode", accent);
@@ -134,40 +110,7 @@ export default function AppearanceSettingsCard() {
         </button>
       </div>
 
-      <fieldset className="mt-6">
-        <legend className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--app-text-muted)]">Tema</legend>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {APPEARANCE_THEME_OPTIONS.map((option) => {
-            const selected = preferences.baseTheme === option.id;
-            const colors = themePreviewColors(option);
-            return (
-              <button
-                key={option.id}
-                type="button"
-                aria-pressed={selected}
-                onClick={() => selectTheme(option.id)}
-                className={`relative min-h-36 rounded-xl border p-3 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-focus)] ${
-                  selected
-                    ? "border-[var(--app-accent)] bg-[var(--app-selected)]"
-                    : "border-[var(--app-border)] bg-[var(--app-surface-2)] hover:border-[var(--app-border-strong)] hover:bg-[var(--app-hover)]"
-                }`}
-              >
-                <span className="flex h-10 overflow-hidden rounded-lg border border-black/10" aria-hidden="true">
-                  {colors.map((color, index) => <span key={`${color}-${index}`} className="flex-1" style={{ background: color }} />)}
-                </span>
-                <span className="mt-3 flex items-center justify-between gap-2 text-sm font-semibold text-[var(--app-text-primary)]">
-                  {option.label}
-                  {selected && <Check className="h-4 w-4 text-[var(--app-accent-strong)]" aria-hidden="true" />}
-                </span>
-                <span className="mt-1 block text-xs leading-relaxed text-[var(--app-text-muted)]">{option.description}</span>
-              </button>
-            );
-          })}
-        </div>
-        {preferences.baseTheme === "system" && (
-          <p className="mt-2 text-xs text-[var(--app-text-muted)]">Şu anda sistem tercihi {resolvedTheme === "porcelain" ? "açık" : "koyu"} olarak çözüldü.</p>
-        )}
-      </fieldset>
+      <ThemeStudio onConfirm={onConfirm} />
 
       <fieldset className="mt-7 border-t border-[var(--app-border)] pt-6">
         <legend className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--app-text-muted)]">Dünya vurgusu</legend>

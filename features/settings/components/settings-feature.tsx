@@ -45,7 +45,7 @@ export default function SettingsFeature({
         subtitle="Hesap, cloud sync, veri yönetimi ve uygulama bilgisi"
       />
       <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2 lg:gap-5">
-        <AppearanceSettingsCard />
+        <AppearanceSettingsCard onConfirm={onConfirm} />
         <LayoutSettingsCard
           preferences={layout.preferences}
           isHydrated={layout.isHydrated}

@@ -2,8 +2,8 @@ import type { AppAppearancePreferences, ProfilePresentationPreferences } from ".
 import { DEFAULT_IMAGE_TRANSFORM } from "./image-transform";
 
 export const DEFAULT_APP_APPEARANCE_PREFERENCES: AppAppearancePreferences = {
-  version: 2,
-  baseTheme: "obsidian",
+  version: 3,
+  theme: { kind: "preset", id: "obsidian" },
   accentMode: "auto",
   effectsLevel: "subtle",
   density: "comfortable",
@@ -25,7 +25,10 @@ export const DEFAULT_PROFILE_PRESENTATION_PREFERENCES: ProfilePresentationPrefer
 };
 
 export function defaultAppearancePreferences(): AppAppearancePreferences {
-  return { ...DEFAULT_APP_APPEARANCE_PREFERENCES };
+  return {
+    ...DEFAULT_APP_APPEARANCE_PREFERENCES,
+    theme: { ...DEFAULT_APP_APPEARANCE_PREFERENCES.theme },
+  };
 }
 
 export function defaultProfilePresentationPreferences(): ProfilePresentationPreferences {

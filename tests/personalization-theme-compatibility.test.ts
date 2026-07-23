@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-import { BASE_THEME_REGISTRY } from "@/lib/personalization/theme-registry";
+import { BASE_THEME_REGISTRY, getBaseThemeDefinition } from "@/lib/personalization/theme-registry";
 
 const css = readFileSync("app/globals.css", "utf8");
 const layout = readFileSync("app/layout.tsx", "utf8");
@@ -30,13 +30,13 @@ const REQUIRED_CSS_TOKENS = [
   "--app-accent-soft",
 ] as const;
 
-function themeBlock(theme: "obsidian" | "porcelain" | "ocean"): string {
+function themeBlock(theme: Exclude<keyof typeof BASE_THEME_REGISTRY, "system">): string {
   const match = css.match(new RegExp(`\\[data-theme="${theme}"\\] \\{([\\s\\S]*?)\\n\\}`, "m"));
   return match?.[1] ?? "";
 }
 
 describe("theme registry and CSS compatibility", () => {
-  it.each(["obsidian", "porcelain", "ocean"] as const)("defines every required token for %s", (theme) => {
+  it.each(["obsidian", "porcelain", "ocean", "dusty_rose", "forest", "lavender", "polar", "sepia"] as const)("defines every required token for %s", (theme) => {
     const block = themeBlock(theme);
     for (const token of REQUIRED_CSS_TOKENS) expect(block).toContain(`${token}:`);
     expect(BASE_THEME_REGISTRY[theme]).toHaveProperty("tokens");
@@ -51,7 +51,7 @@ describe("theme registry and CSS compatibility", () => {
   it("keeps CSS source-of-truth preview values aligned with the registry", () => {
     for (const theme of ["obsidian", "porcelain", "ocean"] as const) {
       const block = themeBlock(theme);
-      const tokens = BASE_THEME_REGISTRY[theme].tokens;
+      const tokens = getBaseThemeDefinition(theme).tokens;
       expect(block).toContain(`--app-bg: ${tokens.background}`);
       expect(block).toContain(`--app-surface-1: ${tokens.surface1}`);
       expect(block).toContain(`--app-text-primary: ${tokens.textPrimary}`);

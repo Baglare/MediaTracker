@@ -193,7 +193,7 @@ P5A, chart palette, density, effects veya varsayılan açılış tabını layout
 
 ## P5B grafik, yoğunluk, efekt ve başlangıç tercihleri
 
-`AppAppearancePreferences` `version: 2` ile `chartPaletteId` ve `followWorldCompletedColor` alanlarını taşır; mevcut `density` ve `effectsLevel` alanları root runtime tarafından aktif olarak uygulanır. Chart registry renk sunumunun tek kaynağıdır. Right Rail donut ve status listesi ile Dashboard durum dağılımı aynı resolver sonucunu tüketir. Grafik palette'i hata, başarı, recommendation lifecycle, notification severity, favori veya `connectionColor` anlamlarını değiştirmez.
+P5B ile `AppAppearancePreferences` `version: 2` olarak `chartPaletteId` ve `followWorldCompletedColor` alanlarını taşımaya başladı; P6 migration'ı aynı alanları koruyarak modeli `version: 3` preset/custom tema seçimine yükseltir. Mevcut `density` ve `effectsLevel` alanları root runtime tarafından aktif olarak uygulanır. Chart registry renk sunumunun tek kaynağıdır. Right Rail donut ve status listesi ile Dashboard durum dağılımı aynı resolver sonucunu tüketir. Grafik palette'i hata, başarı, recommendation lifecycle, notification severity, favori veya `connectionColor` anlamlarını değiştirmez.
 
 Yoğunluk `data-density="comfortable|compact"` üzerinden yalnız ortak spacing tokenlarını değiştirir: sayfa/section aralığı, panel/card padding, toolbar gap ve list row padding. Compact mod fontları, poster oranlarını, modal formlarını veya erişilebilir kontrol hedeflerini küçültmez. Ortak primitive'ler, Dashboard composition, Right Rail, Feed/Öneriler kartları ve Bildirimler/Kullanıcı Ara satırları bu tokenları tüketir; eski tekil feature yüzeyleri kademeli olarak mevcut spacing'ini korur.
 
@@ -201,7 +201,43 @@ Efekt seviyesi `data-effects="off|subtle|full"` ile dekoratif motif, glow, yüze
 
 Başlangıç tercihi appearance veya layout modeline eklenmez. `StartupPreferences version: 1`, `mediaTracker:startupPreferences:v1` içinde yalnız Dashboard, Kütüphane, Keşfet, Takvim veya Ayarlar default'unu saklar. Açık `?tab=` query her zaman preference'tan önceliklidir. Sidebar Dashboard bağlantısı `/?tab=dashboard`, gear `/?tab=settings` üretir; bu nedenle default tercih açık navigasyon niyetini ezmez. Bare `/` hydration sırasında yanlış feature'ı kısa süre göstermemek için startup state çözülene kadar yalnız içerik sınırını bekletir; kalıcı AppShell remount edilmez.
 
-P5A `LayoutPreferences` yalnız stable widget görünürlüğü/sırasını taşımaya devam eder. P5B chart/spacing/motion/startup alanlarını layout anahtarına yazmaz. P6 RGB/HEX, custom theme, Tozpembe, Orman ve import/export özellikleri base theme registry/token katmanında kalacaktır; chart palette ve startup modelleri tema kimliği veya ham CSS kabul etmez.
+P5A `LayoutPreferences` yalnız stable widget görünürlüğü/sırasını taşımaya devam eder. P5B chart/spacing/motion/startup alanlarını layout anahtarına yazmaz. P6 RGB/HEX ve custom theme davranışı base theme registry/token katmanında kalır; chart palette ve startup modelleri tema kimliği veya ham CSS kabul etmez.
+
+## P6 Gelişmiş Tema Stüdyosu
+
+### Preset + custom seçim modeli
+
+`AppAppearancePreferences version: 3`, kapalı `baseTheme` alanı yerine ayrışmış `ThemeSelection` kullanır. Preset seçimleri `system`, `obsidian`, `porcelain`, `ocean`, `dusty_rose`, `forest`, `lavender`, `polar` ve `sepia` kimliklerini taşır; custom seçim yalnız güvenli `ct_*` kimliğine işaret eder. v1/v2 kayıtları alan bazında normalize edilir; accent, density, effects, chart palette ve world-aware completed seçimi korunur. Silinmiş veya bulunamayan custom kimliği Obsidyen'e düşer.
+
+Yeni hazır temalar registry metadata'sı ve CSS semantic scope'ları üzerinden çalışır:
+
+- **Tozpembe:** kırık beyaz/gül kurusu, sakin bordo vurgu.
+- **Orman:** katmanlı çam ve yosun yüzeyleri, toprak ikincil vurgu.
+- **Lavanta:** soluk lavanta, gri-mavi yüzey ve koyu erik vurgu.
+- **Kutup:** buz mavisi/slate yüzey ve kontrollü cyan.
+- **Sepya:** parşömen, mürekkep kahvesi ve terracotta; Arşiv dünya kimliği değildir.
+
+### Custom theme girdileri ve token üretimi
+
+Kullanıcı yalnız `colorScheme`, `background`, `surface`, `accent` ve `secondaryAccent` değerlerini seçer. HEX girdisi `#RGB` veya `#RRGGBB`, RGB kanalları 0–255 aralığında kabul edilir ve kayıt öncesi canonical `#RRGGBB` biçimine çevrilir. CSS function, URL, gradient, alpha ve raw CSS kabul edilmez. `deriveCustomThemeTokens` bu dört renkten surface katmanları, metinler, border, hover/selected, focus, overlay, shadow, input ve disabled tokenlarını saf ve deterministik biçimde türetir. Error/success/warning semantic renkleri custom accent'e dönüştürülmez.
+
+`relativeLuminance`, `contrastRatio` ve `evaluateThemeContrast` ana/ikincil metin, muted metin, focus ve border ayrımını kontrol eder. Kritik ana metin uyarısı çözülmeden tema etkinleştirilmez. “Otomatik düzelt” yalnız türetilmiş metin/border/focus düzeltmelerini kaydeder; kullanıcının dört ana rengini sessizce değiştirmez. Bu rapor yardımcı bir uygulama kontrolüdür, WCAG sertifikası değildir.
+
+### Persistence, runtime ve ilk paint
+
+Custom katalog `mediaTracker:customThemes:v1` anahtarında local-first saklanır. Runtime validation bozuk JSON/version/kayıtları atar, yinelenen kimlikleri temizler ve en fazla 20 temayı kabul eder. Tema adı 1–40 karakterdir; ID Web Crypto ile üretilir. Preset kayıtları düzenlenmez veya silinmez.
+
+Root runtime custom temada `data-theme-source="custom"`, `data-theme="custom"` ve `data-custom-theme-id` uygular. Inline style yalnız `APP_THEME_TOKEN_CSS_VARIABLES` allowlist'indeki semantic property'leri kullanır; preset'e dönüldüğünde bu inline tokenlar temizlenir ve CSS `[data-theme]` scope'ları yeniden source of truth olur. World accent seçimi custom surface'i korur: `theme` custom accent'i, sabit Doğu/Kadraj/Arşiv world registry rengini kullanır.
+
+İlk paint için bütün custom katalog cookie'ye yazılmaz. Yalnız aktif custom temanın normalize edilmiş dört ana girdisi, renk karakteri, güvenli düzeltmeleri ve accent modu kompakt cookie snapshot'ında mirror edilir. Root layout aynı saf token üreticisini server tarafında kullanarak ilk HTML'e allowlist inline semantic tokenları yazar. Cookie parser tüm kimlik ve renkleri allowlist/HEX doğrulamasından geçirir; invalid snapshot güvenli Obsidyen fallback'ine düşer.
+
+### Tema Stüdyosu, güvenlik ve performans
+
+Tema Stüdyosu preset listesini registry'den üretir; custom tema oluşturma, düzenleme/yeniden adlandırma, kopyalama, confirmation ile silme, yalnız kaydetme ve kaydet-uygula akışlarını sunar. Ortak `ColorField` native picker, HEX, RGB ve 36 renkli merkezi katalog arasında senkronizasyon sağlar. Mini preview gerçek semantic tokenları kullanır. “Uygulamada geçici önizle” root tokenlarını kalıcı preference/cookie yazmadan değiştirir; vazgeçme önceki seçimi geri getirir.
+
+Tema değişimi network, route reload, AppShell remount, local library parse veya auth/profile/XP fetch üretmez. Custom state Tema Stüdyosu ve tek root runtime sınırında kalır. Cloud tema sync, tema marketi, import/export, raw CSS, custom font/background image, world/chart/profile palette editörleri kapsam dışıdır.
+
+Chart palette, public `profilePaletteId`, banner/avatar sunumu ve Yin/Yang `connectionColor` ayrı sahipliklerini korur; custom app theme bu alanlara yazmaz.
 
 ## Gelecek aşamalar
 
@@ -219,4 +255,4 @@ P5A `LayoutPreferences` yalnız stable widget görünürlüğü/sırasını taş
 - P2 migration uygulanmış kabul edilir; P3.0 transform migration'ı için remote Supabase işlemi veya migration apply yapılmamıştır.
 - Dashboard internal sekmeleri route'a taşınmamıştır; P4 yalnız mevcut `/?tab=` sözleşmesini koruyarak feature sınırlarını ayırmıştır.
 - Public profil modüllerinin veri/visibility davranışı yeniden tasarlanmamış; P3.1 yalnız ortak surface ve state dilini uygular.
-- Custom RGB/HEX tema üreticisi, Tozpembe/Orman ve tema import/export P6 kapsamındadır.
+- Cloud tema sync, tema marketi ve import/export bu sürümde yoktur; P6.1 için değerlendirilebilir.

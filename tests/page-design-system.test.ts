@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import { WORLD_THEME_REGISTRY } from "@/lib/personalization/world-theme-registry";
+import { BASE_THEME_REGISTRY } from "@/lib/personalization/theme-registry";
 
 const read = (path: string) => readFileSync(path, "utf8");
 const css = read("app/globals.css");
@@ -59,7 +60,8 @@ describe("P3.1 surfaces, themes and world identity", () => {
     "--app-section-divider",
     "--app-subtle-highlight",
   ])("defines %s for all active themes", (token) => {
-    expect(css.match(new RegExp(`${token}:`, "g"))).toHaveLength(3);
+    const activeThemeCount = Object.keys(BASE_THEME_REGISTRY).filter((id) => id !== "system").length;
+    expect(css.match(new RegExp(`${token}:`, "g"))).toHaveLength(activeThemeCount);
   });
 
   it("keeps all world identities in the canonical registry", () => {

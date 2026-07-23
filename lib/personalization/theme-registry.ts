@@ -2,8 +2,69 @@ import type {
   BaseThemeDefinition,
   BaseThemeId,
   BaseThemeRegistryEntry,
+  CustomThemeInputs,
   ResolvedBaseThemeId,
 } from "./types";
+import { deriveCustomThemeTokens } from "./custom-theme-tokens";
+
+export const PRESET_THEME_INPUTS: Readonly<Record<ResolvedBaseThemeId, CustomThemeInputs>> = {
+  obsidian: {
+    colorScheme: "dark",
+    background: "#09090B",
+    surface: "#18181B",
+    accent: "#8B5CF6",
+    secondaryAccent: "#F59E0B",
+  },
+  porcelain: {
+    colorScheme: "light",
+    background: "#F5F5F4",
+    surface: "#FAFAF9",
+    accent: "#7C3AED",
+    secondaryAccent: "#B45309",
+  },
+  ocean: {
+    colorScheme: "dark",
+    background: "#06111F",
+    surface: "#0B1B2D",
+    accent: "#0EA5E9",
+    secondaryAccent: "#14B8A6",
+  },
+  dusty_rose: {
+    colorScheme: "light",
+    background: "#F5ECEE",
+    surface: "#FFF8F6",
+    accent: "#8A3F5D",
+    secondaryAccent: "#B66A7C",
+  },
+  forest: {
+    colorScheme: "dark",
+    background: "#10231C",
+    surface: "#183128",
+    accent: "#7FA56F",
+    secondaryAccent: "#B1845A",
+  },
+  lavender: {
+    colorScheme: "light",
+    background: "#F1EFF8",
+    surface: "#FAF8FF",
+    accent: "#66528F",
+    secondaryAccent: "#9B79B0",
+  },
+  polar: {
+    colorScheme: "light",
+    background: "#EEF5F7",
+    surface: "#F8FBFC",
+    accent: "#137C8B",
+    secondaryAccent: "#4A6A7E",
+  },
+  sepia: {
+    colorScheme: "light",
+    background: "#F2E6CF",
+    surface: "#FBF2E2",
+    accent: "#9A4F37",
+    secondaryAccent: "#6F543C",
+  },
+};
 
 export const BASE_THEME_REGISTRY: Readonly<Record<BaseThemeId, BaseThemeRegistryEntry>> = {
   system: {
@@ -18,6 +79,7 @@ export const BASE_THEME_REGISTRY: Readonly<Record<BaseThemeId, BaseThemeRegistry
     description: "MediaTracker'ın mevcut koyu zinc görünümü.",
     colorScheme: "dark",
     tokens: {
+      ...deriveCustomThemeTokens(PRESET_THEME_INPUTS.obsidian),
       background: "#09090b",
       surface1: "#18181b",
       surface2: "#27272a",
@@ -53,6 +115,7 @@ export const BASE_THEME_REGISTRY: Readonly<Record<BaseThemeId, BaseThemeRegistry
     description: "Kırık beyaz, açık stone ve yumuşak gri temeli.",
     colorScheme: "light",
     tokens: {
+      ...deriveCustomThemeTokens(PRESET_THEME_INPUTS.porcelain),
       background: "#f5f5f4",
       surface1: "#fafaf9",
       surface2: "#e7e5e4",
@@ -88,6 +151,7 @@ export const BASE_THEME_REGISTRY: Readonly<Record<BaseThemeId, BaseThemeRegistry
     description: "Lacivert yüzeyler üzerinde mavi ve turkuaz vurgular.",
     colorScheme: "dark",
     tokens: {
+      ...deriveCustomThemeTokens(PRESET_THEME_INPUTS.ocean),
       background: "#06111f",
       surface1: "#0b1b2d",
       surface2: "#10263d",
@@ -116,6 +180,41 @@ export const BASE_THEME_REGISTRY: Readonly<Record<BaseThemeId, BaseThemeRegistry
       hover: "#10263d",
       selected: "rgba(34, 211, 238, 0.14)",
     },
+  },
+  dusty_rose: {
+    id: "dusty_rose",
+    label: "Tozpembe",
+    description: "Gül kurusu vurgular, krem yüzeyler ve sakin bordo tonları.",
+    colorScheme: "light",
+    tokens: deriveCustomThemeTokens(PRESET_THEME_INPUTS.dusty_rose),
+  },
+  forest: {
+    id: "forest",
+    label: "Orman",
+    description: "Çam ve yosun yeşilini sıcak toprak tonlarıyla dengeler.",
+    colorScheme: "dark",
+    tokens: deriveCustomThemeTokens(PRESET_THEME_INPUTS.forest),
+  },
+  lavender: {
+    id: "lavender",
+    label: "Lavanta",
+    description: "Soluk lavanta yüzeyleri koyu erik vurgusuyla birleştirir.",
+    colorScheme: "light",
+    tokens: deriveCustomThemeTokens(PRESET_THEME_INPUTS.lavender),
+  },
+  polar: {
+    id: "polar",
+    label: "Kutup",
+    description: "Buz mavisi ve slate tonlarında kontrollü, açık bir tema.",
+    colorScheme: "light",
+    tokens: deriveCustomThemeTokens(PRESET_THEME_INPUTS.polar),
+  },
+  sepia: {
+    id: "sepia",
+    label: "Sepya",
+    description: "Parşömen yüzeyleri, mürekkep kahvesi ve terracotta vurgusu.",
+    colorScheme: "light",
+    tokens: deriveCustomThemeTokens(PRESET_THEME_INPUTS.sepia),
   },
 };
 

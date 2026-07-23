@@ -27,8 +27,8 @@ function memoryStorage(initial?: string): AppearancePreferencesStorage & { value
 describe("appearance preferences", () => {
   it("defaults to the current Obsidian appearance", () => {
     expect(DEFAULT_APP_APPEARANCE_PREFERENCES).toEqual({
-      version: 2,
-      baseTheme: "obsidian",
+      version: 3,
+      theme: { kind: "preset", id: "obsidian" },
       accentMode: "auto",
       effectsLevel: "subtle",
       density: "comfortable",
@@ -48,7 +48,7 @@ describe("appearance preferences", () => {
   it("normalizes a partial preference object field by field", () => {
     expect(normalizeAppearancePreferences({ version: 1, baseTheme: "ocean", density: "compact", accentMode: "invalid" })).toEqual({
       ...DEFAULT_APP_APPEARANCE_PREFERENCES,
-      baseTheme: "ocean",
+      theme: { kind: "preset", id: "ocean" },
       density: "compact",
     });
   });
@@ -64,7 +64,7 @@ describe("appearance preferences", () => {
       followWorldCompletedColor: false,
     })).toEqual({
       ...DEFAULT_APP_APPEARANCE_PREFERENCES,
-      baseTheme: "ocean",
+      theme: { kind: "preset", id: "ocean" },
       accentMode: "arch",
       followWorldCompletedColor: false,
     });
@@ -75,7 +75,7 @@ describe("appearance preferences", () => {
     writeAppearancePreferences(storage, { version: 1, baseTheme: "porcelain", extra: "ignored" });
     expect(JSON.parse(storage.values.get(APPEARANCE_PREFERENCES_STORAGE_KEY) ?? "null")).toEqual({
       ...DEFAULT_APP_APPEARANCE_PREFERENCES,
-      baseTheme: "porcelain",
+      theme: { kind: "preset", id: "porcelain" },
     });
   });
 
@@ -90,7 +90,7 @@ describe("appearance preferences", () => {
     }));
     expect(readAppearancePreferences(storage)).toEqual({
       ...DEFAULT_APP_APPEARANCE_PREFERENCES,
-      baseTheme: "porcelain",
+      theme: { kind: "preset", id: "porcelain" },
       accentMode: "screen",
       density: "compact",
       effectsLevel: "off",
@@ -106,7 +106,7 @@ describe("appearance preferences", () => {
   it("registers Porcelain and Ocean without activating them", () => {
     expect(BASE_THEME_REGISTRY.porcelain).toMatchObject({ id: "porcelain", colorScheme: "light" });
     expect(BASE_THEME_REGISTRY.ocean).toMatchObject({ id: "ocean", colorScheme: "dark" });
-    expect(DEFAULT_APP_APPEARANCE_PREFERENCES.baseTheme).toBe("obsidian");
+    expect(DEFAULT_APP_APPEARANCE_PREFERENCES.theme).toEqual({ kind: "preset", id: "obsidian" });
   });
 });
 

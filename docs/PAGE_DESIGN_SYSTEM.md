@@ -103,6 +103,12 @@ Ortak spacing, `--app-page-gap`, `--app-section-gap`, `--app-panel-padding`, `--
 - Motifler CSS tabanlıdır; resim, canvas, timer veya loop animasyonu kullanmaz.
 - Server component kendi `/api` route'una HTTP isteği atmaz.
 
+## Custom semantic tema tüketimi
+
+Shared primitive ve feature yüzeyleri preset veya custom tema kimliğine göre `switch` yazmaz. Renk tüketimi yalnız `--app-*` semantic tokenları üzerinden yapılır. Preset scope'larında CSS renklerin source of truth'udur; custom temada root runtime aynı semantic property allowlist'ine türetilmiş tokenları uygular. Component raw RGB/HEX girdisi, custom tema ID'si veya kullanıcı CSS'i tüketmez.
+
+World accent, status renkleri, chart palette ve profile palette kendi domain sahipliğini korur. Generic focus, selected, panel, card, input ve muted metin rolleri app tokenlarından; error/success/warning ve feature statüleri kendi semantic tokenlarından gelir. Böylece yeni preset veya custom tema eklenmesi sayfa primitive'lerinde tema-özel class tablosu gerektirmez.
+
 ## Sonraki migration planı
 
 P3.1 Feed, Öneriler, Bildirimler, Kullanıcı Ara, İlerleme ve profil alt modüllerini ortak dile taşıdı. P4, Dashboard/Kütüphane composition ve domain sınırlarını görsel redesign yapmadan ayırdı. P5A widget görünürlüğü/sırasını, P5B ise chart palette ile ortak density/effects tokenlarını bağladı. Feature veri akışı, selector, command ve lazy-loading kuralları için [FRONTEND_ARCHITECTURE.md](./FRONTEND_ARCHITECTURE.md); preference ayrımları için [PERSONALIZATION_ARCHITECTURE.md](./PERSONALIZATION_ARCHITECTURE.md) belgesine bakın.

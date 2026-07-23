@@ -11,8 +11,10 @@ import { resolveThemeAccent } from "@/components/theme-accent";
 const settingsSource = readFileSync("components/personalization/appearance-settings-card.tsx", "utf8");
 
 describe("appearance settings view model", () => {
-  it("shows exactly four active theme choices", () => {
-    expect(APPEARANCE_THEME_OPTIONS.map((option) => option.id)).toEqual(["system", "obsidian", "porcelain", "ocean"]);
+  it("derives all active preset theme choices from the registry", () => {
+    expect(APPEARANCE_THEME_OPTIONS.map((option) => option.id)).toEqual([
+      "system", "obsidian", "porcelain", "ocean", "dusty_rose", "forest", "lavender", "polar", "sepia",
+    ]);
   });
 
   it("shows exactly six world accent choices", () => {

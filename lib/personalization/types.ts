@@ -1,8 +1,22 @@
 import type { ImageTransform } from "./image-transform";
 
-export type BaseThemeId = "system" | "obsidian" | "porcelain" | "ocean";
+export type PresetThemeId =
+  | "system"
+  | "obsidian"
+  | "porcelain"
+  | "ocean"
+  | "dusty_rose"
+  | "forest"
+  | "lavender"
+  | "polar"
+  | "sepia";
 
-export type ResolvedBaseThemeId = Exclude<BaseThemeId, "system">;
+export type BaseThemeId = PresetThemeId;
+export type ResolvedBaseThemeId = Exclude<PresetThemeId, "system">;
+
+export type ThemeSelection =
+  | { kind: "preset"; id: PresetThemeId }
+  | { kind: "custom"; id: string };
 
 export type AccentMode = "auto" | "theme" | "east" | "screen" | "arch" | "neutral";
 
@@ -10,8 +24,8 @@ export type EffectsLevel = "off" | "subtle" | "full";
 export type AppDensity = "comfortable" | "compact";
 
 export interface AppAppearancePreferences {
-  version: 2;
-  baseTheme: BaseThemeId;
+  version: 3;
+  theme: ThemeSelection;
   accentMode: AccentMode;
   effectsLevel: EffectsLevel;
   density: AppDensity;
@@ -47,6 +61,69 @@ export interface BaseThemeTokens {
   inputBackground: string;
   hover: string;
   selected: string;
+  secondaryAccent: string;
+  disabledText: string;
+  disabledBackground: string;
+  disabledBorder: string;
+  actionSuccessText: string;
+  actionSuccessBackground: string;
+  actionSuccessBorder: string;
+  actionAccentText: string;
+  actionAccentBackground: string;
+  actionAccentBorder: string;
+  selectedText: string;
+  selectedBackground: string;
+  selectedBorder: string;
+  heroBackground: string;
+  panelBackground: string;
+  cardBackground: string;
+  cardHover: string;
+  sectionDivider: string;
+  subtleHighlight: string;
+}
+
+export type AppThemeTokens = BaseThemeTokens;
+
+export interface CustomThemeInputs {
+  colorScheme: "light" | "dark";
+  background: string;
+  surface: string;
+  accent: string;
+  secondaryAccent: string;
+}
+
+export type ThemeTokenCorrectionKey =
+  | "textPrimary"
+  | "textSecondary"
+  | "textMuted"
+  | "border"
+  | "borderStrong"
+  | "focus";
+
+export type CustomThemeCorrections = Partial<
+  Pick<AppThemeTokens, ThemeTokenCorrectionKey>
+>;
+
+export interface CustomThemeDefinition {
+  version: 1;
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+  inputs: CustomThemeInputs;
+  corrections?: CustomThemeCorrections;
+}
+
+export interface ThemeContrastWarning {
+  key: string;
+  message: string;
+  ratio?: number;
+}
+
+export interface ThemeContrastReport {
+  valid: boolean;
+  warnings: ThemeContrastWarning[];
+  corrections?: CustomThemeCorrections;
 }
 
 export interface BaseThemeDefinition {
@@ -65,6 +142,14 @@ export interface SystemThemeDefinition {
 }
 
 export type BaseThemeRegistryEntry = BaseThemeDefinition | SystemThemeDefinition;
+
+export interface ResolvedThemeDefinition {
+  id: ResolvedBaseThemeId | "custom";
+  label: string;
+  description: string;
+  colorScheme: "light" | "dark";
+  tokens: AppThemeTokens;
+}
 
 export type WorldThemeKey = "neutral" | "east" | "screen" | "arch";
 
@@ -85,9 +170,9 @@ export interface WorldThemeDefinition {
 }
 
 export interface ResolvedAppearanceTheme {
-  resolvedBaseTheme: ResolvedBaseThemeId;
+  resolvedBaseTheme: ResolvedBaseThemeId | "custom";
   resolvedAccent: "theme" | WorldThemeKey;
-  base: BaseThemeDefinition;
+  base: ResolvedThemeDefinition;
   world: WorldThemeDefinition;
 }
 

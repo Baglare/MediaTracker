@@ -6,7 +6,6 @@ import type {
   AccentMode,
   AppAppearancePreferences,
   AppDensity,
-  BaseThemeId,
   ChartPaletteId,
   EffectsLevel,
   ProfileAvatarFrame,
@@ -17,10 +16,22 @@ import type {
   ProfilePaletteId,
   ProfilePresentationPreferences,
   ProfileSurfaceStyle,
+  PresetThemeId,
+  ThemeSelection,
 } from "./types";
 import { bannerPositionFallback, normalizeImageTransform } from "./image-transform";
 
-const BASE_THEMES = new Set<BaseThemeId>(["system", "obsidian", "porcelain", "ocean"]);
+const PRESET_THEMES = new Set<PresetThemeId>([
+  "system",
+  "obsidian",
+  "porcelain",
+  "ocean",
+  "dusty_rose",
+  "forest",
+  "lavender",
+  "polar",
+  "sepia",
+]);
 const ACCENT_MODES = new Set<AccentMode>(["auto", "theme", "east", "screen", "arch", "neutral"]);
 const EFFECTS_LEVELS = new Set<EffectsLevel>(["off", "subtle", "full"]);
 const DENSITIES = new Set<AppDensity>(["comfortable", "compact"]);
@@ -57,11 +68,16 @@ function readKnown<T extends string>(value: unknown, known: ReadonlySet<T>, fall
 
 export function normalizeAppearancePreferences(value: unknown): AppAppearancePreferences {
   const fallback = defaultAppearancePreferences();
-  if (!isRecord(value) || (value.version !== 1 && value.version !== 2)) return fallback;
+  if (!isRecord(value) || (value.version !== 1 && value.version !== 2 && value.version !== 3)) return fallback;
 
   return {
-    version: 2,
-    baseTheme: readKnown(value.baseTheme, BASE_THEMES, fallback.baseTheme),
+    version: 3,
+    theme: value.version === 3
+      ? normalizeThemeSelection(value.theme)
+      : {
+          kind: "preset",
+          id: readKnown(value.baseTheme, PRESET_THEMES, "obsidian"),
+        },
     accentMode: readKnown(value.accentMode, ACCENT_MODES, fallback.accentMode),
     effectsLevel: readKnown(value.effectsLevel, EFFECTS_LEVELS, fallback.effectsLevel),
     density: readKnown(value.density, DENSITIES, fallback.density),
@@ -70,6 +86,24 @@ export function normalizeAppearancePreferences(value: unknown): AppAppearancePre
       ? value.followWorldCompletedColor
       : fallback.followWorldCompletedColor,
   };
+}
+
+export function normalizeThemeSelection(value: unknown): ThemeSelection {
+  if (!isRecord(value)) return { kind: "preset", id: "obsidian" };
+  if (value.kind === "preset") {
+    return {
+      kind: "preset",
+      id: readKnown(value.id, PRESET_THEMES, "obsidian"),
+    };
+  }
+  if (
+    value.kind === "custom"
+    && typeof value.id === "string"
+    && /^ct_[a-z0-9_-]{8,80}$/i.test(value.id)
+  ) {
+    return { kind: "custom", id: value.id };
+  }
+  return { kind: "preset", id: "obsidian" };
 }
 
 export function normalizeProfilePresentationPreferences(value: unknown): ProfilePresentationPreferences {
