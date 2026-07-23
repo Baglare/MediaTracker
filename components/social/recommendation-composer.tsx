@@ -28,7 +28,8 @@ export function RecommendationComposer({ initialRecipientId, onSent, onCancel }:
 
   useEffect(() => {
     void Promise.resolve().then(() => {
-      setMedia(loadMediaList() ?? []);
+      const read = loadMediaList();
+      setMedia(read.status === "valid" || read.status === "empty" ? read.data ?? [] : []);
       try {
         const raw = sessionStorage.getItem(DRAFT_KEY);
         if (raw) { setDraft(JSON.parse(raw) as SocialMediaEntitySnapshot); sessionStorage.removeItem(DRAFT_KEY); }

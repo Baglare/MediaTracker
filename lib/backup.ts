@@ -6,28 +6,7 @@
 
 import { MediaItem, ProgressLog, withMediaClassification } from "./types";
 import { withInferredSeriesGroup } from "./series-group";
-
-const VALID_MEDIA_TYPES = new Set<MediaItem["type"]>([
-  "movie",
-  "tv",
-  "anime",
-  "manga",
-  "manhwa",
-  "manhua",
-  "book",
-  "light_novel",
-  "web_novel",
-  "visual_novel",
-]);
-
-const VALID_MEDIA_STATUSES = new Set<MediaItem["status"]>([
-  "watching",
-  "reading",
-  "planning",
-  "completed",
-  "paused",
-  "dropped",
-]);
+import { decodeMediaItem, decodeMediaItems, decodeProgressLogs } from "./local-data-codec";
 
 // ---- Export Yapısı ----
 
@@ -124,22 +103,28 @@ export function validateBackupPayload(
     return { valid: false, error: "Backup dosyasında 'mediaItems' dizisi bulunamadı." };
   }
 
-  // Her item'ın en azından id ve title alanına sahip olduğunu kontrol et
-  const normalizedItems = data.mediaItems
-    .filter((item): item is Partial<MediaItem> => {
-      if (!item || typeof item !== "object") return false;
-      const title = (item as { title?: unknown }).title;
-      return typeof title === "string" && title.trim().length > 0;
-    })
-    .map(normalizeImportedMediaItem);
-
-  // progressLogs array kontrolü
-  let normalizedLogs: ProgressLog[] = [];
-  if (Array.isArray(data.progressLogs)) {
-    normalizedLogs = data.progressLogs as ProgressLog[];
+  const decodedItems = decodeMediaItems(data.mediaItems);
+  if (!decodedItems.ok) {
+    const first = decodedItems.issues[0];
+    return {
+      valid: false,
+      error: `Backup media kaydı doğrulanamadı (kayıt ${first.recordIndex + 1}, ${first.path}).`,
+    };
   }
 
-  return { valid: true, items: normalizedItems, logs: normalizedLogs };
+  if (data.progressLogs !== undefined && !Array.isArray(data.progressLogs)) {
+    return { valid: false, error: "Backup dosyasında 'progressLogs' dizi olmalıdır." };
+  }
+  const decodedLogs = decodeProgressLogs(Array.isArray(data.progressLogs) ? data.progressLogs : []);
+  if (!decodedLogs.ok) {
+    const first = decodedLogs.issues[0];
+    return {
+      valid: false,
+      error: `Backup progress log doğrulanamadı (kayıt ${first.recordIndex + 1}, ${first.path}).`,
+    };
+  }
+
+  return { valid: true, items: decodedItems.records, logs: decodedLogs.records };
 }
 
 /**
@@ -154,107 +139,11 @@ function generateId(): string {
  * Eksik veya hatalı alanlar için varsayılan değerler atar.
  */
 export function normalizeImportedMediaItem(item: Partial<MediaItem>): MediaItem {
-  const type = typeof item.type === "string" && VALID_MEDIA_TYPES.has(item.type)
-    ? item.type
-    : "movie";
-  const status = typeof item.status === "string" && VALID_MEDIA_STATUSES.has(item.status)
-    ? item.status
-    : "planning";
-
-  // userRating doğrulama: 0-10 arası tam sayı olmalı
-  let userRating: number | null | undefined = item.userRating;
-  if (userRating !== null && userRating !== undefined) {
-    userRating = Math.round(userRating);
-    if (isNaN(userRating) || userRating < 0 || userRating > 10) {
-      userRating = null;
-    }
+  const decoded = decodeMediaItem(item);
+  if (decoded.status === "invalid") {
+    throw new Error(`Geçersiz MediaItem: ${decoded.issues.map((entry) => entry.path).join(", ")}`);
   }
-
-  // tags: boş stringleri ve duplicate'leri temizle
-  const tags: string[] = [];
-  if (Array.isArray(item.tags)) {
-    const seen = new Set<string>();
-    for (const tag of item.tags) {
-      const trimmed = String(tag).trim();
-      const lower = trimmed.toLowerCase();
-      if (trimmed && !seen.has(lower)) {
-        seen.add(lower);
-        tags.push(trimmed);
-      }
-    }
-  }
-
-  // Array alanlarını temizle (boş stringleri kaldır)
-  const cleanStringArray = (arr?: unknown[]): string[] | undefined => {
-    if (!Array.isArray(arr)) return undefined;
-    const cleaned = arr.map((v) => String(v).trim()).filter((v) => v.length > 0);
-    return cleaned.length > 0 ? cleaned : undefined;
-  };
-
-  // totalProgress güvenliği
-  const totalProgress = Math.max(1, Number(item.totalProgress) || 1);
-  const currentProgress = Math.max(0, Math.min(Number(item.currentProgress) || 0, totalProgress));
-
-  return withMediaClassification({
-    id: typeof item.id === "string" && item.id.trim().length > 0 ? item.id : generateId(),
-    title: typeof item.title === "string" ? item.title.trim() : "İsimsiz",
-    type,
-    theme: item.theme,
-    mediaType: item.mediaType,
-    subType: item.subType,
-    status,
-    coverImage: typeof item.coverImage === "string" && item.coverImage.length > 0
-      ? item.coverImage
-      : `/placeholders/${type}.svg`,
-    currentProgress,
-    totalProgress,
-
-    // Kişisel alanlar
-    userRating: userRating ?? null,
-    favorite: Boolean(item.favorite),
-    tags,
-    personalNotes: item.personalNotes ? String(item.personalNotes) : "",
-
-    // Eski alanları koru
-    rating: item.rating,
-    externalSource: item.externalSource,
-    externalId: item.externalId,
-    overview: item.overview,
-    releaseYear: item.releaseYear,
-    backdropUrl: item.backdropUrl,
-    runtime: item.runtime,
-    numberOfSeasons: item.numberOfSeasons,
-    numberOfEpisodes: item.numberOfEpisodes,
-    tvmazeStatus: item.tvmazeStatus,
-    tmdbStatus: item.tmdbStatus,
-    lastAirDate: item.lastAirDate,
-    nextAirDate: item.nextAirDate,
-    genres: cleanStringArray(item.genres),
-    networkName: item.networkName,
-    language: item.language,
-    authors: cleanStringArray(item.authors),
-    pageCount: item.pageCount,
-    editionCount: item.editionCount,
-    languages: cleanStringArray(item.languages),
-    subjects: cleanStringArray(item.subjects),
-    isbn: cleanStringArray(item.isbn),
-    nativeTitle: item.nativeTitle,
-    episodes: item.episodes,
-    chapters: item.chapters,
-    volumes: item.volumes,
-    countryOfOrigin: item.countryOfOrigin,
-    anilistStatus: item.anilistStatus,
-    format: item.format,
-    averageScore: item.averageScore,
-    popularity: item.popularity,
-    siteUrl: item.siteUrl,
-    nextAiringEpisode: item.nextAiringEpisode,
-    seriesGroupId: item.seriesGroupId,
-    seriesGroupTitle: item.seriesGroupTitle,
-    seriesRelationType: item.seriesRelationType,
-    seasonNumber: item.seasonNumber,
-    orderIndex: item.orderIndex,
-  });
+  return decoded.value;
 }
 
 /**

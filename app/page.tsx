@@ -184,6 +184,38 @@ export default function HomePage() {
     );
   }
 
+  if (library.libraryIntegrity !== "valid") {
+    const recoveryMessage =
+      library.libraryIntegrity === "corrupt"
+        ? "Yerel kütüphane verisi bozuk görünüyor. Veri korunarak karantinaya alındı; üzerine demo veya boş veri yazılmadı."
+        : library.libraryIntegrity === "unsupported_version"
+          ? "Yerel kütüphane bu uygulamanın desteklemediği daha yeni bir veri sürümü kullanıyor."
+          : library.libraryIntegrity === "migration_failed"
+            ? "Eski yerel verinin güvenli migration işlemi tamamlanamadı. Kaynak veri korunuyor."
+            : "Tarayıcı depolamasına güvenli biçimde erişilemedi. Yerel değişiklikler durduruldu.";
+    return (
+      <main className="mx-auto grid min-h-64 max-w-2xl place-items-center px-4 py-10">
+        <section
+          role="alert"
+          className="rounded-2xl border border-[color-mix(in_srgb,var(--app-danger)_40%,var(--app-border))] bg-[var(--app-panel-bg)] p-6"
+        >
+          <h1 className="text-lg font-semibold text-[var(--app-text-primary)]">
+            Yerel veri kurtarma gerekiyor
+          </h1>
+          <p className="mt-2 text-sm leading-6 text-[var(--app-text-secondary)]">
+            {recoveryMessage}
+          </p>
+          {library.storageError && (
+            <p className="mt-3 text-xs text-[var(--app-text-muted)]">{library.storageError}</p>
+          )}
+          <p className="mt-4 text-xs text-[var(--app-text-muted)]">
+            Otomatik kayıt, cloud queue ve XP tam eşitlemesi bu durumda çalıştırılmaz.
+          </p>
+        </section>
+      </main>
+    );
+  }
+
   const world = resolveWorldScope(activeTab, preferences.themeFilter);
   const showRightRail = shouldShowDashboardRightRail(activeTab);
   const content = (() => {
@@ -305,6 +337,14 @@ export default function HomePage() {
           trigger={preferences.worldTransition}
           effectsLevel={appearance.preferences.effectsLevel}
         />
+        {library.storageError && (
+          <p
+            role="alert"
+            className="mb-4 rounded-xl border border-[color-mix(in_srgb,var(--app-danger)_35%,var(--app-border))] bg-[var(--app-panel-bg)] p-3 text-sm text-[var(--app-danger)]"
+          >
+            {library.storageError} Değişiklik kalıcı olmadığı için cloud, XP ve sosyal kuyruklara eklenmedi.
+          </p>
+        )}
         {content}
         <MediaCommandHost commands={commands} mediaList={library.mediaList} />
       </div>

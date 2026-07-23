@@ -11,6 +11,7 @@ import { PageSection } from "@/components/ui/page-section";
 import { StatCard } from "@/components/ui/stat-card";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { WORLD_THEME_REGISTRY } from "@/lib/personalization/world-theme-registry";
+import { guardXpFullSync } from "@/lib/library-hydration";
 import { loadMediaList } from "@/lib/storage";
 import { buildSafeMediaState, earnedWorldTitles, xpEventLabel, XP_TRUST_LABELS } from "@/lib/xp/progression";
 import type { XpDashboardSummary, XpWorldKey } from "@/lib/xp/types";
@@ -49,7 +50,18 @@ export function ProgressionDashboard() {
 
   async function synchronizeLibrary() {
     setMessage(undefined);
-    const items = (loadMediaList() ?? []).map((item) => buildSafeMediaState(item));
+    const guard = guardXpFullSync(loadMediaList());
+    if (!guard.allowed) {
+      setMessage(
+        guard.reason === "library_data_corrupt"
+          ? "Yerel kütüphane verisi bozuk olduğu için XP eşitlemesi engellendi."
+          : guard.reason === "library_migration_required"
+            ? "Yerel kütüphane migration gerektirdiği için XP eşitlemesi engellendi."
+            : "Yerel kütüphane güvenli biçimde yüklenemediği için XP eşitlemesi engellendi.",
+      );
+      return;
+    }
+    const items = guard.items.map((item) => buildSafeMediaState(item));
     const response = await fetch("/api/xp", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "sync_states", items, replace: true }) });
     const body = await response.json().catch(() => ({})) as { message?: string; xpDelta?: number; changedEntitlements?: number };
     if (!response.ok) { setMessage(body.message ?? "Kütüphane XP ile eşitlenemedi."); return; }

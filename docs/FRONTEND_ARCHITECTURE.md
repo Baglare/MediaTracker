@@ -60,13 +60,13 @@ Command hook domain mutationlarını `useMediaLibrary` API'sine delege eder. Mod
 
 ## Persistence ve side effect'ler
 
-- `lib/storage` local media ve progress log adapter'ıdır.
-- `useMediaLibrary` hydration/persistence ile XP ve social outbox akışlarını koordine eder.
+- `lib/storage` versioned media/progress envelope adapter'ını dışa açar; runtime codec, dual-read migration, quarantine ve current/temp/backup protokolü domain storage katmanında kalır.
+- `useMediaLibrary` tipli hydration durumunu korur ve mutation'larda önce doğrulanmış local snapshot'ı, sonra XP/social/cloud side effect'lerini uygular.
 - Discovery network çağrıları yalnız `useDiscoveryController` ve mevcut search component'lerinde kalır.
 - Browser online listener'ları sahip oldukları hook içinde kurulup temizlenir.
 - Selector ve presentation component'leri side effect üretmez.
 
-Local storage veya outbox hatası local medya mutation'ını geri almaz. Aynı mutation için persistence/outbox sorumluluğu ikinci bir feature hook'unda çoğaltılmaz.
+Local storage write başarısızsa mutation React source state'e kabul edilmez ve hiçbir cloud/XP/social işi üretilmez. Outbox hatası ise doğrulanmış local mutation'ı geri almaz. Aynı mutation için persistence/outbox sorumluluğu ikinci bir feature hook'unda çoğaltılmaz. Ayrıntılı format ve recovery sözleşmesi [LOCAL_DATA_FORMAT_AND_RECOVERY.md](./LOCAL_DATA_FORMAT_AND_RECOVERY.md) belgesindedir.
 
 ## Server/client sınırı ve performans
 

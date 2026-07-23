@@ -35,7 +35,7 @@ interface CloudDataStatusCardProps {
   configured: boolean;
   mediaItems: MediaItem[];
   progressLogs: ProgressLog[];
-  onReplaceData: (items: MediaItem[], logs: ProgressLog[]) => void;
+  onReplaceData: (items: MediaItem[], logs: ProgressLog[]) => boolean;
   onConfirm: (title: string, message: string, onOk: () => void) => void;
 }
 
@@ -209,7 +209,10 @@ export default function CloudDataStatusCard({
           showBanner({ kind: "error", text: res.message });
           return;
         }
-        onReplaceData(res.mediaItems, res.progressLogs);
+        if (!onReplaceData(res.mediaItems, res.progressLogs)) {
+          showBanner({ kind: "error", text: "Cloud verisi indirildi ancak güvenli local write tamamlanamadı." });
+          return;
+        }
         showBanner({ kind: "success", text: res.message });
         void refresh();
       }
@@ -229,7 +232,10 @@ export default function CloudDataStatusCard({
           showBanner({ kind: "error", text: res.message });
           return;
         }
-        onReplaceData(res.mediaItems, res.progressLogs);
+        if (!onReplaceData(res.mediaItems, res.progressLogs)) {
+          showBanner({ kind: "error", text: "Cloud birleştirmesi hazırlandı ancak güvenli local write tamamlanamadı." });
+          return;
+        }
         showBanner({ kind: "success", text: res.message });
         void refresh();
       }

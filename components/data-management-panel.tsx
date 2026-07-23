@@ -27,7 +27,7 @@ import {
 interface DataManagementPanelProps {
   mediaList: MediaItem[];
   progressLogs?: ProgressLog[];
-  onImport: (items: MediaItem[], logs: ProgressLog[]) => void;
+  onImport: (items: MediaItem[], logs: ProgressLog[]) => boolean;
   onReset: () => void;
   onConfirm: (title: string, message: string, onOk: () => void) => void;
 }
@@ -113,13 +113,19 @@ export default function DataManagementPanel({
           "Verileri Değiştir",
           `Mevcut ${mediaList.length} içerik silinecek ve ${importedItems.length} içerik ile değiştirilecek. Emin misin?`,
           () => {
-            onImport(result.items, result.logs);
-            showFeedback("success", result.message);
+            const persisted = onImport(result.items, result.logs);
+            showFeedback(
+              persisted ? "success" : "error",
+              persisted ? result.message : "İçe aktarma doğrulandı ancak güvenli local write tamamlanamadı.",
+            );
           }
         );
       } else {
-        onImport(result.items, result.logs);
-        showFeedback("success", result.message);
+        const persisted = onImport(result.items, result.logs);
+        showFeedback(
+          persisted ? "success" : "error",
+          persisted ? result.message : "İçe aktarma doğrulandı ancak güvenli local write tamamlanamadı.",
+        );
       }
     };
 

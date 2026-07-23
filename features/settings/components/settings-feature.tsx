@@ -22,7 +22,7 @@ interface SettingsFeatureProps {
   mediaList: MediaItem[];
   progressLogs: ProgressLog[];
   layout: LayoutController;
-  onReplaceData: (items: MediaItem[], logs: ProgressLog[]) => void;
+  onReplaceData: (items: MediaItem[], logs: ProgressLog[]) => boolean;
   onReset: () => void;
   onConfirm: (title: string, message: string, onOk: () => void) => void;
 }

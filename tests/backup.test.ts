@@ -109,7 +109,7 @@ describe("backup import and merge", () => {
     });
   });
 
-  it("handles missing or wrongly typed item fields without throwing", () => {
+  it("rejects wrongly typed records instead of silently dropping or defaulting them", () => {
     const parsed = parseBackupJson(JSON.stringify({
       appName: "MediaTracker",
       data: {
@@ -118,10 +118,9 @@ describe("backup import and merge", () => {
       },
     }));
 
-    expect(parsed.valid).toBe(true);
-    if (!parsed.valid) return;
-    expect(parsed.items).toHaveLength(1);
-    expect(parsed.items[0].title).toBe("Usable");
-    expect(parsed.logs).toEqual([]);
+    expect(parsed).toMatchObject({
+      valid: false,
+      error: expect.stringContaining("Backup media kaydı doğrulanamadı"),
+    });
   });
 });
