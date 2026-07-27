@@ -102,7 +102,11 @@ export const mediaIdentityAliasRegistryCodec: PersonalDataCodec<MediaIdentityAli
   value,
 ) => {
   if (!isRecord(value) || value.version !== 1 || !Array.isArray(value.records)) {
-    return { ok: false, message: "Media identity alias registry formati gecersiz." };
+    return {
+      ok: false,
+      code: "alias_registry_invalid",
+      message: "Media identity alias registry formati gecersiz.",
+    };
   }
   const records: MediaIdentityAliasRecord[] = [];
   const issues = Array.isArray(value.issues)
@@ -119,7 +123,11 @@ export const mediaIdentityAliasRegistryCodec: PersonalDataCodec<MediaIdentityAli
       || typeof raw.createdAt !== "string"
       || !Number.isFinite(Date.parse(raw.createdAt))
     ) {
-      return { ok: false, message: "Media identity alias kaydi gecersiz." };
+      return {
+        ok: false,
+        code: "alias_record_invalid",
+        message: "Media identity alias kaydi gecersiz.",
+      };
     }
     const identity = parseCanonicalMediaKeyV2(raw.canonicalKey);
     const alias = normalizeAlias(raw.alias);
@@ -130,7 +138,11 @@ export const mediaIdentityAliasRegistryCodec: PersonalDataCodec<MediaIdentityAli
       || (aliasIdentity && raw.aliasType !== "merged-canonical-key")
       || aliasIdentity?.key === identity.key
     ) {
-      return { ok: false, message: "Alias dogrudan ve gecerli bir V2 canonical key'e gitmelidir." };
+      return {
+        ok: false,
+        code: "alias_invalid_target",
+        message: "Alias dogrudan ve gecerli bir V2 canonical key'e gitmelidir.",
+      };
     }
     const next: MediaIdentityAliasRecord = {
       alias,
@@ -149,8 +161,27 @@ export const mediaIdentityAliasRegistryCodec: PersonalDataCodec<MediaIdentityAli
     }
   }
   const aliasKeys = new Set(records.map((entry) => normalizeAlias(entry.alias)));
-  if (records.some((entry) => aliasKeys.has(normalizeAlias(entry.canonicalKey)))) {
-    return { ok: false, message: "Media identity alias chain veya cycle iceremez." };
+  const chained = records.filter((entry) =>
+    aliasKeys.has(normalizeAlias(entry.canonicalKey)));
+  if (chained.length > 0) {
+    const targets = new Map(
+      records.map((entry) => [normalizeAlias(entry.alias), normalizeAlias(entry.canonicalKey)]),
+    );
+    const hasCycle = chained.some((entry) => {
+      const seen = new Set<string>();
+      let cursor: string | undefined = normalizeAlias(entry.alias);
+      while (cursor && targets.has(cursor)) {
+        if (seen.has(cursor)) return true;
+        seen.add(cursor);
+        cursor = targets.get(cursor);
+      }
+      return false;
+    });
+    return {
+      ok: false,
+      code: hasCycle ? "alias_cycle" : "alias_chain",
+      message: "Media identity alias chain veya cycle iceremez.",
+    };
   }
   return {
     ok: true,

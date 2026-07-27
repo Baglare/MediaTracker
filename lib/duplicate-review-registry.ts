@@ -69,7 +69,11 @@ export const duplicateReviewRegistryCodec: PersonalDataCodec<DuplicateReviewRegi
   value,
 ) => {
   if (!isRecord(value) || value.version !== 1 || !Array.isArray(value.decisions)) {
-    return { ok: false, message: "Duplicate review registry formati gecersiz." };
+    return {
+      ok: false,
+      code: "duplicate_review_registry_invalid",
+      message: "Duplicate review registry formati gecersiz.",
+    };
   }
   const decisions: DuplicateReviewDecision[] = [];
   const seen = new Set<string>();
@@ -88,11 +92,19 @@ export const duplicateReviewRegistryCodec: PersonalDataCodec<DuplicateReviewRegi
       || !Number.isFinite(Date.parse(raw.decidedAt))
       || seen.has(raw.candidateFingerprint)
     ) {
-      return { ok: false, message: "Duplicate review karar kaydi gecersiz." };
+      return {
+        ok: false,
+        code: "duplicate_review_record_invalid",
+        message: "Duplicate review karar kaydi gecersiz.",
+      };
     }
     const recordIds = normalizeRecordIds(raw.recordIds);
     if (!recordIds) {
-      return { ok: false, message: "Duplicate review record listesi gecersiz." };
+      return {
+        ok: false,
+        code: "duplicate_review_record_ids_invalid",
+        message: "Duplicate review record listesi gecersiz.",
+      };
     }
     seen.add(raw.candidateFingerprint);
     decisions.push({

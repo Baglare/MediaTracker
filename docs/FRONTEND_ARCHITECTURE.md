@@ -49,6 +49,14 @@ hazırlanır. `lib/media-identity-aliases.ts` mantıksal identity alias'larını
 Ayrıntılar [DUPLICATE_MERGE_AND_RECOVERY.md](./DUPLICATE_MERGE_AND_RECOVERY.md)
 belgesindedir.
 
+D1D.1 integrity sınırı `lib/local-data-integrity.ts` içindeki saf scanner ve
+salt-okunur storage inspector'larıdır. Settings paneli codec, registry veya
+queue formatını yeniden yorumlamaz; owner generation doğrulaması geçmiş
+hesabın raporunu maskeler. Scanner hiçbir domain state'i değiştirmez ve
+repair/network side-effect üretmez. Ayrıntılar
+[LOCAL_DATA_INTEGRITY_SCANNER.md](./LOCAL_DATA_INTEGRITY_SCANNER.md)
+belgesindedir.
+
 ## Library data flow
 
 ```text

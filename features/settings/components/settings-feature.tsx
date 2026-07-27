@@ -8,6 +8,7 @@ import CloudDataStatusCard from "@/components/cloud-data-status-card";
 import CloudSyncStatusCard from "@/components/cloud-sync-status-card";
 import DataManagementPanel from "@/components/data-management-panel";
 import DuplicateReviewPanel from "@/components/duplicate-review-panel";
+import LocalDataIntegrityPanel from "@/components/local-data-integrity-panel";
 import PageHeader from "@/components/page-header";
 import AppearanceSettingsCard from "@/components/personalization/appearance-settings-card";
 import LayoutSettingsCard from "@/components/personalization/layout-settings-card";
@@ -86,6 +87,11 @@ export default function SettingsFeature({
             onImport={onReplaceData}
             onReset={onReset}
             onConfirm={onConfirm}
+          />
+          <LocalDataIntegrityPanel
+            ownerScope={ownerScope}
+            mediaList={mediaList}
+            progressLogs={progressLogs}
           />
           <DuplicateReviewPanel
             ownerScope={ownerScope}

@@ -42,13 +42,19 @@ export interface PersonalDataEnvelope<T> {
 export type PersonalDataReadResult<T> =
   | { status: "missing"; sourceKey: string }
   | { status: "valid"; sourceKey: string; data: T; writtenAt: string }
-  | { status: "corrupt"; sourceKey: string; quarantineKey?: string; message: string }
+  | {
+      status: "corrupt";
+      sourceKey: string;
+      quarantineKey?: string;
+      message: string;
+      diagnosticCode?: string;
+    }
   | { status: "owner_mismatch"; sourceKey: string; message: string }
   | { status: "storage_unavailable"; sourceKey: string; message: string };
 
 export type PersonalDataCodec<T> = (
   value: unknown,
-) => { ok: true; value: T } | { ok: false; message: string };
+) => { ok: true; value: T } | { ok: false; message: string; code?: string };
 
 const FORMAT = "mediatracker-personal-data" as const;
 
@@ -79,7 +85,7 @@ function decodeEnvelope<T>(
   codec: PersonalDataCodec<T>,
 ):
   | { ok: true; value: T; writtenAt: string }
-  | { ok: false; ownerMismatch?: boolean; message: string } {
+  | { ok: false; ownerMismatch?: boolean; message: string; code?: string } {
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
@@ -107,6 +113,59 @@ function decodeEnvelope<T>(
   const decoded = codec(parsed.value);
   if (!decoded.ok) return decoded;
   return { ok: true, value: decoded.value, writtenAt: parsed.writtenAt };
+}
+
+/**
+ * D1D read-only inspection path. It reuses the canonical personal-data
+ * envelope decoder and domain codec without creating quarantine evidence.
+ */
+export function inspectPersonalData<T>(
+  scope: LocalOwnerScope,
+  domain: PersonalDataDomain,
+  codec: PersonalDataCodec<T>,
+  storage: Pick<PersonalStorageLike, "getItem"> | null = browserStorage(),
+): PersonalDataReadResult<T> {
+  const keys = buildPersonalDataKeys(domain, scope);
+  if (!storage) {
+    return {
+      status: "storage_unavailable",
+      sourceKey: keys.current,
+      message: "Tarayici local storage kullanilamiyor.",
+    };
+  }
+  let raw: string | null;
+  try {
+    raw = storage.getItem(keys.current);
+  } catch {
+    return {
+      status: "storage_unavailable",
+      sourceKey: keys.current,
+      message: "Kisisel veri current slotu okunamadi.",
+    };
+  }
+  if (raw === null) return { status: "missing", sourceKey: keys.current };
+  const decoded = decodeEnvelope(raw, domain, scope, codec);
+  if (decoded.ok) {
+    return {
+      status: "valid",
+      sourceKey: keys.current,
+      data: decoded.value,
+      writtenAt: decoded.writtenAt,
+    };
+  }
+  if (decoded.ownerMismatch) {
+    return {
+      status: "owner_mismatch",
+      sourceKey: keys.current,
+      message: decoded.message,
+    };
+  }
+  return {
+    status: "corrupt",
+    sourceKey: keys.current,
+    message: decoded.message,
+    diagnosticCode: decoded.code,
+  };
 }
 
 function quarantineRaw(
@@ -202,6 +261,7 @@ export function readPersonalData<T>(
     sourceKey: keys.current,
     quarantineKey: quarantineRaw(storage, domain, keys.current, raw, decoded.message),
     message: decoded.message,
+    diagnosticCode: decoded.code,
   };
 }
 

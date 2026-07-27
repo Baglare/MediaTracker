@@ -36,7 +36,11 @@ export const mediaRecordRedirectRegistryCodec: PersonalDataCodec<MediaRecordRedi
   value,
 ) => {
   if (!isRecord(value) || value.version !== 1 || !Array.isArray(value.records)) {
-    return { ok: false, message: "Media record redirect registry formati gecersiz." };
+    return {
+      ok: false,
+      code: "redirect_registry_invalid",
+      message: "Media record redirect registry formati gecersiz.",
+    };
   }
   const records: MediaRecordRedirect[] = [];
   const fromIds = new Set<string>();
@@ -51,7 +55,11 @@ export const mediaRecordRedirectRegistryCodec: PersonalDataCodec<MediaRecordRedi
       || !Number.isFinite(Date.parse(raw.createdAt))
       || fromIds.has(raw.fromRecordId)
     ) {
-      return { ok: false, message: "Media record redirect kaydi gecersiz." };
+      return {
+        ok: false,
+        code: "redirect_record_invalid",
+        message: "Media record redirect kaydi gecersiz.",
+      };
     }
     fromIds.add(raw.fromRecordId);
     records.push({
@@ -62,7 +70,22 @@ export const mediaRecordRedirectRegistryCodec: PersonalDataCodec<MediaRecordRedi
     });
   }
   if (records.some((entry) => fromIds.has(entry.toRecordId))) {
-    return { ok: false, message: "Redirect chain veya cycle dogrudan registry'de saklanamaz." };
+    const targets = new Map(records.map((entry) => [entry.fromRecordId, entry.toRecordId]));
+    const hasCycle = records.some((entry) => {
+      const seen = new Set<string>();
+      let cursor: string | undefined = entry.fromRecordId;
+      while (cursor && targets.has(cursor)) {
+        if (seen.has(cursor)) return true;
+        seen.add(cursor);
+        cursor = targets.get(cursor);
+      }
+      return false;
+    });
+    return {
+      ok: false,
+      code: hasCycle ? "redirect_cycle" : "redirect_chain",
+      message: "Redirect chain veya cycle dogrudan registry'de saklanamaz.",
+    };
   }
   return {
     ok: true,

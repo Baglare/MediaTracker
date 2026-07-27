@@ -384,6 +384,61 @@ function decodeEnvelopeRaw(
   };
 }
 
+/**
+ * D1D read-only inspection path. Unlike the hydration reader this never
+ * quarantines, migrates, restores or writes any storage slot.
+ */
+export function inspectScopedLocalData<T>(
+  scope: LocalOwnerScope,
+  domain: LocalDataDomain,
+  target: Pick<LocalStorageLike, "getItem"> | null = browserStorage(),
+): StorageReadResult<T> {
+  const keys = buildLocalDataKeys(domain, scope);
+  if (!target) {
+    return {
+      status: "storage_unavailable",
+      sourceKey: keys.current,
+      issues: [{ code: "storage_unavailable", message: "Tarayıcı local storage kullanılamıyor." }],
+    };
+  }
+  let raw: string | null;
+  try {
+    raw = target.getItem(keys.current);
+  } catch {
+    return {
+      status: "storage_unavailable",
+      sourceKey: keys.current,
+      issues: [{ code: "storage_read_failed", message: "Local data okunamadı." }],
+    };
+  }
+  if (raw === null) {
+    return {
+      status: "missing",
+      sourceKey: keys.current,
+      ownerScope: scope.key,
+      issues: [],
+    };
+  }
+  const decoded = decodeEnvelopeRaw(raw, domain, scope);
+  if (!decoded.ok) {
+    return {
+      status: decoded.status,
+      sourceKey: keys.current,
+      ownerScope: scope.key,
+      issues: decoded.issues,
+    };
+  }
+  return {
+    status: decoded.records.length === 0 ? "empty" : "valid",
+    data: decoded.records as T,
+    sourceKey: keys.current,
+    schemaVersion: decoded.schemaVersion,
+    ownerScope: decoded.ownerScope,
+    datasetOrigin: decoded.datasetOrigin,
+    issues: decoded.issues,
+  };
+}
+
 interface QuarantineEnvelope {
   format: "mediatracker-local-quarantine";
   domain: LocalDataDomain;

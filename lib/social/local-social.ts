@@ -62,6 +62,24 @@ export interface RecommendationLocalLink {
   userId: string;
 }
 
+export interface RecommendationLinkInspectionIssue {
+  code: "recommendation_link_invalid" | "recommendation_link_owner_mismatch";
+  index: number;
+  localMediaId?: string;
+}
+
+export type RecommendationLinkInspectionResult =
+  | {
+      status: "missing" | "valid";
+      links: RecommendationLocalLink[];
+      issues: RecommendationLinkInspectionIssue[];
+    }
+  | {
+      status: "corrupt" | "storage_unavailable";
+      links: [];
+      issues: RecommendationLinkInspectionIssue[];
+    };
+
 interface CachedPreferences { userId: string; configured: boolean; activity: ActivityPreferences }
 
 function browserStorage(): StorageLike | null { return typeof window === "undefined" ? null : window.localStorage; }
@@ -223,6 +241,57 @@ export function loadRecommendationLinksForScope(
   storage: StorageLike | null = browserStorage(),
 ): RecommendationLocalLink[] {
   return scope.kind === "user" ? loadRecommendationLinks(scope.userId, storage) : [];
+}
+
+export function inspectRecommendationLinksForScope(
+  scope: LocalOwnerScope,
+  storage: Pick<StorageLike, "getItem"> | null = browserStorage(),
+): RecommendationLinkInspectionResult {
+  if (!storage) return { status: "storage_unavailable", links: [], issues: [] };
+  let raw: string | null;
+  try {
+    raw = storage.getItem(buildRecommendationLinksKeyForScope(scope));
+  } catch {
+    return { status: "storage_unavailable", links: [], issues: [] };
+  }
+  if (raw === null) return { status: "missing", links: [], issues: [] };
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return { status: "corrupt", links: [], issues: [] };
+  }
+  if (!Array.isArray(parsed)) return { status: "corrupt", links: [], issues: [] };
+  const links: RecommendationLocalLink[] = [];
+  const issues: RecommendationLinkInspectionIssue[] = [];
+  parsed.forEach((value, index) => {
+    const rawLink = value && typeof value === "object"
+      ? value as Record<string, unknown>
+      : null;
+    const localMediaId = typeof rawLink?.localMediaId === "string"
+      ? rawLink.localMediaId
+      : undefined;
+    if (
+      rawLink
+      && (
+        scope.kind === "guest"
+        || rawLink.userId !== scope.userId
+      )
+    ) {
+      issues.push({
+        code: "recommendation_link_owner_mismatch",
+        index,
+        localMediaId,
+      });
+      return;
+    }
+    if (!isLocalLink(value)) {
+      issues.push({ code: "recommendation_link_invalid", index, localMediaId });
+      return;
+    }
+    links.push(value);
+  });
+  return { status: "valid", links, issues };
 }
 
 export function replaceRecommendationLinksForScope(

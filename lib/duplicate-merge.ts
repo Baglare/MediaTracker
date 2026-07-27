@@ -1011,12 +1011,20 @@ export const duplicateMergeJournalCodec: PersonalDataCodec<DuplicateMergeJournal
     || !Number.isFinite(Date.parse(value.createdAt))
     || !Number.isFinite(Date.parse(value.updatedAt))
   ) {
-    return { ok: false, message: "Duplicate merge journal formati gecersiz." };
+    return {
+      ok: false,
+      code: "merge_journal_invalid",
+      message: "Duplicate merge journal formati gecersiz.",
+    };
   }
   const before = decodeSnapshot(value.before, value.ownerScope);
   const after = decodeSnapshot(value.after, value.ownerScope);
   if (!before || !after) {
-    return { ok: false, message: "Duplicate merge journal snapshot'i gecersiz." };
+    return {
+      ok: false,
+      code: "merge_journal_snapshot_invalid",
+      message: "Duplicate merge journal snapshot'i gecersiz.",
+    };
   }
   return {
     ok: true,

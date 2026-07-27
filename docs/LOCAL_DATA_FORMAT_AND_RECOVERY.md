@@ -192,13 +192,24 @@ protokolle çalışır. Ayrıntılar
 [DUPLICATE_MERGE_AND_RECOVERY.md](./DUPLICATE_MERGE_AND_RECOVERY.md)
 belgesindedir.
 
+## D1D.1 salt-okunur integrity taraması
+
+Aktif owner media/log graph'ı ve ilişkili alias, redirect, review, merge
+journal, recommendation link ve cloud queue kayıtları canonical codec'ler
+üzerinden salt-okunur inspect edilir. Inspection migration, quarantine, restore
+veya repair yazımı yapmaz; corrupt/recovery durumunu ayrı issue olarak raporlar.
+Issue sınıfları ve privacy sınırı
+[LOCAL_DATA_INTEGRITY_SCANNER.md](./LOCAL_DATA_INTEGRITY_SCANNER.md)
+belgesindedir.
+
 ## Bilinen sınırlamalar
 
 - Local profile, custom theme ve AI state namespace'i D1B.2B ile
   [LOCAL_PERSONAL_DATA_OWNERSHIP.md](./LOCAL_PERSONAL_DATA_OWNERSHIP.md)
   sözleşmesine taşınmıştır.
 - Checksum, taşınabilir backup manifesti ve restore UI D1E kapsamıdır.
-- Quarantine görüntüleme/retention ve integrity repair D1D/D1F kapsamıdır.
+- Quarantine görüntüleme/retention ve integrity repair D1D'nin sonraki
+  aşaması/D1F kapsamıdır; D1D.1 yalnız salt-okunur rapor üretir.
 - Duplicate tarama/review D1C.2A, kontrollü merge/journal/undo D1C.2B ile
   sağlanmıştır.
 - Web Storage gerçek multi-key transaction veya multi-tab lock sağlamaz.

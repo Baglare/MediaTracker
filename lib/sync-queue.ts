@@ -13,6 +13,17 @@ export interface SyncQueueStorageLike {
   removeItem(key: string): void;
 }
 
+export interface SyncQueueInspectionIssue {
+  code: "queue_owner_mismatch" | "queue_item_invalid";
+  index: number;
+  recordId?: string;
+}
+
+export type SyncQueueInspectionResult =
+  | { status: "missing"; items: SyncQueueItem[]; issues: SyncQueueInspectionIssue[] }
+  | { status: "valid"; items: SyncQueueItem[]; issues: SyncQueueInspectionIssue[] }
+  | { status: "corrupt" | "storage_unavailable"; items: []; issues: SyncQueueInspectionIssue[] };
+
 function browserStorage(): SyncQueueStorageLike | null {
   return typeof localStorage === "undefined" ? null : localStorage;
 }
@@ -55,6 +66,56 @@ export function loadSyncQueue(
   } catch {
     return [];
   }
+}
+
+export function inspectSyncQueue(
+  scope: LocalOwnerScope,
+  storage: Pick<SyncQueueStorageLike, "getItem"> | null = browserStorage(),
+): SyncQueueInspectionResult {
+  if (!storage) return { status: "storage_unavailable", items: [], issues: [] };
+  let raw: string | null;
+  try {
+    raw = storage.getItem(buildSyncQueueKey(scope));
+  } catch {
+    return { status: "storage_unavailable", items: [], issues: [] };
+  }
+  if (raw === null) return { status: "missing", items: [], issues: [] };
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return { status: "corrupt", items: [], issues: [] };
+  }
+  if (!Array.isArray(parsed)) return { status: "corrupt", items: [], issues: [] };
+  const items: SyncQueueItem[] = [];
+  const issues: SyncQueueInspectionIssue[] = [];
+  parsed.forEach((value, index) => {
+    const rawItem = value && typeof value === "object"
+      ? value as Record<string, unknown>
+      : null;
+    const payload = rawItem?.payload && typeof rawItem.payload === "object"
+      ? rawItem.payload as Record<string, unknown>
+      : null;
+    const recordId = typeof payload?.id === "string" ? payload.id : undefined;
+    const ownerMismatch = Boolean(
+      rawItem
+      && (
+        rawItem.ownerScope !== scope.key
+        || (scope.kind === "user" && rawItem.userId !== scope.userId)
+        || (scope.kind === "guest" && rawItem.userId !== undefined)
+      ),
+    );
+    if (ownerMismatch) {
+      issues.push({ code: "queue_owner_mismatch", index, recordId });
+      return;
+    }
+    if (!isSyncQueueItem(value, scope)) {
+      issues.push({ code: "queue_item_invalid", index, recordId });
+      return;
+    }
+    items.push(value);
+  });
+  return { status: "valid", items, issues };
 }
 
 export function saveSyncQueue(
