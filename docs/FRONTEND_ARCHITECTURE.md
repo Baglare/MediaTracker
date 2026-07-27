@@ -64,6 +64,13 @@ kullanır ve journal/read-back/rollback/undo akışını yönetir. Scanner,
 componentler ve domain codec'leri paralel bir validation veya background repair
 sistemi oluşturmaz.
 
+D1E.1 portable backup sınırı `lib/portable-backup.ts` içindeki owner-neutral
+builder, deterministic serializer, SHA-256 checksum ve read-only inspector'dır.
+`PortableBackupPanel` yalnız domain/privacy seçimi, güvenli summary ve browser
+download/file-pick akışını yönetir; restore/import veya storage write komutu
+üretmez. Ayrıntılar [PORTABLE_BACKUP_FORMAT.md](./PORTABLE_BACKUP_FORMAT.md)
+belgesindedir.
+
 ## Library data flow
 
 ```text

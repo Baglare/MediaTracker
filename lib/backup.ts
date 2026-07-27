@@ -86,6 +86,16 @@ export function validateBackupPayload(
 
   const obj = payload as Record<string, unknown>;
 
+  const manifest = obj.manifest && typeof obj.manifest === "object"
+    ? obj.manifest as Record<string, unknown>
+    : null;
+  if (manifest?.format === "mediatracker-portable-backup") {
+    return {
+      valid: false,
+      error: "Portable Backup V2 bu aşamada yalnız read-only incelenebilir; restore/import desteklenmiyor.",
+    };
+  }
+
   // appName kontrolü (opsiyonel ama faydalı)
   if (obj.appName && obj.appName !== "MediaTracker") {
     return { valid: false, error: "Bu dosya MediaTracker backup formatında değil." };

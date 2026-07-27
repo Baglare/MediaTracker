@@ -23,8 +23,11 @@ import {
   parseBackupJson,
   resolveBackupImport,
 } from "@/lib/backup";
+import type { LocalOwnerScope } from "@/lib/local-owner-scope";
+import PortableBackupPanel from "@/components/portable-backup-panel";
 
 interface DataManagementPanelProps {
+  ownerScope: LocalOwnerScope | null;
   mediaList: MediaItem[];
   progressLogs?: ProgressLog[];
   onImport: (items: MediaItem[], logs: ProgressLog[]) => boolean;
@@ -33,6 +36,7 @@ interface DataManagementPanelProps {
 }
 
 export default function DataManagementPanel({
+  ownerScope,
   mediaList,
   progressLogs = [],
   onImport,
@@ -165,6 +169,12 @@ export default function DataManagementPanel({
       {/* Genişletilmiş panel */}
       {isExpanded && (
         <div className="mt-3 p-4 bg-zinc-900/30 rounded-xl border border-zinc-800/30 space-y-4">
+          <PortableBackupPanel
+            ownerScope={ownerScope}
+            mediaList={mediaList}
+            progressLogs={progressLogs}
+          />
+
           {/* Feedback mesajı */}
           {feedback && (
             <div

@@ -82,6 +82,7 @@ export default function SettingsFeature({
             onConfirm={onConfirm}
           />
           <DataManagementPanel
+            ownerScope={ownerScope}
             mediaList={mediaList}
             progressLogs={progressLogs}
             onImport={onReplaceData}

@@ -208,6 +208,11 @@ rollback ve fingerprint korumalı son-repair undo akışını ekler. Manual-only
 issue'lar ve cloud/XP/social state değiştirilmez. Ayrıntılar aynı scanner
 belgesindedir.
 
+D1E.1 portable export, current/temp/backup slotlarını kopyalamak yerine
+doğrulanmış aktif-owner domain modellerinden owner-neutral ve SHA-256 checksum'lu
+bir dosya üretir. File inspection hiçbir storage write yapmaz. Format ve privacy
+sınırı [PORTABLE_BACKUP_FORMAT.md](./PORTABLE_BACKUP_FORMAT.md) belgesindedir.
+
 ## Bilinen sınırlamalar
 
 - Local profile, custom theme ve AI state namespace'i D1B.2B ile
