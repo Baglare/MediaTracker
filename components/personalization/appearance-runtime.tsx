@@ -72,7 +72,11 @@ export function AppearanceRuntime({
     resetToDefaults,
   } = useAppearancePreferences(initialPreferences);
   const customThemes = useCustomThemesRuntime();
-  const ownerTheme = useOwnerThemeSelection();
+  const {
+    selection: ownerThemeSelection,
+    hydrated: ownerThemeHydrated,
+    setSelection: setOwnerThemeSelection,
+  } = useOwnerThemeSelection();
   const [activeWorld, setActiveWorldState] = useState<WorldThemeKey>("neutral");
   const [prefersDark, setPrefersDark] = useState(initialIdentity.resolvedTheme !== "porcelain");
   const [previewTheme, setPreviewTheme] = useState<CustomThemeDefinition | null>(null);
@@ -84,8 +88,8 @@ export function AppearanceRuntime({
     return subscribeToSystemTheme(mediaQuery, setPrefersDark);
   }, []);
 
-  const effectiveTheme = ownerTheme.hydrated && ownerTheme.selection?.kind === "custom"
-    ? ownerTheme.selection
+  const effectiveTheme = ownerThemeHydrated && ownerThemeSelection?.kind === "custom"
+    ? ownerThemeSelection
     : preferences.theme;
   const effectivePreferences = useMemo<AppAppearancePreferences>(() => ({
     ...preferences,
@@ -110,18 +114,19 @@ export function AppearanceRuntime({
   useEffect(() => {
     if (
       !hydrated
-      || !ownerTheme.hydrated
+      || !ownerThemeHydrated
       || !customThemes.hydrated
       || effectiveTheme.kind !== "custom"
       || persistedCustomTheme
     ) return;
-    ownerTheme.setSelection(null);
+    setOwnerThemeSelection(null);
   }, [
     customThemes.hydrated,
     effectiveTheme,
     hydrated,
-    ownerTheme,
+    ownerThemeHydrated,
     persistedCustomTheme,
+    setOwnerThemeSelection,
   ]);
 
   useEffect(() => {
@@ -149,11 +154,11 @@ export function AppearanceRuntime({
   const setThemeSelection = useCallback((selection: ThemeSelection) => {
     setPreviewTheme(null);
     if (selection.kind === "custom") {
-      ownerTheme.setSelection(selection);
+      setOwnerThemeSelection(selection);
       return;
     }
-    if (ownerTheme.setSelection(null)) updatePreference("theme", selection);
-  }, [ownerTheme, updatePreference]);
+    if (setOwnerThemeSelection(null)) updatePreference("theme", selection);
+  }, [setOwnerThemeSelection, updatePreference]);
 
   const previewCustomTheme = useCallback((theme: CustomThemeDefinition) => {
     setPreviewTheme(theme);
@@ -165,13 +170,13 @@ export function AppearanceRuntime({
 
   const resetAppearance = useCallback(() => {
     setPreviewTheme(null);
-    ownerTheme.setSelection(null);
+    setOwnerThemeSelection(null);
     resetToDefaults();
-  }, [ownerTheme, resetToDefaults]);
+  }, [resetToDefaults, setOwnerThemeSelection]);
 
   const value = useMemo<AppearanceRuntimeValue>(() => ({
     preferences: runtimePreferences,
-    hydrated: hydrated && ownerTheme.hydrated && customThemes.hydrated,
+    hydrated: hydrated && ownerThemeHydrated && customThemes.hydrated,
     updatePreference,
     resetToDefaults: resetAppearance,
     setThemeSelection,
@@ -189,7 +194,7 @@ export function AppearanceRuntime({
     clearThemePreview,
     customThemes.hydrated,
     hydrated,
-    ownerTheme.hydrated,
+    ownerThemeHydrated,
     previewCustomTheme,
     previewTheme,
     resetAppearance,

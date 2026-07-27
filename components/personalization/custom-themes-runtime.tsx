@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, type ReactNode } from "react";
+import { createContext, useContext, useMemo, type ReactNode } from "react";
 import { useCustomThemes } from "@/hooks/use-custom-themes";
 import { useAuth } from "@/hooks/use-auth";
 import { resolveLocalOwnerScope } from "@/lib/local-owner-scope";
@@ -11,8 +11,11 @@ const CustomThemesRuntimeContext = createContext<CustomThemesRuntimeValue | null
 
 export function CustomThemesRuntime({ children }: { children: ReactNode }) {
   const auth = useAuth();
-  const scope = resolveLocalOwnerScope(
-    auth.loading ? undefined : auth.user?.id ?? null,
+  const scope = useMemo(
+    () => resolveLocalOwnerScope(
+      auth.loading ? undefined : auth.user?.id ?? null,
+    ),
+    [auth.loading, auth.user?.id],
   );
   const value = useCustomThemes(scope);
   return (

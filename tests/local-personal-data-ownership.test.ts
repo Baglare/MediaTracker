@@ -339,9 +339,20 @@ describe("auth transition and device-preference contracts", () => {
   it("masks previous profile/theme/AI owners and retains generation guards", () => {
     const profileHook = readFileSync("hooks/use-owned-profile-preferences.ts", "utf8");
     const themesHook = readFileSync("hooks/use-custom-themes.ts", "utf8");
+    const themesRuntime = readFileSync(
+      "components/personalization/custom-themes-runtime.tsx",
+      "utf8",
+    );
+    const appearanceRuntime = readFileSync(
+      "components/personalization/appearance-runtime.tsx",
+      "utf8",
+    );
     const ai = readFileSync("components/ai-advisor.tsx", "utf8");
     expect(profileHook).toMatch(/isHydratedOwnerVisible|isCurrentOwnerGeneration/);
     expect(themesHook).toMatch(/isHydratedOwnerVisible|isCurrentOwnerGeneration/);
+    expect(themesRuntime).toMatch(/const scope = useMemo\(/);
+    expect(themesRuntime).toContain("[auth.loading, auth.user?.id]");
+    expect(appearanceRuntime).not.toMatch(/\[\s*ownerTheme,/);
     expect(ai).toMatch(/ownerVisible|inFlightRequestId\.current = null/);
   });
 
