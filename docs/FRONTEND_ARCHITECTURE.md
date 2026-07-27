@@ -38,7 +38,16 @@ sınırıdır. Component'ler title normalization, confidence veya alias bridge
 kontrolünü ve versioned karar registry'sini koordine eder;
 `components/duplicate-review-panel.tsx` yalnız güvenli özetleri gösterir.
 Scanner media/log/alias state'ini değiştiremez ve XP/social/cloud side-effect
-üretemez. Merge executor D1C.2B'ye kadar bu sınırın parçası değildir.
+üretemez.
+
+D1C.2B merge sınırı `lib/duplicate-merge.ts` içindedir: kullanıcı kontrollü
+planlama, güncel-state doğrulaması, multi-domain journal, rollback/recovery ve
+bounded undo burada koordine edilir. UI raw storage key veya remote mutation
+bilmez; durable cloud queue yalnız local domain yazıları doğrulandıktan sonra
+hazırlanır. `lib/media-identity-aliases.ts` mantıksal identity alias'larını,
+`lib/media-record-redirects.ts` ise local record ID redirect'lerini ayrı tutar.
+Ayrıntılar [DUPLICATE_MERGE_AND_RECOVERY.md](./DUPLICATE_MERGE_AND_RECOVERY.md)
+belgesindedir.
 
 ## Library data flow
 
