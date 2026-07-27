@@ -202,13 +202,19 @@ Issue sınıfları ve privacy sınırı
 [LOCAL_DATA_INTEGRITY_SCANNER.md](./LOCAL_DATA_INTEGRITY_SCANNER.md)
 belgesindedir.
 
+D1D.2 bu rapordaki yalnız deterministik `safe` issue'lar için owner-scoped
+`integrityRepairJournal`, explicit preview/onay, safe-write, read-back/rescan,
+rollback ve fingerprint korumalı son-repair undo akışını ekler. Manual-only
+issue'lar ve cloud/XP/social state değiştirilmez. Ayrıntılar aynı scanner
+belgesindedir.
+
 ## Bilinen sınırlamalar
 
 - Local profile, custom theme ve AI state namespace'i D1B.2B ile
   [LOCAL_PERSONAL_DATA_OWNERSHIP.md](./LOCAL_PERSONAL_DATA_OWNERSHIP.md)
   sözleşmesine taşınmıştır.
 - Checksum, taşınabilir backup manifesti ve restore UI D1E kapsamıdır.
-- Quarantine görüntüleme/retention ve integrity repair D1D'nin sonraki
+- D1D.2 deterministik safe repair uygular. D1D.1 tarihsel notunda repair sonraki
   aşaması/D1F kapsamıdır; D1D.1 yalnız salt-okunur rapor üretir.
 - Duplicate tarama/review D1C.2A, kontrollü merge/journal/undo D1C.2B ile
   sağlanmıştır.

@@ -28,6 +28,8 @@ export interface StorageReadIssue {
   recordIndex?: number;
   recordId?: string;
   path?: string;
+  previousValue?: unknown;
+  nextValue?: unknown;
 }
 
 export interface StorageReadResult<T> {
@@ -223,6 +225,8 @@ function codecIssues(
     recordIndex: entry.recordIndex,
     recordId: entry.recordId,
     path: entry.path,
+    previousValue: "previousValue" in entry ? entry.previousValue : undefined,
+    nextValue: "nextValue" in entry ? entry.nextValue : undefined,
   }));
 }
 
@@ -380,6 +384,8 @@ function decodeEnvelopeRaw(
       recordIndex: entry.recordIndex,
       recordId: entry.recordId,
       path: entry.path,
+      previousValue: "previousValue" in entry ? entry.previousValue : undefined,
+      nextValue: "nextValue" in entry ? entry.nextValue : undefined,
     })),
   };
 }
@@ -977,6 +983,8 @@ function saveLibrarySnapshotInternal(
   target: LocalStorageLike | null,
   scope?: LocalOwnerScope,
   datasetOrigin: LocalDatasetOrigin = "user",
+  syncAliases = true,
+  preserveRepairableInput = false,
 ): StorageWriteResult {
   if (!target) {
     return {
@@ -1009,7 +1017,7 @@ function saveLibrarySnapshotInternal(
   }
   const mediaWrite = writeDomain(
     "media-library",
-    mediaDecoded.records,
+    preserveRepairableInput ? mediaItems : mediaDecoded.records,
     target,
     scope,
     datasetOrigin,
@@ -1018,7 +1026,7 @@ function saveLibrarySnapshotInternal(
 
   const logsWrite = writeDomain(
     "progress-logs",
-    logsDecoded.records,
+    preserveRepairableInput ? progressLogs : logsDecoded.records,
     target,
     scope,
     datasetOrigin,
@@ -1034,7 +1042,7 @@ function saveLibrarySnapshotInternal(
     }
     return logsWrite;
   }
-  if (scope && datasetOrigin !== "demo") {
+  if (scope && datasetOrigin !== "demo" && syncAliases) {
     const aliases = syncMediaIdentityAliases(scope, mediaDecoded.records, target);
     if (!aliases.writeResult.ok) {
       const mediaRestored = restoreRaw(target, mediaKeys.current, previousMedia);
@@ -1094,6 +1102,66 @@ export function saveScopedLibrarySnapshot(
     target,
     scope,
     datasetOrigin,
+  );
+}
+
+/**
+ * Integrity repair zaten mevcut alias/redirect state'ini ayrı fingerprint ile
+ * doğrular. Bu dar writer media/log safe-write protokolünü korur fakat seçilen
+ * repair dışında compatibility alias üretmez.
+ */
+export function saveScopedLibrarySnapshotForIntegrityRepair(
+  scope: LocalOwnerScope,
+  mediaItems: MediaItem[],
+  progressLogs: ProgressLog[],
+  datasetOrigin: LocalDatasetOrigin,
+  target: LocalStorageLike | null = browserStorage(),
+): StorageWriteResult {
+  if (!isLocalOwnerScope(scope)) {
+    return {
+      ok: false,
+      code: "verification_failed",
+      message: "Local owner scope gecersiz.",
+      recoverable: false,
+    };
+  }
+  return saveLibrarySnapshotInternal(
+    mediaItems,
+    progressLogs,
+    target,
+    scope,
+    datasetOrigin,
+    false,
+  );
+}
+
+/**
+ * Yalnız confirmed repair undo/rollback içindir. Runtime codec yine zorunludur
+ * fakat repairable raw alanlar normalize edilmeden önceki snapshot'a dönebilir.
+ */
+export function saveScopedLibrarySnapshotForIntegrityRollback(
+  scope: LocalOwnerScope,
+  mediaItems: MediaItem[],
+  progressLogs: ProgressLog[],
+  datasetOrigin: LocalDatasetOrigin,
+  target: LocalStorageLike | null = browserStorage(),
+): StorageWriteResult {
+  if (!isLocalOwnerScope(scope)) {
+    return {
+      ok: false,
+      code: "verification_failed",
+      message: "Local owner scope gecersiz.",
+      recoverable: false,
+    };
+  }
+  return saveLibrarySnapshotInternal(
+    mediaItems,
+    progressLogs,
+    target,
+    scope,
+    datasetOrigin,
+    false,
+    true,
   );
 }
 

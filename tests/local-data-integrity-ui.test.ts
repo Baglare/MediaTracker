@@ -18,14 +18,21 @@ describe("local data integrity UI and owner transition contract", () => {
     expect(panel).toContain('controller.status === "recovery-required"');
   });
 
-  it("states that scanning is read-only and exposes no repair action or sensitive field", () => {
+  it("keeps scanning read-only and exposes only explicit single-issue repair controls", () => {
     const panel = source("components/local-data-integrity-panel.tsx");
     expect(panel).toContain("Bu tarama salt okunurdur.");
     expect(panel).toContain("otomatik tamir uygulamaz");
+    expect(panel).toContain("Düzeltmeyi hazırla");
+    expect(panel).toContain("Onayla ve bu repair");
+    expect(panel).toContain("affectedRecordCount");
+    expect(panel).toContain("affectedLogCount");
+    expect(panel).toContain("affectedGroupCount");
+    expect(panel).toContain("Son repair");
+    expect(panel).toContain("Güvenli rollback");
+    expect(panel).not.toContain("Hepsini düzelt");
     expect(panel).not.toContain("personalNotes");
     expect(panel).not.toContain("providerPayload");
     expect(panel).not.toContain("ownerScope.userId");
-    expect(panel).not.toContain(">Tamir et<");
   });
 
   it("masks prior-owner results and rejects stale async generations", () => {
@@ -35,6 +42,7 @@ describe("local data integrity UI and owner transition contract", () => {
     expect(hook).toContain("isCurrentOwnerGeneration");
     expect(hook).toContain("isHydratedOwnerVisible");
     expect(hook).toContain("window.clearTimeout(timer)");
+    expect(hook).toContain("repairPlan.ownerScope !== activeScope.key");
   });
 
   it("uses read-only inspectors and is mounted in Settings data management", () => {

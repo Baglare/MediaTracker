@@ -83,13 +83,60 @@ raw auth UID taşımaz. UI record ID'yi mümkün olduğunda güvenli başlık ö
 eşler; owner için yalnız `guest`/`user` sınıfı raporda bulunur. Source
 fingerprint veri değişimini doğrulamak içindir ve UI'da gösterilmez.
 
+## D1D.2 kontrollü repair
+
+Scanner salt-okunur kalır. D1D.2 repair coordinator
+`lib/local-data-integrity-repair.ts`, scanner issue ID'sini ve kaynak
+fingerprint'ini yeniden doğruladıktan sonra yalnız tek seçili `safe` issue için
+deterministik bir plan üretir. Preview değişecek alanları ve etkilenen
+record/log/group sayılarını gösterir; kullanıcı açıkça onaylamadan yazma
+başlamaz. Varsayılan veya arka plan “hepsini düzelt” akışı yoktur.
+
+Desteklenen safe repair'ler:
+
+- stale duplicate review kararını silmek;
+- collision/cycle içermeyen alias veya record redirect chain'ini unique terminal
+  hedefe flatten etmek;
+- aynı group slotundaki duplicate explicit `orderIndex` değerlerinden
+  deterministik sonraki değerleri temizlemek;
+- recommendation local link veya orphan log `mediaId` değerini mevcut valid
+  record redirect üzerinden remap etmek;
+- alanları valid Canonical Identity V2 kaydında yalnız türetilmiş `key`
+  mismatch'ini düzeltmek;
+- mevcut duplicate merge coordinator ile in-progress merge journal recovery'si.
+
+Her işlem owner-scoped `integrityRepairJournal` içine versioned plan ve minimal
+before/after patch yazar. Domain değişiklikleri mevcut temp/current/backup
+safe-write protokolünü kullanır ve read-back/rescan ile doğrulanır. Hata halinde
+before patch geri uygulanır; bu da doğrulanamazsa journal
+`recovery-required` kalır. Son tamamlanan repair, sonuç fingerprint'i
+değişmemişse geri alınabilir. Undo başka owner'a uygulanmaz ve merge-journal
+recovery'sini yeniden yarım duruma döndürmez.
+
+Corrupt alias/redirect current slotu genel writer tarafından hâlâ korunur.
+Repair writer yalnız canonical codec'in collision/cycle içermeyen repairable
+chain olarak kanıtladığı eski snapshot'ı backup'a alıp doğrulanmış flattened
+değerle değiştirebilir.
+
+## Manual-only sınırı
+
+Unresolved/invalid manual identity, exact identity collision, alias/redirect
+collision veya cycle, conflicting duplicate log payload, redirectsiz belirsiz
+orphan log, owner mismatch, corrupt media envelope ve invalid cloud queue
+operasyonu değiştirilmez. Cross-source identity tahmini, record silme, duplicate
+merge, XP/social side effect ve network/cloud mutation repair coordinator'ın
+dışındadır.
+
 ## UI davranışı
 
 Settings içindeki **Veri Bütünlüğü** paneli severity/domain sayaçlarını,
 yeniden tarama aksiyonunu, issue kodunu, güvenli ilişki özetini ve
 repairability etiketini gösterir. Sağlıklı durumda boş sonuç; critical
-recovery durumunda belirgin uyarı gösterilir. Panel açıkça salt-okunur olduğunu
-belirtir ve repair/otomatik düzeltme butonu içermez.
+recovery durumunda belirgin uyarı gösterilir. Panel taramanın salt-okunur
+olduğunu belirtir. Yalnız `safe` issue'larda “Düzeltmeyi hazırla”, before/after
+preview, tek-issue onayı, sonuç/recovery durumu ve uygun son işlem için undo
+gösterilir. Personal note, AI içeriği, raw provider payload ve owner UID preview
+ve journal metadata'sına yazılmaz.
 
 ## Manuel smoke
 
@@ -102,13 +149,18 @@ belirtir ve repair/otomatik düzeltme butonu içermez.
    oluşmadığını ve recovery uyarısının göründüğünü doğrula.
 6. Issue özetinde personal note, provider payload ve owner UID olmadığını
    kontrol et.
+7. Bir safe issue için preview'u aç; yalnız seçili issue'nun değiştiğini,
+   read-back sonrası issue'nun kaybolduğunu ve medya/log/XP sayısının
+   değişmediğini doğrula.
+8. Repair sonrası ilgili kaydı değiştirip undo'nun stale fingerprint nedeniyle
+   bloke olduğunu doğrula.
 
 Bu repository turunda gerçek tarayıcı ve iki hesap smoke'u otomatik
 çalıştırılmaz; unit/static testler browser veya cloud kanıtı değildir.
 
 ## Sonraki sınır
 
-Repair, quarantine yönetimi ve kullanıcı onaylı recovery D1D'nin sonraki
-aşamasıdır. Cloud revision/tombstone ve cross-device bütünlük D2; merkezi
-backup/restore D1E kapsamındadır.
-
+Collision/unresolved/manual-only repair, quarantine yönetimi ve kullanıcı
+kararı isteyen graph dönüşümleri sonraki D1D/D1F kapsamındadır. Cloud
+revision/tombstone ve cross-device bütünlük D2; merkezi backup/restore D1E
+kapsamındadır.

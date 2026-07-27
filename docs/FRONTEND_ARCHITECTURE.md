@@ -57,6 +57,13 @@ repair/network side-effect üretmez. Ayrıntılar
 [LOCAL_DATA_INTEGRITY_SCANNER.md](./LOCAL_DATA_INTEGRITY_SCANNER.md)
 belgesindedir.
 
+D1D.2 yazma sınırı `lib/local-data-integrity-repair.ts` içindeki coordinator'dır.
+UI yalnız seçili safe issue için preview/onay komutu verir; coordinator issue ve
+owner fingerprint'ini yeniden doğrular, mevcut domain writer/codec'lerini
+kullanır ve journal/read-back/rollback/undo akışını yönetir. Scanner,
+componentler ve domain codec'leri paralel bir validation veya background repair
+sistemi oluşturmaz.
+
 ## Library data flow
 
 ```text

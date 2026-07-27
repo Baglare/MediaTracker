@@ -81,10 +81,35 @@ export const mediaRecordRedirectRegistryCodec: PersonalDataCodec<MediaRecordRedi
       }
       return false;
     });
+    if (!hasCycle) {
+      const flattened = records.map((entry) => {
+        let toRecordId = entry.toRecordId;
+        const seen = new Set<string>();
+        while (targets.has(toRecordId) && !seen.has(toRecordId)) {
+          seen.add(toRecordId);
+          toRecordId = targets.get(toRecordId)!;
+        }
+        return { ...entry, toRecordId };
+      }).sort((left, right) =>
+        left.fromRecordId.localeCompare(right.fromRecordId, "en"));
+      return {
+        ok: false,
+        code: "redirect_chain",
+        message: "Redirect chain dogrudan unique hedefe flatten edilmelidir.",
+        repairData: {
+          current: {
+            version: 1,
+            records: [...records].sort((left, right) =>
+              left.fromRecordId.localeCompare(right.fromRecordId, "en")),
+          },
+          repaired: { version: 1, records: flattened },
+        },
+      };
+    }
     return {
       ok: false,
-      code: hasCycle ? "redirect_cycle" : "redirect_chain",
-      message: "Redirect chain veya cycle dogrudan registry'de saklanamaz.",
+      code: "redirect_cycle",
+      message: "Redirect cycle registry'de saklanamaz.",
     };
   }
   return {
@@ -95,6 +120,17 @@ export const mediaRecordRedirectRegistryCodec: PersonalDataCodec<MediaRecordRedi
         left.fromRecordId.localeCompare(right.fromRecordId, "en")),
     },
   };
+};
+
+/** Yalnız integrity rollback/undo için repairable chain snapshot codec'i. */
+export const mediaRecordRedirectRecoveryCodec: PersonalDataCodec<MediaRecordRedirectRegistry> = (
+  value,
+) => {
+  const decoded = mediaRecordRedirectRegistryCodec(value);
+  if (decoded.ok) return decoded;
+  return decoded.code === "redirect_chain" && decoded.repairData
+    ? { ok: true, value: decoded.repairData.current }
+    : decoded;
 };
 
 export function emptyMediaRecordRedirectRegistry(): MediaRecordRedirectRegistry {

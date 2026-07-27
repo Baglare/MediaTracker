@@ -177,10 +177,38 @@ export const mediaIdentityAliasRegistryCodec: PersonalDataCodec<MediaIdentityAli
       }
       return false;
     });
+    if (!hasCycle) {
+      const flattened = records.map((entry) => {
+        let canonicalKey = normalizeAlias(entry.canonicalKey);
+        const seen = new Set<string>();
+        while (targets.has(canonicalKey) && !seen.has(canonicalKey)) {
+          seen.add(canonicalKey);
+          canonicalKey = targets.get(canonicalKey)!;
+        }
+        return { ...entry, canonicalKey };
+      });
+      return {
+        ok: false,
+        code: "alias_chain",
+        message: "Media identity alias chain dogrudan canonical hedefe flatten edilmelidir.",
+        repairData: {
+          current: {
+            version: 1,
+            records,
+            issues: dedupeIssues(issues),
+          },
+          repaired: {
+            version: 1,
+            records: flattened,
+            issues: dedupeIssues(issues),
+          },
+        },
+      };
+    }
     return {
       ok: false,
-      code: hasCycle ? "alias_cycle" : "alias_chain",
-      message: "Media identity alias chain veya cycle iceremez.",
+      code: "alias_cycle",
+      message: "Media identity alias cycle iceremez.",
     };
   }
   return {
@@ -191,6 +219,21 @@ export const mediaIdentityAliasRegistryCodec: PersonalDataCodec<MediaIdentityAli
       issues: dedupeIssues(issues),
     },
   };
+};
+
+/**
+ * Yalnız integrity rollback/undo içindir. Normal writer chain kabul etmez;
+ * bu codec merkezi decoder'ın collision/cycle içermeyen repairable chain
+ * snapshot'ını geri yüklemesine izin verir.
+ */
+export const mediaIdentityAliasRecoveryCodec: PersonalDataCodec<MediaIdentityAliasRegistry> = (
+  value,
+) => {
+  const decoded = mediaIdentityAliasRegistryCodec(value);
+  if (decoded.ok) return decoded;
+  return decoded.code === "alias_chain" && decoded.repairData
+    ? { ok: true, value: decoded.repairData.current }
+    : decoded;
 };
 
 function dedupeIssues(issues: readonly MediaIdentityIssue[]): MediaIdentityIssue[] {

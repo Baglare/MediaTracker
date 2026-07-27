@@ -15,7 +15,8 @@ export type PersonalDataDomain =
   | "mediaIdentityAliases"
   | "duplicateReviewDecisions"
   | "mediaRecordRedirects"
-  | "duplicateMergeJournal";
+  | "duplicateMergeJournal"
+  | "integrityRepairJournal";
 
 export interface PersonalStorageLike {
   getItem(key: string): string | null;
@@ -48,13 +49,27 @@ export type PersonalDataReadResult<T> =
       quarantineKey?: string;
       message: string;
       diagnosticCode?: string;
+      repairData?: {
+        current: T;
+        repaired: T;
+      };
     }
   | { status: "owner_mismatch"; sourceKey: string; message: string }
   | { status: "storage_unavailable"; sourceKey: string; message: string };
 
 export type PersonalDataCodec<T> = (
   value: unknown,
-) => { ok: true; value: T } | { ok: false; message: string; code?: string };
+) =>
+  | { ok: true; value: T }
+  | {
+      ok: false;
+      message: string;
+      code?: string;
+      repairData?: {
+        current: T;
+        repaired: T;
+      };
+    };
 
 const FORMAT = "mediatracker-personal-data" as const;
 
@@ -85,7 +100,16 @@ function decodeEnvelope<T>(
   codec: PersonalDataCodec<T>,
 ):
   | { ok: true; value: T; writtenAt: string }
-  | { ok: false; ownerMismatch?: boolean; message: string; code?: string } {
+  | {
+      ok: false;
+      ownerMismatch?: boolean;
+      message: string;
+      code?: string;
+      repairData?: {
+        current: T;
+        repaired: T;
+      };
+    } {
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
@@ -165,6 +189,7 @@ export function inspectPersonalData<T>(
     sourceKey: keys.current,
     message: decoded.message,
     diagnosticCode: decoded.code,
+    repairData: decoded.repairData,
   };
 }
 
@@ -262,14 +287,16 @@ export function readPersonalData<T>(
     quarantineKey: quarantineRaw(storage, domain, keys.current, raw, decoded.message),
     message: decoded.message,
     diagnosticCode: decoded.code,
+    repairData: decoded.repairData,
   };
 }
 
-export function writePersonalData<T>(
+function writePersonalDataInternal<T>(
   scope: LocalOwnerScope,
   domain: PersonalDataDomain,
   value: T,
   codec: PersonalDataCodec<T>,
+  previousCodec: PersonalDataCodec<T>,
   storage: PersonalStorageLike | null = browserStorage(),
 ): StorageWriteResult {
   if (!storage || !isLocalOwnerScope(scope)) {
@@ -340,7 +367,7 @@ export function writePersonalData<T>(
   }
   let backupCreated = false;
   if (previous !== null) {
-    if (!decodeEnvelope(previous, domain, scope, codec).ok) {
+    if (!decodeEnvelope(previous, domain, scope, previousCodec).ok) {
       removeQuietly(storage, keys.temp);
       return {
         ok: false,
@@ -353,7 +380,7 @@ export function writePersonalData<T>(
       storage.setItem(keys.backup, previous);
       if (
         storage.getItem(keys.backup) !== previous
-        || !decodeEnvelope(previous, domain, scope, codec).ok
+        || !decodeEnvelope(previous, domain, scope, previousCodec).ok
       ) {
         removeQuietly(storage, keys.temp);
         return {
@@ -398,4 +425,43 @@ export function writePersonalData<T>(
     removeQuietly(storage, keys.temp);
   }
   return { ok: true, writtenAt, backupCreated };
+}
+
+export function writePersonalData<T>(
+  scope: LocalOwnerScope,
+  domain: PersonalDataDomain,
+  value: T,
+  codec: PersonalDataCodec<T>,
+  storage: PersonalStorageLike | null = browserStorage(),
+): StorageWriteResult {
+  return writePersonalDataInternal(
+    scope,
+    domain,
+    value,
+    codec,
+    codec,
+    storage,
+  );
+}
+
+/**
+ * Explicit integrity-repair path. The new value must pass the canonical codec;
+ * the existing current slot may pass only the narrower recovery codec.
+ */
+export function writeRepairedPersonalData<T>(
+  scope: LocalOwnerScope,
+  domain: PersonalDataDomain,
+  value: T,
+  codec: PersonalDataCodec<T>,
+  recoveryCodec: PersonalDataCodec<T>,
+  storage: PersonalStorageLike | null = browserStorage(),
+): StorageWriteResult {
+  return writePersonalDataInternal(
+    scope,
+    domain,
+    value,
+    codec,
+    recoveryCodec,
+    storage,
+  );
 }

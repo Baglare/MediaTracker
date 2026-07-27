@@ -180,6 +180,30 @@ function envelopeIssue(
       });
     }
     for (const codecIssue of result.issues) {
+      if (codecIssue.code === "IDENTITY_KEY_MISMATCH") {
+        addIssue(issues, {
+          code: "IDENTITY_KEY_MISMATCH",
+          domain: "identity",
+          severity: "warning",
+          recordIds: codecIssue.recordId ? [codecIssue.recordId] : [],
+          summary: "Persisted Canonical Identity V2 key alanlarla eşleşmiyor.",
+          values: [
+            typeof codecIssue.previousValue === "string"
+              ? codecIssue.previousValue
+              : "unknown-current",
+            typeof codecIssue.nextValue === "string"
+              ? codecIssue.nextValue
+              : "unknown-expected",
+          ],
+          repairability: codecIssue.recordId
+            && typeof codecIssue.previousValue === "string"
+            && typeof codecIssue.nextValue === "string"
+            ? "safe"
+            : "manual-only",
+          recommendation: "Source/namespace/stable ID korunarak yalnız key yeniden üretilebilir.",
+        });
+        continue;
+      }
       addIssue(issues, {
         code: `ENVELOPE_CODEC_${codecIssue.code.toUpperCase()}`,
         domain: "envelope",
@@ -215,16 +239,25 @@ function personalSourceIssue<T>(
 ): boolean {
   if (!result || result.status === "missing" || result.status === "valid") return false;
   const diagnostic = result.status === "corrupt" ? result.diagnosticCode : undefined;
+  const safelyFlattenable = result.status === "corrupt"
+    && Boolean(result.repairData)
+    && (diagnostic === "alias_chain" || diagnostic === "redirect_chain");
   const code = diagnostic?.toUpperCase()
     ?? `${label.toUpperCase().replaceAll("-", "_")}_${result.status.toUpperCase()}`;
   addIssue(issues, {
     code,
     domain,
-    severity: result.status === "storage_unavailable" ? "error" : "critical",
+    severity: safelyFlattenable
+      ? "warning"
+      : result.status === "storage_unavailable"
+        ? "error"
+        : "critical",
     summary: `${label} owner envelope veya runtime codec doğrulamasını geçemedi.`,
     values: diagnostic ? [diagnostic] : [result.status],
-    repairability: "manual-only",
-    recommendation: "Registry current/backup durumunu recovery ekranında incele.",
+    repairability: safelyFlattenable ? "safe" : "manual-only",
+    recommendation: safelyFlattenable
+      ? "Unique terminal hedefler kullanıcı onayıyla doğrudan flatten edilebilir."
+      : "Registry current/backup durumunu recovery ekranında incele.",
   });
   return true;
 }
@@ -338,6 +371,12 @@ function scanMedia(
   }
   for (const [slot, recordIds] of groupSlots) {
     if (recordIds.length < 2) continue;
+    const members = recordIds
+      .map((recordId) => byId.get(recordId)?.[0])
+      .filter((item): item is MediaItem => Boolean(item));
+    const explicitOrderDuplicate = members.every((item) =>
+      typeof item.orderIndex === "number"
+      && `${item.seriesGroupId}:${item.orderIndex}` === slot);
     addIssue(issues, {
       code: "GROUP_MEMBER_DUPLICATE_SLOT",
       domain: "group",
@@ -345,8 +384,10 @@ function scanMedia(
       recordIds,
       summary: "Aynı series group sırası birden fazla üyeye atanmış.",
       values: [slot, `count:${recordIds.length}`],
-      repairability: "requires-confirmation",
-      recommendation: "Seri sırasını kullanıcı/provider kanıtıyla incele.",
+      repairability: explicitOrderDuplicate ? "safe" : "manual-only",
+      recommendation: explicitOrderDuplicate
+        ? "Bir üyede sıra korunup diğer duplicate orderIndex alanları açık onayla temizlenebilir."
+        : "Season metadata kullanıcı/provider kanıtı olmadan değiştirilmemelidir.",
     });
   }
 }
@@ -441,7 +482,7 @@ function scanProgressLogs(
       summary: redirect
         ? "Progress log eski record ID kullanıyor fakat güvenli redirect hedefi var."
         : "Progress log mevcut olmayan media record'a bağlı.",
-      repairability: redirect ? "safe" : "requires-confirmation",
+      repairability: redirect ? "safe" : "manual-only",
       recommendation: redirect
         ? "D1D repair aşamasında mediaId redirect hedefiyle doğrulanabilir."
         : "Log'u silmeden önce media backup/redirect geçmişini incele.",
@@ -462,9 +503,9 @@ function scanProgressLogs(
         ? "Aynı progress log payload'ı birden fazla kez saklanmış."
         : "Aynı progress log ID farklı payload'lar taşıyor.",
       values: [`count:${entries.length}`],
-      repairability: payloads.size === 1 ? "safe" : "manual-only",
+      repairability: "manual-only",
       recommendation: payloads.size === 1
-        ? "Tek mantıksal log D1D repair aşamasında korunabilir."
+        ? "Bu aşama log silmediği için duplicate log manuel inceleme gerektirir."
         : "Conflicting log payload'ları kullanıcı kararı olmadan değiştirme.",
     });
   }
@@ -474,6 +515,7 @@ function scanRecommendations(
   issues: Map<string, LocalDataIntegrityIssue>,
   source: RecommendationLinkInspectionResult | undefined,
   recordIds: Set<string>,
+  redirects: MediaRecordRedirectRegistry,
 ): void {
   if (!source) return;
   if (source.status === "corrupt" || source.status === "storage_unavailable") {
@@ -500,16 +542,30 @@ function scanRecommendations(
       recommendation: "Owner/cache kaydını otomatik adopt etme.",
     });
   }
+  const redirectBySource = new Map(
+    redirects.records.map((entry) => [entry.fromRecordId, entry.toRecordId]),
+  );
   for (const link of source.links) {
     if (recordIds.has(link.localMediaId)) continue;
+    const redirectTarget = redirectBySource.get(link.localMediaId);
+    const canRemap = Boolean(redirectTarget && recordIds.has(redirectTarget));
     addIssue(issues, {
-      code: "RECOMMENDATION_LINK_MEDIA_MISSING",
+      code: canRemap
+        ? "RECOMMENDATION_LINK_REDIRECT_PENDING"
+        : "RECOMMENDATION_LINK_MEDIA_MISSING",
       domain: "recommendation-link",
       severity: "warning",
-      recordIds: [link.localMediaId],
-      summary: "Recommendation local link mevcut olmayan media record'a bağlı.",
-      repairability: "safe",
-      recommendation: "Remote snapshot'ı değiştirmeden stale local projection temizlenebilir.",
+      recordIds: [
+        link.localMediaId,
+        ...(redirectTarget ? [redirectTarget] : []),
+      ],
+      summary: canRemap
+        ? "Recommendation local link eski record ID kullanıyor fakat valid redirect hedefi var."
+        : "Recommendation local link mevcut olmayan media record'a bağlı.",
+      repairability: canRemap ? "safe" : "manual-only",
+      recommendation: canRemap
+        ? "Yalnız local link valid redirect hedefiyle remap edilebilir."
+        : "Geçerli redirect olmadan local link silinmemeli veya tahmin edilmemelidir.",
     });
   }
 }
@@ -534,6 +590,7 @@ function scanDuplicateReviews(
       severity: "info",
       recordIds: decision.recordIds,
       summary: "Duplicate review kararı artık güncel candidate/evidence ile eşleşmiyor.",
+      values: [decision.candidateFingerprint, decision.evidenceFingerprint],
       repairability: "safe",
       recommendation: "Stale karar gelecekteki repair aşamasında kaldırılabilir.",
     });
@@ -696,7 +753,7 @@ export function scanLocalDataIntegrity(
   const redirects = scanRedirects(issues, input.redirects, recordIds);
 
   scanProgressLogs(issues, progressLogs, recordIds, redirects);
-  scanRecommendations(issues, input.recommendationLinks, recordIds);
+  scanRecommendations(issues, input.recommendationLinks, recordIds, redirects);
 
   personalSourceIssue(
     issues,
