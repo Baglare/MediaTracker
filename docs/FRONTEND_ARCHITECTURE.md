@@ -66,10 +66,13 @@ sistemi oluşturmaz.
 
 D1E.1 portable backup sınırı `lib/portable-backup.ts` içindeki owner-neutral
 builder, deterministic serializer, SHA-256 checksum ve read-only inspector'dır.
-`PortableBackupPanel` yalnız domain/privacy seçimi, güvenli summary ve browser
-download/file-pick akışını yönetir; restore/import veya storage write komutu
-üretmez. Ayrıntılar [PORTABLE_BACKUP_FORMAT.md](./PORTABLE_BACKUP_FORMAT.md)
-belgesindedir.
+D1E.2 additive import coordinator'ı `lib/portable-additive-import.ts` içinde
+owner/stale doğrulama, dry-run plan, journal, multi-domain safe-write,
+read-back/rollback ve undo'yu yönetir. `PortableBackupPanel` storage key veya
+remote API bilmez; yalnız domain/privacy seçimi, güvenli summary, exact-copy
+kararı ve explicit onay verir. Network yalnız durable queue sonrasında mevcut
+sync manager üzerinden tetiklenir. Ayrıntılar
+[PORTABLE_BACKUP_FORMAT.md](./PORTABLE_BACKUP_FORMAT.md) belgesindedir.
 
 ## Library data flow
 

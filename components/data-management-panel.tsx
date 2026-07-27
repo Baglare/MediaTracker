@@ -170,6 +170,7 @@ export default function DataManagementPanel({
       {isExpanded && (
         <div className="mt-3 p-4 bg-zinc-900/30 rounded-xl border border-zinc-800/30 space-y-4">
           <PortableBackupPanel
+            key={ownerScope?.key ?? "owner-pending"}
             ownerScope={ownerScope}
             mediaList={mediaList}
             progressLogs={progressLogs}

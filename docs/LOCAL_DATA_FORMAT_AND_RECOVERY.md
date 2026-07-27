@@ -213,6 +213,15 @@ doğrulanmış aktif-owner domain modellerinden owner-neutral ve SHA-256 checksu
 bir dosya üretir. File inspection hiçbir storage write yapmaz. Format ve privacy
 sınırı [PORTABLE_BACKUP_FORMAT.md](./PORTABLE_BACKUP_FORMAT.md) belgesindedir.
 
+D1E.2 additive import, doğrulanmış Portable V2 payload için owner-scoped
+`portableImportJournal`, before/after snapshot, multi-domain read-back ve
+rollback kullanır. Queue durable olmadan network tetiklenmez; stale owner/state
+planı uygulanmaz. Undo yalnız import result fingerprint'i güncelse before
+snapshot'a döner. Authenticated import queue'sunda remote dispatch işareti
+bulunuyorsa veya queue sonucu artık kesin değilse local undo bloke edilir.
+Replace, merge, XP/social mutation ve cloud delete bu recovery akışının parçası
+değildir.
+
 ## Bilinen sınırlamalar
 
 - Local profile, custom theme ve AI state namespace'i D1B.2B ile

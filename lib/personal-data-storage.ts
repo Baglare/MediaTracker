@@ -16,7 +16,8 @@ export type PersonalDataDomain =
   | "duplicateReviewDecisions"
   | "mediaRecordRedirects"
   | "duplicateMergeJournal"
-  | "integrityRepairJournal";
+  | "integrityRepairJournal"
+  | "portableImportJournal";
 
 export interface PersonalStorageLike {
   getItem(key: string): string | null;

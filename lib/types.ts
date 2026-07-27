@@ -312,6 +312,12 @@ export interface SyncQueueItem {
   createdAt: string;
   retryCount: number;
   lastError?: string;
+  /**
+   * İlk remote dispatch denemesinden hemen önce durable olarak yazılır.
+   * Bu alan varsa remote sonuç başarısız görünse bile operasyon artık güvenli
+   * biçimde "hiç gönderilmedi" kabul edilemez.
+   */
+  dispatchStartedAt?: string;
   ownerScope: string;
   /**
    * Authenticated owner için Supabase user id. Guest öğesinde bulunmaz ve

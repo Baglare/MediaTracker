@@ -47,6 +47,13 @@ function isSyncQueueItem(value: unknown, scope: LocalOwnerScope): value is SyncQ
   if (typeof item.createdAt !== "string" || item.createdAt.length === 0) return false;
   if (typeof item.retryCount !== "number" || !Number.isInteger(item.retryCount) || item.retryCount < 0) return false;
   if (item.lastError !== undefined && typeof item.lastError !== "string") return false;
+  if (
+    item.dispatchStartedAt !== undefined
+    && (
+      typeof item.dispatchStartedAt !== "string"
+      || !Number.isFinite(Date.parse(item.dispatchStartedAt))
+    )
+  ) return false;
   if (item.ownerScope !== scope.key) return false;
   if (scope.kind === "user" && item.userId !== scope.userId) return false;
   if (scope.kind === "guest" && item.userId !== undefined) return false;

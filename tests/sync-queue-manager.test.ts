@@ -167,6 +167,55 @@ describe("sync queue and manager", () => {
     expect(cloudMocks.uploadMediaItems).toHaveBeenCalledWith("user-a", [mediaItem("m1")]);
   });
 
+  it("durably marks an item before its remote dispatch resolves", async () => {
+    const manager = await import("@/lib/sync-manager");
+    const queue = await import("@/lib/sync-queue");
+    const scope = createUserOwnerScope("user-a");
+    manager.setUserId("user-a");
+    queue.saveSyncQueue(scope, [queueItem()]);
+    let resolveUpload!: (value: { ok: true }) => void;
+    cloudMocks.uploadMediaItems.mockImplementation(() =>
+      new Promise((resolve) => { resolveUpload = resolve; })
+    );
+
+    const flushing = manager.flush();
+
+    expect(queue.loadSyncQueue(scope)[0].dispatchStartedAt).toBeTruthy();
+    resolveUpload({ ok: true });
+    await flushing;
+  });
+
+  it("retries a crash-persisted dispatch marker with the same operation id", async () => {
+    const queue = await import("@/lib/sync-queue");
+    const scope = createUserOwnerScope("user-a");
+    const persistedDispatchAt = "2026-07-20T10:01:00.000Z";
+    queue.saveSyncQueue(scope, [queueItem({
+      id: "stable-operation-id",
+      dispatchStartedAt: persistedDispatchAt,
+    })]);
+    cloudMocks.uploadMediaItems
+      .mockResolvedValueOnce({ ok: false, error: "network request failed" })
+      .mockResolvedValueOnce({ ok: true });
+
+    // Yeni modül örneği, uygulamanın crash/reload sonrasındaki manager state'ini temsil eder.
+    vi.resetModules();
+    const reloadedManager = await import("@/lib/sync-manager");
+    reloadedManager.setUserId("user-a");
+    await vi.waitFor(() => {
+      expect(queue.loadSyncQueue(scope)[0]).toMatchObject({
+        id: "stable-operation-id",
+        retryCount: 1,
+        lastError: "Ağ hatası.",
+        dispatchStartedAt: persistedDispatchAt,
+      });
+    });
+
+    await reloadedManager.flush();
+
+    expect(cloudMocks.uploadMediaItems).toHaveBeenCalledTimes(2);
+    expect(queue.loadSyncQueue(scope)).toEqual([]);
+  });
+
   it("keeps a failed item and updates retryCount and lastError", async () => {
     const manager = await import("@/lib/sync-manager");
     const queue = await import("@/lib/sync-queue");
@@ -178,7 +227,12 @@ describe("sync queue and manager", () => {
     await manager.flush();
 
     expect(queue.loadSyncQueue(scope)).toMatchObject([
-      { id: "queue-1", retryCount: 3, lastError: "Ağ hatası." },
+      {
+        id: "queue-1",
+        retryCount: 3,
+        lastError: "Ağ hatası.",
+        dispatchStartedAt: expect.any(String),
+      },
     ]);
   });
 

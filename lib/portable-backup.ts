@@ -151,6 +151,19 @@ export interface PortableBackupInspectionResult {
   summary: PortableBackupInspectionSummary;
 }
 
+export type DecodedPortableBackupResult =
+  | {
+      ok: true;
+      manifest: PortableBackupManifest;
+      data: PortableBackupData;
+      inspection: PortableBackupInspectionResult;
+    }
+  | {
+      ok: false;
+      inspection: PortableBackupInspectionResult;
+      error: string;
+    };
+
 const DOMAIN_SET = new Set<string>(PORTABLE_BACKUP_DOMAINS);
 const TOP_LEVEL_FIELDS = new Set(["manifest", "data"]);
 const MANIFEST_FIELDS = new Set([
@@ -817,7 +830,7 @@ export async function inspectPortableBackupText(
       }
       const containsPersonalNotes = decodedMedia.records.some((item) =>
         typeof item.personalNotes === "string" && item.personalNotes.length > 0);
-      if (containsPersonalNotes !== summary.personalNotesIncluded) {
+      if (containsPersonalNotes && !summary.personalNotesIncluded) {
         issue(
           issues,
           "error",
@@ -927,6 +940,64 @@ export async function inspectPortableBackupText(
 
   summary.compatible = issues.every((entry) => entry.severity !== "error");
   return result(summary.compatible ? "valid" : "invalid", issues, summary);
+}
+
+/**
+ * D1E.2 preflight/executor boundary. It performs the same read-only inspection
+ * first and returns only canonical codec output; it never writes local state.
+ */
+export async function decodePortableBackupForImport(
+  text: string,
+  cryptoApi: Pick<Crypto, "subtle"> | undefined = globalThis.crypto,
+): Promise<DecodedPortableBackupResult> {
+  const inspection = await inspectPortableBackupText(text, cryptoApi);
+  if (inspection.status !== "valid") {
+    const issueCodes = [...new Set(inspection.issues.map((issue) => issue.code))].join(", ");
+    return {
+      ok: false,
+      inspection,
+      error: inspection.status === "legacy"
+        ? "Legacy backup additive Portable V2 import yoluna giremez."
+        : `Portable backup import preflight doğrulamasını geçemedi${
+            issueCodes ? ` (${issueCodes})` : ""
+          }.`,
+    };
+  }
+  const parsed = JSON.parse(text) as PortableBackupV2;
+  const data: PortableBackupData = {};
+  if (parsed.manifest.domains.includes("mediaItems")) {
+    const decoded = decodeMediaItems(parsed.data.mediaItems ?? []);
+    if (!decoded.ok) return { ok: false, inspection, error: "Media codec doğrulaması başarısız." };
+    data.mediaItems = decoded.records;
+  }
+  if (parsed.manifest.domains.includes("progressLogs")) {
+    const decoded = decodeProgressLogs(parsed.data.progressLogs ?? []);
+    if (!decoded.ok) return { ok: false, inspection, error: "Progress codec doğrulaması başarısız." };
+    data.progressLogs = decoded.records;
+  }
+  if (parsed.manifest.domains.includes("identityAliases")) {
+    const decoded = mediaIdentityAliasRegistryCodec(parsed.data.identityAliases);
+    if (!decoded.ok) return { ok: false, inspection, error: "Alias codec doğrulaması başarısız." };
+    data.identityAliases = decoded.value;
+  }
+  if (parsed.manifest.domains.includes("recordRedirects")) {
+    const decoded = mediaRecordRedirectRegistryCodec(parsed.data.recordRedirects);
+    if (!decoded.ok) return { ok: false, inspection, error: "Redirect codec doğrulaması başarısız." };
+    data.recordRedirects = decoded.value;
+  }
+  if (parsed.manifest.domains.includes("recommendationLinks")) {
+    const links = parsed.data.recommendationLinks ?? [];
+    if (!links.every(validPortableLink)) {
+      return { ok: false, inspection, error: "Recommendation link codec doğrulaması başarısız." };
+    }
+    data.recommendationLinks = links;
+  }
+  return {
+    ok: true,
+    manifest: parsed.manifest,
+    data,
+    inspection,
+  };
 }
 
 export function portableBackupFilename(exportedAt: string): string {

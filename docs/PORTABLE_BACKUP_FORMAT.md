@@ -4,13 +4,17 @@
 
 D1E.1, aktif local owner'ın doğrulanmış core veri grafiğini owner-neutral bir
 JSON dosyasına aktarır ve seçilen dosyayı hiçbir local state yazmadan inceler.
-Bu aşama restore, import merge/replace, cloud upload veya queue üretmez. Mevcut
+D1E.2 aynı doğrulanmış Portable V2 verisi için kontrollü, yalnız eklemeli import
+sağlar. Replace, mevcut kayıt silme ve duplicate merge yapmaz. Mevcut
 `lib/backup.ts` legacy backup/import sözleşmesi geriye dönük uyumluluk için
-korunur.
+korunur ve Portable V2 additive coordinator'a yönlendirilmez.
 
 Domain modeli ve read-only inspector `lib/portable-backup.ts`, kullanıcı akışı
 `components/portable-backup-panel.tsx` sınırındadır. Component raw storage key,
 auth UID veya domain codec ayrıntısı bilmez.
+
+Additive plan/executor/journal sınırı `lib/portable-additive-import.ts` içindedir.
+Panel yalnız dry-run seçeneklerini ve açık kullanıcı onayını iletir.
 
 ## Format
 
@@ -137,14 +141,72 @@ hazırlanmış ve checksum'u hesaplanmış snapshot'ı indirir. Ayrı dosya seç
 hata/uyarı sayaçları ile güvenli identity/ilişki özetini gösterir ve açıkça
 “Dosya inceleme verilerinizi değiştirmez” mesajını taşır.
 
+## Kontrollü additive import
+
+Import yalnız `inspectPortableBackupText` ve domain codec'leri `valid` sonucu
+verdikten sonra planlanır. SHA-256 içerik bütünlüğü kontrolüdür; dosyanın kim
+tarafından üretildiğini veya güvenilir kaynaktan geldiğini kanıtlamaz. Manifest
+`ownerType` alanı UI'da bilgi olarak gösterilir, raw owner ataması yapılmaz.
+
+Plan aktif owner'ın media, log, alias, redirect, recommendation-link ve cloud
+queue snapshot fingerprint'iyle backup checksum'una bağlıdır. Uygulama anında
+backup tekrar doğrulanır, state yeniden okunur ve plan deterministik biçimde
+yeniden üretilir. Owner veya kaynak state değişmişse stale plan reddedilir.
+
+Varsayılan politika:
+
+- aynı record ID ve aynı içerik: atla;
+- aynı record ID ve farklı içerik: blocker;
+- aynı Canonical Identity ve farklı record ID: exact duplicate, varsayılan atla;
+- kullanıcı exact duplicate için açıkça ayrı kayıt seçerse checksum tabanlı
+  deterministik local record ID üret ve aynı remap tablosunu log/recommendation
+  ilişkilerinde kullan;
+- aynı log ID ve aynı payload: atla; farklı payload: blocker;
+- alias/redirect collision, cycle veya eksik ilişki hedefi: tahmin etmeden bloke et;
+- backup not içermiyorsa mevcut record'un personal note alanını temizleme;
+- unresolved identity'yi koru, yeni identity uydurma.
+
+Aynı backup ikinci kez planlandığında mevcut deterministic copy/record/log
+bulunur ve yeni kopya üretilmez. Domain ve record kararları dry-run listesinde
+`add`, `skip`, `exact` veya `conflict` olarak görünür. Personal note içeriği
+özet veya plan metadata'sında gösterilmez.
+
+## Transaction, rollback ve undo
+
+Owner-scoped `portableImportJournal` planı ve multi-domain before/after
+snapshot'ını tutar. Sıra şöyledir:
+
+1. backup, owner ve source fingerprint yeniden doğrulanır;
+2. prepared/applying journal safe-write ile yazılır;
+3. media/log envelope, alias, redirect ve recommendation linkleri uygulanır;
+4. authenticated owner için yalnız eklenen media/log upsert'leri mevcut durable
+   cloud queue'ya yazılır;
+5. bütün domain'ler read-back fingerprint ile doğrulanır;
+6. local commit receipt yazıldıktan sonra mevcut sync manager tetiklenebilir.
+
+Local domain veya queue persistence hatasında network çağrısı başlamaz ve before
+snapshot geri yüklenir. Rollback de doğrulanamazsa journal
+`recovery-required` kalır. Network/flush hatasında local import korunur; durable
+queue `sync-pending` olarak tekrar denenebilir.
+
+Guest import, result fingerprint değişmemişse before snapshot üzerinden local
+undo edilebilir. Authenticated importte undo yalnız importun durable queue
+işlemleri hâlâ mevcut ve hiçbirinde `dispatchStartedAt` yoksa kullanılabilir;
+bu durumda undo queue işlemlerini iptal edip before snapshot'ı geri yükler.
+Sync manager ilk remote çağrıdan önce `dispatchStartedAt` alanını durable
+yazar. Herhangi bir import upsert'i in-flight olmuşsa, queue'dan başarıyla
+çıkarılmışsa veya remote sonucu belirsizse local undo bloke edilir ve nedeni
+UI'da gösterilir. Böylece cloud'a ulaşmış kayıt localden silinip sahte başarı
+gösterilmez. Undo XP/social state'e dokunmaz ve cloud delete üretmez.
+
 ## Bilinen sınırlamalar
 
-- Restore/import write, replace/merge ve conflict çözümü D1E'nin sonraki
-  aşamasıdır.
+- Additive import replace, record-level merge veya mevcut kayıt silme sağlamaz.
 - Backup encryption ve parola koruması yoktur.
 - Checksum dosyanın yetkili bir kaynaktan geldiğini kanıtlamaz.
 - Portable backup cloud revision/tombstone veya cross-device transaction
   garantisi taşımaz.
+- Legacy backup import akışı bu coordinator'ın dışında ve değişmeden kalır.
 
 ## Manuel smoke
 
@@ -156,3 +218,12 @@ hata/uyarı sayaçları ile güvenli identity/ilişki özetini gösterir ve aç�
 4. Dosyada bir karakter değiştirip checksum mismatch uyarısını doğrula.
 5. Legacy backup seçip yalnız tanı/uyumluluk özeti gösterildiğini doğrula.
 6. Inspection öncesi/sonrası localStorage değerlerinin değişmediğini kontrol et.
+7. Portable V2 dosyasında dry-run sayaçlarını incele; exact duplicate seçimini
+   açmadan yalnız yeni kayıtların eklendiğini doğrula.
+8. Exact duplicate için “ayrı local kayıt” seç; log ve recommendation link
+   remap'inin aynı hedef ID'yi kullandığını doğrula.
+9. Aynı dosyayı ikinci kez uygula; yeni kopya oluşmadığını kontrol et.
+10. Offline authenticated importta `sync-pending`, online dönüşte mevcut queue
+    flush davranışını kontrol et.
+11. Son importu undo et; import öncesi local state ve XP toplamının korunduğunu
+    doğrula.

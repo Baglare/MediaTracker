@@ -288,6 +288,29 @@ export async function flush(): Promise<void> {
   lastError = null;
   notify();
 
+  const eligibleIds = new Set(eligible.map((item) => item.id));
+  const dispatchStartedAt = new Date().toISOString();
+  const queueBeforeDispatch = loadSyncQueue(flushScope);
+  const markedQueue = queueBeforeDispatch.map((item) =>
+    eligibleIds.has(item.id) && !item.dispatchStartedAt
+      ? { ...item, dispatchStartedAt }
+      : item);
+  try {
+    saveSyncQueue(flushScope, markedQueue);
+    const verified = new Map(
+      loadSyncQueue(flushScope).map((item) => [item.id, item]),
+    );
+    if ([...eligibleIds].some((id) => !verified.get(id)?.dispatchStartedAt)) {
+      throw new Error("dispatch_marker_verification_failed");
+    }
+  } catch {
+    syncing = false;
+    lastError = "Cloud gönderim işareti kaydedilemedi.";
+    notify();
+    return;
+  }
+  notify();
+
   const successIds = new Set<string>();
   const failures = new Map<string, { retryCount: number; lastError: string }>();
 
