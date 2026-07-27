@@ -3,6 +3,10 @@
 // ============================================
 
 import type { AniListRelationLite } from "./anilist-types";
+import type {
+  CanonicalMediaIdentityV2,
+  MediaIdentityIssueCode,
+} from "./media-identity";
 
 // Desteklenen medya türleri
 export type MediaType =
@@ -81,6 +85,13 @@ export type SeriesRelationType =
 // Her bir medya kartının sahip olduğu veriler
 export interface MediaItem {
   id: string;                    // Benzersiz kimlik
+  /**
+   * Local record ID'den ayridir. Legacy kayitlarda hydration migration'i
+   * tamamlanana kadar undefined olabilir; yeni persisted kayitlar V2 tasir.
+   */
+  identity?: CanonicalMediaIdentityV2;
+  identityStatus?: "unresolved";
+  identityIssueCodes?: MediaIdentityIssueCode[];
   title: string;                 // Medyanın adı
   type: MediaType;               // Film mi, dizi mi, anime mi vs.
   theme?: MediaTheme;            // Yeni classification: ana tema
@@ -101,6 +112,8 @@ export interface MediaItem {
   // --- Dış kaynak entegrasyonu için opsiyonel alanlar ---
   externalSource?: MediaSource;  // Medya hangi kaynaktan eklendi?
   externalId?: string;           // Dış kaynaktaki kimlik (TMDB ID, TVmaze ID vb.)
+  imdbId?: string;               // Doğrulanmış IMDb bridge kimliği (varsa)
+  originalTitle?: string;        // Provider'ın güvenli alternatif/orijinal başlığı
   overview?: string;             // Kısa açıklama / özet
   releaseYear?: number;          // Çıkış yılı
   backdropUrl?: string;          // Arka plan görseli URL'si

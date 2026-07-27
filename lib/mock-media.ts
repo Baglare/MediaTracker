@@ -5,6 +5,7 @@
 // İleride Supabase, TMDB, AniList gibi servislerle değiştirilecek.
 
 import { MediaItem, withMediaClassification } from "./types";
+import { createManualMediaIdentity } from "./media-identity";
 
 const baseMockMediaList: MediaItem[] = [
   // --- FİLMLER ---
@@ -156,5 +157,10 @@ const baseMockMediaList: MediaItem[] = [
 ];
 
 export const mockMediaList: MediaItem[] = baseMockMediaList.map((item) =>
-  withMediaClassification(item)
+  withMediaClassification({
+    ...item,
+    identity: createManualMediaIdentity(
+      `00000000-0000-4000-8000-${item.id.padStart(12, "0")}`,
+    ),
+  })
 );

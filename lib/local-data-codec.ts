@@ -13,6 +13,13 @@ import {
   withMediaClassification,
 } from "./types";
 import { withInferredSeriesGroup } from "./series-group";
+import {
+  decodeCanonicalMediaIdentity,
+  ensureMediaIdentity,
+  findExactIdentityCollisions,
+  isMediaIdentityIssueCode,
+  type MediaIdentityIssue,
+} from "./media-identity";
 
 export interface RecordCodecIssue {
   code: string;
@@ -35,6 +42,7 @@ export interface RecordCollectionDecodeResult<T> {
   records: T[];
   issues: Array<RecordCodecIssue & { recordIndex: number; recordId?: string }>;
   repairs: Array<RecordCodecRepair & { recordIndex: number; recordId?: string }>;
+  warnings: Array<RecordCodecIssue & { recordIndex: number; recordId?: string }>;
 }
 
 const MEDIA_TYPES = new Set<MediaType>([
@@ -246,7 +254,16 @@ export function decodeMediaItem(rawValue: unknown): RecordDecodeResult<MediaItem
   const raw = rawValue;
   const issues: RecordCodecIssue[] = [];
   const repairs: RecordCodecRepair[] = [];
+  const warnings: RecordCodecIssue[] = [];
   const output: Record<string, unknown> = {};
+  let invalidExternalSource = false;
+  const persistedUnresolved = raw.identityStatus === "unresolved";
+  if (persistedUnresolved) {
+    output.identityStatus = "unresolved";
+    output.identityIssueCodes = Array.isArray(raw.identityIssueCodes)
+      ? raw.identityIssueCodes.filter(isMediaIdentityIssueCode)
+      : ["IDENTITY_UNRESOLVED"];
+  }
 
   const id = readRequiredString(raw, "id", issues);
   const title = readRequiredString(raw, "title", issues);
@@ -342,6 +359,8 @@ export function decodeMediaItem(rawValue: unknown): RecordDecodeResult<MediaItem
 
   copyOptionalString(raw, output, "personalNotes", issues);
   copyOptionalString(raw, output, "externalId", issues);
+  copyOptionalString(raw, output, "imdbId", issues);
+  copyOptionalString(raw, output, "originalTitle", issues);
   copyOptionalString(raw, output, "overview", issues);
   copyOptionalString(raw, output, "backdropUrl", issues);
   copyOptionalString(raw, output, "tvmazeStatus", issues);
@@ -383,7 +402,14 @@ export function decodeMediaItem(rawValue: unknown): RecordDecodeResult<MediaItem
     if (typeof raw.externalSource === "string" && MEDIA_SOURCES.has(raw.externalSource as MediaSource)) {
       output.externalSource = raw.externalSource;
     } else {
-      issues.push(issue("invalid_external_source", "externalSource", "Bilinmeyen externalSource değeri."));
+      invalidExternalSource = true;
+      output.identityStatus = "unresolved";
+      output.identityIssueCodes = ["IDENTITY_INVALID_SOURCE"];
+      warnings.push(issue(
+        "IDENTITY_INVALID_SOURCE",
+        "externalSource",
+        "Bilinmeyen externalSource korundu; sahte V2 identity uretilmedi.",
+      ));
     }
   }
   if (raw.theme !== undefined) {
@@ -456,7 +482,49 @@ export function decodeMediaItem(rawValue: unknown): RecordDecodeResult<MediaItem
 
   if (issues.length > 0) return { status: "invalid", issues };
 
-  const classified = withMediaClassification(output as unknown as MediaItem);
+  const identityRecord = output as unknown as MediaItem;
+  if (raw.identity !== undefined) {
+    const decodedIdentity = decodeCanonicalMediaIdentity(raw.identity, id);
+    if (decodedIdentity.status === "valid") {
+      identityRecord.identity = decodedIdentity.value;
+      delete identityRecord.identityStatus;
+      delete identityRecord.identityIssueCodes;
+    } else if (decodedIdentity.status === "repairable") {
+      identityRecord.identity = decodedIdentity.value;
+      delete identityRecord.identityStatus;
+      delete identityRecord.identityIssueCodes;
+      repairs.push({
+        code: decodedIdentity.issue.code,
+        path: "identity.key",
+        message: decodedIdentity.issue.evidence,
+        previousValue: decodedIdentity.issue.currentIdentity,
+        nextValue: decodedIdentity.issue.expectedIdentity,
+      });
+    } else if (!invalidExternalSource) {
+      warnings.push(identityIssueToCodec(decodedIdentity.issue));
+      identityRecord.identityStatus = "unresolved";
+      identityRecord.identityIssueCodes = [decodedIdentity.issue.code];
+    } else {
+      warnings.push(identityIssueToCodec(decodedIdentity.issue));
+    }
+  } else if (!invalidExternalSource && !persistedUnresolved) {
+    const repaired = ensureMediaIdentity(identityRecord);
+    if (repaired.item.identity) {
+      identityRecord.identity = repaired.item.identity;
+      repairs.push(...repaired.issues.map((entry) => ({
+        code: entry.code,
+        path: "identity",
+        message: entry.evidence,
+        nextValue: repaired.item.identity,
+      })));
+    } else {
+      warnings.push(...repaired.issues.map(identityIssueToCodec));
+      identityRecord.identityStatus = "unresolved";
+      identityRecord.identityIssueCodes = repaired.issues.map((entry) => entry.code);
+    }
+  }
+
+  const classified = withMediaClassification(identityRecord);
   if (output.theme === undefined || output.mediaType === undefined || output.subType === undefined) {
     repairs.push({
       code: "classification_inferred",
@@ -474,8 +542,12 @@ export function decodeMediaItem(rawValue: unknown): RecordDecodeResult<MediaItem
   }
 
   return repairs.length > 0
-    ? { status: "repairable", value: grouped, repairs, warnings: [] }
-    : { status: "valid", value: grouped, warnings: [] };
+    ? { status: "repairable", value: grouped, repairs, warnings }
+    : { status: "valid", value: grouped, warnings };
+}
+
+function identityIssueToCodec(entry: MediaIdentityIssue): RecordCodecIssue {
+  return issue(entry.code, "identity", entry.evidence);
 }
 
 function defaultUnit(mediaType: MediaType): ProgressLogUnit {
@@ -618,6 +690,7 @@ function decodeCollection<T>(
   const records: T[] = [];
   const issues: RecordCollectionDecodeResult<T>["issues"] = [];
   const repairs: RecordCollectionDecodeResult<T>["repairs"] = [];
+  const warnings: RecordCollectionDecodeResult<T>["warnings"] = [];
   values.forEach((value, recordIndex) => {
     const result = decode(value);
     const recordId = isRecord(value) && typeof value.id === "string" ? value.id : undefined;
@@ -626,15 +699,23 @@ function decodeCollection<T>(
       return;
     }
     records.push(result.value);
+    warnings.push(...result.warnings.map((entry) => ({ ...entry, recordIndex, recordId })));
     if (result.status === "repairable") {
       repairs.push(...result.repairs.map((entry) => ({ ...entry, recordIndex, recordId })));
     }
   });
-  return { ok: issues.length === 0, records, issues, repairs };
+  return { ok: issues.length === 0, records, issues, repairs, warnings };
 }
 
 export function decodeMediaItems(values: unknown[]): RecordCollectionDecodeResult<MediaItem> {
-  return decodeCollection(values, decodeMediaItem);
+  const decoded = decodeCollection(values, decodeMediaItem);
+  const recordIndexes = new Map(decoded.records.map((entry, index) => [entry.id, index]));
+  decoded.warnings.push(...findExactIdentityCollisions(decoded.records).map((entry) => ({
+    ...identityIssueToCodec(entry),
+    recordIndex: recordIndexes.get(entry.recordId ?? "") ?? 0,
+    recordId: entry.recordId,
+  })));
+  return decoded;
 }
 
 export function decodeProgressLogs(values: unknown[]): RecordCollectionDecodeResult<ProgressLog> {

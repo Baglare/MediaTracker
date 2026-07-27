@@ -9,6 +9,13 @@ import type { MediaItem, ProgressLog } from "@/lib/types";
 function media(overrides: Partial<MediaItem> = {}): MediaItem {
   return {
     id: "m1",
+    identity: {
+      version: 2,
+      key: "v2:manual:item:550e8400-e29b-41d4-a716-446655440000",
+      source: "manual",
+      namespace: "item",
+      manualId: "550e8400-e29b-41d4-a716-446655440000",
+    },
     title: "Dune",
     type: "movie",
     theme: "screen",

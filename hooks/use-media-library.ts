@@ -57,6 +57,7 @@ import {
 } from "@/lib/social/local-social";
 import { DEFAULT_ACTIVITY_PREFERENCES, type SocialPreferences } from "@/lib/social/interactions";
 import { flushXpOutbox, queueXpMediaState, sendXpOutboxBatch } from "@/lib/xp/outbox";
+import { ensureMediaIdentity } from "@/lib/media-identity";
 
 type ProgressAction = "increment" | "complete" | "manual_adjust" | "added";
 
@@ -418,9 +419,10 @@ export function useMediaLibrary(userId: string | null | undefined) {
     const currentMedia = mediaRef.current;
     const classified = withMediaClassification(withInferredSeriesGroup(item));
     const existing = currentMedia.find((candidate) => candidate.id === classified.id);
-    const stored = existing
+    const merged = existing
       ? withMediaClassification({ ...existing, ...classified })
       : classified;
+    const stored = ensureMediaIdentity(merged).item;
     const nextMedia = existing
       ? currentMedia.map((candidate) => candidate.id === classified.id ? stored : candidate)
       : [...currentMedia, stored];

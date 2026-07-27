@@ -26,6 +26,20 @@ Shared `components/ui`, `components/app-shell`, `lib/personalization`, `lib/stor
 
 Sayfa içinde doğrudan `localStorage`, `/api` fetch'i, filtre/group algoritması veya modal markup'ı bulunmaz. AppShell root layout'ta kalıcıdır; feature geçişleri ikinci shell üretmez.
 
+## Media identity domain sınırı
+
+`MediaItem.id` local record kimliğidir; UI selection, edit/delete, grup üyeliği ve `ProgressLog.mediaId` bu değeri kullanır. `MediaItem.identity` ise `lib/media-identity.ts` tarafından üretilen ve doğrulanan Canonical Media Identity V2'dir. Component'ler source/namespace key string'i üretmez; manual/discovery/cloud/import kayıtları codec ve identity helper sınırından geçer.
+
+XP ve social remote sözleşmeleri D1C.1'de legacy canonical key'i korur. Local recommendation lookup V2 ve owner-scoped compatibility alias registry ile dual-read yapabilir. Identity değişikliği record ID ilişkilerini, cloud tablo kolonlarını veya remote idempotency key'lerini sessizce değiştiremez. Ayrıntılar [CANONICAL_MEDIA_IDENTITY.md](./CANONICAL_MEDIA_IDENTITY.md) belgesindedir.
+
+Duplicate adaylığı `lib/duplicate-scanner.ts` içindeki saf ve local-only domain
+sınırıdır. Component'ler title normalization, confidence veya alias bridge
+üretmez. `hooks/use-duplicate-review.ts` aktif owner hydration/generation
+kontrolünü ve versioned karar registry'sini koordine eder;
+`components/duplicate-review-panel.tsx` yalnız güvenli özetleri gösterir.
+Scanner media/log/alias state'ini değiştiremez ve XP/social/cloud side-effect
+üretemez. Merge executor D1C.2B'ye kadar bu sınırın parçası değildir.
+
 ## Library data flow
 
 ```text

@@ -2,7 +2,7 @@
 
 ## Kapsam
 
-Bu belge D1B.1 local media library ve progress-log persistence sözleşmesini tanımlar. D1B.2A owner namespace entegrasyonu, auth geçişi ve queue izolasyonu [LOCAL_DATA_OWNERSHIP_AND_NAMESPACES.md](./LOCAL_DATA_OWNERSHIP_AND_NAMESPACES.md) belgesinde tanımlanır. Canonical identity, duplicate birleştirme, cloud revision/tombstone, trash UI ve taşınabilir backup formatı bu sözleşmenin parçası değildir.
+Bu belge D1B.1 local media library ve progress-log persistence sözleşmesini tanımlar. D1B.2A owner namespace entegrasyonu, auth geçişi ve queue izolasyonu [LOCAL_DATA_OWNERSHIP_AND_NAMESPACES.md](./LOCAL_DATA_OWNERSHIP_AND_NAMESPACES.md) belgesinde tanımlanır. D1C.1 schema v3 identity migration'ı ve compatibility alias sözleşmesi [CANONICAL_MEDIA_IDENTITY.md](./CANONICAL_MEDIA_IDENTITY.md) belgesindedir. Duplicate birleştirme, cloud revision/tombstone, trash UI ve taşınabilir backup formatı bu sözleşmenin parçası değildir.
 
 ## Envelope formatı
 
@@ -12,8 +12,10 @@ Media ve progress log kayıtları ayrı domain envelope'larında saklanır:
 {
   "format": "mediatracker-local-data",
   "domain": "media-library",
-  "schemaVersion": 1,
-  "writerVersion": "D1B.1",
+  "schemaVersion": 3,
+  "writerVersion": "D1C.1",
+  "ownerScope": "guest",
+  "datasetOrigin": "user",
   "writtenAt": "2026-07-23T10:00:00.000Z",
   "recordCount": 1,
   "records": []
@@ -25,16 +27,16 @@ Desteklenen domain'ler:
 - `media-library`
 - `progress-logs`
 
-Domain karışıklığı, `records` dışı veri biçimi ve `recordCount` uyuşmazlığı corrupt kabul edilir. Bilinmeyen üst seviye metadata alanları geriye/ileriye dönük uyumluluk için yok sayılır. Yalnız `schemaVersion: 1` desteklenir; daha yeni sürüm `unsupported_version` sonucudur.
+Domain karışıklığı, `records` dışı veri biçimi, owner uyuşmazlığı ve `recordCount` uyuşmazlığı ayrı doğrulama sonuçları üretir. Bilinmeyen üst seviye metadata alanları geriye/ileriye dönük uyumluluk için yok sayılır. Aktif owner-scoped sürüm `schemaVersion: 3`'tür; scoped v2 sequential migration kaynağıdır, daha yeni sürüm `unsupported_version` sonucudur.
 
 ## Anahtarlar ve slotlar
 
-| Domain | Current | Temp | Backup | Legacy |
+| Domain | Scoped current | Temp | Backup | Unscoped/legacy |
 |---|---|---|---|---|
-| Media | `mediaTracker:data:media:v1` | `...:temp` | `...:backup` | `media-tracker-list` |
-| Progress | `mediaTracker:data:progressLogs:v1` | `...:temp` | `...:backup` | `media-tracker-logs` |
+| Media | `mediaTracker:data:v2:<scope>:media` | `...:temp` | `...:backup` | `mediaTracker:data:media:v1`, `media-tracker-list` |
+| Progress | `mediaTracker:data:v2:<scope>:progressLogs` | `...:temp` | `...:backup` | `mediaTracker:data:progressLogs:v1`, `media-tracker-logs` |
 
-Legacy raw backup anahtarları `mediaTracker:legacyBackup:<domain>:v1` biçimindedir. D1B.2 user namespace'i `buildLocalDataKeys` sınırına eklenecektir; D1B.1 anahtarlarında user ID bulunmaz.
+Legacy raw backup anahtarları `mediaTracker:legacyBackup:<domain>:v1` biçimindedir. Anahtar adındaki `v2` owner key-layout sürümüdür; envelope içindeki current schema sürümü `3`'tür.
 
 ## Read result durumları
 
@@ -50,7 +52,7 @@ Bu durumlar birbirine dönüştürülmez. Özellikle empty ile corrupt aynı de�
 
 ## MediaItem runtime codec
 
-Codec zorunlu kimlik, başlık, type, status, progress ve cover alanlarını; rating, favorite, notes, external identity, classification, grup ve kaynak metadata alanlarını runtime'da doğrular.
+Codec zorunlu record ID, başlık, type, status, progress ve cover alanlarını; rating, favorite, notes, external identity, Canonical Identity V2, classification, grup ve kaynak metadata alanlarını runtime'da doğrular.
 
 Kayıpsız normalizasyonlar repair olarak raporlanır:
 
@@ -154,6 +156,26 @@ D1B.1 unscoped schema v1 anahtarları artık sahipliği belirsiz migration kayna
 
 Scoped key ile envelope `ownerScope` uyuşmazlığı `owner_mismatch` sonucudur ve corrupt/quarantine akışına dönüştürülmez. Safe-write current/temp/backup protokolü her owner scope içinde aynı şekilde uygulanır.
 
+## D1C.1 schema v3 entegrasyonu
+
+Scoped v2 media envelope ilk başarılı read sırasında v3'e migrate edilir. Runtime codec external kayıtlar için deterministik V2 identity türetir, manuel kayda bir kez UUID verir ve unresolved/exact-collision kayıtları silmeden issue olarak korur. Progress record formatı değişmez; envelope sürümü media ile birlikte v3 olur.
+
+Media current ile owner-scoped `mediaIdentityAliases` registry birlikte doğrulanır. Alias registry safe-write başarısızsa v3 media current kabul edilmez ve önceki current geri yüklenir; backup slotları recovery adayı olarak korunur. Ayrıntılı identity ve consumer compatibility sözleşmesi [CANONICAL_MEDIA_IDENTITY.md](./CANONICAL_MEDIA_IDENTITY.md) belgesindedir.
+
+## D1C.2A duplicate review registry
+
+Duplicate scanner kararı media envelope'a yazılmaz. Owner-scoped
+`duplicateReviewDecisions` personal-data domain'i yalnız candidate/evidence
+fingerprint, scan version, record ID listesi, karar ve zamanı saklar. Personal
+note, başlık, overview veya provider payload registry'ye kopyalanmaz.
+
+Registry aynı temp/current/backup ve read-back verification protokolünü
+kullanır. Corrupt veya foreign-owner current quarantine/owner-mismatch sonucu
+üretir; recovery kararı olmadan overwrite edilmez. Candidate evidence veya
+record üyeliği değiştiğinde eski karar uygulanmaz. Ayrıntılar
+[DUPLICATE_SCANNER_AND_REVIEW.md](./DUPLICATE_SCANNER_AND_REVIEW.md)
+belgesindedir.
+
 ## Bilinen sınırlamalar
 
 - Local profile, custom theme ve AI state namespace'i D1B.2B ile
@@ -161,6 +183,6 @@ Scoped key ile envelope `ownerScope` uyuşmazlığı `owner_mismatch` sonucudur 
   sözleşmesine taşınmıştır.
 - Checksum, taşınabilir backup manifesti ve restore UI D1E kapsamıdır.
 - Quarantine görüntüleme/retention ve integrity repair D1D/D1F kapsamıdır.
-- Canonical identity ve duplicate çözümü D1C kapsamıdır.
+- Duplicate tarama/review D1C.2A ile sağlanmıştır; merge D1C.2B kapsamındadır.
 - Web Storage gerçek multi-key transaction veya multi-tab lock sağlamaz.
 - Cloud revision, tombstone ve composite ownership D2 kapsamıdır.

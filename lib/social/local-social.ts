@@ -4,6 +4,14 @@ import {
   type LocalOwnerScope,
 } from "@/lib/local-owner-scope";
 import type { MediaItem } from "@/lib/types";
+import {
+  ensureMediaIdentity,
+  getCanonicalMediaKeyV2,
+} from "@/lib/media-identity";
+import {
+  resolveCanonicalMediaAlias,
+  type MediaIdentityAliasRegistry,
+} from "@/lib/media-identity-aliases";
 
 export const SOCIAL_OUTBOX_KEY = "media-tracker-social-outbox";
 export const SOCIAL_OUTBOX_QUARANTINE_KEY = "mediaTracker:quarantine:social-outbox:ownerless";
@@ -224,10 +232,34 @@ export function saveRecommendationLink(link: RecommendationLocalLink, storage: S
   return next.filter((item) => item.userId === link.userId);
 }
 
-export function findMatchingLocalMedia(media: Pick<SocialMediaEntitySnapshot,"canonicalKey">, items: MediaItem[]): MediaItem | undefined {
-  return items.find((item) => mediaToSocialSnapshot(item).canonicalKey === media.canonicalKey);
+export function findMatchingLocalMedia(
+  media: Pick<SocialMediaEntitySnapshot, "canonicalKey">,
+  items: MediaItem[],
+  aliases?: MediaIdentityAliasRegistry,
+): MediaItem | undefined {
+  const resolvedV2 = aliases
+    ? resolveCanonicalMediaAlias(aliases, media.canonicalKey)
+    : null;
+  return items.find((item) => (
+    (resolvedV2 !== null && getCanonicalMediaKeyV2(item) === resolvedV2)
+    || getCanonicalMediaKeyV2(item) === media.canonicalKey
+    || mediaToSocialSnapshot(item).canonicalKey === media.canonicalKey
+  ));
 }
 
 export function recommendationToPlanningMedia(recommendationId: string, media: SocialMediaEntitySnapshot): MediaItem {
-  return { id: `social-${recommendationId}`, title: media.title, type: media.mediaType, status: "planning", coverImage: media.coverUrl ?? "", currentProgress: 0, totalProgress: 0, favorite: false, userRating: null, externalSource: media.externalSource as MediaItem["externalSource"], externalId: media.externalId, overview: media.overview };
+  return ensureMediaIdentity({
+    id: `social-${recommendationId}`,
+    title: media.title,
+    type: media.mediaType,
+    status: "planning",
+    coverImage: media.coverUrl ?? "",
+    currentProgress: 0,
+    totalProgress: 0,
+    favorite: false,
+    userRating: null,
+    externalSource: media.externalSource as MediaItem["externalSource"],
+    externalId: media.externalId,
+    overview: media.overview,
+  }).item;
 }

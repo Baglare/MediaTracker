@@ -336,6 +336,7 @@ export default function HomePage() {
         <SettingsFeature
           user={user}
           configured={configured}
+          ownerScope={library.ownerScope}
           mediaList={library.mediaList}
           progressLogs={library.progressLogs}
           layout={layout}

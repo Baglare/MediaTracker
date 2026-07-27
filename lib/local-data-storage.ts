@@ -8,6 +8,7 @@ import {
   isLocalOwnerScope,
   type LocalOwnerScope,
 } from "./local-owner-scope";
+import { syncMediaIdentityAliases } from "./media-identity-aliases";
 
 export type LocalDataDomain = "media-library" | "progress-logs";
 export type LocalDatasetOrigin = "demo" | "user" | "legacy";
@@ -53,8 +54,8 @@ export interface LegacyLocalDataEnvelope<T> {
 export interface LocalDataEnvelope<T> {
   format: "mediatracker-local-data";
   domain: LocalDataDomain;
-  schemaVersion: 2;
-  writerVersion: "D1B.2A";
+  schemaVersion: 3;
+  writerVersion: "D1C.1";
   ownerScope: string;
   datasetOrigin: LocalDatasetOrigin;
   writtenAt: string;
@@ -96,7 +97,7 @@ export interface LocalStorageLike {
 }
 
 export const LOCAL_DATA_FORMAT = "mediatracker-local-data" as const;
-export const LOCAL_DATA_SCHEMA_VERSION = 2 as const;
+export const LOCAL_DATA_SCHEMA_VERSION = 3 as const;
 export const UNSCOPED_LOCAL_DATA_SCHEMA_VERSION = 1 as const;
 
 /**
@@ -200,7 +201,7 @@ function createEnvelope<T>(
     format: LOCAL_DATA_FORMAT,
     domain,
     schemaVersion: LOCAL_DATA_SCHEMA_VERSION,
-    writerVersion: "D1B.2A",
+    writerVersion: "D1C.1",
     ownerScope: scope.key,
     datasetOrigin,
     writtenAt,
@@ -297,7 +298,11 @@ function decodeEnvelopeRaw(
       }],
     };
   }
-  if (parsed.schemaVersion < expectedVersion) {
+  const isSupportedOwnedMigration =
+    Boolean(expectedScope)
+    && parsed.schemaVersion === 2
+    && expectedVersion === LOCAL_DATA_SCHEMA_VERSION;
+  if (parsed.schemaVersion < expectedVersion && !isSupportedOwnedMigration) {
     return {
       ok: false,
       status: "migration_failed",
@@ -369,7 +374,7 @@ function decodeEnvelopeRaw(
     schemaVersion: parsed.schemaVersion,
     ownerScope,
     datasetOrigin,
-    issues: decoded.repairs.map((entry) => ({
+    issues: [...decoded.repairs, ...decoded.warnings].map((entry) => ({
       code: entry.code,
       message: entry.message,
       recordIndex: entry.recordIndex,
@@ -473,7 +478,85 @@ function readDomain<T>(
       issues: [{ code: "storage_read_failed", message: "Local data okunamadı." }],
     };
   }
-  if (currentRaw !== null) return readCurrent<T>(domain, currentRaw, keys.current, target, scope);
+  if (currentRaw !== null) {
+    const current = readCurrent<T>(domain, currentRaw, keys.current, target, scope);
+    if (
+      scope
+      && (current.status === "valid" || current.status === "empty")
+      && current.schemaVersion === 2
+      && Array.isArray(current.data)
+    ) {
+      const migratedRecords = current.data as Array<MediaItem | ProgressLog>;
+      const write = writeDomain(
+        domain,
+        migratedRecords,
+        target,
+        scope,
+        current.datasetOrigin ?? "legacy",
+      );
+      if (!write.ok) {
+        return {
+          status: "migration_failed",
+          sourceKey: keys.current,
+          schemaVersion: 2,
+          ownerScope: scope.key,
+          datasetOrigin: current.datasetOrigin,
+          issues: [...current.issues, { code: write.code, message: write.message }],
+          rawBackupKey: keys.backup,
+        };
+      }
+      if (
+        domain === "media-library"
+        && current.datasetOrigin !== "demo"
+      ) {
+        const aliasSync = syncMediaIdentityAliases(
+          scope,
+          migratedRecords as MediaItem[],
+          target,
+        );
+        if (!aliasSync.writeResult.ok) {
+          restoreRaw(target, keys.current, currentRaw);
+          return {
+            status: "migration_failed",
+            sourceKey: keys.current,
+            schemaVersion: 2,
+            ownerScope: scope.key,
+            datasetOrigin: current.datasetOrigin,
+            issues: [
+              ...current.issues,
+              {
+                code: aliasSync.writeResult.code,
+                message: aliasSync.writeResult.message,
+              },
+            ],
+            rawBackupKey: keys.backup,
+          };
+        }
+      }
+      const migratedRaw = target.getItem(keys.current);
+      if (migratedRaw === null) {
+        restoreRaw(target, keys.current, currentRaw);
+        return {
+          status: "migration_failed",
+          sourceKey: keys.current,
+          schemaVersion: 2,
+          ownerScope: scope.key,
+          datasetOrigin: current.datasetOrigin,
+          issues: [{
+            code: "verification_failed",
+            message: "V2 -> V3 migration current read-back sirasinda kayboldu.",
+          }],
+          rawBackupKey: keys.backup,
+        };
+      }
+      const migrated = readCurrent<T>(domain, migratedRaw, keys.current, target, scope);
+      return {
+        ...migrated,
+        rawBackupKey: keys.backup,
+      };
+    }
+    return current;
+  }
 
   if (scope) {
     return { status: "missing", sourceKey: keys.current, issues: [], ownerScope: scope.key };
@@ -786,7 +869,25 @@ export function saveScopedMediaList(
       recoverable: true,
     };
   }
-  return writeDomain("media-library", decoded.records, target, scope, datasetOrigin);
+  if (!target) return writeDomain("media-library", decoded.records, target, scope, datasetOrigin);
+  const keys = buildLocalDataKeys("media-library", scope);
+  let previous: string | null;
+  try {
+    previous = target.getItem(keys.current);
+  } catch (error) {
+    return writeFailure(error, "Mevcut media current slot okunamadi.");
+  }
+  const write = writeDomain("media-library", decoded.records, target, scope, datasetOrigin);
+  if (!write.ok || datasetOrigin === "demo") return write;
+  const aliases = syncMediaIdentityAliases(scope, decoded.records, target);
+  if (!aliases.writeResult.ok) {
+    restoreRaw(target, keys.current, previous);
+    return aliases.writeResult;
+  }
+  return {
+    ...write,
+    backupCreated: write.backupCreated || aliases.writeResult.backupCreated,
+  };
 }
 
 export function saveScopedProgressLogs(
@@ -842,9 +943,12 @@ function saveLibrarySnapshotInternal(
   }
 
   let previousMedia: string | null;
+  let previousLogs: string | null;
   const mediaKeys = buildLocalDataKeys("media-library", scope);
+  const progressKeys = buildLocalDataKeys("progress-logs", scope);
   try {
     previousMedia = target.getItem(mediaKeys.current);
+    previousLogs = target.getItem(progressKeys.current);
   } catch (error) {
     return writeFailure(error, "Mevcut media current slot okunamadı.");
   }
@@ -874,6 +978,30 @@ function saveLibrarySnapshotInternal(
       };
     }
     return logsWrite;
+  }
+  if (scope && datasetOrigin !== "demo") {
+    const aliases = syncMediaIdentityAliases(scope, mediaDecoded.records, target);
+    if (!aliases.writeResult.ok) {
+      const mediaRestored = restoreRaw(target, mediaKeys.current, previousMedia);
+      const logsRestored = restoreRaw(target, progressKeys.current, previousLogs);
+      if (!mediaRestored || !logsRestored) {
+        return {
+          ok: false,
+          code: "verification_failed",
+          message: "Alias registry yazimi basarisiz oldu ve library rollback tamamlanamadi; backup slotlari korundu.",
+          recoverable: true,
+        };
+      }
+      return aliases.writeResult;
+    }
+    return {
+      ok: true,
+      writtenAt: logsWrite.writtenAt,
+      backupCreated:
+        mediaWrite.backupCreated
+        || logsWrite.backupCreated
+        || aliases.writeResult.backupCreated,
+    };
   }
   return {
     ok: true,

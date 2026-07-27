@@ -17,6 +17,7 @@ import {
 } from "../types";
 import { withInferredSeriesGroup } from "../series-group";
 import type { Database, Json } from "./types";
+import { ensureMediaIdentity } from "../media-identity";
 
 type MediaItemRow = Database["public"]["Tables"]["media_items"]["Row"];
 type MediaItemInsert = Database["public"]["Tables"]["media_items"]["Insert"];
@@ -52,6 +53,8 @@ const METADATA_KEYS = [
   "languages",
   "subjects",
   "isbn",
+  "imdbId",
+  "originalTitle",
   "nativeTitle",
   "episodes",
   "chapters",
@@ -122,7 +125,7 @@ export function fromMediaRow(row: MediaItemRow): MediaItem {
       ? row.cover_url
       : `/placeholders/${row.type}.svg`;
 
-  return withMediaClassification(withInferredSeriesGroup({
+  const item = withMediaClassification(withInferredSeriesGroup({
     id: row.id,
     title: row.title,
     type: row.type as MediaType,
@@ -141,6 +144,9 @@ export function fromMediaRow(row: MediaItemRow): MediaItem {
     releaseYear: row.release_year ?? undefined,
     ...meta,
   }));
+  return ensureMediaIdentity(item, {
+    legacyRecordId: !item.externalSource && !item.externalId ? row.id : undefined,
+  }).item;
 }
 
 // ---- ProgressLog → progress_logs row ----

@@ -7,6 +7,7 @@ import AuthPanel from "@/components/auth-panel";
 import CloudDataStatusCard from "@/components/cloud-data-status-card";
 import CloudSyncStatusCard from "@/components/cloud-sync-status-card";
 import DataManagementPanel from "@/components/data-management-panel";
+import DuplicateReviewPanel from "@/components/duplicate-review-panel";
 import PageHeader from "@/components/page-header";
 import AppearanceSettingsCard from "@/components/personalization/appearance-settings-card";
 import LayoutSettingsCard from "@/components/personalization/layout-settings-card";
@@ -14,12 +15,14 @@ import StartupSettingsCard from "@/components/personalization/startup-settings-c
 import { PersonalDataOwnershipPanel } from "@/components/personal-data-ownership-panel";
 import type { useLayoutPreferences } from "@/hooks/use-layout-preferences";
 import type { MediaItem, ProgressLog } from "@/lib/types";
+import type { LocalOwnerScope } from "@/lib/local-owner-scope";
 
 type LayoutController = ReturnType<typeof useLayoutPreferences>;
 
 interface SettingsFeatureProps {
   user: User | null;
   configured: boolean;
+  ownerScope: LocalOwnerScope | null;
   mediaList: MediaItem[];
   progressLogs: ProgressLog[];
   layout: LayoutController;
@@ -31,6 +34,7 @@ interface SettingsFeatureProps {
 export default function SettingsFeature({
   user,
   configured,
+  ownerScope,
   mediaList,
   progressLogs,
   layout,
@@ -82,6 +86,11 @@ export default function SettingsFeature({
             onImport={onReplaceData}
             onReset={onReset}
             onConfirm={onConfirm}
+          />
+          <DuplicateReviewPanel
+            ownerScope={ownerScope}
+            mediaList={mediaList}
+            progressLogs={progressLogs}
           />
         </div>
         <div className="app-panel rounded-2xl border p-[var(--app-panel-padding)] lg:col-span-2">

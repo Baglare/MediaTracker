@@ -1,5 +1,6 @@
 import type { MediaItem, MediaStatus, MediaType } from "@/lib/types";
 import type { ModuleVisibility } from "@/lib/social/types";
+import { getLegacyCanonicalMediaKey } from "@/lib/media-identity";
 
 export const ACTIVITY_EVENT_TYPES = ["media_started", "media_completed", "rating_shared", "favorite_shared", "shared_note_published", "recommendation_completed", "manual_media_share"] as const;
 export const REACTION_TYPES = ["like", "love", "interesting", "celebrate"] as const;
@@ -176,9 +177,12 @@ export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
   recommendationWithdrawn: true,
 };
 
+/**
+ * @deprecated Remote XP/social contracts still consume this legacy key in
+ * D1C.1. New local identity consumers must use getCanonicalMediaKeyV2.
+ */
 export function canonicalMediaKey(media: Pick<MediaItem, "id" | "title" | "type" | "externalSource" | "externalId">): string {
-  if (media.externalSource && media.externalId) return `${media.externalSource}:${media.externalId}`.toLowerCase();
-  return `local:${media.type}:${media.title.trim().toLocaleLowerCase("tr-TR")}`;
+  return getLegacyCanonicalMediaKey(media);
 }
 
 export function mediaWorld(type: MediaType): SocialMediaEntitySnapshot["world"] {

@@ -14,6 +14,7 @@ import {
   sendSocialOutboxItem,
 } from "./social/local-social";
 import { flushXpOutbox, queueXpMediaState, sendXpOutboxBatch } from "./xp/outbox";
+import { ensureMediaIdentity, getCanonicalMediaKeyV2 } from "./media-identity";
 
 export type RecommendationLibraryWriteResult =
   | { ok: true; item: MediaItem; alreadyPresent: boolean }
@@ -34,6 +35,7 @@ export function addRecommendationToLocalLibrary(
   item: MediaItem,
   userId: string,
 ): RecommendationLibraryWriteResult {
+  const identifiedItem = ensureMediaIdentity(item).item;
   const scope = createUserOwnerScope(userId);
   const mediaRead = loadScopedMediaList(scope);
   const logsRead = loadScopedProgressLogs(scope);
@@ -43,30 +45,34 @@ export function addRecommendationToLocalLibrary(
   const currentMedia = mediaRead.data ?? [];
   const currentLogs = logsRead.data ?? [];
   const existing = currentMedia.find((candidate) =>
-    candidate.id === item.id
+    candidate.id === identifiedItem.id
+    || (
+      Boolean(getCanonicalMediaKeyV2(candidate))
+      && getCanonicalMediaKeyV2(candidate) === getCanonicalMediaKeyV2(identifiedItem)
+    )
     || (
       Boolean(candidate.externalSource)
-      && candidate.externalSource === item.externalSource
-      && candidate.externalId === item.externalId
+      && candidate.externalSource === identifiedItem.externalSource
+      && candidate.externalId === identifiedItem.externalId
     )
   );
   if (existing) return { ok: true, item: existing, alreadyPresent: true };
   const addedLog: ProgressLog = {
     id: `log-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-    mediaId: item.id,
-    mediaTitle: item.title,
-    mediaType: item.type,
+    mediaId: identifiedItem.id,
+    mediaTitle: identifiedItem.title,
+    mediaType: identifiedItem.type,
     action: "added",
     detail: "Öneriden kütüphaneye eklendi",
-    amount: item.currentProgress,
-    unit: getProgressUnit(item.type),
+    amount: identifiedItem.currentProgress,
+    unit: getProgressUnit(identifiedItem.type),
     previousProgress: 0,
-    newProgress: item.currentProgress,
+    newProgress: identifiedItem.currentProgress,
     createdAt: new Date().toISOString(),
   };
   const writeResult = saveScopedLibrarySnapshot(
     scope,
-    [...currentMedia, item],
+    [...currentMedia, identifiedItem],
     [...currentLogs, addedLog],
     "user",
   );
@@ -75,12 +81,12 @@ export function addRecommendationToLocalLibrary(
   }
 
   setOwnerScope(scope);
-  enqueueMediaUpsert(item);
+  enqueueMediaUpsert(identifiedItem);
   enqueueProgressLog(addedLog);
-  queueXpMediaState(item, userId);
-  queueMediaSocialEvents(undefined, item, userId);
+  queueXpMediaState(identifiedItem, userId);
+  queueMediaSocialEvents(undefined, identifiedItem, userId);
   void flushXpOutbox(userId, sendXpOutboxBatch);
   void flushSocialOutbox(userId, sendSocialOutboxItem);
   window.dispatchEvent(new CustomEvent("media-tracker:local-library-changed"));
-  return { ok: true, item, alreadyPresent: false };
+  return { ok: true, item: identifiedItem, alreadyPresent: false };
 }

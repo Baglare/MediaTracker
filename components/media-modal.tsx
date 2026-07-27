@@ -43,6 +43,7 @@ import {
 } from "lucide-react";
 import { MediaItem, MediaType, MediaStatus } from "@/lib/types";
 import { getMediaTypeLabel, getStatusLabel } from "@/lib/progress";
+import { createManualMediaIdentity, ensureMediaIdentity } from "@/lib/media-identity";
 
 interface MediaModalProps {
   isOpen: boolean;
@@ -278,6 +279,9 @@ export default function MediaModal({ isOpen, editingItem, onSave, onClose }: Med
     const item: MediaItem = {
       ...(editingItem || {}),
       id: editingItem?.id || generateId(),
+      identity: editingItem
+        ? ensureMediaIdentity(editingItem).item.identity
+        : createManualMediaIdentity(),
       title: title.trim(),
       type, status,
       coverImage: finalCover,

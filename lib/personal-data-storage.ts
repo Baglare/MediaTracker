@@ -11,7 +11,9 @@ export type PersonalDataDomain =
   | "themeCloudSync"
   | "aiSession"
   | "aiFeedback"
-  | "aiPreferences";
+  | "aiPreferences"
+  | "mediaIdentityAliases"
+  | "duplicateReviewDecisions";
 
 export interface PersonalStorageLike {
   getItem(key: string): string | null;
