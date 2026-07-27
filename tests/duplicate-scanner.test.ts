@@ -398,7 +398,7 @@ describe("grouping, fingerprint and read-only preview", () => {
     const preview = buildDuplicateMergePreview(candidate, [first, second], logs);
     expect(preview).toMatchObject({
       recordIds: ["a", "b"],
-      blockedReasons: ["MERGE_EXECUTOR_NOT_AVAILABLE", "SURVIVOR_NOT_SELECTED"],
+      blockedReasons: ["SURVIVOR_NOT_SELECTED", "CURRENT_STATE_NOT_REVALIDATED"],
       relationships: {
         progressLogCounts: { a: 1, b: 0 },
         groupMemberships: { a: ["group-1", "Group"], b: [] },

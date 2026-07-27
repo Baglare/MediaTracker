@@ -7,8 +7,14 @@ import type { SyncEntity, SyncOperation, SyncQueueItem } from "./types";
 export const LEGACY_SYNC_QUEUE_KEY = "media-tracker-sync-queue";
 const LEGACY_QUEUE_REVIEW_KEY = "mediaTracker:queueMigration:v1:ownerless-reviewed";
 
-function isBrowser(): boolean {
-  return typeof window !== "undefined";
+export interface SyncQueueStorageLike {
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
+  removeItem(key: string): void;
+}
+
+function browserStorage(): SyncQueueStorageLike | null {
+  return typeof localStorage === "undefined" ? null : localStorage;
 }
 
 export function buildSyncQueueKey(scope: LocalOwnerScope): string {
@@ -36,10 +42,13 @@ function isSyncQueueItem(value: unknown, scope: LocalOwnerScope): value is SyncQ
   return true;
 }
 
-export function loadSyncQueue(scope: LocalOwnerScope): SyncQueueItem[] {
-  if (!isBrowser()) return [];
+export function loadSyncQueue(
+  scope: LocalOwnerScope,
+  storage: SyncQueueStorageLike | null = browserStorage(),
+): SyncQueueItem[] {
+  if (!storage) return [];
   try {
-    const raw = localStorage.getItem(buildSyncQueueKey(scope));
+    const raw = storage.getItem(buildSyncQueueKey(scope));
     if (!raw) return [];
     const parsed = JSON.parse(raw) as unknown;
     return Array.isArray(parsed) ? parsed.filter((item) => isSyncQueueItem(item, scope)) : [];
@@ -48,10 +57,31 @@ export function loadSyncQueue(scope: LocalOwnerScope): SyncQueueItem[] {
   }
 }
 
-export function saveSyncQueue(scope: LocalOwnerScope, queue: SyncQueueItem[]): void {
-  if (!isBrowser()) return;
+export function saveSyncQueue(
+  scope: LocalOwnerScope,
+  queue: SyncQueueItem[],
+  storage: SyncQueueStorageLike | null = browserStorage(),
+): void {
+  if (!storage) return;
   const safe = queue.filter((item) => isSyncQueueItem(item, scope));
-  localStorage.setItem(buildSyncQueueKey(scope), JSON.stringify(safe));
+  storage.setItem(buildSyncQueueKey(scope), JSON.stringify(safe));
+}
+
+export function replaceSyncQueueDurably(
+  scope: LocalOwnerScope,
+  queue: SyncQueueItem[],
+  storage: SyncQueueStorageLike | null = browserStorage(),
+): boolean {
+  if (!storage) return false;
+  const safe = queue.filter((item) => isSyncQueueItem(item, scope));
+  try {
+    const serialized = JSON.stringify(safe);
+    storage.setItem(buildSyncQueueKey(scope), serialized);
+    if (storage.getItem(buildSyncQueueKey(scope)) !== serialized) return false;
+    return JSON.stringify(loadSyncQueue(scope, storage)) === serialized;
+  } catch {
+    return false;
+  }
 }
 
 export function enqueueSyncOperation(
@@ -78,8 +108,9 @@ export function enqueueSyncOperation(
 }
 
 export function clearSyncQueue(scope: LocalOwnerScope): void {
-  if (!isBrowser()) return;
-  localStorage.removeItem(buildSyncQueueKey(scope));
+  const storage = browserStorage();
+  if (!storage) return;
+  storage.removeItem(buildSyncQueueKey(scope));
 }
 
 export function getPendingSyncCount(scope: LocalOwnerScope): number {
@@ -91,13 +122,14 @@ export function getPendingSyncCount(scope: LocalOwnerScope): number {
  * copied into a guest or authenticated queue.
  */
 export function quarantineLegacyOwnerlessQueue(): string | null {
-  if (!isBrowser()) return null;
+  const storage = browserStorage();
+  if (!storage) return null;
   try {
-    if (localStorage.getItem(LEGACY_QUEUE_REVIEW_KEY)) return null;
-    const raw = localStorage.getItem(LEGACY_SYNC_QUEUE_KEY);
+    if (storage.getItem(LEGACY_QUEUE_REVIEW_KEY)) return null;
+    const raw = storage.getItem(LEGACY_SYNC_QUEUE_KEY);
     if (raw === null) return null;
     const key = `mediaTracker:quarantine:cloud-sync-queue:${Date.now()}`;
-    localStorage.setItem(key, JSON.stringify({
+    storage.setItem(key, JSON.stringify({
       format: "mediatracker-local-quarantine",
       domain: "cloud-sync-queue",
       sourceKey: LEGACY_SYNC_QUEUE_KEY,
@@ -105,7 +137,7 @@ export function quarantineLegacyOwnerlessQueue(): string | null {
       errorCodes: ["owner_scope_missing"],
       rawPayload: raw,
     }));
-    localStorage.setItem(LEGACY_QUEUE_REVIEW_KEY, JSON.stringify({
+    storage.setItem(LEGACY_QUEUE_REVIEW_KEY, JSON.stringify({
       version: 1,
       sourceKey: LEGACY_SYNC_QUEUE_KEY,
       quarantineKey: key,

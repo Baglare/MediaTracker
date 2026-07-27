@@ -174,7 +174,9 @@ Settings içindeki “Tekrarlanan Kayıt İncelemesi” paneli:
 gösterir.
 
 Personal note, overview, raw provider payload, AI verisi ve raw owner UID
-gösterilmez. Merge, delete, otomatik düzeltme ve log taşıma aksiyonu yoktur.
+candidate listesinde gösterilmez. Otomatik merge/delete/düzeltme aksiyonu
+yoktur. D1C.2B kontrollü merge akışı yalnız explicit alt küme ve alan
+kararlarından sonra açılır.
 
 ## Merge preview foundation
 
@@ -197,12 +199,14 @@ Preview survivor seçmez, alan birleştirmez ve side-effect üretmez.
 - TMDB'nin mevcut detail yanıtındaki doğrulanmış `imdbId`, strong evidence için
   güvenli local/cloud metadata whitelist'inde korunur; remote schema değişmez.
 
-## D1C.2B sınırı
+## D1C.2B entegrasyonu
 
-D1C.2B kullanıcı kontrollü survivor seçimi, alan karşılaştırması, ProgressLog ve
-grup ilişkisi taşıma, XP compatibility ve rollback planını ayrı executor olarak
-tasarlamalıdır. D1C.2A candidate veya review kararını merge komutu olarak
-yorumlamaz.
+D1C.2B candidate veya review kararını merge komutu olarak yorumlamaz. Kullanıcı
+ayrıca alt küme, survivor record, canonical identity ve bütün alan conflict'lerini
+seçer. Executor candidate/evidence fingerprint'ini güncel local state ile tekrar
+hesaplar. Journal, rollback, cloud queue ve bounded undo sözleşmesi
+[DUPLICATE_MERGE_AND_RECOVERY.md](./DUPLICATE_MERGE_AND_RECOVERY.md)
+belgesindedir.
 
 ## Manuel testler
 

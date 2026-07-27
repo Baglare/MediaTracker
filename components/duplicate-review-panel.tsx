@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   ChevronDown,
@@ -10,14 +10,23 @@ import {
   Eye,
   RefreshCw,
   ShieldCheck,
+  Undo2,
 } from "lucide-react";
+import DuplicateMergeWorkflow from "@/components/duplicate-merge-workflow";
 import { useDuplicateReview } from "@/hooks/use-duplicate-review";
+import {
+  readDuplicateMergeJournal,
+  recoverPendingDuplicateMerge,
+  undoLastDuplicateMerge,
+  type DuplicateMergeJournal,
+} from "@/lib/duplicate-merge";
 import {
   buildDuplicateMergePreview,
   summarizeDuplicateCandidate,
 } from "@/lib/duplicate-scanner";
 import type { DuplicateReviewStatus } from "@/lib/duplicate-review-registry";
 import type { LocalOwnerScope } from "@/lib/local-owner-scope";
+import { flush } from "@/lib/sync-manager";
 import type { MediaItem, ProgressLog } from "@/lib/types";
 
 interface DuplicateReviewPanelProps {
@@ -48,6 +57,40 @@ export default function DuplicateReviewPanel({
   const [isExpanded, setIsExpanded] = useState(false);
   const [expandedCandidate, setExpandedCandidate] = useState<string | null>(null);
   const [showReviewed, setShowReviewed] = useState(false);
+  const [lastMerge, setLastMerge] = useState<DuplicateMergeJournal | null>(null);
+  const [mergeStatusMessage, setMergeStatusMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      if (!ownerScope) {
+        setLastMerge(null);
+        setMergeStatusMessage(null);
+        return;
+      }
+      const recovery = recoverPendingDuplicateMerge(ownerScope);
+      if (recovery && !recovery.ok) setMergeStatusMessage(recovery.message);
+      const journal = readDuplicateMergeJournal(ownerScope);
+      setLastMerge(journal.status === "valid" ? journal.data : null);
+      if (journal.status !== "missing" && journal.status !== "valid") {
+        setMergeStatusMessage("Merge journal güvenli biçimde okunamadı; recovery gerekiyor.");
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [ownerScope, mediaList]);
+
+  function undoLastMerge() {
+    if (!ownerScope) return;
+    const result = undoLastDuplicateMerge(ownerScope, {
+      triggerSync: () => {
+        void flush();
+      },
+    });
+    setMergeStatusMessage(result.ok
+      ? "Son merge local snapshot’tan geri alındı."
+      : result.message);
+    const journal = readDuplicateMergeJournal(ownerScope);
+    setLastMerge(journal.status === "valid" ? journal.data : null);
+  }
 
   const openReviews = useMemo(
     () => controller.reviews.filter((review) => review.decision === "open"),
@@ -102,9 +145,43 @@ export default function DuplicateReviewPanel({
         <div className="mt-3 space-y-4 rounded-xl border border-zinc-800/30 bg-zinc-900/30 p-4">
           <div className="rounded-xl border border-violet-500/20 bg-violet-500/5 p-3">
             <p className="text-xs leading-5 text-violet-200">
-              Bu aşama yalnız olası tekrarları tespit eder. Kayıtlar otomatik olarak değiştirilmez.
+              Kayıtlar otomatik olarak değiştirilmez. Merge yalnız seçtiğin alt küme,
+              survivor, identity ve alan kararları yeniden doğrulandıktan sonra uygulanır.
             </p>
           </div>
+
+          {lastMerge?.receipt && ["completed", "sync-pending"].includes(lastMerge.state) && (
+            <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="text-xs leading-5 text-emerald-200">
+                  <p className="font-medium">Son merge tamamlandı</p>
+                  <p>
+                    {lastMerge.receipt.mediaCountBefore} → {lastMerge.receipt.mediaCountAfter} kayıt,
+                    {" "}{lastMerge.receipt.remappedLogCount} log taşındı.
+                    {lastMerge.state === "sync-pending" ? " Cloud sync bekliyor." : ""}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={undoLastMerge}
+                  className="flex items-center gap-1.5 rounded-lg bg-emerald-500/15 px-3 py-1.5 text-xs text-emerald-200 hover:bg-emerald-500/25"
+                >
+                  <Undo2 className="h-3.5 w-3.5" />
+                  Son merge’i geri al
+                </button>
+              </div>
+              <p className="mt-2 text-[10px] text-emerald-300/70">
+                Merge sonrası ilgili local kayıtlar değiştiyse undo güvenlik nedeniyle bloke edilir.
+                Cross-device undo revision/tombstone olmadan garanti edilmez.
+              </p>
+            </div>
+          )}
+
+          {mergeStatusMessage && (
+            <div role="status" className="rounded-lg bg-zinc-800/60 p-2 text-xs text-zinc-300">
+              {mergeStatusMessage}
+            </div>
+          )}
 
           {controller.warning && (
             <div
@@ -278,6 +355,15 @@ export default function DuplicateReviewPanel({
                             Yok say
                           </button>
                         </div>
+
+                        {ownerScope && (
+                          <DuplicateMergeWorkflow
+                            key={candidate.fingerprint}
+                            ownerScope={ownerScope}
+                            candidate={candidate}
+                            mediaList={mediaList}
+                          />
+                        )}
                       </div>
                     )}
                   </article>

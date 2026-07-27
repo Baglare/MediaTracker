@@ -13,7 +13,9 @@ export type PersonalDataDomain =
   | "aiFeedback"
   | "aiPreferences"
   | "mediaIdentityAliases"
-  | "duplicateReviewDecisions";
+  | "duplicateReviewDecisions"
+  | "mediaRecordRedirects"
+  | "duplicateMergeJournal";
 
 export interface PersonalStorageLike {
   getItem(key: string): string | null;

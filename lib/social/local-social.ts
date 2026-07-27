@@ -218,6 +218,35 @@ export function loadRecommendationLinks(userId: string, storage: StorageLike | n
     : [];
 }
 
+export function loadRecommendationLinksForScope(
+  scope: LocalOwnerScope,
+  storage: StorageLike | null = browserStorage(),
+): RecommendationLocalLink[] {
+  return scope.kind === "user" ? loadRecommendationLinks(scope.userId, storage) : [];
+}
+
+export function replaceRecommendationLinksForScope(
+  scope: LocalOwnerScope,
+  links: RecommendationLocalLink[],
+  storage: StorageLike | null = browserStorage(),
+): boolean {
+  if (!storage) return false;
+  if (scope.kind === "guest") return links.length === 0;
+  if (links.some((link) => !isLocalLink(link) || link.userId !== scope.userId)) return false;
+  const deduped = [
+    ...new Map(links.map((link) => [link.recommendationId, link])).values(),
+  ];
+  const key = buildRecommendationLinksKeyForScope(scope);
+  try {
+    const serialized = JSON.stringify(deduped);
+    storage.setItem(key, serialized);
+    return storage.getItem(key) === serialized
+      && loadRecommendationLinksForScope(scope, storage).length === deduped.length;
+  } catch {
+    return false;
+  }
+}
+
 export function validRecommendationLinkIds(userId: string, media: MediaItem[], storage: StorageLike | null = browserStorage()): string[] {
   const mediaIds = new Set(media.map((item) => item.id));
   return loadRecommendationLinks(userId, storage).filter((link) => mediaIds.has(link.localMediaId)).map((link) => link.recommendationId);

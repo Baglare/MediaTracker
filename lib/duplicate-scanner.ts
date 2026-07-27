@@ -689,7 +689,7 @@ export function buildDuplicateMergePreview(
   return {
     candidateId: candidate.id,
     recordIds: [...candidate.recordIds],
-    blockedReasons: ["MERGE_EXECUTOR_NOT_AVAILABLE", "SURVIVOR_NOT_SELECTED"],
+    blockedReasons: ["SURVIVOR_NOT_SELECTED", "CURRENT_STATE_NOT_REVALIDATED"],
     relationships: {
       progressLogCounts,
       groupMemberships,

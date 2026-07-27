@@ -163,7 +163,11 @@ kanıtlayan güvenilir metadata ve ayrı bir migration kararıyla eklenebilir.
   ve false-positive koruması
   [DUPLICATE_SCANNER_AND_REVIEW.md](./DUPLICATE_SCANNER_AND_REVIEW.md)
   sözleşmesinde uygulanmıştır.
-- D1C.2B: kullanıcı kontrollü merge executor, survivor ve ilişki taşıma.
+- D1C.2B: kullanıcı kontrollü merge executor, survivor ve ilişki taşıma
+  [DUPLICATE_MERGE_AND_RECOVERY.md](./DUPLICATE_MERGE_AND_RECOVERY.md)
+  sözleşmesiyle uygulanmıştır. Kaybeden V2/legacy/record alias'ları seçilen
+  canonical V2 key'e doğrudan flatten edilir; local record ilişkileri ayrı
+  `mediaRecordRedirects` registry'siyle survivor ID'ye çözülür.
 - D1D: issue raporlama, quarantine ve repair akışları.
 - D1E: versioned portable backup/export sözleşmesi.
 - D2: XP/social/cloud key consumer migration'ı, revision, tombstone ve remote

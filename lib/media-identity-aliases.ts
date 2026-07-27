@@ -20,7 +20,8 @@ import type { MediaItem } from "./types";
 export type MediaIdentityAliasType =
   | "legacy-canonical-key"
   | "record-id"
-  | "previous-provider-key";
+  | "previous-provider-key"
+  | "merged-canonical-key";
 
 export interface MediaIdentityAliasRecord {
   alias: string;
@@ -44,6 +45,7 @@ const ALIAS_TYPES = new Set<MediaIdentityAliasType>([
   "legacy-canonical-key",
   "record-id",
   "previous-provider-key",
+  "merged-canonical-key",
 ]);
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -121,7 +123,13 @@ export const mediaIdentityAliasRegistryCodec: PersonalDataCodec<MediaIdentityAli
     }
     const identity = parseCanonicalMediaKeyV2(raw.canonicalKey);
     const alias = normalizeAlias(raw.alias);
-    if (!identity || !alias || parseCanonicalMediaKeyV2(alias)) {
+    const aliasIdentity = parseCanonicalMediaKeyV2(alias);
+    if (
+      !identity
+      || !alias
+      || (aliasIdentity && raw.aliasType !== "merged-canonical-key")
+      || aliasIdentity?.key === identity.key
+    ) {
       return { ok: false, message: "Alias dogrudan ve gecerli bir V2 canonical key'e gitmelidir." };
     }
     const next: MediaIdentityAliasRecord = {
@@ -139,6 +147,10 @@ export const mediaIdentityAliasRegistryCodec: PersonalDataCodec<MediaIdentityAli
       byAlias.set(alias, next);
       records.push(next);
     }
+  }
+  const aliasKeys = new Set(records.map((entry) => normalizeAlias(entry.alias)));
+  if (records.some((entry) => aliasKeys.has(normalizeAlias(entry.canonicalKey)))) {
+    return { ok: false, message: "Media identity alias chain veya cycle iceremez." };
   }
   return {
     ok: true,
@@ -221,7 +233,13 @@ export function updateMediaIdentityAliases(
   for (const raw of additions) {
     const alias = normalizeAlias(raw.alias);
     const canonical = parseCanonicalMediaKeyV2(raw.canonicalKey);
-    if (!alias || !canonical || parseCanonicalMediaKeyV2(alias)) continue;
+    const aliasIdentity = parseCanonicalMediaKeyV2(alias);
+    if (
+      !alias
+      || !canonical
+      || (aliasIdentity && raw.aliasType !== "merged-canonical-key")
+      || aliasIdentity?.key === canonical.key
+    ) continue;
     const existing = byAlias.get(alias);
     if (!existing) {
       const next = { ...raw, alias, canonicalKey: canonical.key };
@@ -274,8 +292,111 @@ export function resolveCanonicalMediaAlias(
   registry: MediaIdentityAliasRegistry,
   inputKey: string,
 ): string | null {
-  const direct = parseCanonicalMediaKeyV2(inputKey);
-  if (direct) return direct.key;
   const alias = normalizeAlias(inputKey);
-  return registry.records.find((entry) => entry.alias === alias)?.canonicalKey ?? null;
+  const resolved = registry.records.find((entry) => entry.alias === alias)?.canonicalKey;
+  if (resolved) return resolved;
+  const direct = parseCanonicalMediaKeyV2(inputKey);
+  return direct?.key ?? null;
+}
+
+export type MergedIdentityAliasResult =
+  | { ok: true; registry: MediaIdentityAliasRegistry }
+  | { ok: false; code: "alias_collision" | "alias_chain"; message: string };
+
+function issueMentionsAlias(issue: MediaIdentityIssue, alias: string): boolean {
+  return issue.code === "IDENTITY_ALIAS_COLLISION"
+    && issue.evidence.toLowerCase().endsWith(normalizeAlias(alias));
+}
+
+export function buildMergedIdentityAliases(args: {
+  current: MediaIdentityAliasRegistry;
+  selectedItems: readonly MediaItem[];
+  canonicalKey: string;
+  createdAt?: string;
+}): MergedIdentityAliasResult {
+  const canonical = parseCanonicalMediaKeyV2(args.canonicalKey);
+  if (!canonical) {
+    return { ok: false, code: "alias_chain", message: "Merge canonical identity gecersiz." };
+  }
+  const createdAt = args.createdAt ?? new Date().toISOString();
+  const selectedKeys = new Set(
+    args.selectedItems
+      .map(getCanonicalMediaKeyV2)
+      .filter((key): key is string => Boolean(key)),
+  );
+  const proposed = new Map<string, MediaIdentityAliasRecord>();
+  const add = (record: MediaIdentityAliasRecord) => {
+    const alias = normalizeAlias(record.alias);
+    if (normalizeAlias(canonical.key) === alias) return;
+    proposed.set(alias, { ...record, alias, canonicalKey: canonical.key });
+  };
+  for (const item of args.selectedItems) {
+    add({
+      alias: getLegacyCanonicalMediaKey(item),
+      canonicalKey: canonical.key,
+      aliasType: "legacy-canonical-key",
+      createdAt,
+    });
+    add({
+      alias: item.id,
+      canonicalKey: canonical.key,
+      aliasType: "record-id",
+      createdAt,
+    });
+    const identityKey = getCanonicalMediaKeyV2(item);
+    if (identityKey && identityKey !== canonical.key) {
+      add({
+        alias: identityKey,
+        canonicalKey: canonical.key,
+        aliasType: "merged-canonical-key",
+        createdAt,
+      });
+    }
+  }
+  for (const alias of proposed.keys()) {
+    if (args.current.issues.some((entry) => issueMentionsAlias(entry, alias))) {
+      return {
+        ok: false,
+        code: "alias_collision",
+        message: `Collision issue tasiyan alias merge edilemez: ${alias}`,
+      };
+    }
+  }
+
+  const records = new Map<string, MediaIdentityAliasRecord>();
+  for (const current of args.current.records) {
+    const alias = normalizeAlias(current.alias);
+    const shouldFlatten = selectedKeys.has(current.canonicalKey);
+    const proposedRecord = proposed.get(alias);
+    if (
+      proposedRecord
+      && !shouldFlatten
+      && current.canonicalKey !== canonical.key
+    ) {
+      return {
+        ok: false,
+        code: "alias_collision",
+        message: `Alias baska bir identity'ye ait: ${alias}`,
+      };
+    }
+    records.set(alias, shouldFlatten
+      ? { ...current, canonicalKey: canonical.key }
+      : current);
+  }
+  for (const [alias, record] of proposed) records.set(alias, record);
+  const registry: MediaIdentityAliasRegistry = {
+    version: 1,
+    records: [...records.values()],
+    issues: args.current.issues.filter(
+      (entry) => !(
+        entry.code === "IDENTITY_EXACT_COLLISION"
+        && entry.recordId
+        && args.selectedItems.some((item) => item.id === entry.recordId)
+      ),
+    ),
+  };
+  const decoded = mediaIdentityAliasRegistryCodec(registry);
+  return decoded.ok
+    ? { ok: true, registry: decoded.value }
+    : { ok: false, code: "alias_chain", message: decoded.message };
 }

@@ -176,6 +176,22 @@ record üyeliği değiştiğinde eski karar uygulanmaz. Ayrıntılar
 [DUPLICATE_SCANNER_AND_REVIEW.md](./DUPLICATE_SCANNER_AND_REVIEW.md)
 belgesindedir.
 
+## D1C.2B merge journal ve recovery
+
+Kontrollü merge media envelope'a yarım sonuç yazıp bırakmaz. Owner-scoped
+`duplicateMergeJournal` before/after snapshot, versioned plan, uygulanmış
+aşamalar, receipt ve recovery durumunu safe-write ile saklar. Media/log,
+identity alias, record redirect, recommendation link ve cloud queue yazıları
+read-back fingerprint ile doğrulanır.
+
+Local veya durable queue write hatasında network başlamaz ve before snapshot
+geri yüklenir. Rollback doğrulanamazsa `recovery-required` görünür kalır.
+Incomplete startup journal yalnız eşleşen owner için idempotent rollback edilir.
+Son tamamlanmış merge'in undo'su current result fingerprint değişmediyse aynı
+protokolle çalışır. Ayrıntılar
+[DUPLICATE_MERGE_AND_RECOVERY.md](./DUPLICATE_MERGE_AND_RECOVERY.md)
+belgesindedir.
+
 ## Bilinen sınırlamalar
 
 - Local profile, custom theme ve AI state namespace'i D1B.2B ile
@@ -183,6 +199,7 @@ belgesindedir.
   sözleşmesine taşınmıştır.
 - Checksum, taşınabilir backup manifesti ve restore UI D1E kapsamıdır.
 - Quarantine görüntüleme/retention ve integrity repair D1D/D1F kapsamıdır.
-- Duplicate tarama/review D1C.2A ile sağlanmıştır; merge D1C.2B kapsamındadır.
+- Duplicate tarama/review D1C.2A, kontrollü merge/journal/undo D1C.2B ile
+  sağlanmıştır.
 - Web Storage gerçek multi-key transaction veya multi-tab lock sağlamaz.
 - Cloud revision, tombstone ve composite ownership D2 kapsamıdır.
