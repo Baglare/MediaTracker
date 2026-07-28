@@ -103,6 +103,8 @@ Operation ledger side-effect idempotency sağlar; canonical identity unique cons
 
 D2B.2A ile bu sözleşme opt-in istemci adapter'ına bağlanır. Queue schema v2, stabil `operationId`, enqueue anındaki `expectedRevision` ve `transport` bilgisini durable tutar. Server sonucu runtime codec ile doğrulanmadan revision güncellenmez veya queue öğesi silinmez. Controlled conflict queue'da bloklu kalır; local media/progress state'i sessizce overwrite ya da delete edilmez. Feature flag varsayılanı kapalı olduğundan production legacy yolu bu fazda değişmez.
 
+D2B.2B, blocked ve retryable durumlarını kullanıcı yüzeyinde ayırır. Revision conflict remote özet okunmadan retry edilemez; retry yeni bir logical operation ID alır, mevcut operation retry'ları ise stabil ID'yi korur. Tombstone yalnız explicit restore ile kalkar. Missing parent progress planı media-before-progress sırasını durable queue'da kurar. Global record ID conflict manual-only kalır. Bu UI bir conflict motoru veya otomatik merge değildir ve feature flag'i değiştiremez.
+
 ## 7. Aşamalı rollout
 
 1. **Additive schema:** Nullable identity/revision/operation kolonlarını, fiziksel UUID adaylarını, operation ledger'ı ve non-unique indexleri ekle. Eski PK/FK/unique ve istemci yolu korunur.

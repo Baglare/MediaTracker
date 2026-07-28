@@ -151,6 +151,163 @@ describe("Cloud Media V2 sync manager integration", () => {
     });
   });
 
+  it("resolves revision conflict as a new logical operation without changing it during retry", async () => {
+    vi.stubGlobal("navigator", { onLine: false });
+    const manager = await import("@/lib/sync-manager");
+    const queue = await import("@/lib/sync-queue");
+    const scope = createUserOwnerScope("user-a");
+    manager.setOwnerScope(scope);
+    queue.saveSyncQueue(scope, [{
+      schemaVersion: 2,
+      id: "blocked-operation-id",
+      operationId: "blocked-operation-id",
+      transport: "cloud-v2",
+      entity: "media_item",
+      operation: "upsert",
+      expectedRevision: 2,
+      payload: media(),
+      createdAt: "2026-07-28T10:00:00.000Z",
+      retryCount: 0,
+      dispatchStartedAt: "2026-07-28T10:00:01.000Z",
+      ownerScope: scope.key,
+      userId: scope.userId,
+      blockedConflict: {
+        reason: "revision_mismatch",
+        serverRevision: 4,
+        serverDeletedAt: null,
+        detectedAt: "2026-07-28T10:00:02.000Z",
+      },
+    }]);
+
+    const result = manager.retryCloudV2Conflict(
+      scope,
+      "blocked-operation-id",
+      4,
+    );
+    expect(result.ok).toBe(true);
+    const [replacement] = queue.loadSyncQueue(scope);
+    expect(replacement).toMatchObject({
+      expectedRevision: 4,
+      operation: "upsert",
+    });
+    expect(replacement).not.toHaveProperty("blockedConflict");
+    expect(replacement.operationId).not.toBe("blocked-operation-id");
+    expect(queue.loadSyncQueue(scope)[0].operationId)
+      .toBe(replacement.operationId);
+    expect(v2Mocks.dispatch).not.toHaveBeenCalled();
+  });
+
+  it("queues parent media before retrying a blocked progress operation", async () => {
+    vi.stubGlobal("navigator", { onLine: false });
+    const manager = await import("@/lib/sync-manager");
+    const queue = await import("@/lib/sync-queue");
+    const scope = createUserOwnerScope("user-a");
+    manager.setOwnerScope(scope);
+    queue.saveSyncQueue(scope, [{
+      schemaVersion: 2,
+      id: "blocked-progress-id",
+      operationId: "blocked-progress-id",
+      transport: "cloud-v2",
+      entity: "progress_log",
+      operation: "upsert",
+      expectedRevision: 0,
+      payload: {
+        id: "log-1",
+        mediaId: "media-1",
+        mediaTitle: "V2",
+        mediaType: "movie",
+        action: "added",
+        amount: 0,
+        unit: "movie",
+        previousProgress: 0,
+        newProgress: 0,
+        createdAt: "2026-07-28T10:00:00.000Z",
+      },
+      createdAt: "2026-07-28T10:00:00.000Z",
+      retryCount: 0,
+      dispatchStartedAt: "2026-07-28T10:00:01.000Z",
+      ownerScope: scope.key,
+      userId: scope.userId,
+      blockedConflict: {
+        reason: "media_target_unavailable",
+        serverRevision: 0,
+        serverDeletedAt: null,
+        detectedAt: "2026-07-28T10:00:02.000Z",
+      },
+    }]);
+
+    expect(manager.retryProgressAfterParent(
+      scope,
+      "blocked-progress-id",
+      media(),
+    ).ok).toBe(true);
+    expect(queue.loadSyncQueue(scope).map((item) => item.entity)).toEqual([
+      "media_item",
+      "progress_log",
+    ]);
+    expect(queue.loadSyncQueue(scope)[1]).toMatchObject({
+      expectedRevision: 0,
+    });
+    expect(queue.loadSyncQueue(scope)[1]).not.toHaveProperty("blockedConflict");
+  });
+
+  it("acknowledges a blocked conflict and clears only its local conflict state", async () => {
+    vi.stubGlobal("navigator", { onLine: false });
+    const manager = await import("@/lib/sync-manager");
+    const queue = await import("@/lib/sync-queue");
+    const state = await import("@/lib/cloud-media-v2-state");
+    const scope = createUserOwnerScope("user-a");
+    manager.setOwnerScope(scope);
+    queue.saveSyncQueue(scope, [{
+      schemaVersion: 2,
+      id: "blocked-use-remote",
+      operationId: "blocked-use-remote",
+      transport: "cloud-v2",
+      entity: "media_item",
+      operation: "upsert",
+      expectedRevision: 2,
+      payload: media(),
+      createdAt: "2026-07-28T10:00:00.000Z",
+      retryCount: 0,
+      ownerScope: scope.key,
+      userId: scope.userId,
+      blockedConflict: {
+        reason: "revision_mismatch",
+        serverRevision: 4,
+        serverDeletedAt: null,
+        detectedAt: "2026-07-28T10:00:02.000Z",
+      },
+    }]);
+    expect(state.writeCloudMediaV2ServerResult(scope, {
+      entity: "media_item",
+      recordId: "media-1",
+      operationId: "blocked-use-remote",
+      revision: 4,
+      deletedAt: null,
+      conflict: "revision_mismatch",
+    }).ok).toBe(true);
+
+    expect(manager.acknowledgeCloudV2Conflict(
+      scope,
+      "blocked-use-remote",
+    )).toEqual({ ok: true });
+    expect(queue.loadSyncQueue(scope)).toEqual([]);
+    expect(state.getCloudMediaV2RecordState(
+      scope,
+      "media_item",
+      "media-1",
+    )).toMatchObject({
+      revision: 4,
+      deletedAt: null,
+    });
+    expect(state.getCloudMediaV2RecordState(
+      scope,
+      "media_item",
+      "media-1",
+    )?.conflict).toBeUndefined();
+    expect(v2Mocks.dispatch).not.toHaveBeenCalled();
+  });
+
   it("keeps network failures retryable with the same operation id", async () => {
     const manager = await import("@/lib/sync-manager");
     const queue = await import("@/lib/sync-queue");

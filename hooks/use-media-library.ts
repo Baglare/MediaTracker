@@ -531,6 +531,22 @@ export function useMediaLibrary(userId: string | null | undefined) {
     return true;
   }, [applyPersistedSnapshot, queueXpMutation, userId]);
 
+  const applyCloudConflictResolution = useCallback((
+    items: MediaItem[],
+    logs: ProgressLog[],
+  ) => {
+    const decodedMedia = decodeMediaItems(items);
+    const decodedLogs = decodeProgressLogs(logs);
+    if (!decodedMedia.ok || !decodedLogs.ok) {
+      setStorageError("Cloud conflict çözümü runtime doğrulamasını geçemedi.");
+      return false;
+    }
+    return applyPersistedSnapshot(
+      decodedMedia.records,
+      decodedLogs.records,
+    ).ok;
+  }, [applyPersistedSnapshot]);
+
   const resetMedia = useCallback(() => {
     const currentMedia = mediaRef.current;
     if (!applyPersistedSnapshot(mockMediaList, logsRef.current).ok) return;
@@ -616,6 +632,7 @@ export function useMediaLibrary(userId: string | null | undefined) {
     updateRating,
     commitMediaChanges,
     importMedia,
+    applyCloudConflictResolution,
     resetMedia,
   };
 }

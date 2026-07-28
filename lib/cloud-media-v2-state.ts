@@ -44,6 +44,7 @@ const conflictReasons = new Set<CloudMediaV2ConflictReason>([
   "already_tombstoned",
   "not_tombstoned",
   "immutable_log_conflict",
+  "unknown",
 ]);
 
 export const cloudMediaV2StateCodec: PersonalDataCodec<CloudMediaV2LocalState> = (

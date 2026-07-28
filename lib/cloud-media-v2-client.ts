@@ -172,11 +172,15 @@ export function decodeCloudMediaV2Result(
   if (
     value.ok === false
     && value.conflict === true
-    && conflictReasons.has(value.reason as CloudMediaV2ConflictReason)
   ) {
+    const reason = conflictReasons.has(
+      value.reason as CloudMediaV2ConflictReason,
+    )
+      ? value.reason as CloudMediaV2ConflictReason
+      : "unknown";
     return {
       kind: "conflict",
-      reason: value.reason as CloudMediaV2ConflictReason,
+      reason,
       revision: value.revision,
       deletedAt,
     };

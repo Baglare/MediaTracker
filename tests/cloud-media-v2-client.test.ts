@@ -243,6 +243,22 @@ describe("Cloud Media V2 client adapter", () => {
     });
   });
 
+  it("maps an unknown server conflict to a safe generic blocked reason", () => {
+    expect(decodeCloudMediaV2Result({
+      ok: false,
+      conflict: true,
+      reason: "future_conflict_reason",
+      entityType: "media",
+      recordId: "media-1",
+      revision: 7,
+    }, queueItem())).toEqual({
+      kind: "conflict",
+      reason: "unknown",
+      revision: 7,
+      deletedAt: null,
+    });
+  });
+
   it("retries with the same operation id and does not rewrite expected revision", async () => {
     const item = queueItem();
     const response = {

@@ -50,3 +50,15 @@ Geri dönüş gerekirse:
 - Revision yalnız doğrulanmış RPC sonucundan owner-scoped `cloudMediaV2State` alanına yazılır. `revision_mismatch`, `tombstoned`, `record_id_unavailable` ve `media_target_unavailable` local kaydı değiştirmeden queue öğesini bloklar.
 - Network/sonucu bilinmeyen hata queue öğesini aynı operation ID ile retryable bırakır. Guest RPC çağırmaz; owner generation kontrolü stale sonucu yeni hesaba uygulamaz.
 - Conflict çözüm UI'si, otomatik local/cloud merge ve legacy yolun kapatılması bu fazın dışındadır.
+
+## D2B.2B conflict UI ve rollout
+
+- Cloud Sync kartı owner-scoped queue'dan `pending`, `in-flight`, `retryable`, `blocked`, son sync/hata ve aktif `legacy | v2` adapter bilgisini gösterir. Logout/account switch önceki owner özetini göstermez.
+- `revision_mismatch`: remote revision/özet açıkça yenilenir. Kullanıcı cloud sürümünü local kabul edebilir, güncel revision üzerinden yeni logical operation oluşturabilir veya blocked işlemi erteleyebilir. Mevcut operation ID'nin payload/revision anlamı değiştirilmez.
+- `tombstoned`: local kayıt otomatik canlandırılmaz. Kullanıcı silmeyi local kabul edebilir veya güncel server revision ile explicit `restore` operation oluşturabilir.
+- `media_target_unavailable`: doğrulanmış local parent media önce queue'ya eklenir; progress yeni logical operation olarak hemen arkasına yazılır. Parent yoksa işlem blocked kalır.
+- `record_id_unavailable`: additive fazın global PK sınırı olarak manual-only gösterilir. Otomatik record ID rewrite veya merge yapılmaz.
+- Bilinmeyen server conflict reason'ı runtime adapter tarafından `unknown` generic blocked sonucuna düşürülür; raw payload/stack/SQL kullanıcıya gösterilmez.
+- Blocked öğeler otomatik flush/retry dışında kalır. Network hataları retryable kalır ve aynı operation ID ile mevcut retry davranışını sürdürür.
+- `NEXT_PUBLIC_CLOUD_MEDIA_V2_ENABLED` varsayılanı kapalıdır. UI flag açmaz; kapalı ortamda yalnız `Legacy` adapter görünür. Test ortamında V2 için environment değişkeni `true` verilir.
+- Production rollout sırası: test/staging canlı client testi, sınırlı opt-in cohort, blocked/retryable gözlemi, rollback flag doğrulaması ve ancak sonra ayrı production kararıdır. Legacy yol bu fazda kaldırılmaz.

@@ -28,6 +28,10 @@ interface SettingsFeatureProps {
   progressLogs: ProgressLog[];
   layout: LayoutController;
   onReplaceData: (items: MediaItem[], logs: ProgressLog[]) => boolean;
+  onApplyCloudConflictResolution: (
+    items: MediaItem[],
+    logs: ProgressLog[],
+  ) => boolean;
   onReset: () => void;
   onConfirm: (title: string, message: string, onOk: () => void) => void;
 }
@@ -40,6 +44,7 @@ export default function SettingsFeature({
   progressLogs,
   layout,
   onReplaceData,
+  onApplyCloudConflictResolution,
   onReset,
   onConfirm,
 }: SettingsFeatureProps) {
@@ -70,7 +75,13 @@ export default function SettingsFeature({
         <StartupSettingsCard />
         <div className="space-y-4 lg:space-y-5">
           <AuthPanel />
-          <CloudSyncStatusCard />
+          <CloudSyncStatusCard
+            ownerScope={ownerScope}
+            mediaItems={mediaList}
+            progressLogs={progressLogs}
+            onApplyResolution={onApplyCloudConflictResolution}
+            onConfirm={onConfirm}
+          />
         </div>
         <div className="space-y-4 lg:space-y-5">
           <CloudDataStatusCard

@@ -20,6 +20,7 @@ const CLOUD_MEDIA_V2_CONFLICT_REASONS = new Set([
   "already_tombstoned",
   "not_tombstoned",
   "immutable_log_conflict",
+  "unknown",
 ]);
 
 export interface SyncQueueStorageLike {

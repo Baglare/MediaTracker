@@ -10,7 +10,8 @@
     "test": "vitest",
     "test:run": "vitest run",
     "test:cloud-v2-live": "vitest run tests/cloud-media-v2-live.integration.test.ts --reporter=verbose",
-    "test:cloud-v2-client-live": "vitest run tests/cloud-media-v2-client-live.integration.test.ts --reporter=verbose"
+    "test:cloud-v2-client-live": "vitest run tests/cloud-media-v2-client-live.integration.test.ts --reporter=verbose",
+    "test:cloud-v2-conflicts-live": "vitest run tests/cloud-media-v2-conflicts-live.integration.test.ts --reporter=verbose"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.2",

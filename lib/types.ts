@@ -314,7 +314,8 @@ export type CloudMediaV2ConflictReason =
   | "not_found"
   | "already_tombstoned"
   | "not_tombstoned"
-  | "immutable_log_conflict";
+  | "immutable_log_conflict"
+  | "unknown";
 
 export interface SyncQueueConflict {
   reason: CloudMediaV2ConflictReason;

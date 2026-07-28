@@ -341,6 +341,9 @@ export default function HomePage() {
           progressLogs={library.progressLogs}
           layout={layout}
           onReplaceData={library.importMedia}
+          onApplyCloudConflictResolution={
+            library.applyCloudConflictResolution
+          }
           onReset={commands.requestReset}
           onConfirm={commands.openConfirmation}
         />

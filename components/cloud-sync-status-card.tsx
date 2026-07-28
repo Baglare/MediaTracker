@@ -10,8 +10,33 @@ import { Cloud, CloudOff, RefreshCcw, Loader2, AlertTriangle, WifiOff, UserX } f
 import { useAuth } from "@/hooks/use-auth";
 import { useSyncStatus } from "@/hooks/use-sync-status";
 import { clearOrphanedQueue, syncNow } from "@/lib/sync-manager";
+import type { LocalOwnerScope } from "@/lib/local-owner-scope";
+import type { MediaItem, ProgressLog } from "@/lib/types";
+import CloudV2ConflictPanel from "@/components/cloud-v2-conflict-panel";
 
-export default function CloudSyncStatusCard() {
+interface CloudSyncStatusCardProps {
+  ownerScope: LocalOwnerScope | null;
+  mediaItems: MediaItem[];
+  progressLogs: ProgressLog[];
+  onApplyResolution: (items: MediaItem[], logs: ProgressLog[]) => boolean;
+  onConfirm: (title: string, message: string, onOk: () => void) => void;
+}
+
+function formatLastSync(value: string | null): string {
+  if (!value) return "Henüz yok";
+  return new Intl.DateTimeFormat("tr-TR", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(new Date(value));
+}
+
+export default function CloudSyncStatusCard({
+  ownerScope,
+  mediaItems,
+  progressLogs,
+  onApplyResolution,
+  onConfirm,
+}: CloudSyncStatusCardProps) {
   const { configured, user, loading } = useAuth();
   const sync = useSyncStatus();
 
@@ -23,6 +48,9 @@ export default function CloudSyncStatusCard() {
     description = "Cloud sync henüz yapılandırılmadı. Verilerin bu tarayıcıda saklanıyor.";
   } else if (!user) {
     description = "Supabase yapılandırıldı. Cloud sync için giriş yapabilirsin.";
+  } else if (sync.blocked > 0) {
+    description =
+      "Bazı Cloud V2 işlemleri kullanıcı kararı bekliyor. Blocked işlemler otomatik retry edilmez.";
   } else if (sync.pending > 0 && !sync.online) {
     description = "Çevrimdışısın. Bekleyen cloud işlemleri internet geldiğinde otomatik gönderilecek.";
   } else if (sync.pending > 0) {
@@ -48,6 +76,11 @@ export default function CloudSyncStatusCard() {
       text: "Çevrimdışı",
       cls: "text-amber-300 bg-amber-500/10 ring-1 ring-amber-500/30",
     };
+  } else if (sync.blocked > 0) {
+    statusBadge = {
+      text: `Karar bekliyor · ${sync.blocked}`,
+      cls: "text-rose-300 bg-rose-500/10 ring-1 ring-rose-500/30",
+    };
   } else if (sync.lastError && sync.pending > 0) {
     statusBadge = {
       text: "Hata",
@@ -65,7 +98,10 @@ export default function CloudSyncStatusCard() {
     };
   }
 
-  const canSyncNow = isCloudReady && sync.online && !sync.syncing && sync.pending > 0;
+  const canSyncNow = isCloudReady
+    && sync.online
+    && !sync.syncing
+    && sync.pending > sync.blocked;
 
   return (
     <div className="bg-zinc-900/50 rounded-2xl border border-zinc-800/50 p-6">
@@ -98,6 +134,13 @@ export default function CloudSyncStatusCard() {
             }
           >
             {headerLabel}
+          </span>
+        </div>
+
+        <div className="flex items-center justify-between gap-4">
+          <span className="text-zinc-400">Aktif Adapter</span>
+          <span className="text-zinc-200 text-xs px-2 py-1 rounded-md bg-zinc-800/60 ring-1 ring-zinc-700/40">
+            {sync.adapter === "v2" ? "Cloud V2" : "Legacy"}
           </span>
         </div>
 
@@ -135,6 +178,26 @@ export default function CloudSyncStatusCard() {
           >
             {sync.pending}
           </span>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2 text-center">
+          <div className="rounded-md bg-zinc-800/50 px-2 py-2">
+            <div className="text-xs font-semibold text-violet-300">{sync.inFlight}</div>
+            <div className="text-[10px] text-zinc-500">in-flight</div>
+          </div>
+          <div className="rounded-md bg-zinc-800/50 px-2 py-2">
+            <div className="text-xs font-semibold text-amber-300">{sync.retryable}</div>
+            <div className="text-[10px] text-zinc-500">retryable</div>
+          </div>
+          <div className="rounded-md bg-zinc-800/50 px-2 py-2">
+            <div className="text-xs font-semibold text-rose-300">{sync.blocked}</div>
+            <div className="text-[10px] text-zinc-500">blocked</div>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between gap-4">
+          <span className="text-zinc-400">Son Sync</span>
+          <span className="text-xs text-zinc-300">{formatLastSync(sync.lastSyncAt)}</span>
         </div>
 
         {sync.orphaned > 0 && (
@@ -183,6 +246,14 @@ export default function CloudSyncStatusCard() {
             </button>
           </div>
         )}
+
+        <CloudV2ConflictPanel
+          ownerScope={ownerScope}
+          mediaItems={mediaItems}
+          progressLogs={progressLogs}
+          onApplyResolution={onApplyResolution}
+          onConfirm={onConfirm}
+        />
       </div>
     </div>
   );

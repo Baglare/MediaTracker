@@ -17,6 +17,7 @@ import {
   createSyncQueueItem,
   loadSyncQueue,
   quarantineLegacyOwnerlessQueue,
+  replaceSyncQueueDurably,
   saveSyncQueue,
 } from "./sync-queue";
 import {
@@ -32,11 +33,19 @@ import {
   dispatchCloudMediaV2QueueItem,
   isCloudMediaV2Enabled,
 } from "./cloud-media-v2-client";
-import { writeCloudMediaV2ServerResult } from "./cloud-media-v2-state";
+import {
+  getCloudMediaV2RecordState,
+  writeCloudMediaV2ServerResult,
+} from "./cloud-media-v2-state";
 
 export interface SyncSnapshot {
   /** Aktif owner scope'taki bekleyen item sayısı. Guest öğeleri flush edilmez. */
   pending: number;
+  inFlight: number;
+  retryable: number;
+  blocked: number;
+  synced: boolean;
+  adapter: "legacy" | "v2";
   /** Aktif scoped key içinde owner doğrulamasını geçemeyen öğe sayısı. */
   orphaned: number;
   syncing: boolean;
@@ -61,6 +70,11 @@ const listeners = new Set<Listener>();
 let cachedSnapshot: SyncSnapshot = computeSnapshot();
 const serverSnapshot: SyncSnapshot = {
   pending: 0,
+  inFlight: 0,
+  retryable: 0,
+  blocked: 0,
+  synced: true,
+  adapter: "legacy",
   orphaned: 0,
   syncing: false,
   online: true,
@@ -79,6 +93,9 @@ function isFlushableForCurrentUser(item: SyncQueueItem): boolean {
 function computeSnapshot(): SyncSnapshot {
   const queue = ownerScope ? loadSyncQueue(ownerScope) : [];
   let pending = 0;
+  let inFlight = 0;
+  let retryable = 0;
+  let blocked = 0;
   let orphaned = 0;
   for (const it of queue) {
     if (!ownerScope || ownerScope.kind === "guest") {
@@ -86,12 +103,25 @@ function computeSnapshot(): SyncSnapshot {
       pending++;
     } else if (isFlushableForCurrentUser(it)) {
       pending++;
+      if (it.blockedConflict) {
+        blocked++;
+      } else {
+        if (it.dispatchStartedAt) inFlight++;
+        if (it.retryCount > 0) retryable++;
+      }
     } else {
       orphaned++;
     }
   }
   return {
     pending,
+    inFlight,
+    retryable,
+    blocked,
+    synced: pending === 0 && !syncing && lastError === null,
+    adapter: ownerScope?.kind === "user" && isCloudMediaV2Enabled()
+      ? "v2"
+      : "legacy",
     orphaned,
     syncing,
     online,
@@ -222,6 +252,223 @@ export function enqueueMediaRestore(id: string): boolean {
 
 export function enqueueProgressLog(log: ProgressLog): void {
   enqueueRaw({ entity: "progress_log", operation: "upsert", payload: log });
+}
+
+export type CloudV2ResolutionResult =
+  | { ok: true; operationId?: string }
+  | {
+      ok: false;
+      code:
+        | "owner_mismatch"
+        | "adapter_unavailable"
+        | "conflict_missing"
+        | "invalid_resolution"
+        | "queue_write_failed";
+      message: string;
+    };
+
+function validateResolutionOwner(
+  scope: LocalOwnerScope,
+): CloudV2ResolutionResult | null {
+  if (scope.kind !== "user" || ownerScope?.key !== scope.key) {
+    return {
+      ok: false,
+      code: "owner_mismatch",
+      message: "Conflict çözümü aktif hesaba ait değil.",
+    };
+  }
+  if (!isCloudMediaV2Enabled()) {
+    return {
+      ok: false,
+      code: "adapter_unavailable",
+      message: "Cloud V2 adapter aktif değil.",
+    };
+  }
+  return null;
+}
+
+function replaceBlockedOperation(
+  scope: Extract<LocalOwnerScope, { kind: "user" }>,
+  itemId: string,
+  operation: SyncOperation,
+  expectedRevision: number,
+): CloudV2ResolutionResult {
+  const queue = loadSyncQueue(scope);
+  const blocked = queue.find(
+    (item) => item.id === itemId && item.blockedConflict,
+  );
+  if (!blocked) {
+    return {
+      ok: false,
+      code: "conflict_missing",
+      message: "Çözülecek blocked işlem artık mevcut değil.",
+    };
+  }
+  const fresh = createSyncQueueItem(scope, {
+    entity: blocked.entity,
+    operation,
+    payload: operation === "restore"
+      ? { id: payloadId(blocked) }
+      : blocked.payload,
+  });
+  fresh.expectedRevision = expectedRevision;
+  const next = queue.filter((item) => item.id !== itemId).concat(fresh);
+  if (!replaceSyncQueueDurably(scope, next)) {
+    return {
+      ok: false,
+      code: "queue_write_failed",
+      message: "Conflict çözüm işlemi güvenli biçimde kuyruğa yazılamadı.",
+    };
+  }
+  notify();
+  if (online && !syncing) void flush();
+  return { ok: true, operationId: fresh.operationId };
+}
+
+export function retryCloudV2Conflict(
+  scope: LocalOwnerScope,
+  itemId: string,
+  expectedRevision: number,
+): CloudV2ResolutionResult {
+  const ownerError = validateResolutionOwner(scope);
+  if (ownerError) return ownerError;
+  if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0) {
+    return {
+      ok: false,
+      code: "invalid_resolution",
+      message: "Remote revision geçersiz.",
+    };
+  }
+  return replaceBlockedOperation(
+    scope as Extract<LocalOwnerScope, { kind: "user" }>,
+    itemId,
+    "upsert",
+    expectedRevision,
+  );
+}
+
+export function restoreCloudV2Tombstone(
+  scope: LocalOwnerScope,
+  itemId: string,
+): CloudV2ResolutionResult {
+  const ownerError = validateResolutionOwner(scope);
+  if (ownerError) return ownerError;
+  const blocked = loadSyncQueue(scope).find((item) => item.id === itemId);
+  if (blocked?.blockedConflict?.reason !== "tombstoned") {
+    return {
+      ok: false,
+      code: "invalid_resolution",
+      message: "Bu işlem restore edilebilir tombstone conflict'i değil.",
+    };
+  }
+  return replaceBlockedOperation(
+    scope as Extract<LocalOwnerScope, { kind: "user" }>,
+    itemId,
+    "restore",
+    blocked.blockedConflict.serverRevision,
+  );
+}
+
+export function retryProgressAfterParent(
+  scope: LocalOwnerScope,
+  itemId: string,
+  parent: MediaItem,
+): CloudV2ResolutionResult {
+  const ownerError = validateResolutionOwner(scope);
+  if (ownerError) return ownerError;
+  const userScope = scope as Extract<LocalOwnerScope, { kind: "user" }>;
+  const queue = loadSyncQueue(userScope);
+  const blocked = queue.find((item) => item.id === itemId);
+  const progressPayload = blocked?.payload as { mediaId?: unknown } | undefined;
+  if (
+    blocked?.entity !== "progress_log"
+    || blocked.blockedConflict?.reason !== "media_target_unavailable"
+    || progressPayload?.mediaId !== parent.id
+  ) {
+    return {
+      ok: false,
+      code: "invalid_resolution",
+      message: "Progress işlemi için doğrulanmış parent media bulunamadı.",
+    };
+  }
+  const parentOperation = createSyncQueueItem(userScope, {
+    entity: "media_item",
+    operation: "upsert",
+    payload: parent,
+  });
+  const progressOperation = createSyncQueueItem(userScope, {
+    entity: "progress_log",
+    operation: "upsert",
+    payload: blocked.payload,
+  });
+  progressOperation.expectedRevision = blocked.blockedConflict.serverRevision;
+  const next = queue
+    .filter((item) => item.id !== itemId)
+    .concat(parentOperation, progressOperation);
+  if (!replaceSyncQueueDurably(userScope, next)) {
+    return {
+      ok: false,
+      code: "queue_write_failed",
+      message: "Parent/progress sync planı güvenli biçimde yazılamadı.",
+    };
+  }
+  notify();
+  if (online && !syncing) void flush();
+  return { ok: true, operationId: progressOperation.operationId };
+}
+
+export function acknowledgeCloudV2Conflict(
+  scope: LocalOwnerScope,
+  itemId: string,
+): CloudV2ResolutionResult {
+  const ownerError = validateResolutionOwner(scope);
+  if (ownerError) return ownerError;
+  const queue = loadSyncQueue(scope);
+  const blocked = queue.find(
+    (item) => item.id === itemId && item.blockedConflict,
+  );
+  if (!blocked) {
+    return {
+      ok: false,
+      code: "conflict_missing",
+      message: "Blocked işlem artık mevcut değil.",
+    };
+  }
+  if (!replaceSyncQueueDurably(
+    scope,
+    queue.filter((item) => item.id !== itemId),
+  )) {
+    return {
+      ok: false,
+      code: "queue_write_failed",
+      message: "Blocked işlem güvenli biçimde kaldırılamadı.",
+    };
+  }
+  const recordId = payloadId(blocked);
+  const currentState = recordId
+    ? getCloudMediaV2RecordState(scope, blocked.entity, recordId)
+    : undefined;
+  if (
+    !recordId
+    || !currentState
+    || !writeCloudMediaV2ServerResult(scope, {
+      entity: blocked.entity,
+      recordId,
+      operationId: currentState.lastOperationId,
+      revision: currentState.revision,
+      deletedAt: currentState.deletedAt,
+    }).ok
+  ) {
+    replaceSyncQueueDurably(scope, queue);
+    notify();
+    return {
+      ok: false,
+      code: "queue_write_failed",
+      message: "Conflict state temizlenemedi; blocked işlem geri yüklendi.",
+    };
+  }
+  notify();
+  return { ok: true };
 }
 
 export function enqueueOwnedSnapshotSyncPlan(
