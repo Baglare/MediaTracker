@@ -101,10 +101,12 @@ Owner-scoped durable queue ve generation guard korunabilir. Gerekli uyarlamalar:
 
 Operation ledger side-effect idempotency sağlar; canonical identity unique constraint veya client timestamp bunun yerine kullanılamaz.
 
+D2B.2A ile bu sözleşme opt-in istemci adapter'ına bağlanır. Queue schema v2, stabil `operationId`, enqueue anındaki `expectedRevision` ve `transport` bilgisini durable tutar. Server sonucu runtime codec ile doğrulanmadan revision güncellenmez veya queue öğesi silinmez. Controlled conflict queue'da bloklu kalır; local media/progress state'i sessizce overwrite ya da delete edilmez. Feature flag varsayılanı kapalı olduğundan production legacy yolu bu fazda değişmez.
+
 ## 7. Aşamalı rollout
 
 1. **Additive schema:** Nullable identity/revision/operation kolonlarını, fiziksel UUID adaylarını, operation ledger'ı ve non-unique indexleri ekle. Eski PK/FK/unique ve istemci yolu korunur.
-2. **Dual-read/write:** Generated type'ları yenile. Mapper yeni kolonları yalnız desteklenen şemaya yazar; read yeni alanları tercih edip eski row'ları legacy fallback ile açar. Yeni RPC gölge/opt-in başlar; eski client hard-delete davranışı ayrıca izlenir.
+2. **Dual-read/write:** Yeni RPC opt-in adapter ile başlar; legacy PostgREST yolu fallback olarak kalır. Queue V2 envelope'a dual-read migration yapar. Generated type'lar gerçek bağlı şemadan ayrıca yenilenir; elle tutulan tipler generated kanıtı sayılmaz. Read yeni alanları tercih edip eski row'ları legacy fallback ile açar; eski client hard-delete davranışı ayrıca izlenir.
 3. **Backfill:** `row_pk/log_pk`, `revision` ve owner-record alanlarını batch'lerle doldur. External identity yalnız source + namespace güvenilir biçimde türetilebiliyorsa yazılır. Manual/unresolved identity uydurulmaz; sonraki doğrulanmış client upload'ı beklenir. Progress ilişkisi yalnız aynı-owner join ile backfill edilir.
 4. **Doğrulama:** Null/duplicate dağılımları, cross-owner FK ihlalleri, external unique çakışmaları, tombstone geri doğma senaryosu, operation replay ve RLS testleri çalıştırılır. Eski/yeni okuma sonuçları sayım değil içerik fingerprint'i ile karşılaştırılır.
 5. **Enforcement:** `(user_id,id)` unique ve composite progress FK doğrulanır; revision/RPC zorunlu yapılır. External unique non-unique'e çevrilir. Fiziksel PK geçişi ancak bütün FK ve client'lar hazırsa yapılır.

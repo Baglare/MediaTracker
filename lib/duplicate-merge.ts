@@ -58,8 +58,8 @@ import {
   type StorageLike as SocialStorageLike,
 } from "./social/local-social";
 import {
-  buildSyncQueueKey,
-  loadSyncQueue,
+  createSyncQueueItem,
+  inspectSyncQueue,
   replaceSyncQueueDurably,
   type SyncQueueStorageLike,
 } from "./sync-queue";
@@ -1083,10 +1083,15 @@ function captureSnapshot(
     return { ok: false, message: "Alias veya redirect registry recovery gerektiriyor." };
   }
   const linkKey = buildRecommendationLinksKeyForScope(scope);
-  const queueKey = buildSyncQueueKey(scope);
+  const queueInspection = inspectSyncQueue(scope, storage);
+  if (
+    queueInspection.status !== "missing"
+    && queueInspection.status !== "valid"
+  ) {
+    return { ok: false, message: "Cloud sync queue formati gecersiz." };
+  }
   try {
     const rawLinks = storage.getItem(linkKey);
-    const rawQueue = storage.getItem(queueKey);
     if (rawLinks !== null) {
       const parsedLinks = JSON.parse(rawLinks) as unknown;
       if (
@@ -1098,15 +1103,6 @@ function captureSnapshot(
         )
       ) {
         return { ok: false, message: "Recommendation link cache formati gecersiz." };
-      }
-    }
-    if (rawQueue !== null) {
-      const parsedQueue = JSON.parse(rawQueue) as unknown;
-      if (
-        !Array.isArray(parsedQueue)
-        || !parsedQueue.every((entry) => isSyncQueueSnapshot(entry, scope.key))
-      ) {
-        return { ok: false, message: "Cloud sync queue formati gecersiz." };
       }
     }
   } catch {
@@ -1125,7 +1121,7 @@ function captureSnapshot(
         ? redirectRead.data
         : emptyMediaRecordRedirectRegistry(),
       recommendationLinks: loadRecommendationLinksForScope(scope, storage),
-      syncQueue: loadSyncQueue(scope, storage),
+      syncQueue: queueInspection.items,
     },
   };
 }
@@ -1228,16 +1224,13 @@ function appendCloudOperations(
 ): SyncQueueItem[] {
   let queue = [...current];
   operations.forEach((operation, index) => {
-    const fresh: SyncQueueItem = {
+    const fresh = createSyncQueueItem(scope, {
       id: `${operationId}:cloud:${index}`,
       entity: operation.entity,
       operation: operation.operation,
       payload: operation.payload,
       createdAt,
-      retryCount: 0,
-      ownerScope: scope.key,
-      userId: scope.kind === "user" ? scope.userId : undefined,
-    };
+    });
     queue = queue.filter((item) =>
       !(
         item.ownerScope === scope.key

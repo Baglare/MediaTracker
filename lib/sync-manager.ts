@@ -14,6 +14,7 @@ import type {
   SyncQueueItem,
 } from "./types";
 import {
+  createSyncQueueItem,
   loadSyncQueue,
   quarantineLegacyOwnerlessQueue,
   saveSyncQueue,
@@ -27,6 +28,11 @@ import {
   uploadMediaItems,
   uploadProgressLogs,
 } from "./supabase/cloud-repository";
+import {
+  dispatchCloudMediaV2QueueItem,
+  isCloudMediaV2Enabled,
+} from "./cloud-media-v2-client";
+import { writeCloudMediaV2ServerResult } from "./cloud-media-v2-state";
 
 export interface SyncSnapshot {
   /** Aktif owner scope'taki bekleyen item sayısı. Guest öğeleri flush edilmez. */
@@ -160,10 +166,6 @@ function payloadId(item: SyncQueueItem): string | null {
   return null;
 }
 
-function generateQueueId(): string {
-  return `sq-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-}
-
 /**
  * Aynı entity + aynı payload-id için bekleyen kayıtları yenisiyle değiştirir.
  * - upsert(X) gelirse: X için bekleyen upsert/delete'leri sil, yeni upsert'i ekle.
@@ -178,6 +180,12 @@ function coalesceQueue(queue: SyncQueueItem[], fresh: SyncQueueItem): SyncQueueI
     if (existing.entity !== fresh.entity) return true;
     const existingId = payloadId(existing);
     if (existingId !== freshPayloadId) return true;
+    if (
+      fresh.transport === "cloud-v2"
+      && existing.transport === "cloud-v2"
+      && existing.dispatchStartedAt
+      && !existing.blockedConflict
+    ) return true;
     return false; // aynı entity + aynı id → eski kayıt drop
   });
   return [...filtered, fresh];
@@ -189,17 +197,7 @@ function enqueueRaw(input: {
   payload: unknown;
 }): void {
   if (!ownerScope) return;
-  const item: SyncQueueItem = {
-    id: generateQueueId(),
-    entity: input.entity,
-    operation: input.operation,
-    payload: input.payload,
-    createdAt: new Date().toISOString(),
-    retryCount: 0,
-    // Login varsa kullanıcıya bağla; yoksa anonim — sonradan adopte edilir.
-    ownerScope: ownerScope.key,
-    userId: ownerScope.kind === "user" ? ownerScope.userId : undefined,
-  };
+  const item = createSyncQueueItem(ownerScope, input);
   const next = coalesceQueue(loadSyncQueue(ownerScope), item);
   saveSyncQueue(ownerScope, next);
   notify();
@@ -214,6 +212,12 @@ export function enqueueMediaUpsert(item: MediaItem): void {
 
 export function enqueueMediaDelete(id: string): void {
   enqueueRaw({ entity: "media_item", operation: "delete", payload: { id } });
+}
+
+export function enqueueMediaRestore(id: string): boolean {
+  if (!isCloudMediaV2Enabled()) return false;
+  enqueueRaw({ entity: "media_item", operation: "restore", payload: { id } });
+  return true;
 }
 
 export function enqueueProgressLog(log: ProgressLog): void {
@@ -239,9 +243,62 @@ export function enqueueOwnedSnapshotSyncPlan(
 // ---- Flush ----
 
 async function processItem(
-  uid: string,
-  item: SyncQueueItem
-): Promise<{ ok: true } | { ok: false; error: string }> {
+  scope: Extract<LocalOwnerScope, { kind: "user" }>,
+  item: SyncQueueItem,
+  generation: number,
+): Promise<
+  | { ok: true }
+  | {
+      ok: false;
+      error: string;
+      conflict?: SyncQueueItem["blockedConflict"];
+      stale?: boolean;
+    }
+> {
+  if (item.transport === "cloud-v2") {
+    const result = await dispatchCloudMediaV2QueueItem(scope.userId, item);
+    if (generation !== ownerGeneration || ownerScope?.key !== scope.key) {
+      return { ok: false, error: "stale_owner_response", stale: true };
+    }
+    if (result.kind === "applied") {
+      const stored = writeCloudMediaV2ServerResult(scope, {
+        entity: item.entity,
+        recordId: payloadId(item) ?? "",
+        operationId: item.operationId ?? item.id,
+        revision: result.revision,
+        deletedAt: result.deletedAt,
+      });
+      return stored.ok
+        ? { ok: true }
+        : { ok: false, error: "Cloud revision local olarak kaydedilemedi." };
+    }
+    if (result.kind === "conflict") {
+      const detectedAt = new Date().toISOString();
+      const stored = writeCloudMediaV2ServerResult(scope, {
+        entity: item.entity,
+        recordId: payloadId(item) ?? "",
+        operationId: item.operationId ?? item.id,
+        revision: result.revision,
+        deletedAt: result.deletedAt,
+        conflict: result.reason,
+      });
+      if (!stored.ok) {
+        return { ok: false, error: "Cloud conflict local olarak kaydedilemedi." };
+      }
+      return {
+        ok: false,
+        error: `Cloud conflict: ${result.reason}`,
+        conflict: {
+          reason: result.reason,
+          serverRevision: result.revision,
+          serverDeletedAt: result.deletedAt,
+          detectedAt,
+        },
+      };
+    }
+    return { ok: false, error: result.error };
+  }
+  const uid = scope.userId;
   if (item.entity === "media_item" && item.operation === "upsert") {
     const res = await uploadMediaItems(uid, [item.payload as MediaItem]);
     return res.ok ? { ok: true } : { ok: false, error: res.error };
@@ -280,7 +337,9 @@ export async function flush(): Promise<void> {
   const flushGeneration = ownerGeneration;
   const snapshot = loadSyncQueue(flushScope);
   const eligible = snapshot.filter((item) =>
-    item.ownerScope === flushScope.key && item.userId === flushScope.userId
+    item.ownerScope === flushScope.key
+    && item.userId === flushScope.userId
+    && !item.blockedConflict
   );
   if (eligible.length === 0) return;
 
@@ -312,17 +371,27 @@ export async function flush(): Promise<void> {
   notify();
 
   const successIds = new Set<string>();
-  const failures = new Map<string, { retryCount: number; lastError: string }>();
+  const failures = new Map<string, {
+    retryCount: number;
+    lastError: string;
+    conflict?: SyncQueueItem["blockedConflict"];
+  }>();
+  let staleResponse = false;
 
   for (const item of eligible) {
     try {
-      const res = await processItem(flushScope.userId, item);
+      const res = await processItem(flushScope, item, flushGeneration);
+      if (!res.ok && res.stale) {
+        staleResponse = true;
+        break;
+      }
       if (res.ok) {
         successIds.add(item.id);
       } else {
         failures.set(item.id, {
-          retryCount: item.retryCount + 1,
+          retryCount: res.conflict ? item.retryCount : item.retryCount + 1,
           lastError: shortenError(res.error),
+          ...(res.conflict ? { conflict: res.conflict } : {}),
         });
       }
     } catch (e) {
@@ -334,13 +403,27 @@ export async function flush(): Promise<void> {
     }
   }
 
+  if (staleResponse) {
+    syncing = false;
+    notify();
+    if (ownerScope?.kind === "user" && online) void flush();
+    return;
+  }
+
   // Flush sırasında yeni item eklenmiş olabilir → güncel kuyruğu yeniden yükle
   const current = loadSyncQueue(flushScope);
   const next = current
     .filter((i) => !successIds.has(i.id))
     .map((i) => {
       const f = failures.get(i.id);
-      if (f) return { ...i, retryCount: f.retryCount, lastError: f.lastError };
+      if (f) {
+        return {
+          ...i,
+          retryCount: f.retryCount,
+          lastError: f.lastError,
+          ...(f.conflict ? { blockedConflict: f.conflict } : {}),
+        };
+      }
       return i;
     });
   try {

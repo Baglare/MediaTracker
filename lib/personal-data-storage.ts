@@ -17,7 +17,8 @@ export type PersonalDataDomain =
   | "mediaRecordRedirects"
   | "duplicateMergeJournal"
   | "integrityRepairJournal"
-  | "portableImportJournal";
+  | "portableImportJournal"
+  | "cloudMediaV2State";
 
 export interface PersonalStorageLike {
   getItem(key: string): string | null;

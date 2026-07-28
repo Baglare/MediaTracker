@@ -48,6 +48,7 @@ import {
   type StorageLike as SocialStorageLike,
 } from "./social/local-social";
 import {
+  createSyncQueueItem,
   inspectSyncQueue,
   replaceSyncQueueDurably,
   type SyncQueueStorageLike,
@@ -438,16 +439,13 @@ function appendQueueOperations(
         && payload?.id === operation.recordId
       );
     });
-    queue.push({
+    queue.push(createSyncQueueItem(scope, {
       id: `${operationId}:cloud:${index}`,
       entity: operation.entity,
       operation: "upsert",
       payload: operation.payload,
       createdAt: new Date(0).toISOString(),
-      retryCount: 0,
-      ownerScope: scope.key,
-      userId: scope.userId,
-    });
+    }));
   });
   return queue;
 }

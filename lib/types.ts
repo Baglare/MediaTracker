@@ -302,16 +302,44 @@ export type SyncStatus =
 
 export type SyncEntity = "media_item" | "progress_log";
 
-export type SyncOperation = "upsert" | "delete";
+export type SyncOperation = "upsert" | "delete" | "restore";
+
+export type SyncTransport = "legacy" | "cloud-v2";
+
+export type CloudMediaV2ConflictReason =
+  | "revision_mismatch"
+  | "tombstoned"
+  | "record_id_unavailable"
+  | "media_target_unavailable"
+  | "not_found"
+  | "already_tombstoned"
+  | "not_tombstoned"
+  | "immutable_log_conflict";
+
+export interface SyncQueueConflict {
+  reason: CloudMediaV2ConflictReason;
+  serverRevision: number;
+  serverDeletedAt: string | null;
+  detectedAt: string;
+}
 
 export interface SyncQueueItem {
+  /** Queue v1 raw item'ları read sırasında v2'ye normalize edilir. */
+  schemaVersion?: 2;
   id: string;
+  /** Server idempotency ledger'a gönderilen, retry boyunca değişmeyen kimlik. */
+  operationId?: string;
+  transport?: SyncTransport;
   entity: SyncEntity;
   operation: SyncOperation;
+  /** Yalnız cloud-v2 transport için enqueue anındaki server revision beklentisi. */
+  expectedRevision?: number;
   payload: unknown;
   createdAt: string;
   retryCount: number;
   lastError?: string;
+  /** Controlled conflict çözülmeden aynı operation yeniden dispatch edilmez. */
+  blockedConflict?: SyncQueueConflict;
   /**
    * İlk remote dispatch denemesinden hemen önce durable olarak yazılır.
    * Bu alan varsa remote sonuç başarısız görünse bile operasyon artık güvenli

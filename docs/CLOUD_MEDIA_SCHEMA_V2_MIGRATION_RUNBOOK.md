@@ -1,6 +1,6 @@
 # Cloud Media Schema V2 Migration Runbook
 
-Bu belge D2B.1 additive migration paketinin rollback/roll-forward sınırını tanımlar. Migration bu aşamada hiçbir veritabanına uygulanmamıştır.
+Bu belge D2B.1 additive migration paketinin rollback/roll-forward sınırını tanımlar. Paket boş test projesinde doğrulanmıştır; production'a uygulanmamıştır.
 
 ## Uygulama sırası
 
@@ -40,3 +40,13 @@ Geri dönüş gerekirse:
 - Legacy direct delete hard-delete yapabilir ve tombstone protokolünü bypass eder.
 - Generated `lib/supabase/types.ts`, client mapper ve queue payload sözleşmesi migration uygulanıp doğrulanmadan değiştirilmez.
 - XP/social/recommendation canonical key sözleşmeleri bu paketin dışındadır.
+
+## D2B.2A istemci adapter'ı
+
+- `NEXT_PUBLIC_CLOUD_MEDIA_V2_ENABLED=true` yalnız kontrollü test/rollout ortamında V2 transport'u açar. Varsayılan kapalıdır ve mevcut PostgREST upsert/hard-delete yolu çalışmayı sürdürür.
+- Queue envelope sürümü `2` ve key biçimi `mediaTracker:queue:v2:<owner-scope>:cloudSync` olur. Eski owner-scoped v1 array ilk okumada doğrulanarak V2 envelope'a kopyalanır; kaynak silinmez.
+- V2 queue öğesi stabil `operationId`, `expectedRevision`, `transport` ve server conflict özetini taşır. Dispatch başlamış işlem coalescing ile yeni bir operation'a dönüştürülmez.
+- Media işlemleri `apply_media_item_sync_operation`, progress upsert işlemleri `apply_progress_log_sync_operation` RPC'sine gider. Canonical identity payload'dadır; local record ID ayrı `p_record_id` argümanıdır.
+- Revision yalnız doğrulanmış RPC sonucundan owner-scoped `cloudMediaV2State` alanına yazılır. `revision_mismatch`, `tombstoned`, `record_id_unavailable` ve `media_target_unavailable` local kaydı değiştirmeden queue öğesini bloklar.
+- Network/sonucu bilinmeyen hata queue öğesini aynı operation ID ile retryable bırakır. Guest RPC çağırmaz; owner generation kontrolü stale sonucu yeni hesaba uygulamaz.
+- Conflict çözüm UI'si, otomatik local/cloud merge ve legacy yolun kapatılması bu fazın dışındadır.
