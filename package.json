@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest",
-    "test:run": "vitest run"
+    "test:run": "vitest run",
+    "test:cloud-v2-live": "vitest run tests/cloud-media-v2-live.integration.test.ts --reporter=verbose"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.2",
