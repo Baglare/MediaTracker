@@ -88,3 +88,26 @@ Migration direct `INSERT/UPDATE/DELETE` yetkilerini `anon` ve `authenticated` ro
 - Revision, tombstone ve idempotency ledger satırları silinmez veya yeniden numaralandırılmaz.
 - Production flag migration sonrasında legacy'ye çevrilmez. Uygulama rollback'i gerekiyorsa V2 RPC sözleşmesini koruyan önceki istemci sürümü kullanılmalıdır.
 - Canlı DB uygulaması, backup/PITR kanıtı ve iki kullanıcı smoke sonucu bu repository paketinin dışında operasyonel onay gerektirir.
+
+## D2C.2 production cutover
+
+Production geçişi aşağıdaki sıradan sapmadan yapılır:
+
+1. Production migration geçmişi doğrulanır; D2B.1 ve D2C.1 read-only preflight sonuçları proje referansı ile arşivlenir.
+2. PITR/backup geri yükleme noktası oluşturulur ve erişilebilirliği doğrulanır.
+3. D2B.1 additive migration uygulanır; post-verification tamamlanır.
+4. D2C.2 guard içeren uygulama `NEXT_PUBLIC_CLOUD_MEDIA_SCHEMA_STAGE=d2b1` ve V2 flag kapalı olarak deploy edilir.
+5. `NEXT_PUBLIC_CLOUD_MEDIA_V2_ENABLED=true` kontrollü rollout ile açılır; production varsayılanı repository içinde değiştirilmez.
+6. İki kullanıcıyla media/progress, RLS, CAS conflict, tombstone ve restore smoke'u çalıştırılır.
+7. Legacy direct DML trafiğinin kalmadığı gözlem/DB audit kanıtıyla doğrulanır.
+8. Bakım penceresi açılır, `NEXT_PUBLIC_CLOUD_MEDIA_MAINTENANCE=true` yayınlanır, deployment epoch değiştirilir ve D2C.1 uygulanır.
+9. D2C.1 post-verification ile row count/fingerprint ve iki kullanıcı smoke'u yeniden doğrulanır; uygulama `schemaStage=d2c1`, V2 açık ve bakım kapalı deploy edilir.
+10. Incident halinde legacy flag'e dönülmez. Queue/ledger korunur, mutation durdurulur ve V2 sözleşmesini koruyan roll-forward uygulanır.
+
+Runtime uyumluluk matrisi `legacy+legacy`, `d2b1+legacy`, `d2b1+v2` ve `d2c1+v2` kombinasyonlarını kabul eder. `legacy+v2`, bilinmeyen stage ve özellikle `d2c1+legacy` fail-closed davranır. D2C.1 şemasında flag yanlışlıkla kapalı olsa bile yeni mutation legacy transport olarak oluşturulmaz; V2 queue item olarak korunur ve uygulama yenilenene kadar dispatch edilmez.
+
+`/api/cloud/rollout` yalnız public stage, maintenance, deployment epoch ve minimum client sürümünü `no-store` olarak döndürür. Açık sekmeler bunu periyodik doğrular. Bakım veya epoch/client değişiminde sync durur; kullanıcı kontrollü yenileme mesajı görür. D2C.2'den daha eski sekmeler bu guard'a sahip olmadığından D2C.1 öncesi hosting/edge bakım sayfası, zorunlu reload ve legacy trafik drain kontrolü ayrıca zorunludur.
+
+Canlı test komutları yalnız açık `SUPABASE_TEST_*` değişkenleriyle çalışır ve `SUPABASE_TEST_URL`, `NEXT_PUBLIC_SUPABASE_URL` veya `SUPABASE_PRODUCTION_URL` ile aynı origin ise reddedilir. Operatör ayrıca dashboard project ref'ini preflight çıktısındaki beklenen ref ile elle eşleştirmelidir. Anon key dışında secret/service-role client bundle'a veya test çıktısına konmaz.
+
+Network nedeniyle rollout sözleşmesi doğrulanamazsa local kullanım sürer fakat cloud mutation dispatch edilmez. UI yalnız kontrollü hata kodu/mesajı gösterir; raw SQL, stack trace, operation payload, personal note ve owner UID gösterilmez. Guest local-first davranışı, XP ve social queue'ları bu gate'in dışındadır.

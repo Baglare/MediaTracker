@@ -30,11 +30,12 @@ import { useMediaLibrary } from "@/hooks/use-media-library";
 import { useLayoutPreferences } from "@/hooks/use-layout-preferences";
 import { usePersistedPreferences } from "@/hooks/use-persisted-preferences";
 import { useXpProgression } from "@/hooks/use-xp-progression";
+import { useCloudRolloutGuard } from "@/hooks/use-cloud-rollout-guard";
+import CloudRolloutNotice from "@/components/cloud-rollout-notice";
 import { calculateDashboardStats } from "@/lib/dashboard-stats";
 import type { GlobalSearchCategory } from "@/lib/global-search-types";
 import { calculateUserProgression } from "@/lib/user-progression";
 import type { MediaType } from "@/lib/types";
-
 const LibraryFeature = dynamic(
   () => import("@/features/library/components/library-feature"),
 );
@@ -56,7 +57,6 @@ const ActivityFeature = dynamic(
 const SettingsFeature = dynamic(
   () => import("@/features/settings/components/settings-feature"),
 );
-
 const PERSONAL_TABS = new Set<DashboardTabId>([
   "progress",
   "watchlist",
@@ -65,7 +65,6 @@ const PERSONAL_TABS = new Set<DashboardTabId>([
   "notes",
   "stats",
 ]);
-
 export default function HomePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -77,6 +76,7 @@ export default function HomePage() {
     startup.preferences.defaultDashboardTab,
   );
   const { user, configured, loading: authLoading } = useAuth();
+  const cloudRollout = useCloudRolloutGuard(!authLoading && configured ? user?.id ?? null : null);
   const library = useMediaLibrary(authLoading ? undefined : user?.id ?? null);
   const preferences = usePersistedPreferences();
   const layout = useLayoutPreferences();
@@ -374,6 +374,7 @@ export default function HomePage() {
             {library.storageError} Değişiklik kalıcı olmadığı için cloud, XP ve sosyal kuyruklara eklenmedi.
           </p>
         )}
+        <CloudRolloutNotice contract={cloudRollout} />
         {content}
         <MediaCommandHost commands={commands} mediaList={library.mediaList} />
       </div>

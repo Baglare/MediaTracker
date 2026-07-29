@@ -339,6 +339,56 @@ describe("Cloud Media V2 sync manager integration", () => {
     expect(queue.loadSyncQueue(GUEST_OWNER_SCOPE)[0].transport).toBe("legacy");
   });
 
+  it("blocks legacy direct DML after D2C.1 and preserves work as V2 queue items", async () => {
+    vi.stubEnv("NEXT_PUBLIC_CLOUD_MEDIA_V2_ENABLED", "false");
+    vi.stubEnv("NEXT_PUBLIC_CLOUD_MEDIA_SCHEMA_STAGE", "d2c1");
+    const manager = await import("@/lib/sync-manager");
+    const queue = await import("@/lib/sync-queue");
+    const repository = await import("@/lib/supabase/cloud-repository");
+    const scope = createUserOwnerScope("user-a");
+    manager.setOwnerScope(scope);
+    manager.enqueueMediaUpsert(media());
+    await manager.flush();
+
+    expect(queue.loadSyncQueue(scope)[0].transport).toBe("cloud-v2");
+    expect(manager.getSnapshot()).toMatchObject({
+      adapter: "legacy",
+      schemaStage: "d2c1",
+      rolloutStatus: "reload_required",
+      requiresReload: true,
+      incompatible: 1,
+    });
+    expect(v2Mocks.dispatch).not.toHaveBeenCalled();
+    expect(repository.uploadMediaItems).not.toHaveBeenCalled();
+  });
+
+  it("does not dispatch queue transport that disagrees with the active adapter", async () => {
+    const manager = await import("@/lib/sync-manager");
+    const queue = await import("@/lib/sync-queue");
+    const repository = await import("@/lib/supabase/cloud-repository");
+    const scope = createUserOwnerScope("user-a");
+    manager.setOwnerScope(scope);
+    queue.saveSyncQueue(scope, [{
+      schemaVersion: 2,
+      id: "legacy-open-tab",
+      operationId: "legacy-open-tab",
+      transport: "legacy",
+      entity: "media_item",
+      operation: "upsert",
+      expectedRevision: 0,
+      payload: media(),
+      createdAt: "2026-07-29T10:00:00.000Z",
+      retryCount: 0,
+      ownerScope: scope.key,
+      userId: scope.userId,
+    }]);
+    await manager.flush();
+
+    expect(manager.getSnapshot().incompatible).toBe(1);
+    expect(v2Mocks.dispatch).not.toHaveBeenCalled();
+    expect(repository.uploadMediaItems).not.toHaveBeenCalled();
+  });
+
   it("does not apply a stale User A response to User B queue state", async () => {
     const manager = await import("@/lib/sync-manager");
     const queue = await import("@/lib/sync-queue");

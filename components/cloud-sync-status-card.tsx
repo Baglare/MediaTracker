@@ -48,6 +48,9 @@ export default function CloudSyncStatusCard({
     description = "Cloud sync henüz yapılandırılmadı. Verilerin bu tarayıcıda saklanıyor.";
   } else if (!user) {
     description = "Supabase yapılandırıldı. Cloud sync için giriş yapabilirsin.";
+  } else if (sync.rolloutStatus !== "ready") {
+    description =
+      "Cloud şema ve istemci uyumluluğu doğrulanana kadar bekleyen işlemler gönderilmeyecek.";
   } else if (sync.blocked > 0) {
     description =
       "Bazı Cloud V2 işlemleri kullanıcı kararı bekliyor. Blocked işlemler otomatik retry edilmez.";
@@ -101,7 +104,9 @@ export default function CloudSyncStatusCard({
   const canSyncNow = isCloudReady
     && sync.online
     && !sync.syncing
-    && sync.pending > sync.blocked;
+    && sync.pending > sync.blocked
+    && sync.rolloutStatus === "ready"
+    && sync.incompatible === 0;
 
   return (
     <div className="bg-zinc-900/50 rounded-2xl border border-zinc-800/50 p-6">
@@ -141,6 +146,21 @@ export default function CloudSyncStatusCard({
           <span className="text-zinc-400">Aktif Adapter</span>
           <span className="text-zinc-200 text-xs px-2 py-1 rounded-md bg-zinc-800/60 ring-1 ring-zinc-700/40">
             {sync.adapter === "v2" ? "Cloud V2" : "Legacy"}
+          </span>
+        </div>
+
+        <div className="flex items-center justify-between gap-4">
+          <span className="text-zinc-400">Şema Uyumluluğu</span>
+          <span
+            className={
+              sync.rolloutStatus === "ready"
+                ? "text-emerald-300 text-xs px-2 py-1 rounded-md bg-emerald-500/10 ring-1 ring-emerald-500/30"
+                : "text-amber-300 text-xs px-2 py-1 rounded-md bg-amber-500/10 ring-1 ring-amber-500/30"
+            }
+          >
+            {sync.rolloutStatus === "ready"
+              ? sync.schemaStage.toUpperCase()
+              : "Durduruldu"}
           </span>
         </div>
 

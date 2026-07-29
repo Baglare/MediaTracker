@@ -37,6 +37,11 @@ import {
   getCloudMediaV2RecordState,
   writeCloudMediaV2ServerResult,
 } from "./cloud-media-v2-state";
+import {
+  getCloudRolloutContract,
+  type CloudRolloutContract,
+  type CloudRolloutStatus,
+} from "./cloud-rollout";
 
 export interface SyncSnapshot {
   /** Aktif owner scope'taki bekleyen item sayısı. Guest öğeleri flush edilmez. */
@@ -46,6 +51,11 @@ export interface SyncSnapshot {
   blocked: number;
   synced: boolean;
   adapter: "legacy" | "v2";
+  schemaStage: CloudRolloutContract["schemaStage"];
+  rolloutStatus: CloudRolloutStatus;
+  rolloutCode: string | null;
+  requiresReload: boolean;
+  incompatible: number;
   /** Aktif scoped key içinde owner doğrulamasını geçemeyen öğe sayısı. */
   orphaned: number;
   syncing: boolean;
@@ -65,6 +75,7 @@ let lastError: string | null = null;
 let lastSyncAt: string | null = null;
 let online = typeof navigator !== "undefined" ? navigator.onLine : true;
 let onlineListenersAttached = false;
+let runtimeRolloutOverride: CloudRolloutContract | null = null;
 
 const listeners = new Set<Listener>();
 let cachedSnapshot: SyncSnapshot = computeSnapshot();
@@ -75,6 +86,11 @@ const serverSnapshot: SyncSnapshot = {
   blocked: 0,
   synced: true,
   adapter: "legacy",
+  schemaStage: "legacy",
+  rolloutStatus: "ready",
+  rolloutCode: null,
+  requiresReload: false,
+  incompatible: 0,
   orphaned: 0,
   syncing: false,
   online: true,
@@ -92,17 +108,23 @@ function isFlushableForCurrentUser(item: SyncQueueItem): boolean {
 
 function computeSnapshot(): SyncSnapshot {
   const queue = ownerScope ? loadSyncQueue(ownerScope) : [];
+  const rollout = runtimeRolloutOverride ?? getCloudRolloutContract();
   let pending = 0;
   let inFlight = 0;
   let retryable = 0;
   let blocked = 0;
   let orphaned = 0;
+  let incompatible = 0;
   for (const it of queue) {
     if (!ownerScope || ownerScope.kind === "guest") {
       // Login yok → hepsi "bekliyor" sayılır, orphan kavramı uygulanmaz
       pending++;
     } else if (isFlushableForCurrentUser(it)) {
       pending++;
+      if (
+        (rollout.adapter === "v2" && it.transport !== "cloud-v2")
+        || (rollout.adapter === "legacy" && it.transport !== "legacy")
+      ) incompatible++;
       if (it.blockedConflict) {
         blocked++;
       } else {
@@ -119,9 +141,12 @@ function computeSnapshot(): SyncSnapshot {
     retryable,
     blocked,
     synced: pending === 0 && !syncing && lastError === null,
-    adapter: ownerScope?.kind === "user" && isCloudMediaV2Enabled()
-      ? "v2"
-      : "legacy",
+    adapter: ownerScope?.kind === "user" ? rollout.adapter : "legacy",
+    schemaStage: rollout.schemaStage,
+    rolloutStatus: rollout.status,
+    rolloutCode: rollout.code,
+    requiresReload: rollout.requiresReload,
+    incompatible,
     orphaned,
     syncing,
     online,
@@ -183,6 +208,16 @@ export function setOwnerScope(scope: LocalOwnerScope | null): void {
   quarantineLegacyOwnerlessQueue();
   notify();
   if (ownerScope?.kind === "user" && online) void flush();
+}
+
+export function setCloudRolloutRuntimeContract(
+  contract: CloudRolloutContract | null,
+): void {
+  runtimeRolloutOverride = contract;
+  notify();
+  if (contract?.status === "ready" && ownerScope?.kind === "user" && online) {
+    void flush();
+  }
 }
 
 // ---- Enqueue helpers (coalescing'le) ----
@@ -582,12 +617,36 @@ export async function flush(): Promise<void> {
 
   const flushScope = ownerScope;
   const flushGeneration = ownerGeneration;
+  const rollout = runtimeRolloutOverride ?? getCloudRolloutContract();
+  if (rollout.status !== "ready") {
+    lastError = rollout.message;
+    notify();
+    return;
+  }
   const snapshot = loadSyncQueue(flushScope);
   const eligible = snapshot.filter((item) =>
     item.ownerScope === flushScope.key
     && item.userId === flushScope.userId
     && !item.blockedConflict
+    && (
+      (rollout.adapter === "v2" && item.transport === "cloud-v2")
+      || (rollout.adapter === "legacy" && item.transport === "legacy")
+    )
   );
+  const incompatibleItems = snapshot.filter((item) =>
+    item.ownerScope === flushScope.key
+    && item.userId === flushScope.userId
+    && (
+      (rollout.adapter === "v2" && item.transport !== "cloud-v2")
+      || (rollout.adapter === "legacy" && item.transport !== "legacy")
+    )
+  );
+  if (incompatibleItems.length > 0) {
+    lastError =
+      "Bekleyen cloud işlemleri aktif adapter ile uyumlu değil. Güvenlik için gönderim durduruldu.";
+    notify();
+    return;
+  }
   if (eligible.length === 0) return;
 
   syncing = true;

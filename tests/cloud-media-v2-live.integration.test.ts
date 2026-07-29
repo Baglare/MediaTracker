@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { assertSafeSupabaseTestTarget } from "@/lib/supabase-test-target";
 
 const requiredEnvironment = [
   "SUPABASE_TEST_URL",
@@ -48,6 +49,7 @@ function requiredEnvironmentValue(
 }
 
 function createTestClient(): SupabaseClient {
+  assertSafeSupabaseTestTarget(requiredEnvironmentValue("SUPABASE_TEST_URL"));
   return createClient(
     requiredEnvironmentValue("SUPABASE_TEST_URL"),
     requiredEnvironmentValue("SUPABASE_TEST_ANON_KEY"),

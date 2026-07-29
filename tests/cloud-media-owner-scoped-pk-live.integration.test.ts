@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { assertSafeSupabaseTestTarget } from "@/lib/supabase-test-target";
 
 const requiredEnvironment = [
   "SUPABASE_TEST_URL",
@@ -41,25 +42,8 @@ function requiredEnvironmentValue(
   return value;
 }
 
-function normalizeUrl(value: string): string {
-  return value.replace(/\/+$/, "").toLowerCase();
-}
-
 function assertNonProductionTarget(): void {
-  const testUrl = requiredEnvironmentValue("SUPABASE_TEST_URL");
-  const parsed = new URL(testUrl);
-  if (!["http:", "https:"].includes(parsed.protocol)) {
-    throw new Error("SUPABASE_TEST_URL must be an HTTP(S) test project URL.");
-  }
-  const configuredProductionUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  if (
-    configuredProductionUrl
-    && normalizeUrl(configuredProductionUrl) === normalizeUrl(testUrl)
-  ) {
-    throw new Error(
-      "Refusing live D2C.1 test: SUPABASE_TEST_URL matches NEXT_PUBLIC_SUPABASE_URL.",
-    );
-  }
+  assertSafeSupabaseTestTarget(requiredEnvironmentValue("SUPABASE_TEST_URL"));
 }
 
 function createTestClient(): SupabaseClient {

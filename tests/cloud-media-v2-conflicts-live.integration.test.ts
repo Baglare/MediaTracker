@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { assertSafeSupabaseTestTarget } from "@/lib/supabase-test-target";
 import type { MediaItem, ProgressLog, SyncQueueItem } from "@/lib/types";
 import {
   createUserOwnerScope,
@@ -77,6 +78,7 @@ function requiredEnvironmentValue(
 }
 
 function createTestClient(): SupabaseClient {
+  assertSafeSupabaseTestTarget(requiredEnvironmentValue("SUPABASE_TEST_URL"));
   return createClient(
     requiredEnvironmentValue("SUPABASE_TEST_URL"),
     requiredEnvironmentValue("SUPABASE_TEST_ANON_KEY"),

@@ -6,7 +6,7 @@ import type { SyncEntity, SyncOperation, SyncQueueItem } from "./types";
 import {
   getCloudMediaV2RecordState,
 } from "./cloud-media-v2-state";
-import { isCloudMediaV2Enabled } from "./cloud-media-v2-client";
+import { getCloudRolloutContract } from "./cloud-rollout";
 
 export const LEGACY_SYNC_QUEUE_KEY = "media-tracker-sync-queue";
 export const SYNC_QUEUE_SCHEMA_VERSION = 2 as const;
@@ -308,7 +308,12 @@ export function createSyncQueueItem(
   const id = input.id ?? generateId();
   const payload = isRecord(input.payload) ? input.payload : {};
   const recordId = typeof payload.id === "string" ? payload.id : "";
-  const v2 = scope.kind === "user" && isCloudMediaV2Enabled();
+  const rollout = getCloudRolloutContract();
+  // D2C.1 şemasında legacy direct DML yasaktır. Flag yanlışlıkla kapalı kalsa
+  // bile mutation durable V2 item olarak korunur; manager uyumsuzluğu çözülene
+  // kadar bunu dispatch etmez.
+  const v2 = scope.kind === "user"
+    && (rollout.adapter === "v2" || rollout.schemaStage === "d2c1");
   const state = v2 && recordId
     ? getCloudMediaV2RecordState(scope, input.entity, recordId)
     : undefined;
