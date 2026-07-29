@@ -62,3 +62,29 @@ Geri dönüş gerekirse:
 - Blocked öğeler otomatik flush/retry dışında kalır. Network hataları retryable kalır ve aynı operation ID ile mevcut retry davranışını sürdürür.
 - `NEXT_PUBLIC_CLOUD_MEDIA_V2_ENABLED` varsayılanı kapalıdır. UI flag açmaz; kapalı ortamda yalnız `Legacy` adapter görünür. Test ortamında V2 için environment değişkeni `true` verilir.
 - Production rollout sırası: test/staging canlı client testi, sınırlı opt-in cohort, blocked/retryable gözlemi, rollback flag doğrulaması ve ancak sonra ayrı production kararıdır. Legacy yol bu fazda kaldırılmaz.
+
+## D2C.1 uygulama sırası
+
+D2C.1 global `id` primary key sınırını kaldırdığı için additive D2B.1 kadar geriye uyumlu değildir. Migration yalnız aşağıdaki V2 client gate tamamlandıktan sonra uygulanabilir:
+
+1. `NEXT_PUBLIC_CLOUD_MEDIA_V2_ENABLED=true` kontrollü production rollout ile doğrulanır.
+2. Aktif istemcilerin media/progress mutation trafiğinin V2 RPC yolundan geldiği gözlemlenir.
+3. Legacy adapter ile direct PostgREST upsert/hard-delete durdurulur. UI'da adapter durumu `v2` olmalıdır.
+4. `supabase/d2c1_owner_scoped_pk_preflight.sql` read-only çalıştırılır; owner-record fingerprint, row count, duplicate ve orphan/cross-owner sonuçları saklanır.
+5. Veritabanının point-in-time recovery ayarı doğrulanır ve migration öncesi backup/snapshot referansı kaydedilir.
+6. `20260728120000_owner_scoped_primary_key_enforcement.sql` bakım penceresinde tek transaction olarak uygulanır.
+7. `supabase/d2c1_owner_scoped_pk_post_migration.sql` çalıştırılır; preflight/post row count ve fingerprint değerleri karşılaştırılır.
+8. İki authenticated test kullanıcısı aynı record ID ile ayrı media ve progress kayıtları oluşturur. RLS izolasyonu, CAS revision, tombstone, restore ve aynı operation ID retry tekrar doğrulanır.
+
+Migration `media_items.row_pk` ve mevcut adıyla `progress_logs.log_pk` kolonlarını fiziksel primary key yapar. `(user_id,id)` unique constraint'leri owner içindeki record kimliğini korur. Progress ilişkisi yalnız `(user_id,media_id) -> media_items(user_id,id)` üzerinden yürür. Canonical identity index'i non-unique kalır; exact duplicate kayıtlar desteklenmeye devam eder.
+
+Migration direct `INSERT/UPDATE/DELETE` yetkilerini `anon` ve `authenticated` rollerinden kaldırır; mevcut owner-scoped `SELECT` ve `auth.uid()` tabanlı RLS korunur. V2 security-definer RPC'leri owner + record ID ile doğru satırı çözer. Bu nedenle migration uygulandıktan sonra legacy adapter'a production flag ile geri dönmek güvenli rollback değildir.
+
+## D2C.1 rollback ve roll-forward sınırı
+
+- Transaction commit etmeden hata oluşursa constraint ve RPC değişiklikleri atomik geri alınır.
+- Commit sonrasında aynı record ID farklı owner'larda kullanılabilir. Global `id` PK'ye otomatik dönüş bu kayıtları temsil edemez; destructive down migration yoktur.
+- Sorun halinde V2 mutation trafiği kontrollü biçimde durdurulur, queue ve operation ledger korunur, read-only erişim sürdürülür ve düzeltici roll-forward migration hazırlanır.
+- Revision, tombstone ve idempotency ledger satırları silinmez veya yeniden numaralandırılmaz.
+- Production flag migration sonrasında legacy'ye çevrilmez. Uygulama rollback'i gerekiyorsa V2 RPC sözleşmesini koruyan önceki istemci sürümü kullanılmalıdır.
+- Canlı DB uygulaması, backup/PITR kanıtı ve iki kullanıcı smoke sonucu bu repository paketinin dışında operasyonel onay gerektirir.
