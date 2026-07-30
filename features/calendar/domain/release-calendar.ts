@@ -848,7 +848,7 @@ function exactDateInTimeZone(dateTime: string, timeZone: string): string | null 
   }
 }
 
-function eventCalendarDate(
+export function getReleaseEventCalendarDate(
   event: ReleaseEvent,
   options: ReleaseCalendarSelectorOptions = {},
 ): string | null {
@@ -895,7 +895,7 @@ export function selectReleaseAgenda(
     tba: [],
   };
   for (const event of sortReleaseEvents(events)) {
-    const calendarDate = eventCalendarDate(event, options);
+    const calendarDate = getReleaseEventCalendarDate(event, options);
     if (!calendarDate) {
       agenda.tba.push(event);
       continue;
@@ -965,7 +965,9 @@ export function selectLaterReleaseEvents(
 export function selectTbaReleaseEvents(
   events: readonly ReleaseEvent[],
 ): ReleaseEvent[] {
-  return sortReleaseEvents(events).filter((event) => eventCalendarDate(event) === null);
+  return sortReleaseEvents(events).filter(
+    (event) => getReleaseEventCalendarDate(event) === null,
+  );
 }
 
 export function selectReleaseEventsForMonth(
@@ -978,7 +980,7 @@ export function selectReleaseEventsForMonth(
   }
   return sortReleaseEvents(events).filter((event) => {
     if (event.date.precision === "month_only") return event.date.month === month;
-    const calendarDate = eventCalendarDate(event, options);
+    const calendarDate = getReleaseEventCalendarDate(event, options);
     return calendarDate?.slice(0, 7) === month;
   });
 }

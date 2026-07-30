@@ -3,6 +3,7 @@ import {
   resolveTvSeasonIdentity,
   selectReleaseAgenda,
   selectReleaseEventsForMedia,
+  sortReleaseEvents,
   type ReleaseAgenda,
   type ReleaseEvent,
   type ReleaseProviderContext,
@@ -182,6 +183,16 @@ export interface ReleaseAgendaViewItem {
   fetchedAt: string;
 }
 
+export type ReleaseMediaFilter = "tv" | "anime" | "movie";
+
+export function filterReleaseCalendarViewItems(
+  items: readonly ReleaseAgendaViewItem[],
+  filters: readonly ReleaseMediaFilter[],
+): ReleaseAgendaViewItem[] {
+  const selected = new Set(filters);
+  return items.filter((item) => selected.has(item.media.type as ReleaseMediaFilter));
+}
+
 export interface ReleaseAgendaView {
   today: ReleaseAgendaViewItem[];
   next7Days: ReleaseAgendaViewItem[];
@@ -190,34 +201,45 @@ export interface ReleaseAgendaView {
   tba: ReleaseAgendaViewItem[];
 }
 
-export function buildReleaseAgendaView(input: {
+export function buildReleaseCalendarViewItems(input: {
   items: readonly MediaItem[];
   cache: ReleaseCalendarCache;
-  today: string;
-  timeZone?: string;
   nowMs?: number;
-}): ReleaseAgendaView {
+}): ReleaseAgendaViewItem[] {
   const nowMs = input.nowMs ?? Date.now();
-  const byEventId = new Map<string, ReleaseAgendaViewItem>();
-  const visibleEvents: ReleaseEvent[] = [];
+  const visibleItems: ReleaseAgendaViewItem[] = [];
   for (const media of input.items) {
     if (!isReleaseEligible(media)) continue;
     const entry = currentReleaseCacheEntry(input.cache, media);
     if (!entry) continue;
     const stale = isReleaseCacheEntryStale(entry, nowMs);
     for (const event of selectReleaseEventsForMedia(media, entry.events)) {
-      visibleEvents.push(event);
-      byEventId.set(event.id, { event, media, stale, fetchedAt: entry.fetchedAt });
+      visibleItems.push({ event, media, stale, fetchedAt: entry.fetchedAt });
     }
   }
+  const order = new Map(
+    sortReleaseEvents(visibleItems.map(({ event }) => event))
+      .map((event, index) => [event, index]),
+  );
+  return visibleItems.sort(
+    (left, right) => (order.get(left.event) ?? 0) - (order.get(right.event) ?? 0),
+  );
+}
+
+export function buildReleaseAgendaFromViewItems(input: {
+  items: readonly ReleaseAgendaViewItem[];
+  today: string;
+  timeZone?: string;
+}): ReleaseAgendaView {
+  const byEvent = new Map(input.items.map((item) => [item.event, item]));
   const agenda: ReleaseAgenda = selectReleaseAgenda(
-    visibleEvents,
+    input.items.map(({ event }) => event),
     input.today,
     { timeZone: input.timeZone },
   );
   const map = (events: ReleaseEvent[]) =>
     events.flatMap((event) => {
-      const view = byEventId.get(event.id);
+      const view = byEvent.get(event);
       return view ? [view] : [];
     });
   return {
@@ -227,6 +249,20 @@ export function buildReleaseAgendaView(input: {
     later: map(agenda.later),
     tba: map(agenda.tba),
   };
+}
+
+export function buildReleaseAgendaView(input: {
+  items: readonly MediaItem[];
+  cache: ReleaseCalendarCache;
+  today: string;
+  timeZone?: string;
+  nowMs?: number;
+}): ReleaseAgendaView {
+  return buildReleaseAgendaFromViewItems({
+    items: buildReleaseCalendarViewItems(input),
+    today: input.today,
+    timeZone: input.timeZone,
+  });
 }
 
 export function cacheEntriesForMedia(

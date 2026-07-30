@@ -14,10 +14,12 @@ import {
   createReleaseProviders,
 } from "@/features/calendar/providers/release-providers";
 import {
-  buildReleaseAgendaView,
+  buildReleaseAgendaFromViewItems,
+  buildReleaseCalendarViewItems,
   cacheEntriesForMedia,
   refreshReleaseCalendarCache,
   type ReleaseAgendaView,
+  type ReleaseAgendaViewItem,
   type ReleaseRefreshFailure,
 } from "@/features/calendar/services/release-calendar-service";
 import type { LocalOwnerScope } from "@/lib/local-owner-scope";
@@ -51,7 +53,10 @@ interface OwnedReleaseState {
 }
 
 export interface UseReleaseCalendarResult {
+  items: ReleaseAgendaViewItem[];
   agenda: ReleaseAgendaView;
+  today: string;
+  timeZone?: string;
   loading: boolean;
   refreshing: boolean;
   stale: boolean;
@@ -142,13 +147,19 @@ export function useReleaseCalendar(input: {
 
   const visible = state?.ownerScope === input.ownerScope?.key ? state : null;
   const nowMs = visible?.observedAt ?? 0;
-  const agenda = visible
-    ? buildReleaseAgendaView({
+  const today = visible ? localToday(nowMs) : "";
+  const items = visible
+    ? buildReleaseCalendarViewItems({
         items: input.mediaList,
         cache: visible.cache,
-        today: localToday(nowMs),
-        timeZone: visible.timeZone,
         nowMs,
+      })
+    : [];
+  const agenda = visible
+    ? buildReleaseAgendaFromViewItems({
+        items,
+        today,
+        timeZone: visible.timeZone,
       })
     : EMPTY_AGENDA;
   const entries = visible ? cacheEntriesForMedia(input.mediaList, visible.cache) : [];
@@ -161,7 +172,10 @@ export function useReleaseCalendar(input: {
   }, [load]);
 
   return {
+    items,
     agenda,
+    today,
+    timeZone: visible?.timeZone,
     loading: Boolean(input.ownerScope && input.libraryReady && (!visible || visible.loading)),
     refreshing: visible?.refreshing ?? false,
     stale: entries.some((entry) => isReleaseCacheEntryStale(entry, nowMs)),
