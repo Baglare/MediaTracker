@@ -301,7 +301,7 @@ export default function HomePage() {
           progressLogs={library.progressLogs}
           commands={commands}
           resolveRelatedAction={discovery.resolveRelatedAction}
-          onAddRelatedParts={discovery.addMissingTvmazeParts}
+          onAddRelatedParts={discovery.addMissingTvmazeParts} ownerScope={library.ownerScope} libraryReady={library.isLoaded && library.libraryIntegrity === "valid"}
         />
       );
     }

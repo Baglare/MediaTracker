@@ -18,7 +18,8 @@ export type PersonalDataDomain =
   | "duplicateMergeJournal"
   | "integrityRepairJournal"
   | "portableImportJournal"
-  | "cloudMediaV2State";
+  | "cloudMediaV2State"
+  | "releaseCalendarCache";
 
 export interface PersonalStorageLike {
   getItem(key: string): string | null;
