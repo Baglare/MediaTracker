@@ -3,7 +3,10 @@ begin transaction read only;
 do $d2b1_read_only_preflight$
 declare
   v_definition text;
-  v_policy_count integer;
+  v_table text;
+  v_command text;
+  v_policy_total integer;
+  v_policy_matching integer;
 begin
   if current_setting('server_version_num')::integer < 150000 then
     raise exception 'd2b1_requires_postgresql_15';
@@ -200,77 +203,81 @@ begin
     raise exception 'd2b1_owner_rls_not_enabled';
   end if;
 
-  select count(*) into v_policy_count
-  from pg_policies
-  where schemaname='public' and tablename='media_items'
-    and policyname in (
-      'media_items_select_own','media_items_insert_own',
-      'media_items_update_own','media_items_delete_own'
-    );
-  if v_policy_count<>4 then
-    raise exception 'd2b1_media_owner_policy_drift';
-  end if;
-  if exists (
-    select 1
-    from pg_policies
-    where schemaname='public' and tablename='media_items'
-      and policyname in (
-        'media_items_select_own','media_items_insert_own',
-        'media_items_update_own','media_items_delete_own'
-      )
-      and (
-        position('user_id' in coalesce(qual,''))=0
-          and policyname<>'media_items_insert_own'
-        or position('auth.uid()' in coalesce(qual,''))=0
-          and policyname<>'media_items_insert_own'
-        or position('user_id' in coalesce(with_check,''))=0
-          and policyname in (
-            'media_items_insert_own','media_items_update_own'
-          )
-        or position('auth.uid()' in coalesce(with_check,''))=0
-          and policyname in (
-            'media_items_insert_own','media_items_update_own'
-          )
-      )
-  ) then
-    raise exception 'd2b1_media_owner_policy_expression_drift';
-  end if;
+  foreach v_table in array array['media_items','progress_logs'] loop
+    if exists (
+      select 1
+      from pg_policies
+      where schemaname='public' and tablename=v_table
+        and permissive='PERMISSIVE' and cmd='ALL'
+    ) then
+      if v_table='media_items' then
+        raise exception 'd2b1_media_owner_policy_drift';
+      else
+        raise exception 'd2b1_progress_owner_policy_drift';
+      end if;
+    end if;
 
-  select count(*) into v_policy_count
-  from pg_policies
-  where schemaname='public' and tablename='progress_logs'
-    and policyname in (
-      'progress_logs_select_own','progress_logs_insert_own',
-      'progress_logs_update_own','progress_logs_delete_own'
-    );
-  if v_policy_count<>4 then
-    raise exception 'd2b1_progress_owner_policy_drift';
-  end if;
-  if exists (
-    select 1
-    from pg_policies
-    where schemaname='public' and tablename='progress_logs'
-      and policyname in (
-        'progress_logs_select_own','progress_logs_insert_own',
-        'progress_logs_update_own','progress_logs_delete_own'
+    foreach v_command in array array['SELECT','INSERT','UPDATE','DELETE'] loop
+      with policies as (
+        select
+          roles,
+          replace(
+            regexp_replace(lower(coalesce(qual,'')),
+              '[[:space:]()"]','','g'),
+            '::uuid',''
+          ) as normalized_using,
+          replace(
+            regexp_replace(lower(coalesce(with_check,'')),
+              '[[:space:]()"]','','g'),
+            '::uuid',''
+          ) as normalized_check
+        from pg_policies
+        where schemaname='public' and tablename=v_table
+          and permissive='PERMISSIVE' and cmd=v_command
       )
-      and (
-        position('user_id' in coalesce(qual,''))=0
-          and policyname<>'progress_logs_insert_own'
-        or position('auth.uid()' in coalesce(qual,''))=0
-          and policyname<>'progress_logs_insert_own'
-        or position('user_id' in coalesce(with_check,''))=0
-          and policyname in (
-            'progress_logs_insert_own','progress_logs_update_own'
-          )
-        or position('auth.uid()' in coalesce(with_check,''))=0
-          and policyname in (
-            'progress_logs_insert_own','progress_logs_update_own'
-          )
-      )
-  ) then
-    raise exception 'd2b1_progress_owner_policy_expression_drift';
-  end if;
+      select
+        count(*),
+        count(*) filter (
+          where cardinality(roles)>0
+            and roles <@ array['public','authenticated']::name[]
+            and case v_command
+              when 'SELECT' then normalized_using in (
+                'auth.uid=user_id','user_id=auth.uid'
+              ) and normalized_check=''
+              when 'DELETE' then normalized_using in (
+                'auth.uid=user_id','user_id=auth.uid'
+              ) and normalized_check=''
+              when 'INSERT' then normalized_using=''
+                and normalized_check in (
+                  'auth.uid=user_id','user_id=auth.uid'
+                )
+              when 'UPDATE' then normalized_using in (
+                'auth.uid=user_id','user_id=auth.uid'
+              ) and normalized_check in (
+                'auth.uid=user_id','user_id=auth.uid'
+              )
+              else false
+            end
+        )
+      into v_policy_total,v_policy_matching
+      from policies;
+
+      if v_policy_total<>1 then
+        if v_table='media_items' then
+          raise exception 'd2b1_media_owner_policy_drift';
+        else
+          raise exception 'd2b1_progress_owner_policy_drift';
+        end if;
+      end if;
+      if v_policy_matching<>1 then
+        if v_table='media_items' then
+          raise exception 'd2b1_media_owner_policy_expression_drift';
+        else
+          raise exception 'd2b1_progress_owner_policy_expression_drift';
+        end if;
+      end if;
+    end loop;
+  end loop;
 
   if exists (
     select 1

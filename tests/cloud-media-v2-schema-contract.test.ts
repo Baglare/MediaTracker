@@ -76,6 +76,28 @@ describe("D2B.1 cloud media schema V2 SQL contract (static, not live PostgreSQL/
     }
   });
 
+  it("validates owner-policy semantics without depending on policy names", () => {
+    for (const sql of [migration, preflight]) {
+      expect(sql).toContain(
+        "foreach v_table in array array['media_items','progress_logs']",
+      );
+      expect(sql).toContain(
+        "foreach v_command in array array['select','insert','update','delete']",
+      );
+      expect(sql).toContain("permissive='permissive' and cmd='all'");
+      expect(sql).toContain(
+        "roles <@ array['public','authenticated']::name[]",
+      );
+      expect(sql).toContain("'auth.uid=user_id','user_id=auth.uid'");
+      expect(sql).toContain("normalized_using=''");
+      expect(sql).toContain("v_policy_total<>1");
+      expect(sql).toContain("v_policy_matching<>1");
+      expect(sql).not.toContain("media_items_select_own");
+      expect(sql).not.toContain("progress_logs_select_own");
+      expect(sql).not.toMatch(/policyname\s+in\s*\(/);
+    }
+  });
+
   it("keeps existing rows and destructive schema operations out of the additive phase", () => {
     const additivePhase = migration.slice(
       0,
@@ -186,7 +208,7 @@ describe("D2B.1 cloud media schema V2 SQL contract (static, not live PostgreSQL/
       expect(sql.trimStart().startsWith("begin transaction read only;")).toBe(true);
       expect(sql.trimEnd().endsWith("rollback;")).toBe(true);
       expect(sql).not.toMatch(
-        /\b(?:insert\s+into|update|delete\s+from|alter\s+table|create\s+table|drop\s+table)\b/,
+        /^\s*(?:insert\s+into|update|delete\s+from|alter\s+table|create\s+table|drop\s+table)\b/im,
       );
     }
     expect(preflight).toContain("owner_record_fingerprint");
