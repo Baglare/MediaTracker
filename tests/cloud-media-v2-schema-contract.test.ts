@@ -54,6 +54,28 @@ describe("D2B.1 cloud media schema V2 SQL contract (static, not live PostgreSQL/
     );
   });
 
+  it("validates media CHECK semantics across baseline and production legacy names", () => {
+    for (const sql of [migration, preflight]) {
+      for (const constraintName of [
+        "media_items_progress_nonneg",
+        "media_items_current_progress_check",
+        "media_items_total_nonneg",
+        "media_items_total_progress_check",
+        "media_items_user_rating_range",
+        "media_items_user_rating_check",
+      ]) {
+        expect(sql).toContain(constraintName);
+      }
+      expect(sql).toContain("normalized_definition='checkcurrent_progress>=0'");
+      expect(sql).toContain("normalized_definition='checktotal_progress>=0'");
+      expect(sql).toContain(
+        "'checkuser_ratingisnulloruser_rating>=0anduser_rating<=10'",
+      );
+      expect(sql).toContain("count(distinct oid) filter");
+      expect(sql).toContain("d2b1_media_check_constraint_drift");
+    }
+  });
+
   it("keeps existing rows and destructive schema operations out of the additive phase", () => {
     const additivePhase = migration.slice(
       0,

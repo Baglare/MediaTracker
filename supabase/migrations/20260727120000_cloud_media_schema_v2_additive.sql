@@ -123,16 +123,67 @@ begin
     raise exception 'd2b1_progress_primary_key_drift: %', coalesce(v_definition,'missing');
   end if;
   if (
-    select count(*)
-    from pg_constraint
-    where conrelid='public.media_items'::regclass
-      and conname in (
-        'media_items_progress_nonneg',
-        'media_items_total_nonneg',
-        'media_items_user_rating_range'
-      )
-      and contype='c'
-  )<>3 then
+    with media_checks as (
+      select
+        c.oid,
+        c.conname,
+        a.attname,
+        replace(replace(
+          regexp_replace(
+            lower(pg_get_constraintdef(c.oid)),
+            '[[:space:]()"]','','g'
+          ),
+          '::integer',''
+        ),'::numeric','') as normalized_definition
+      from pg_constraint c
+      cross join lateral unnest(c.conkey) key(attnum)
+      join pg_attribute a
+        on a.attrelid=c.conrelid and a.attnum=key.attnum
+      where c.conrelid='public.media_items'::regclass
+        and c.contype='c'
+        and a.attname in (
+          'current_progress','total_progress','user_rating'
+        )
+    )
+    select
+      count(distinct oid) filter (
+        where attname='current_progress'
+      )<>1
+      or count(distinct oid) filter (
+        where attname='current_progress'
+          and conname in (
+            'media_items_progress_nonneg',
+            'media_items_current_progress_check'
+          )
+          and normalized_definition='checkcurrent_progress>=0'
+      )<>1
+      or count(distinct oid) filter (
+        where attname='total_progress'
+      )<>1
+      or count(distinct oid) filter (
+        where attname='total_progress'
+          and conname in (
+            'media_items_total_nonneg',
+            'media_items_total_progress_check'
+          )
+          and normalized_definition='checktotal_progress>=0'
+      )<>1
+      or count(distinct oid) filter (
+        where attname='user_rating'
+      )<>1
+      or count(distinct oid) filter (
+        where attname='user_rating'
+          and conname in (
+            'media_items_user_rating_range',
+            'media_items_user_rating_check'
+          )
+          and normalized_definition in (
+            'checkuser_ratingisnulloruser_ratingbetween0and10',
+            'checkuser_ratingisnulloruser_rating>=0anduser_rating<=10'
+          )
+      )<>1
+    from media_checks
+  ) then
     raise exception 'd2b1_media_check_constraint_drift';
   end if;
 
