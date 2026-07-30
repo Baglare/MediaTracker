@@ -204,7 +204,9 @@ describe("D2B.0 progress relation repair SQL contract (static, not live PostgreS
   });
 
   it("leaves D2B.1 owner-aware FK validation ready to succeed", () => {
-    expect(d2b1).toContain("d2b1_cross_owner_progress_relation");
+    expect(d2b1).toContain(
+      "d2b1_active_progress_owner_relation_invalid",
+    );
     expect(d2b1).toContain(
       "foreign key (user_id,media_id)\n    references public.media_items(user_id,id)",
     );

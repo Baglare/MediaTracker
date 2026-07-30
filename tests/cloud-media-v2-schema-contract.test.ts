@@ -19,6 +19,17 @@ const runbook = readFileSync(
   "utf8",
 ).toLowerCase();
 
+function normalizedPreflight(sql: string): string {
+  const start = sql.indexOf("do $d2b1_");
+  const finish = sql.indexOf("$;", start);
+  expect(start).toBeGreaterThan(-1);
+  expect(finish).toBeGreaterThan(start);
+  return sql
+    .slice(start, finish + 2)
+    .replace(/\$d2b1_(?:read_only_)?preflight\$/g, "$preflight$")
+    .replace(/\s+/g, "");
+}
+
 function functionBody(name: string): string {
   const start = migration.indexOf(`create function public.${name}`);
   expect(start).toBeGreaterThan(-1);
@@ -44,7 +55,7 @@ describe("D2B.1 cloud media schema V2 SQL contract (static, not live PostgreSQL/
       "d2b1_progress_primary_key_drift",
       "d2b1_external_unique_index_missing_or_changed",
       "d2b1_owner_rls_not_enabled",
-      "d2b1_cross_owner_progress_relation",
+      "d2b1_active_progress_owner_relation_invalid",
       "d2b1_target_objects_already_exist",
     ]) {
       expect(migration).toContain(marker);
@@ -52,6 +63,43 @@ describe("D2B.1 cloud media schema V2 SQL contract (static, not live PostgreSQL/
     expect(migration).not.toMatch(
       /(?:create\s+(?:table|index|policy)|add\s+column)\s+if\s+not\s+exists/,
     );
+  });
+
+  it("keeps standalone and migration preflight semantics synchronized", () => {
+    expect(normalizedPreflight(migration)).toBe(normalizedPreflight(preflight));
+  });
+
+  it("requires D2B.0 repair state without requiring a legacy FK", () => {
+    for (const sql of [migration, preflight]) {
+      expect(sql).toContain("column_name='detached_media_id'");
+      expect(sql).toContain("column_name='detached_at'");
+      expect(sql).toContain("d2b1_d2b0_prerequisite_missing");
+      expect(sql).toContain(
+        "where m.user_id=p.user_id and m.id=p.media_id",
+      );
+      expect(sql).toContain("d2b1_active_progress_owner_relation_invalid");
+      expect(sql).toContain("v_fk_total>1");
+      expect(sql).toContain("v_fk_total=1 and v_fk_compatible<>1");
+      expect(sql).not.toContain("d2b1_progress_media_fk_drift");
+      expect(sql).not.toContain("progress_logs_media_id_fkey");
+    }
+  });
+
+  it("validates optional legacy media FK semantics through catalogs", () => {
+    for (const sql of [migration, preflight]) {
+      expect(sql).toContain(
+        "c.conkey=array[v_progress_media_id_attnum]::smallint[]",
+      );
+      expect(sql).toContain(
+        "c.confrelid='public.media_items'::regclass",
+      );
+      expect(sql).toContain(
+        "c.confkey=array[v_media_item_id_attnum]::smallint[]",
+      );
+      expect(sql).toContain("c.confdeltype='n'");
+      expect(sql).toContain("d2b1_progress_media_fk_ambiguous");
+      expect(sql).toContain("d2b1_progress_media_fk_conflict");
+    }
   });
 
   it("validates media CHECK semantics across baseline and production legacy names", () => {

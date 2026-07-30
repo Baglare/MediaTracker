@@ -7,6 +7,10 @@ declare
   v_command text;
   v_policy_total integer;
   v_policy_matching integer;
+  v_fk_total integer;
+  v_fk_compatible integer;
+  v_progress_media_id_attnum smallint;
+  v_media_item_id_attnum smallint;
 begin
   if current_setting('server_version_num')::integer < 150000 then
     raise exception 'd2b1_requires_postgresql_15';
@@ -101,6 +105,21 @@ begin
   ) then
     raise exception 'd2b1_progress_logs_full_shape_drift';
   end if;
+  if not exists (
+    select 1
+    from information_schema.columns
+    where table_schema='public' and table_name='progress_logs'
+      and column_name='detached_media_id'
+      and data_type='text' and is_nullable='YES'
+  ) or not exists (
+    select 1
+    from information_schema.columns
+    where table_schema='public' and table_name='progress_logs'
+      and column_name='detached_at'
+      and data_type='timestamp with time zone' and is_nullable='YES'
+  ) then
+    raise exception 'd2b1_d2b0_prerequisite_missing';
+  end if;
 
   select pg_get_constraintdef(oid)
   into v_definition
@@ -180,6 +199,36 @@ begin
     from media_checks
   ) then
     raise exception 'd2b1_media_check_constraint_drift';
+  end if;
+
+  select attnum into v_progress_media_id_attnum
+  from pg_attribute
+  where attrelid='public.progress_logs'::regclass
+    and attname='media_id' and not attisdropped;
+  select attnum into v_media_item_id_attnum
+  from pg_attribute
+  where attrelid='public.media_items'::regclass
+    and attname='id' and not attisdropped;
+
+  select
+    count(*),
+    count(*) filter (
+      where c.conkey=array[v_progress_media_id_attnum]::smallint[]
+        and c.confrelid='public.media_items'::regclass
+        and c.confkey=array[v_media_item_id_attnum]::smallint[]
+        and c.confdeltype='n'
+    )
+  into v_fk_total,v_fk_compatible
+  from pg_constraint c
+  where c.conrelid='public.progress_logs'::regclass
+    and c.contype='f'
+    and v_progress_media_id_attnum=any(c.conkey);
+
+  if v_fk_total>1 then
+    raise exception 'd2b1_progress_media_fk_ambiguous: %',v_fk_total;
+  end if;
+  if v_fk_total=1 and v_fk_compatible<>1 then
+    raise exception 'd2b1_progress_media_fk_conflict';
   end if;
 
   if not exists (
@@ -281,15 +330,6 @@ begin
 
   if exists (
     select 1
-    from public.progress_logs p
-    join public.media_items m on m.id=p.media_id
-    where p.media_id is not null and p.user_id<>m.user_id
-  ) then
-    raise exception 'd2b1_cross_owner_progress_relation';
-  end if;
-
-  if exists (
-    select 1
     from information_schema.columns
     where table_schema='public'
       and (
@@ -305,6 +345,19 @@ begin
       )
   ) or to_regclass('public.cloud_media_sync_operations') is not null then
     raise exception 'd2b1_target_objects_already_exist';
+  end if;
+
+  if exists (
+    select 1
+    from public.progress_logs p
+    where p.media_id is not null
+      and not exists (
+        select 1
+        from public.media_items m
+        where m.user_id=p.user_id and m.id=p.media_id
+      )
+  ) then
+    raise exception 'd2b1_active_progress_owner_relation_invalid';
   end if;
 end;
 $d2b1_read_only_preflight$;
