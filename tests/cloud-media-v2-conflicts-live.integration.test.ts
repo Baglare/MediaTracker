@@ -7,6 +7,12 @@ import {
   createUserOwnerScope,
   type LocalOwnerScope,
 } from "@/lib/local-owner-scope";
+import {
+  detectLiveCloudSchemaStage,
+  tombstoneSyntheticV2Record,
+  type LiveCleanupStatus,
+  type LiveCloudSchemaStage,
+} from "./cloud-media-live-test-helpers";
 
 const requiredEnvironment = [
   "SUPABASE_TEST_URL",
@@ -59,11 +65,10 @@ class MemoryStorage implements Storage {
 }
 
 type CleanupResult = {
-  media: "removed" | "failed" | "not-created";
-  progress: "removed" | "failed" | "not-created";
+  media: Record<string, LiveCleanupStatus>;
+  progress: LiveCleanupStatus;
   operationLedger:
-    | "removed"
-    | "retained-permission-denied"
+    | "retained-by-policy"
     | "failed"
     | "not-created";
   errors: string[];
@@ -128,7 +133,7 @@ describe.skipIf(!liveEnvironmentAvailable)(
     const conflicts: string[] = [];
     const passedScenarios: string[] = [];
     const cleanup: CleanupResult = {
-      media: "not-created",
+      media: {},
       progress: "not-created",
       operationLedger: "not-created",
       errors: [],
@@ -139,6 +144,7 @@ describe.skipIf(!liveEnvironmentAvailable)(
     let userB: SupabaseClient;
     let userAId = "";
     let userBId = "";
+    let schemaStage: LiveCloudSchemaStage;
     let scopeA: LocalOwnerScope;
     let scopeB: LocalOwnerScope;
     let manager: typeof import("@/lib/sync-manager");
@@ -283,6 +289,8 @@ describe.skipIf(!liveEnvironmentAvailable)(
       expect(userAId).not.toBe("");
       expect(userBId).not.toBe("");
       expect(userAId).not.toBe(userBId);
+      schemaStage = await detectLiveCloudSchemaStage(userA, runId);
+      vi.stubEnv("NEXT_PUBLIC_CLOUD_MEDIA_SCHEMA_STAGE", schemaStage);
 
       scopeA = createUserOwnerScope(userAId);
       scopeB = createUserOwnerScope(userBId);
@@ -308,70 +316,37 @@ describe.skipIf(!liveEnvironmentAvailable)(
       } finally {
         try {
           if (createdProgress) {
-            const { error } = await userA
-              .from("progress_logs")
-              .delete()
-              .eq("id", progressId);
-            cleanup.progress = error ? "failed" : "removed";
-            if (error) cleanup.errors.push(`progress:${error.code}`);
+            const result = await tombstoneSyntheticV2Record({
+              client: userA,
+              runId,
+              recordId: progressId,
+              entity: "progress",
+              operationId: operation("cleanup-user-a-progress"),
+            });
+            cleanup.progress = result.status;
+            if (result.error) cleanup.errors.push(result.error);
           }
-          const mediaIds = [
-            ...(createdMainMedia ? [mediaId] : []),
-            ...(createdParentMedia ? [parentMediaId] : []),
-          ];
-          if (mediaIds.length > 0) {
-            const { error } = await userA
-              .from("media_items")
-              .delete()
-              .in("id", mediaIds);
-            cleanup.media = error ? "failed" : "removed";
-            if (error) cleanup.errors.push(`media:${error.code}`);
+          for (const [recordId, wasCreated] of [
+            [mediaId, createdMainMedia],
+            [parentMediaId, createdParentMedia],
+          ] as const) {
+            if (!wasCreated) continue;
+            const result = await tombstoneSyntheticV2Record({
+              client: userA,
+              runId,
+              recordId,
+              entity: "media",
+              operationId: operation(
+                `cleanup-user-a-${recordId.slice(runId.length + 1)}`,
+              ),
+            });
+            cleanup.media[recordId] = result.status;
+            if (result.error) cleanup.errors.push(result.error);
           }
 
-          if (operationIds.size === 0) {
-            cleanup.operationLedger = "not-created";
-          } else {
-            const ledgerAttempts = await Promise.all(
-              [userA, userB].map((client) =>
-                client
-                  .from("cloud_media_sync_operations")
-                  .delete()
-                  .in("operation_id", [...operationIds]),
-              ),
-            );
-            const ledgerErrors = ledgerAttempts
-              .map(({ error }) => error)
-              .filter((error) => error !== null);
-            if (
-              ledgerErrors.length > 0
-              && ledgerErrors.every(
-                (error) =>
-                  error.code === "42501"
-                  || /permission denied/i.test(error.message),
-              )
-            ) {
-              cleanup.operationLedger = "retained-permission-denied";
-            } else if (ledgerErrors.length > 0) {
-              cleanup.operationLedger = "failed";
-              cleanup.errors.push(
-                ...ledgerErrors.map((error) => `ledger:${error.code}`),
-              );
-            } else {
-              const remaining = await Promise.all(
-                [userA, userB].map((client) =>
-                  client
-                    .from("cloud_media_sync_operations")
-                    .select("operation_id")
-                    .in("operation_id", [...operationIds]),
-                ),
-              );
-              cleanup.operationLedger = remaining.every(
-                ({ data, error }) => !error && (data?.length ?? 0) === 0,
-              )
-                ? "removed"
-                : "retained-permission-denied";
-            }
-          }
+          cleanup.operationLedger = operationIds.size === 0
+            ? "not-created"
+            : "retained-by-policy";
         } finally {
           await Promise.all([userA.auth.signOut(), userB.auth.signOut()]);
           vi.unstubAllEnvs();
@@ -570,6 +545,10 @@ describe.skipIf(!liveEnvironmentAvailable)(
     }, 30_000);
 
     it("keeps record_id_unavailable blocked without automatic retry", async () => {
+      if (schemaStage === "d2c1") {
+        passedScenarios.push("record_id_unavailable_not_applicable_d2c1");
+        return;
+      }
       liveBridge.client = asLiveBridge(userB, operationIds, rpcCalls);
       manager.setOwnerScope(scopeB);
       manager.enqueueMediaUpsert(media());
@@ -634,6 +613,11 @@ describe.skipIf(!liveEnvironmentAvailable)(
       expect(resolution.ok).toBe(true);
       await networkFinishedPromise;
 
+      const beforeScopeBRevision = state.getCloudMediaV2RecordState(
+        scopeB,
+        "media_item",
+        mediaId,
+      )?.revision;
       liveBridge.client = asLiveBridge(userB, operationIds, rpcCalls);
       manager.setOwnerScope(scopeB);
       release();
@@ -647,7 +631,7 @@ describe.skipIf(!liveEnvironmentAvailable)(
         scopeB,
         "media_item",
         mediaId,
-      )?.revision).toBe(0);
+      )?.revision).toBe(beforeScopeBRevision);
       passedScenarios.push("stale_owner_resolution_rejected");
 
       liveBridge.client = realA;

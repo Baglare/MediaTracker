@@ -2,6 +2,12 @@ import { randomUUID } from "node:crypto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { assertSafeSupabaseTestTarget } from "@/lib/supabase-test-target";
+import {
+  detectLiveCloudSchemaStage,
+  tombstoneSyntheticV2Record,
+  type LiveCleanupStatus,
+  type LiveCloudSchemaStage,
+} from "./cloud-media-live-test-helpers";
 
 const requiredEnvironment = [
   "SUPABASE_TEST_URL",
@@ -28,11 +34,10 @@ type SyncResult = {
 };
 
 type CleanupResult = {
-  media: "removed" | "failed" | "not-created";
-  progress: "removed" | "failed" | "not-created";
+  media: Record<"userA" | "userB", LiveCleanupStatus>;
+  progress: LiveCleanupStatus;
   operationLedger:
-    | "removed"
-    | "retained-permission-denied"
+    | "retained-by-policy"
     | "failed"
     | "not-created";
   errors: string[];
@@ -134,12 +139,13 @@ describe.skipIf(!liveEnvironmentAvailable)(
     let userB: SupabaseClient;
     let userAId = "";
     let userBId = "";
+    let schemaStage: LiveCloudSchemaStage;
     let createdMedia = false;
-    let createdProgress = false;
+    let createdMediaB = false;
     let operationRowsCreated = false;
     const revisions: Record<string, number> = {};
     const cleanup: CleanupResult = {
-      media: "not-created",
+      media: { userA: "not-created", userB: "not-created" },
       progress: "not-created",
       operationLedger: "not-created",
       errors: [],
@@ -171,6 +177,7 @@ describe.skipIf(!liveEnvironmentAvailable)(
       expect(userAId).not.toBe("");
       expect(userBId).not.toBe("");
       expect(userAId).not.toBe(userBId);
+      schemaStage = await detectLiveCloudSchemaStage(userA, runId);
     }, 30_000);
 
     afterAll(async () => {
@@ -178,51 +185,42 @@ describe.skipIf(!liveEnvironmentAvailable)(
         return;
       }
 
-      if (createdProgress) {
-        const { error } = await userA
-          .from("progress_logs")
-          .delete()
-          .eq("id", progressId);
-        cleanup.progress = error ? "failed" : "removed";
-        if (error) cleanup.errors.push(`progress:${error.code}`);
-      }
+      const progressCleanup = await tombstoneSyntheticV2Record({
+        client: userA,
+        runId,
+        recordId: progressId,
+        entity: "progress",
+        operationId: operation("cleanup-user-a-progress"),
+      });
+      cleanup.progress = progressCleanup.status;
+      if (progressCleanup.error) cleanup.errors.push(progressCleanup.error);
 
-      if (createdMedia) {
-        const { error } = await userA
-          .from("media_items")
-          .delete()
-          .eq("id", mediaId);
-        cleanup.media = error ? "failed" : "removed";
-        if (error) cleanup.errors.push(`media:${error.code}`);
+      for (const [owner, client, wasCreated] of [
+        ["userA", userA, createdMedia],
+        ["userB", userB, createdMediaB],
+      ] as const) {
+        if (!wasCreated) continue;
+        const result = await tombstoneSyntheticV2Record({
+          client,
+          runId,
+          recordId: mediaId,
+          entity: "media",
+          operationId: operation(`cleanup-${owner}-media`),
+        });
+        cleanup.media[owner] = result.status;
+        if (result.error) cleanup.errors.push(result.error);
       }
 
       if (operationRowsCreated) {
-        const ledgerAttempts = await Promise.all(
-          [userA, userB].map((client) =>
-            client
-              .from("cloud_media_sync_operations")
-              .delete()
-              .like("operation_id", operationPrefix),
-          ),
-        );
-        const ledgerErrors = ledgerAttempts
-          .map(({ error }) => error)
-          .filter((error) => error !== null);
-        if (ledgerErrors.length === 0) {
-          cleanup.operationLedger = "removed";
-        } else if (
-          ledgerErrors.every(
-            (error) =>
-              error.code === "42501" ||
-              /permission denied/i.test(error.message),
-          )
-        ) {
-          cleanup.operationLedger = "retained-permission-denied";
-        } else {
+        const ledger = await userA
+          .from("cloud_media_sync_operations")
+          .select("operation_id")
+          .like("operation_id", operationPrefix);
+        if (ledger.error) {
           cleanup.operationLedger = "failed";
-          cleanup.errors.push(
-            ...ledgerErrors.map((error) => `ledger:${error.code}`),
-          );
+          cleanup.errors.push(`ledger-read:${ledger.error.code}`);
+        } else {
+          cleanup.operationLedger = "retained-by-policy";
         }
       }
 
@@ -283,8 +281,12 @@ describe.skipIf(!liveEnvironmentAvailable)(
         .update({ title: "foreign mutation must not apply" })
         .eq("id", mediaId)
         .select("id");
-      expect(attempt.error).toBeNull();
-      expect(attempt.data).toEqual([]);
+      if (schemaStage === "d2c1") {
+        expect(attempt.error?.code).toBe("42501");
+      } else {
+        expect(attempt.error).toBeNull();
+        expect(attempt.data).toEqual([]);
+      }
 
       const verification = await userA
         .from("media_items")
@@ -430,7 +432,6 @@ describe.skipIf(!liveEnvironmentAvailable)(
         0,
         progressPayload,
       );
-      createdProgress = own.ok;
       revisions.progressCreated = own.revision;
       expect(own).toMatchObject({
         ok: true,
@@ -465,7 +466,7 @@ describe.skipIf(!liveEnvironmentAvailable)(
       expect(foreignRows.data).toEqual([]);
     });
 
-    it("reports the additive global record ID limit as a conflict", async () => {
+    it("applies the phase-specific cross-owner record ID contract", async () => {
       const result = await applyMediaOperation(
         userB,
         operation("global-id-conflict"),
@@ -474,12 +475,28 @@ describe.skipIf(!liveEnvironmentAvailable)(
         0,
         { ...mediaPayload, title: `User B ${mediaPayload.title}` },
       );
-      expect(result).toMatchObject({
-        ok: false,
-        conflict: true,
-        reason: "record_id_unavailable",
-        revision: 0,
-      });
+      if (schemaStage === "d2b1") {
+        expect(result).toMatchObject({
+          ok: false,
+          conflict: true,
+          reason: "record_id_unavailable",
+          revision: 0,
+        });
+      } else {
+        expect(result).toMatchObject({
+          ok: true,
+          conflict: false,
+          reason: "created",
+          revision: 1,
+        });
+        createdMediaB = true;
+        const [rowA, rowB] = await Promise.all([
+          userA.from("media_items").select("user_id").eq("id", mediaId),
+          userB.from("media_items").select("user_id").eq("id", mediaId),
+        ]);
+        expect(rowA.data).toEqual([{ user_id: userAId }]);
+        expect(rowB.data).toEqual([{ user_id: userBId }]);
+      }
     });
 
     it("hides User A operation ledger rows from User B", async () => {

@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { assertSafeSupabaseTestTarget } from "@/lib/supabase-test-target";
+import { detectLiveCloudSchemaStage } from "./cloud-media-live-test-helpers";
 
 const requiredEnvironment = [
   "SUPABASE_TEST_URL",
@@ -259,6 +260,7 @@ describe.skipIf(!liveEnvironmentAvailable)(
       expect(userAId).not.toBe("");
       expect(userBId).not.toBe("");
       expect(userAId).not.toBe(userBId);
+      expect(await detectLiveCloudSchemaStage(userA, runId)).toBe("d2c1");
     }, 30_000);
 
     afterAll(async () => {
