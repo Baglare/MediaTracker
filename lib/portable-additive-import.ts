@@ -41,6 +41,7 @@ import {
   type PortableBackupDomain,
   type PortableBackupOwnerType,
 } from "./portable-backup";
+import { remapMediaReleaseCalendar } from "../features/calendar/domain/manual-release-calendar";
 import {
   inspectRecommendationLinksForScope,
   replaceRecommendationLinksForScope,
@@ -541,7 +542,14 @@ function buildPlan(
     const wantsCopy = exactCopies.has(incoming.id);
     if (exactMatches.length > 0 && wantsCopy && mediaSelected) {
       const targetId = priorCopyId;
-      const copy = { ...incoming, id: targetId };
+      const copy = {
+        ...incoming,
+        id: targetId,
+        releaseCalendar: remapMediaReleaseCalendar(
+          incoming.releaseCalendar,
+          targetId,
+        ),
+      };
       const existingCopy = currentById.get(targetId);
       if (existingCopy) {
         if (sameMedia(existingCopy, copy)) {

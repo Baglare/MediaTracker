@@ -2,8 +2,24 @@
 
 import Image from "next/image";
 import { useMemo, useState } from "react";
-import { AlertTriangle, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
+import {
+  AlertTriangle,
+  ChevronLeft,
+  ChevronRight,
+  Eye,
+  EyeOff,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Trash2,
+} from "lucide-react";
 
+import { ManualReleaseEventDialog } from "@/features/calendar/components/manual-release-event-dialog";
+import {
+  deleteManualReleaseEvent,
+  hideProviderReleaseEvent,
+  restoreProviderReleaseEvent,
+} from "@/features/calendar/domain/manual-release-calendar";
 import type { ReleaseEvent } from "@/features/calendar/domain/release-calendar";
 import {
   addReleaseCalendarDays,
@@ -20,6 +36,7 @@ import {
   type ReleaseMediaFilter,
 } from "@/features/calendar/services/release-calendar-service";
 import type { MediaItem } from "@/lib/types";
+import type { ManualReleaseEvent } from "@/lib/types";
 
 type CalendarView = "agenda" | "month";
 const FILTERS: Array<{ value: ReleaseMediaFilter; label: string }> = [
@@ -86,10 +103,16 @@ function AgendaGroup({
   title,
   items,
   onOpen,
+  onHide,
+  onEditManual,
+  onDeleteManual,
 }: {
   title: string;
   items: ReleaseAgendaViewItem[];
   onOpen: (item: MediaItem) => void;
+  onHide?: (item: ReleaseAgendaViewItem) => void;
+  onEditManual?: (media: MediaItem, event: ManualReleaseEvent) => void;
+  onDeleteManual?: (media: MediaItem, event: ManualReleaseEvent) => void;
 }) {
   if (items.length === 0) return null;
   return (
@@ -101,22 +124,30 @@ function AgendaGroup({
         <span className="font-mono text-[10px] text-[var(--app-text-muted)]">{items.length}</span>
       </div>
       <div className="space-y-2">
-        {items.map(({ event, media, stale }) => (
-          <button
+        {items.map((viewItem) => {
+          const { event, media, stale } = viewItem;
+          const manualEvent = event.origin.kind === "manual"
+            ? media.releaseCalendar?.manualEvents.find((entry) => entry.id === event.id)
+            : undefined;
+          return (
+          <div
             key={`${media.id}:${event.origin.kind}:${event.id}`}
-            type="button"
-            onClick={() => onOpen(media)}
-            className="flex w-full gap-3 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-2)] p-2.5 text-left motion-safe:transition-colors hover:border-[var(--app-border-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)]"
+            className="flex w-full gap-3 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-2)] p-2.5 text-left motion-safe:transition-colors hover:border-[var(--app-border-strong)]"
           >
-            <Image
-              src={media.coverImage}
-              alt=""
-              width={44}
-              height={64}
-              unoptimized
-              className="h-16 w-11 shrink-0 rounded-md object-cover"
-            />
-            <span className="min-w-0 flex-1">
+            <button
+              type="button"
+              onClick={() => onOpen(media)}
+              className="flex min-w-0 flex-1 gap-3 rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)]"
+            >
+              <Image
+                src={media.coverImage}
+                alt=""
+                width={44}
+                height={64}
+                unoptimized
+                className="h-16 w-11 shrink-0 rounded-md object-cover"
+              />
+              <span className="min-w-0 flex-1">
               <span className="block truncate text-xs font-semibold text-[var(--app-text-primary)]">
                 {media.title}
               </span>
@@ -136,10 +167,48 @@ function AgendaGroup({
                     Eski cache
                   </span>
                 )}
+                {event.origin.kind === "manual" && (
+                  <span className="rounded bg-sky-500/10 px-1 py-0.5 text-sky-300">
+                    Kalıcı manuel olay
+                  </span>
+                )}
               </span>
+              </span>
+            </button>
+            <span className="flex shrink-0 flex-col gap-1">
+              {event.origin.kind === "provider" && onHide && (
+                <button
+                  type="button"
+                  aria-label={`${media.title} provider yayınını gizle`}
+                  onClick={() => onHide(viewItem)}
+                  className="rounded-lg border border-[var(--app-border)] p-1.5 text-[var(--app-text-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)]"
+                >
+                  <EyeOff className="h-3.5 w-3.5" aria-hidden="true" />
+                </button>
+              )}
+              {manualEvent && onEditManual && (
+                <button
+                  type="button"
+                  aria-label={`${manualEvent.title} manuel yayınını düzenle`}
+                  onClick={() => onEditManual(media, manualEvent)}
+                  className="rounded-lg border border-[var(--app-border)] p-1.5 text-[var(--app-text-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)]"
+                >
+                  <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                </button>
+              )}
+              {manualEvent && onDeleteManual && (
+                <button
+                  type="button"
+                  aria-label={`${manualEvent.title} manuel yayınını sil`}
+                  onClick={() => onDeleteManual(media, manualEvent)}
+                  className="rounded-lg border border-[var(--app-border)] p-1.5 text-[var(--app-danger)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)]"
+                >
+                  <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                </button>
+              )}
             </span>
-          </button>
-        ))}
+          </div>
+        )})}
       </div>
     </div>
   );
@@ -165,12 +234,23 @@ function dayLabel(date: string, eventCount: number): string {
 
 export function ReleaseCalendarPanel({
   releases,
+  mediaList,
   libraryReady,
   onOpen,
+  onSave,
+  onConfirm,
 }: {
   releases: UseReleaseCalendarResult;
+  mediaList: MediaItem[];
   libraryReady: boolean;
   onOpen: (item: MediaItem) => void;
+  onSave: (item: MediaItem) => boolean;
+  onConfirm: (
+    title: string,
+    message: string,
+    onConfirm: () => void,
+    confirmLabel?: string,
+  ) => void;
 }) {
   const [view, setView] = useState<CalendarView>("agenda");
   const [filters, setFilters] = useState<ReleaseMediaFilter[]>([
@@ -181,6 +261,11 @@ export function ReleaseCalendarPanel({
   const initialToday = releases.today || fallbackToday();
   const [visibleMonth, setVisibleMonth] = useState(initialToday.slice(0, 7));
   const [selectedDate, setSelectedDate] = useState(initialToday);
+  const [editing, setEditing] = useState<{
+    media?: MediaItem;
+    event?: ManualReleaseEvent;
+  } | null>(null);
+  const [showHidden, setShowHidden] = useState(false);
 
   const filteredItems = useMemo(
     () => filterReleaseCalendarViewItems(releases.items, filters),
@@ -241,6 +326,24 @@ export function ReleaseCalendarPanel({
   const moveSelectedDay = (amount: number) => {
     const target = addReleaseCalendarDays(selectedDate, amount);
     selectDay(target);
+  };
+  const hideProvider = (item: ReleaseAgendaViewItem) => {
+    const hidden = hideProviderReleaseEvent(item.media, item.event);
+    if (hidden.ok) onSave(hidden.item);
+  };
+  const deleteManual = (media: MediaItem, event: ManualReleaseEvent) => {
+    onConfirm(
+      "Manuel yayını sil",
+      `"${event.title}" manuel yayın olayı silinecek. Emin misin?`,
+      () => { onSave(deleteManualReleaseEvent(media, event.id)); },
+      "Sil",
+    );
+  };
+  const agendaActions = {
+    onHide: hideProvider,
+    onEditManual: (media: MediaItem, event: ManualReleaseEvent) =>
+      setEditing({ media, event }),
+    onDeleteManual: deleteManual,
   };
 
   return (
@@ -307,6 +410,60 @@ export function ReleaseCalendarPanel({
           })}
         </div>
       </div>
+      <div className="mb-3 flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => setEditing({})}
+          disabled={!libraryReady || mediaList.every((media) =>
+            media.status === "completed" || media.status === "dropped")}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--app-accent)] px-3 py-1.5 text-[11px] font-semibold text-white disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)]"
+        >
+          <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+          Manuel yayın ekle
+        </button>
+        <button
+          type="button"
+          aria-expanded={showHidden}
+          onClick={() => setShowHidden((current) => !current)}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--app-border)] px-3 py-1.5 text-[11px] text-[var(--app-text-secondary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)]"
+        >
+          <Eye className="h-3.5 w-3.5" aria-hidden="true" />
+          Gizlenen yayınları yönet ({releases.hiddenItems.length})
+        </button>
+      </div>
+      {showHidden && (
+        <div className="mb-3 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-2)] p-3">
+          <h3 className="text-xs font-semibold text-[var(--app-text-primary)]">Gizlenen provider yayınları</h3>
+          {releases.hiddenItems.length === 0 ? (
+            <p className="mt-2 text-xs text-[var(--app-text-muted)]">Gizlenen yayın yok.</p>
+          ) : (
+            <div className="mt-2 space-y-2">
+              {releases.hiddenItems.map((item) => (
+                <div
+                  key={`${item.media.id}:${item.key}`}
+                  className="flex items-center justify-between gap-3 rounded-lg border border-[var(--app-border)] p-2"
+                >
+                  <span className="min-w-0">
+                    <span className="block truncate text-xs font-medium text-[var(--app-text-primary)]">
+                      {item.media.title}
+                    </span>
+                    <span className="block truncate text-[10px] text-[var(--app-text-muted)]">
+                      {item.event?.title ?? "Provider cache’inde artık bulunmayan olay"}
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => onSave(restoreProviderReleaseEvent(item.media, item.key))}
+                    className="shrink-0 rounded-lg border border-[var(--app-border)] px-2 py-1 text-[10px] text-[var(--app-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)]"
+                  >
+                    Geri getir
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {releases.partialError && (
         <div className="mb-3 flex gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2.5 text-[11px] text-amber-300">
@@ -341,11 +498,11 @@ export function ReleaseCalendarPanel({
           )}
           {view === "agenda" ? (
             <>
-              <AgendaGroup title="Bugün" items={filteredAgenda.today} onOpen={onOpen} />
-              <AgendaGroup title="Önümüzdeki 7 gün" items={filteredAgenda.next7Days} onOpen={onOpen} />
-              <AgendaGroup title="Önümüzdeki 30 gün" items={filteredAgenda.next30Days} onOpen={onOpen} />
-              <AgendaGroup title="Daha sonra" items={filteredAgenda.later} onOpen={onOpen} />
-              <AgendaGroup title="Tarihi açıklanmadı" items={filteredAgenda.tba} onOpen={onOpen} />
+              <AgendaGroup title="Bugün" items={filteredAgenda.today} onOpen={onOpen} {...agendaActions} />
+              <AgendaGroup title="Önümüzdeki 7 gün" items={filteredAgenda.next7Days} onOpen={onOpen} {...agendaActions} />
+              <AgendaGroup title="Önümüzdeki 30 gün" items={filteredAgenda.next30Days} onOpen={onOpen} {...agendaActions} />
+              <AgendaGroup title="Daha sonra" items={filteredAgenda.later} onOpen={onOpen} {...agendaActions} />
+              <AgendaGroup title="Tarihi açıklanmadı" items={filteredAgenda.tba} onOpen={onOpen} {...agendaActions} />
             </>
           ) : (
             <>
@@ -474,15 +631,25 @@ export function ReleaseCalendarPanel({
                   Seçili gün · {selectedDate}
                 </h3>
                 {selectedItems.length > 0 ? (
-                  <AgendaGroup title="Yayınlar" items={selectedItems} onOpen={onOpen} />
+                  <AgendaGroup title="Yayınlar" items={selectedItems} onOpen={onOpen} {...agendaActions} />
                 ) : (
                   <p className="text-xs text-[var(--app-text-muted)]">Bu günde yayın yok.</p>
                 )}
               </div>
-              <AgendaGroup title="Tarihi açıklanmadı" items={filteredAgenda.tba} onOpen={onOpen} />
+              <AgendaGroup title="Tarihi açıklanmadı" items={filteredAgenda.tba} onOpen={onOpen} {...agendaActions} />
             </>
           )}
         </div>
+      )}
+      {editing && (
+        <ManualReleaseEventDialog
+          key={`${editing.media?.id ?? "new"}:${editing.event?.id ?? "create"}`}
+          mediaList={mediaList}
+          initialMedia={editing.media}
+          editingEvent={editing.event}
+          onSave={onSave}
+          onClose={() => setEditing(null)}
+        />
       )}
     </>
   );

@@ -7,7 +7,12 @@ import {
   getTvmazeSeasonNumber,
   getTvmazeShowExternalId,
 } from "@/lib/series-group";
-import type { MediaItem, MediaSource, MediaStatus } from "@/lib/types";
+import type {
+  MediaItem,
+  MediaReleaseSchedule,
+  MediaSource,
+  MediaStatus,
+} from "@/lib/types";
 
 export const RELEASE_EVENT_SCHEMA_VERSION = 1 as const;
 
@@ -18,12 +23,7 @@ export type ReleaseEventType =
   | "publication"
   | "manual";
 
-export type ReleaseDatePrecision =
-  | { precision: "exact_datetime"; dateTime: string }
-  | { precision: "date_only"; date: string }
-  | { precision: "month_only"; month: string }
-  | { precision: "year_only"; year: number }
-  | { precision: "tba" };
+export type ReleaseDatePrecision = MediaReleaseSchedule;
 
 type AutomaticReleaseProvider = Exclude<MediaSource, "manual">;
 
@@ -489,6 +489,19 @@ function decodeReleaseDate(
       ));
       return null;
   }
+}
+
+export function decodeReleaseSchedule(
+  value: unknown,
+): { ok: true; value: ReleaseDatePrecision } | {
+  ok: false;
+  issues: ReleaseEventCodecIssue[];
+} {
+  const issues: ReleaseEventCodecIssue[] = [];
+  const decoded = decodeReleaseDate(value, issues);
+  return decoded && issues.length === 0
+    ? { ok: true, value: decoded }
+    : { ok: false, issues };
 }
 
 function decodeOrigin(

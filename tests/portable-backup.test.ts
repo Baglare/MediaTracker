@@ -209,6 +209,33 @@ describe("Portable Backup V2 export", () => {
     expect(inspected.summary.relationships.groupedMedia).toBe(1);
   });
 
+  it("exports manual releases and hidden provider keys but not provider cache", async () => {
+    const calendarMedia = media({
+      releaseCalendar: {
+        version: 1,
+        manualEvents: [{
+          id: "550e8400-e29b-41d4-a716-446655440000",
+          mediaId: "media-1",
+          eventKind: "movie_release",
+          title: "Portable manual release",
+          schedule: { precision: "date_only", date: "2026-08-10" },
+          note: "portable-event-note",
+          createdAt: EXPORTED_AT,
+          updatedAt: EXPORTED_AT,
+        }],
+        hiddenProviderEventKeys: ["tmdb:release-42"],
+      },
+    });
+    const created = await create({ ...source(), mediaItems: [calendarMedia] });
+    const inspected = await inspectPortableBackupText(created.serialized);
+
+    expect(inspected.status).toBe("valid");
+    expect(created.backup.data.mediaItems?.[0].releaseCalendar)
+      .toEqual(calendarMedia.releaseCalendar);
+    expect(created.serialized).toContain("portable-event-note");
+    expect(created.serialized).not.toContain("releaseCalendarCache");
+  });
+
   it("produces the stable browser download filename", () => {
     expect(portableBackupFilename(EXPORTED_AT))
       .toBe("mediatracker-portable-v2-2026-07-30.json");
@@ -297,6 +324,27 @@ describe("Portable Backup V2 read-only inspection", () => {
     expect(JSON.stringify(inspected)).not.toContain("future-private-value");
     expect(JSON.stringify(inspected)).not.toContain("do-not-show");
     expect(JSON.stringify(inspected)).not.toContain("unknown-record-value");
+  });
+
+  it("reports a corrupt manual release instead of silently accepting it", async () => {
+    const created = await create();
+    created.backup.data.mediaItems![0].releaseCalendar = {
+      version: 1,
+      manualEvents: [{
+        id: "not-a-uuid",
+        mediaId: "media-1",
+        eventKind: "manual",
+        title: "",
+        schedule: { precision: "date_only", date: "2026-02-30" },
+        createdAt: "invalid",
+        updatedAt: "invalid",
+      }],
+      hiddenProviderEventKeys: [],
+    };
+    const inspected = await inspectPortableBackupText(await reseal(created.backup));
+    expect(inspected.status).toBe("invalid");
+    expect(inspected.issues.map((entry) => entry.code))
+      .toContain("invalid_manual_event_id");
   });
 
   it("does not expose included personal-note content in its summary or issues", async () => {

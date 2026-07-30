@@ -23,6 +23,12 @@ import {
   type ReleaseFetchError,
   ReleaseProviderError,
 } from "@/features/calendar/providers/release-providers";
+import {
+  buildHiddenProviderEventKey,
+  decodeMediaReleaseCalendarData,
+  isProviderReleaseEventHidden,
+  manualReleaseEventsForMedia,
+} from "@/features/calendar/domain/manual-release-calendar";
 import type { LocalOwnerScope } from "@/lib/local-owner-scope";
 import type { PersonalStorageLike } from "@/lib/personal-data-storage";
 import type { MediaItem } from "@/lib/types";
@@ -183,6 +189,13 @@ export interface ReleaseAgendaViewItem {
   fetchedAt: string;
 }
 
+export interface HiddenProviderReleaseViewItem {
+  key: string;
+  media: MediaItem;
+  event?: ReleaseEvent;
+  stale: boolean;
+}
+
 export type ReleaseMediaFilter = "tv" | "anime" | "movie";
 
 export function filterReleaseCalendarViewItems(
@@ -210,10 +223,16 @@ export function buildReleaseCalendarViewItems(input: {
   const visibleItems: ReleaseAgendaViewItem[] = [];
   for (const media of input.items) {
     if (!isReleaseEligible(media)) continue;
+    for (const event of manualReleaseEventsForMedia(media)) {
+      const updatedAt = media.releaseCalendar?.manualEvents
+        .find((entry) => entry.id === event.id)?.updatedAt ?? new Date(0).toISOString();
+      visibleItems.push({ event, media, stale: false, fetchedAt: updatedAt });
+    }
     const entry = currentReleaseCacheEntry(input.cache, media);
     if (!entry) continue;
     const stale = isReleaseCacheEntryStale(entry, nowMs);
     for (const event of selectReleaseEventsForMedia(media, entry.events)) {
+      if (isProviderReleaseEventHidden(media, event)) continue;
       visibleItems.push({ event, media, stale, fetchedAt: entry.fetchedAt });
     }
   }
@@ -224,6 +243,37 @@ export function buildReleaseCalendarViewItems(input: {
   return visibleItems.sort(
     (left, right) => (order.get(left.event) ?? 0) - (order.get(right.event) ?? 0),
   );
+}
+
+export function buildHiddenProviderReleaseViewItems(input: {
+  items: readonly MediaItem[];
+  cache: ReleaseCalendarCache;
+  nowMs?: number;
+}): HiddenProviderReleaseViewItem[] {
+  const nowMs = input.nowMs ?? Date.now();
+  const results: HiddenProviderReleaseViewItem[] = [];
+  for (const media of input.items) {
+    const releaseData = decodeMediaReleaseCalendarData(media.releaseCalendar, media.id).value;
+    if (releaseData.hiddenProviderEventKeys.length === 0) continue;
+    const entry = currentReleaseCacheEntry(input.cache, media);
+    const eventsByKey = new Map(
+      (entry?.events ?? []).flatMap((event) => {
+        const key = buildHiddenProviderEventKey(event);
+        return key ? [[key, event] as const] : [];
+      }),
+    );
+    for (const key of releaseData.hiddenProviderEventKeys) {
+      results.push({
+        key,
+        media,
+        event: eventsByKey.get(key),
+        stale: entry ? isReleaseCacheEntryStale(entry, nowMs) : false,
+      });
+    }
+  }
+  return results.sort((left, right) =>
+    left.media.title.localeCompare(right.media.title, "tr")
+    || left.key.localeCompare(right.key, "en"));
 }
 
 export function buildReleaseAgendaFromViewItems(input: {

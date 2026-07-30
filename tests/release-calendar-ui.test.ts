@@ -14,6 +14,14 @@ const panelSource = fs.readFileSync(
   path.join(process.cwd(), "features/calendar/components/release-calendar-panel.tsx"),
   "utf8",
 );
+const dialogSource = fs.readFileSync(
+  path.join(process.cwd(), "features/calendar/components/manual-release-event-dialog.tsx"),
+  "utf8",
+);
+const commandsSource = fs.readFileSync(
+  path.join(process.cwd(), "features/library/hooks/use-media-commands.ts"),
+  "utf8",
+);
 
 describe("release agenda UI contract", () => {
   it("replaces only the provider placeholder with agenda states", () => {
@@ -59,5 +67,24 @@ describe("release agenda UI contract", () => {
     expect(hookSource).toContain("state?.ownerScope === input.ownerScope?.key");
     expect(hookSource).toContain("generation !== generationRef.current");
     expect(hookSource).toContain("scopeRef.current?.key !== scope.key");
+  });
+
+  it("offers validated manual CRUD and stable provider-event visibility controls", () => {
+    expect(panelSource).toContain("Manuel yayın ekle");
+    expect(panelSource).toContain("Gizlenen yayınları yönet");
+    expect(panelSource).toContain("Geri getir");
+    expect(panelSource).toContain("hideProviderReleaseEvent");
+    expect(panelSource).toContain("deleteManualReleaseEvent");
+    expect(dialogSource).toContain("Tarih kesinliği");
+    expect(dialogSource).toContain("createManualReleaseEvent");
+    expect(dialogSource).toContain("updateManualReleaseEvent");
+  });
+
+  it("persists calendar changes through the existing media mutation path", () => {
+    expect(source).toContain("onSave={commands.mutations.save}");
+    expect(source).toContain('key={ownerScope?.key ?? "owner-pending"}');
+    expect(commandsSource).toContain("save: mutations.saveMedia");
+    expect(panelSource).not.toContain("enqueueMediaUpsert");
+    expect(panelSource).not.toContain("localStorage");
   });
 });

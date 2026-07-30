@@ -146,8 +146,11 @@ export default function CalendarFeature({
               <ReleaseCalendarPanel
                 key={ownerScope?.key ?? "owner-pending"}
                 releases={releases}
+                mediaList={mediaList}
                 libraryReady={libraryReady}
                 onOpen={commands.openDetail}
+                onSave={commands.mutations.save}
+                onConfirm={commands.openConfirmation}
               />
             </CalendarSection>
           </div>

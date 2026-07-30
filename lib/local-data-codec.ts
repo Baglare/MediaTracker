@@ -20,6 +20,7 @@ import {
   isMediaIdentityIssueCode,
   type MediaIdentityIssue,
 } from "./media-identity";
+import { decodeMediaReleaseCalendarData } from "../features/calendar/domain/manual-release-calendar";
 
 export interface RecordCodecIssue {
   code: string;
@@ -444,6 +445,24 @@ export function decodeMediaItem(rawValue: unknown): RecordDecodeResult<MediaItem
   if (raw.metadata !== undefined) {
     if (isRecord(raw.metadata)) output.metadata = { ...raw.metadata };
     else issues.push(issue("invalid_metadata", "metadata", "metadata bir obje olmalıdır."));
+  }
+  if (raw.releaseCalendar !== undefined) {
+    const decodedReleaseCalendar = decodeMediaReleaseCalendarData(
+      raw.releaseCalendar,
+      id,
+    );
+    output.releaseCalendar = decodedReleaseCalendar.value;
+    const mappedIssues = decodedReleaseCalendar.issues.map((entry) => ({
+      code: entry.code,
+      path: entry.path,
+      message: entry.message,
+    }));
+    warnings.push(...mappedIssues.filter((entry) =>
+      entry.code === "invalid_hidden_provider_key"
+      || entry.code === "invalid_hidden_provider_keys"));
+    issues.push(...mappedIssues.filter((entry) =>
+      entry.code !== "invalid_hidden_provider_key"
+      && entry.code !== "invalid_hidden_provider_keys"));
   }
   if (raw.seasonBreakdown !== undefined) {
     if (

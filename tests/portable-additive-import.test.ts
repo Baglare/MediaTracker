@@ -298,6 +298,40 @@ describe("Portable Backup V2 additive import planning", () => {
 });
 
 describe("Portable Backup V2 additive import transaction", () => {
+  it("remaps embedded manual release media IDs for an explicit exact copy", async () => {
+    const storage = new MemoryStorage();
+    seed(GUEST_OWNER_SCOPE, storage, [media({ id: "existing" })]);
+    const incoming = media({
+      releaseCalendar: {
+        version: 1,
+        manualEvents: [{
+          id: "550e8400-e29b-41d4-a716-446655440000",
+          mediaId: "import-media",
+          eventKind: "manual",
+          title: "Imported release",
+          schedule: { precision: "tba" },
+          createdAt: EXPORTED_AT,
+          updatedAt: EXPORTED_AT,
+        }],
+        hiddenProviderEventKeys: ["tmdb:release-42"],
+      },
+    });
+    const text = await backupText({ mediaItems: [incoming], progressLogs: [] });
+    const prepared = await plan(GUEST_OWNER_SCOPE, storage, text, ["import-media"]);
+    expect((await executePortableAdditiveImport(
+      GUEST_OWNER_SCOPE,
+      text,
+      prepared,
+      { storage },
+    )).ok).toBe(true);
+
+    const added = currentMedia(GUEST_OWNER_SCOPE, storage)
+      .find((item) => item.id.startsWith("import-"));
+    expect(added?.releaseCalendar?.manualEvents[0].mediaId).toBe(added?.id);
+    expect(added?.releaseCalendar?.hiddenProviderEventKeys)
+      .toEqual(["tmdb:release-42"]);
+  });
+
   it("commits all selected domains, relation remaps and durable user queue", async () => {
     const storage = new MemoryStorage();
     seed(USER_A, storage, [media({ id: "existing" })]);

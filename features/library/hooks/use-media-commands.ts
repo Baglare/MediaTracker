@@ -30,7 +30,7 @@ export type MediaOverlayState =
     };
 
 interface LibraryMutationApi {
-  saveMedia: (item: MediaItem) => void;
+  saveMedia: (item: MediaItem) => boolean;
   deleteMedia: (id: string) => void;
   incrementMedia: (id: string) => void;
   completeMedia: (id: string) => void;
@@ -142,6 +142,7 @@ export function useMediaCommands({
     saveQuickAdd,
     commitGroup,
     mutations: {
+      save: mutations.saveMedia,
       increment: mutations.incrementMedia,
       complete: mutations.completeMedia,
       toggleFavorite: mutations.toggleFavorite,

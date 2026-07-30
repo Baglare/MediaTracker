@@ -21,6 +21,7 @@ import {
   type RecommendationLocalLink,
 } from "./social/local-social";
 import type { MediaItem, ProgressLog } from "./types";
+import { decodeMediaReleaseCalendarData } from "../features/calendar/domain/manual-release-calendar";
 
 export const PORTABLE_BACKUP_FORMAT = "mediatracker-portable-backup" as const;
 export const PORTABLE_BACKUP_VERSION = 2 as const;
@@ -211,6 +212,7 @@ const MEDIA_ITEM_FIELDS = new Set([
   "nativeTitle", "episodes", "chapters", "volumes", "countryOfOrigin",
   "anilistStatus", "format", "averageScore", "popularity", "siteUrl",
   "nextAiringEpisode", "anilistRelations",
+  "releaseCalendar",
 ]);
 const PROGRESS_LOG_FIELDS = new Set([
   "id", "mediaId", "mediaTitle", "mediaType", "action", "detail", "amount",
@@ -612,6 +614,22 @@ function inspectDomainUnknownFields(
     "mediaItems",
     "MediaItem",
   );
+  if (Array.isArray(data.mediaItems)) {
+    data.mediaItems.forEach((value, index) => {
+      if (!isRecord(value) || value.releaseCalendar === undefined) return;
+      const decoded = decodeMediaReleaseCalendarData(
+        value.releaseCalendar,
+        typeof value.id === "string" ? value.id : undefined,
+      );
+      decoded.issues.forEach((entry) => issue(
+        issues,
+        "error",
+        entry.code,
+        `MediaItem ${index + 1}: ${entry.message}`,
+        "mediaItems",
+      ));
+    });
+  }
   inspectRecordUnknownFields(
     data.progressLogs,
     PROGRESS_LOG_FIELDS,

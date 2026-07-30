@@ -82,6 +82,37 @@ export type SeriesRelationType =
   | "prequel"
   | "other";
 
+export type MediaReleaseSchedule =
+  | { precision: "exact_datetime"; dateTime: string }
+  | { precision: "date_only"; date: string }
+  | { precision: "month_only"; month: string }
+  | { precision: "year_only"; year: number }
+  | { precision: "tba" };
+
+export type ManualReleaseEventKind =
+  | "episode"
+  | "season_premiere"
+  | "movie_release"
+  | "publication"
+  | "manual";
+
+export interface ManualReleaseEvent {
+  id: string;
+  mediaId: string;
+  eventKind: ManualReleaseEventKind;
+  title: string;
+  schedule: MediaReleaseSchedule;
+  note?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MediaReleaseCalendarData {
+  version: 1;
+  manualEvents: ManualReleaseEvent[];
+  hiddenProviderEventKeys: string[];
+}
+
 // Her bir medya kartının sahip olduğu veriler
 export interface MediaItem {
   id: string;                    // Benzersiz kimlik
@@ -108,6 +139,7 @@ export interface MediaItem {
   favorite?: boolean;             // Favori mi? (varsayılan: false)
   tags?: string[];                // Kişisel etiketler (kullanıcı tanımlı)
   personalNotes?: string;         // Kişisel notlar (serbest metin)
+  releaseCalendar?: MediaReleaseCalendarData; // Kalıcı manuel yayınlar ve provider gizleme kararları
 
   // --- Dış kaynak entegrasyonu için opsiyonel alanlar ---
   externalSource?: MediaSource;  // Medya hangi kaynaktan eklendi?

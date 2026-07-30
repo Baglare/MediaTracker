@@ -451,11 +451,12 @@ export function useMediaLibrary(userId: string | null | undefined) {
       });
     }
 
-    if (!applyPersistedSnapshot(nextMedia, logChange?.logs ?? logsRef.current).ok) return;
+    if (!applyPersistedSnapshot(nextMedia, logChange?.logs ?? logsRef.current).ok) return false;
     enqueueMediaUpsert(stored);
     if (logChange) enqueueProgressLog(logChange.persistedLog);
     queueSocialMutation(existing, stored);
     queueXpMutation(stored);
+    return true;
   }, [
     applyPersistedSnapshot,
     buildAddedLogDetail,

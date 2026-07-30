@@ -16,10 +16,12 @@ import {
 import {
   buildReleaseAgendaFromViewItems,
   buildReleaseCalendarViewItems,
+  buildHiddenProviderReleaseViewItems,
   cacheEntriesForMedia,
   refreshReleaseCalendarCache,
   type ReleaseAgendaView,
   type ReleaseAgendaViewItem,
+  type HiddenProviderReleaseViewItem,
   type ReleaseRefreshFailure,
 } from "@/features/calendar/services/release-calendar-service";
 import type { LocalOwnerScope } from "@/lib/local-owner-scope";
@@ -54,6 +56,7 @@ interface OwnedReleaseState {
 
 export interface UseReleaseCalendarResult {
   items: ReleaseAgendaViewItem[];
+  hiddenItems: HiddenProviderReleaseViewItem[];
   agenda: ReleaseAgendaView;
   today: string;
   timeZone?: string;
@@ -162,6 +165,13 @@ export function useReleaseCalendar(input: {
         timeZone: visible.timeZone,
       })
     : EMPTY_AGENDA;
+  const hiddenItems = visible
+    ? buildHiddenProviderReleaseViewItems({
+        items: input.mediaList,
+        cache: visible.cache,
+        nowMs,
+      })
+    : [];
   const entries = visible ? cacheEntriesForMedia(input.mediaList, visible.cache) : [];
   const lastUpdated = entries
     .map((entry) => entry.fetchedAt)
@@ -173,6 +183,7 @@ export function useReleaseCalendar(input: {
 
   return {
     items,
+    hiddenItems,
     agenda,
     today,
     timeZone: visible?.timeZone,
