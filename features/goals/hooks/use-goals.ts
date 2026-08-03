@@ -6,6 +6,7 @@ import {
   archiveGoal,
   cancelGoal,
   createGoal,
+  createGoalFromApprovedSuggestion,
   deleteGoal,
   reactivateGoal,
   updateGoal,
@@ -13,7 +14,7 @@ import {
   type UpdateGoalPatch,
 } from "@/features/goals/data/goal-repository";
 import { readGoalStore, subscribeGoalStore } from "@/features/goals/data/goal-store";
-import type { Goal } from "@/features/goals/domain/types";
+import type { Goal, GoalSuggestion } from "@/features/goals/domain/types";
 import {
   isCurrentOwnerGeneration,
   isHydratedOwnerVisible,
@@ -61,6 +62,11 @@ export function useGoals(userId: string | null | undefined, mediaItems: readonly
 
   const mutations = useMemo(() => ({
     create: (input: CreateGoalInput) => createGoal(requireOwner(), input, repositoryOptions),
+    approveSuggestion: (suggestion: GoalSuggestion) => createGoalFromApprovedSuggestion(
+      requireOwner(),
+      suggestion,
+      repositoryOptions,
+    ),
     update: (id: string, patch: UpdateGoalPatch) => updateGoal(requireOwner(), id, patch, repositoryOptions),
     cancel: (id: string) => cancelGoal(requireOwner(), id, repositoryOptions),
     archive: (id: string) => archiveGoal(requireOwner(), id, repositoryOptions),

@@ -48,7 +48,7 @@ Bağlı medya sonradan silinirse Goal kaydı korunur ve kartta “Bağlı medya 
 
 `/goals` sayfası aktif, iptal ve arşiv listelerini; manuel create/edit; confirmation üzerinden lifecycle değişiklikleri ve fiziksel delete'i sunar. Form D5-1 scope/metric/date/timezone policy'lerini kullanır. Film ve visual novel progress birimi sunmaz; belirli medya + `completed_media` hedefi `targetValue=1` olur.
 
-Goal kartları yalnız tanımı gösterir: title, origin, scope, metric/target, schedule/tarih/timezone, lifecycle ve exact bağlı medya. `currentValue`, yüzde, progress bar, completed sonucu veya tahmin gösterilmez ve saklanmaz.
+Goal kartları tanımın yanında [D5-3 evaluation sözleşmesinden](./GOAL_SYSTEM_EVALUATION.md) gelen gerçek, ephemeral ilerlemeyi gösterir. `currentValue`, yüzde, attainment veya dönem sonucu Goal store'da saklanmaz.
 
 ## D5-4'e bırakılan persistence kapsamı
 
@@ -56,13 +56,13 @@ Portable backup/import formatı D5-2'de değiştirilmedi. Goal export/import, ad
 
 Cloud queue entity'si, Supabase tablo/RPC/RLS ve migration eklenmedi. D5-4 additive ayrı Goal tablosu, owner scope, revision/CAS, idempotent operation ID ve delete tombstone eklemelidir. MediaItem metadata Goal aggregate deposu olarak kullanılmamalıdır.
 
-## D5-3'e kalan kararlar
+## D5-3 sonucu ve D5-4'e kalan kararlar
 
-D5-3 gerçek evaluation motorunu yazarken aşağıdaki audit kararlarını tamamlamalıdır:
+D5-3 aşağıdaki kararları [GOAL_SYSTEM_EVALUATION.md](./GOAL_SYSTEM_EVALUATION.md) içinde tamamlamıştır:
 
-1. Period içi `completed_media` için immutable completion logu ile current `MediaItem.status` precedence'i.
-2. `added`-completed, logsuz import ve status geri alma durumunda `insufficient_history` davranışı.
-3. Aynı ProgressLog ID'nin local merge/replay payload'ı ile Cloud immutable-log conflict'inde authoritative kaynak.
-4. Detached logların yok sayılması, deterministic contribution ID listesi ve anime-movie sınıflandırması.
+1. Completion contribution için güçlü dönem transition'ı ve current completed status birlikte gerekir.
+2. `added`-completed/logsuz import sayılmaz; `insufficient_history` üretir.
+3. Conflicting ID ve detached log contribution dışıdır; ID listesi deterministiktir.
+4. Evaluation ve suggestion state'i bu local store'a yazılmaz.
 
-Bu kararların hiçbiri Goal içine ikinci sayaç veya kalıcı evaluation sonucu eklememelidir.
+D5-4 portable backup/import ile ayrı Cloud Goal aggregate'ını eklerken bu store envelope'ına türetilmiş sayaç koymamalıdır; immutable Cloud log/CAS ve fiziksel delete tombstone kararı da D5-4'e aittir.

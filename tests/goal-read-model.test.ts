@@ -22,12 +22,12 @@ function goal(lifecycle: Goal["lifecycle"] = "active"): Goal {
 describe("Goal read model contract", () => {
   it.each([
     ["active", 0, "2026-08-01", "not_started"],
-    ["active", 0, "2026-08-03", "not_started"],
+    ["active", 0, "2026-08-03", "in_progress"],
     ["active", 25, "2026-08-10", "in_progress"],
     ["active", 100, "2026-08-10", "reached"],
     ["active", 25, "2026-09-01", "expired"],
-    ["cancelled", 100, "2026-08-10", "inactive_target"],
-    ["archived", 100, "2026-08-10", "inactive_target"],
+    ["cancelled", 100, "2026-08-10", "reached"],
+    ["archived", 100, "2026-08-10", "reached"],
   ] as const)("%s lifecycle / %s current / %s -> %s", (lifecycle, current, date, expected) => {
     expect(deriveGoalAttainment(goal(lifecycle), current, date)).toBe(expected);
   });

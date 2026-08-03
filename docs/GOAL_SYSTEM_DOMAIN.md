@@ -46,7 +46,7 @@ Kalıcı `Goal` alanları: `id`, `title`, `origin`, `scope`, `metric`, `schedule
 
 `origin` manuel hedef ile kullanıcı tarafından onaylanmış sistem önerisinin kaynağını ayırır. `GoalSuggestion` lifecycle taşımayan ephemeral bir öneri sözleşmesidir; yalnız explicit `approveGoalSuggestion` sınırı onu `origin=suggested` aktif Goal'a dönüştürür. D5-1 öneri üretim motoru tanımlamaz.
 
-Lifecycle yalnız kullanıcının hedef kaydı üzerindeki kararını taşır: `active`, `cancelled`, `archived`. Attainment türetilmiş sonuçtur: `not_started`, `in_progress`, `reached`, `expired`, `inactive_target`. Cancelled/archived her zaman değerlendirme dışıdır. `reached`, loglar veya MediaItem state'i değişirse tekrar hesaplanabilir; lifecycle'a yazılmaz.
+Lifecycle yalnız kullanıcının hedef kaydı üzerindeki kararını taşır: `active`, `cancelled`, `archived`. Attainment türetilmiş sonuçtur: `not_started`, `in_progress`, `reached`, `expired`, `inactive_target`. Cancelled/archived tanımlar aktif UI listesinden çıkarılır; lifecycle attainment değerine dönüştürülmez. `reached`, loglar veya MediaItem state'i değişirse tekrar hesaplanabilir; lifecycle'a yazılmaz.
 
 ## Scope ve metric matrisi
 
@@ -84,7 +84,7 @@ Media scope kimliği `mediaRecordId`'dir. `canonicalMediaKey` opsiyonel snapshot
 
 Codec strict allowlist kullanır; bilinmeyen Goal alanları reddedilir. Goal ID stabil UUID, title 1-200 karakter, target pozitif güvenli tam sayı, timestamp'ler timezone taşıyan ISO instant olmalıdır. Scope/metric, tarih aralığı, weekly Monday ve IANA timezone invariant'ları persistence katmanından bağımsız doğrulanır. Versioned `GoalDocument` duplicate Goal ID kabul etmez.
 
-`GoalEvaluation` D5-3 sınırıdır. `currentValue` target'ı aşabilir; `progressPercent` 0-100 clamp edilir, `remainingValue` sıfırın altına inmez. `contributingLogIds` benzersiz ve deterministik sıralıdır. Tanımlı warning'ler: `media_missing`, `detached_logs_ignored`, `incompatible_unit`, `insufficient_history`, `timezone_invalid`. D5-1 gerçek log evaluator engine'i içermez.
+`GoalEvaluation` D5-3 sınırıdır. `currentValue` target'ı aşabilir; `progressPercent` 0-100 clamp edilir, `remainingValue` sıfırın altına inmez. `contributingLogIds` benzersiz ve deterministik sıralıdır. D5-3 `conflicting_log_payload` ve `progress_chain_discontinuity` warning'lerini eklemiş, gerçek trusted-log politikasını [GOAL_SYSTEM_EVALUATION.md](./GOAL_SYSTEM_EVALUATION.md) içinde uygulamıştır.
 
 ## Owner-scoped local persistence kararı
 
@@ -123,13 +123,12 @@ Queue/conflict sözleşmesi mevcut Cloud V2 ilkeleriyle uyumludur:
 - Offline local mutation önce safe-write ile kalıcı olur; remote hata local Goal'ı geri almaz.
 - Goal payload'ı türetilmiş evaluation/sayaç taşımaz. Media/progress değişiklikleri Goal config revision'ını artırmaz; evaluator local authoritative snapshot'tan yeniden çalışır.
 
-## D5-2/D5-3 öncesi açık riskler
+## D5-4 öncesi açık riskler
 
-D5-2 domain kullanımı için hard blocker yoktur. D5-3 evaluator başlamadan şu sözleşmeler netleştirilmelidir:
+D5-3 evaluation için hard blocker bulunmamıştır. Completion/status precedence'i, logsuz import, duplicate/conflicting ID ve anime-movie kararları [evaluation sözleşmesinde](./GOAL_SYSTEM_EVALUATION.md) kesinleştirilmiştir. D5-4'e kalan riskler:
 
-1. Period içi `completed_media` için current `status=completed` ile completion action tarihinin precedence'i.
-2. `added` completed ve logsuz imported completed kayıtların `insufficient_history` davranışı.
-3. Aynı log ID'nin local merge edilmiş payload'ı ile Cloud immutable payload conflict'inde authoritative kaynak.
-4. Anime movie ve visual novel için resolved classification'ın completed-media policy'sine uygulanması.
+1. Dispatch edilmiş log ID payload'ının local bir-saatlik merge ile değiştirilmesinin engellenmesi veya yeni ID'ye ayrılması.
+2. Cloud immutable-log conflict'inin owner-scoped CAS/idempotency ile çözülmesi.
+3. Goal aggregate için ayrı Cloud revision, RPC ve tombstone sözleşmesi.
 
 Bu riskler ikinci kalıcı sayaç eklenerek çözülmemelidir.

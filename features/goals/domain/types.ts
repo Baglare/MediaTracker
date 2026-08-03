@@ -92,7 +92,9 @@ export type GoalEvaluationWarning =
   | "detached_logs_ignored"
   | "incompatible_unit"
   | "insufficient_history"
-  | "timezone_invalid";
+  | "timezone_invalid"
+  | "conflicting_log_payload"
+  | "progress_chain_discontinuity";
 
 export interface GoalEvaluation {
   goalId: string;

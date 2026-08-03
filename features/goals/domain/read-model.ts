@@ -13,6 +13,8 @@ const WARNINGS = new Set<GoalEvaluationWarning>([
   "incompatible_unit",
   "insufficient_history",
   "timezone_invalid",
+  "conflicting_log_payload",
+  "progress_chain_discontinuity",
 ]);
 
 export interface GoalEvaluationInput {
@@ -22,6 +24,7 @@ export interface GoalEvaluationInput {
   referenceDate: string;
   contributingLogIds?: readonly string[];
   warnings?: readonly GoalEvaluationWarning[];
+  inactiveTarget?: boolean;
 }
 
 export type GoalEvaluationResult =
@@ -32,12 +35,13 @@ export function deriveGoalAttainment(
   goal: Goal,
   currentValue: number,
   referenceDate: string,
+  inactiveTarget = false,
 ): GoalAttainment {
-  if (goal.lifecycle !== "active") return "inactive_target";
+  if (inactiveTarget) return "inactive_target";
   if (referenceDate < goal.schedule.startsOn) return "not_started";
   if (currentValue >= goal.metric.targetValue) return "reached";
   if (goal.schedule.endsOn && referenceDate > goal.schedule.endsOn) return "expired";
-  return currentValue > 0 ? "in_progress" : "not_started";
+  return "in_progress";
 }
 
 export function createGoalEvaluation(input: GoalEvaluationInput): GoalEvaluationResult {
@@ -68,7 +72,12 @@ export function createGoalEvaluation(input: GoalEvaluationInput): GoalEvaluation
       targetValue,
       remainingValue: Math.max(0, targetValue - input.currentValue),
       progressPercent: Math.min(100, Math.max(0, (input.currentValue / targetValue) * 100)),
-      attainment: deriveGoalAttainment(input.goal, input.currentValue, input.referenceDate),
+      attainment: deriveGoalAttainment(
+        input.goal,
+        input.currentValue,
+        input.referenceDate,
+        input.inactiveTarget,
+      ),
       contributingLogIds: sortedIds,
       warnings,
     },

@@ -2,7 +2,7 @@
 
 import { Archive, Ban, Pencil, RotateCcw, Trash2 } from "lucide-react";
 
-import type { Goal } from "@/features/goals/domain/types";
+import type { Goal, GoalAttainment, GoalEvaluation, GoalEvaluationWarning } from "@/features/goals/domain/types";
 import type { MediaItem, MediaType } from "@/lib/types";
 
 const MEDIA_TYPE_LABELS: Record<MediaType, string> = {
@@ -10,6 +10,22 @@ const MEDIA_TYPE_LABELS: Record<MediaType, string> = {
   manhua: "Manhua", book: "Kitap", light_novel: "Light novel", web_novel: "Web novel", visual_novel: "Visual novel",
 };
 const LIFECYCLE_LABELS = { active: "Aktif", cancelled: "İptal edildi", archived: "Arşivlendi" } as const;
+const ATTAINMENT_LABELS: Record<GoalAttainment, string> = {
+  not_started: "Henüz başlamadı",
+  in_progress: "Devam ediyor",
+  reached: "Hedefe ulaşıldı",
+  expired: "Süresi doldu",
+  inactive_target: "Bağlı medya bulunamadı",
+};
+const WARNING_LABELS: Record<GoalEvaluationWarning, string> = {
+  media_missing: "Bağlı medya artık kütüphanede bulunmuyor.",
+  detached_logs_ignored: "Silinmiş medyaya ait aktiviteler hesaba katılmadı.",
+  incompatible_unit: "Hedef birimiyle uyumsuz aktiviteler hesaba katılmadı.",
+  insufficient_history: "Tamamlanma tarihini kanıtlayan yeterli aktivite geçmişi yok.",
+  timezone_invalid: "Dönem, geçerli bir timezone ile çözümlenemedi.",
+  conflicting_log_payload: "Aynı kimlikte çelişkili aktiviteler hesaba katılmadı.",
+  progress_chain_discontinuity: "Tutarsız ilerleme zincirinin belirsiz bölümü hesaba katılmadı.",
+};
 
 function scopeLabel(goal: Goal, media?: MediaItem): string {
   if (goal.scope.kind === "library") return "Tüm kütüphane";
@@ -32,6 +48,7 @@ function scheduleLabel(goal: Goal): string {
 export function GoalCard({
   goal,
   mediaItems,
+  evaluation,
   onEdit,
   onCancel,
   onArchive,
@@ -40,6 +57,7 @@ export function GoalCard({
 }: {
   goal: Goal;
   mediaItems: readonly MediaItem[];
+  evaluation?: GoalEvaluation;
   onEdit: () => void;
   onCancel: () => void;
   onArchive: () => void;
@@ -67,7 +85,27 @@ export function GoalCard({
         <div className="sm:col-span-2"><dt className="text-[var(--app-text-muted)]">Program</dt><dd className="mt-0.5 text-[var(--app-text-primary)]">{scheduleLabel(goal)}</dd></div>
         {goal.schedule.kind !== "one_time" && <div className="sm:col-span-2"><dt className="text-[var(--app-text-muted)]">Timezone</dt><dd className="mt-0.5 text-[var(--app-text-primary)]">{goal.schedule.timeZone}</dd></div>}
       </dl>
-      {mediaMissing && <p role="status" className="mt-3 rounded-lg border border-[var(--app-warning)] bg-[var(--app-warning-soft)] px-3 py-2 text-xs text-[var(--app-warning)]">Bağlı medya bulunamadı</p>}
+      {goal.lifecycle === "active" && evaluation && (
+        <section aria-label="Hedef ilerlemesi" className="mt-4 min-w-0 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-1)] p-3">
+          <div className="flex min-w-0 flex-wrap items-baseline justify-between gap-2 text-xs">
+            <span className="font-semibold text-[var(--app-text-primary)]">{evaluation.currentValue} / {evaluation.targetValue}</span>
+            <span className="text-[var(--app-text-secondary)]">{ATTAINMENT_LABELS[evaluation.attainment]}</span>
+          </div>
+          <div role="progressbar" aria-label={`${goal.title} ilerlemesi`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(evaluation.progressPercent)} className="mt-2 h-2 w-full overflow-hidden rounded-full bg-[var(--app-surface-3)]">
+            <div className="h-full rounded-full bg-[var(--app-accent)] transition-[width]" style={{ width: `${evaluation.progressPercent}%` }} />
+          </div>
+          <div className="mt-2 flex flex-wrap justify-between gap-2 text-[11px] text-[var(--app-text-muted)]">
+            <span>%{Math.round(evaluation.progressPercent)} · Kalan {evaluation.remainingValue}</span>
+            <span>{evaluation.periodStart} – {evaluation.periodEnd}</span>
+          </div>
+          {evaluation.warnings.length > 0 && (
+            <ul aria-label="Hedef değerlendirme uyarıları" className="mt-3 space-y-1.5 text-xs text-[var(--app-warning)]">
+              {evaluation.warnings.map((warning) => <li key={warning}>{WARNING_LABELS[warning]}</li>)}
+            </ul>
+          )}
+        </section>
+      )}
+      {goal.lifecycle !== "active" && mediaMissing && <p role="status" className="mt-3 rounded-lg border border-[var(--app-warning)] bg-[var(--app-warning-soft)] px-3 py-2 text-xs text-[var(--app-warning)]">Bağlı medya bulunamadı</p>}
       <div className="mt-4 flex flex-wrap gap-2 border-t border-[var(--app-border)] pt-3">
         {goal.lifecycle === "active" && <button type="button" onClick={onEdit} className={buttonClass}><Pencil className="h-3.5 w-3.5" />Düzenle</button>}
         {goal.lifecycle === "active" && <button type="button" onClick={onCancel} className={buttonClass}><Ban className="h-3.5 w-3.5" />İptal et</button>}
