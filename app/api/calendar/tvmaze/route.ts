@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import {
+  isDateInReleaseWindow,
+  isReleaseRouteTimeout,
+  releaseRouteSignal,
+} from "@/app/api/calendar/release-route-utils";
+
 interface TvmazeReleaseEpisode {
   id: number;
   name?: string | null;
@@ -41,12 +47,14 @@ export async function GET(request: NextRequest) {
     const response = await fetch(`https://api.tvmaze.com/shows/${showId}/episodes`, {
       headers: { accept: "application/json" },
       cache: "no-store",
+      signal: releaseRouteSignal(),
     });
     if (!response.ok) return upstreamFailure(response);
     const payload = await response.json() as unknown;
     if (!Array.isArray(payload)) {
       return NextResponse.json({ error: "TVMaze episode payload geçersiz." }, { status: 502 });
     }
+    const seenEpisodeIds = new Set<number>();
     const episodes = payload
       .filter((entry): entry is TvmazeReleaseEpisode =>
         typeof entry === "object"
@@ -61,12 +69,22 @@ export async function GET(request: NextRequest) {
         airdate: typeof episode.airdate === "string" ? episode.airdate : null,
         airtime: typeof episode.airtime === "string" ? episode.airtime : null,
         airstamp: typeof episode.airstamp === "string" ? episode.airstamp : null,
-      }));
+      }))
+      .filter((episode) => isDateInReleaseWindow(episode.airdate ?? episode.airstamp ?? ""))
+      .filter((episode) => {
+        if (seenEpisodeIds.has(episode.id)) return false;
+        seenEpisodeIds.add(episode.id);
+        return true;
+      });
     return NextResponse.json({ showId, seasonNumber, episodes });
-  } catch {
+  } catch (error) {
     return NextResponse.json(
-      { error: "TVMaze release servisine ulaşılamadı." },
-      { status: 502 },
+      {
+        error: isReleaseRouteTimeout(error)
+          ? "TVMaze release isteği zaman aşımına uğradı."
+          : "TVMaze release servisine ulaşılamadı.",
+      },
+      { status: isReleaseRouteTimeout(error) ? 504 : 502 },
     );
   }
 }

@@ -78,6 +78,12 @@ describe("release agenda UI contract", () => {
     expect(dialogSource).toContain("Tarih kesinliği");
     expect(dialogSource).toContain("createManualReleaseEvent");
     expect(dialogSource).toContain("updateManualReleaseEvent");
+    expect(dialogSource).toContain('event.key === "Escape"');
+    expect(dialogSource).toContain('event.key !== "Tab"');
+    expect(dialogSource).toContain("previouslyFocused?.focus()");
+    expect(dialogSource).toContain("aria-describedby");
+    expect(dialogSource).toContain("aria-invalid");
+    expect(panelSource).toContain('media.coverImage || `/placeholders/${media.type}.svg`');
   });
 
   it("persists calendar changes through the existing media mutation path", () => {

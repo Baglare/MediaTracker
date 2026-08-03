@@ -9,6 +9,7 @@ import {
   type ReleaseProviderContext,
 } from "@/features/calendar/domain/release-calendar";
 import {
+  buildReleaseMediaFingerprint,
   createReleaseCacheEntry,
   currentReleaseCacheEntry,
   isReleaseCacheEntryStale,
@@ -50,6 +51,12 @@ interface RefreshTask {
   item: MediaItem;
   provider: ReturnType<typeof releaseProviderForMedia>;
 }
+
+type ProviderTaskResult =
+  | { ok: true; entry: ReleaseCacheEntry }
+  | { ok: false; failure: ReleaseRefreshFailure };
+
+const inFlightProviderTasks = new Map<string, Promise<ProviderTaskResult>>();
 
 export async function mapWithConcurrency<T, R>(
   values: readonly T[],
@@ -112,7 +119,11 @@ export async function refreshReleaseCalendarCache(input: {
         ? resolvedSeason.value
         : undefined,
     };
-    try {
+    const taskKey = `${input.scope.key}:${provider.id}:${buildReleaseMediaFingerprint(item)}`;
+    const existing = inFlightProviderTasks.get(taskKey);
+    if (existing) return existing;
+    const task = (async (): Promise<ProviderTaskResult> => {
+      try {
       const payload = await provider.fetchEvents({
         mediaRecordId: item.id,
         mediaIdentityKey: item.identity?.key,
@@ -136,15 +147,24 @@ export async function refreshReleaseCalendarCache(input: {
           fetchedAtMs: nowMs,
         }),
       };
-    } catch (error) {
-      return {
-        ok: false as const,
-        failure: {
-          mediaRecordId: item.id,
-          provider: provider.id as "tvmaze" | "anilist" | "tmdb",
-          error: safeFailure(error),
-        },
-      };
+      } catch (error) {
+        return {
+          ok: false as const,
+          failure: {
+            mediaRecordId: item.id,
+            provider: provider.id as "tvmaze" | "anilist" | "tmdb",
+            error: safeFailure(error),
+          },
+        };
+      }
+    })();
+    inFlightProviderTasks.set(taskKey, task);
+    try {
+      return await task;
+    } finally {
+      if (inFlightProviderTasks.get(taskKey) === task) {
+        inFlightProviderTasks.delete(taskKey);
+      }
     }
   });
 

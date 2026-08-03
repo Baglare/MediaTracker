@@ -38,6 +38,7 @@ export interface ReleaseRequestOptions {
   sleep?: (delayMs: number) => Promise<void>;
   maxAttempts?: number;
   maxRetryDelayMs?: number;
+  timeoutMs?: number;
 }
 
 function retryAfterMs(response: Response, now = Date.now()): number | undefined {
@@ -63,12 +64,16 @@ export async function fetchReleaseJson(
   const sleep = options.sleep ?? defaultSleep;
   const maxAttempts = Math.max(1, Math.min(options.maxAttempts ?? 3, 3));
   const maxRetryDelayMs = Math.max(0, options.maxRetryDelayMs ?? 30_000);
+  const timeoutMs = Math.max(1_000, Math.min(options.timeoutMs ?? 10_000, 30_000));
   let lastError: ReleaseProviderError | null = null;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     let response: Response;
     try {
-      response = await fetcher(url, { headers: { accept: "application/json" } });
+      response = await fetcher(url, {
+        headers: { accept: "application/json" },
+        signal: AbortSignal.timeout(timeoutMs),
+      });
     } catch {
       lastError = new ReleaseProviderError({
         code: "network",
@@ -389,6 +394,9 @@ export function normalizeTmdbReleaseEvents(
     availableRegions: decoded.releases.map((release) => release.region),
   });
   const today = options.today ?? new Date().toISOString().slice(0, 10);
+  const horizon = new Date(`${today}T00:00:00Z`);
+  horizon.setUTCDate(horizon.getUTCDate() + 90);
+  const horizonDate = horizon.toISOString().slice(0, 10);
   const regional = region
     ? decoded.releases
         .filter((release) => release.region === region)
@@ -397,8 +405,10 @@ export function normalizeTmdbReleaseEvents(
           return [{ ...release, releaseType: tmdbReleaseType(release.type) }];
         })
     : [];
-  const upcoming = regional.filter((release) => release.dateTime.slice(0, 10) >= today);
-  const candidates = upcoming.length > 0 ? upcoming : regional;
+  const candidates = regional.filter((release) => {
+    const date = release.dateTime.slice(0, 10);
+    return date >= today && date <= horizonDate;
+  });
   candidates.sort((left, right) =>
     RELEASE_TYPE_PRIORITY[left.releaseType] - RELEASE_TYPE_PRIORITY[right.releaseType]
     || (left.dateTime < right.dateTime ? -1 : left.dateTime > right.dateTime ? 1 : 0)
@@ -426,7 +436,11 @@ export function normalizeTmdbReleaseEvents(
         region: selected.region,
       },
     });
-  } else if (validDateOnly(decoded.originalReleaseDate)) {
+  } else if (
+    validDateOnly(decoded.originalReleaseDate)
+    && decoded.originalReleaseDate >= today
+    && decoded.originalReleaseDate <= horizonDate
+  ) {
     event = validEvent({
       schemaVersion: 1,
       id: `tmdb:${decoded.movieId}:general:${decoded.originalReleaseDate}`,

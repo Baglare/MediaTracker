@@ -140,7 +140,7 @@ function AgendaGroup({
               className="flex min-w-0 flex-1 gap-3 rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)]"
             >
               <Image
-                src={media.coverImage}
+                src={media.coverImage || `/placeholders/${media.type}.svg`}
                 alt=""
                 width={44}
                 height={64}

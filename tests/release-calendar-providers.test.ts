@@ -20,6 +20,7 @@ import type {
 } from "@/features/calendar/domain/release-calendar";
 import {
   resolveTvSeasonIdentity,
+  getReleaseEventCalendarDate,
   selectReleaseAgenda,
 } from "@/features/calendar/domain/release-calendar";
 
@@ -148,10 +149,10 @@ describe("automatic release providers", () => {
     };
     const payload = {
       movieId: 42,
-      originalReleaseDate: "2026-05-01",
+      originalReleaseDate: "2026-02-01",
       releases: [
-        { region: "TR", dateTime: "2026-06-01T00:00:00Z", type: 3 },
-        { region: "DE", dateTime: "2026-06-02T00:00:00Z", type: 4 },
+        { region: "TR", dateTime: "2026-02-02T00:00:00Z", type: 3 },
+        { region: "DE", dateTime: "2026-02-03T00:00:00Z", type: 4 },
       ],
     };
     expect(normalizeTmdbReleaseEvents(payload, context, {
@@ -167,7 +168,7 @@ describe("automatic release providers", () => {
       locale: "en-GB",
       today: "2026-01-01",
     })[0]).toMatchObject({
-      date: { precision: "date_only", date: "2026-05-01" },
+      date: { precision: "date_only", date: "2026-02-01" },
       metadata: { releaseType: "general" },
     });
     expect(resolveTmdbReleaseRegion({
@@ -248,6 +249,35 @@ describe("automatic release providers", () => {
       timeZone: "America/New_York",
     }).today).toEqual([instant]);
   });
+
+  it("uses explicit IANA zones at offset and DST boundaries", () => {
+    const eventAt = (dateTime: string): ReleaseEvent => ({
+      schemaVersion: 1,
+      id: dateTime,
+      mediaRecordId: "media-1",
+      type: "episode",
+      title: "Boundary",
+      date: { precision: "exact_datetime", dateTime },
+      origin: {
+        kind: "provider",
+        provider: "anilist",
+        providerEventId: dateTime,
+        persistence: "reproducible_cache",
+      },
+    });
+    expect(getReleaseEventCalendarDate(eventAt("2026-01-01T00:30:00Z"), {
+      timeZone: "America/Los_Angeles",
+    })).toBe("2025-12-31");
+    expect(getReleaseEventCalendarDate(eventAt("2026-01-01T22:30:00Z"), {
+      timeZone: "Asia/Tokyo",
+    })).toBe("2026-01-02");
+    expect(getReleaseEventCalendarDate(eventAt("2026-03-08T07:30:00Z"), {
+      timeZone: "America/New_York",
+    })).toBe("2026-03-08");
+    expect(getReleaseEventCalendarDate(eventAt("2026-11-01T06:30:00Z"), {
+      timeZone: "America/New_York",
+    })).toBe("2026-11-01");
+  });
 });
 
 describe("release provider retry policy", () => {
@@ -281,5 +311,15 @@ describe("release provider retry policy", () => {
     await expect(fetchReleaseJson("/release", { fetcher, sleep })).resolves.toEqual({ ok: true });
     expect(fetcher).toHaveBeenCalledTimes(3);
     expect(sleep).toHaveBeenCalledTimes(2);
+  });
+
+  it("adds a bounded abort signal to browser-to-route requests", async () => {
+    const fetcher = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ ok: true }), { status: 200 }),
+    );
+    await fetchReleaseJson("/release", { fetcher, timeoutMs: 1_500 });
+    expect(fetcher).toHaveBeenCalledWith("/release", expect.objectContaining({
+      signal: expect.any(AbortSignal),
+    }));
   });
 });

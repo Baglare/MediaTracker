@@ -23,6 +23,7 @@ import {
   emptyReleaseCalendarCache,
   isReleaseCacheEntryStale,
   readReleaseCalendarCache,
+  RELEASE_CACHE_MAX_EVENTS_PER_MEDIA,
   RELEASE_CACHE_TTL_MS,
   upsertReleaseCacheEntry,
   writeReleaseCalendarCache,
@@ -278,6 +279,59 @@ describe("release cache refresh orchestration", () => {
       today: "2026-01-01",
     });
     expect(Object.values(agenda).flat()).toEqual([]);
+  });
+
+  it("keeps cache identity stable across status-only changes", () => {
+    const planning = media("status", { status: "planning" });
+    const entry = createReleaseCacheEntry({
+      item: planning,
+      provider: "tmdb",
+      events: [event(planning)],
+    });
+    expect(buildReleaseAgendaView({
+      items: [{ ...planning, status: "completed" }],
+      cache: { version: 1, entries: [entry] },
+      today: "2026-01-01",
+    }).later).toEqual([]);
+    expect(buildReleaseAgendaView({
+      items: [{ ...planning, status: "paused" }],
+      cache: { version: 1, entries: [entry] },
+      today: "2026-01-01",
+    }).later).toHaveLength(1);
+  });
+
+  it("bounds events stored for one media record", () => {
+    const item = media("bounded");
+    const events = Array.from(
+      { length: RELEASE_CACHE_MAX_EVENTS_PER_MEDIA + 10 },
+      (_, index) => event(item, String(index)),
+    );
+    expect(createReleaseCacheEntry({ item, provider: "tmdb", events }).events)
+      .toHaveLength(RELEASE_CACHE_MAX_EVENTS_PER_MEDIA);
+  });
+
+  it("coalesces concurrent refreshes for the same owner and media", async () => {
+    const storage = new MemoryStorage();
+    const scope = createUserOwnerScope("user-a");
+    const item = media("coalesced");
+    let releaseFetch: (() => void) | undefined;
+    const fetchEvents = vi.fn(() => new Promise<Record<string, never>>((resolve) => {
+      releaseFetch = () => resolve({});
+    }));
+    const input = {
+      scope,
+      items: [item],
+      cache: emptyReleaseCalendarCache(),
+      providers: providerSet(fetchEvents),
+      nowMs: Date.parse("2026-01-01T00:00:00Z"),
+      storage,
+    };
+    const first = refreshReleaseCalendarCache(input);
+    const second = refreshReleaseCalendarCache(input);
+    await vi.waitFor(() => expect(fetchEvents).toHaveBeenCalledTimes(1));
+    releaseFetch?.();
+    await expect(Promise.all([first, second])).resolves.toHaveLength(2);
+    expect(fetchEvents).toHaveBeenCalledTimes(1);
   });
 
   it("limits provider work to three concurrent requests", async () => {

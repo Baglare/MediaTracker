@@ -18,6 +18,8 @@ import type { MediaItem, MediaSource } from "@/lib/types";
 
 export const RELEASE_CACHE_VERSION = 1 as const;
 export const RELEASE_CACHE_TTL_MS = 12 * 60 * 60 * 1000;
+export const RELEASE_CACHE_MAX_ENTRIES = 2_000;
+export const RELEASE_CACHE_MAX_EVENTS_PER_MEDIA = 256;
 
 type ReleaseCacheProvider = Exclude<MediaSource, "manual" | "openlibrary" | "omdb">;
 
@@ -46,7 +48,12 @@ function validIso(value: unknown): value is string {
 export const releaseCalendarCacheCodec: PersonalDataCodec<ReleaseCalendarCache> = (
   value,
 ) => {
-  if (!isRecord(value) || value.version !== RELEASE_CACHE_VERSION || !Array.isArray(value.entries)) {
+  if (
+    !isRecord(value)
+    || value.version !== RELEASE_CACHE_VERSION
+    || !Array.isArray(value.entries)
+    || value.entries.length > RELEASE_CACHE_MAX_ENTRIES
+  ) {
     return {
       ok: false,
       code: "release_cache_invalid",
@@ -66,6 +73,7 @@ export const releaseCalendarCacheCodec: PersonalDataCodec<ReleaseCalendarCache> 
       || !validIso(raw.fetchedAt)
       || !validIso(raw.expiresAt)
       || !Array.isArray(raw.events)
+      || raw.events.length > RELEASE_CACHE_MAX_EVENTS_PER_MEDIA
       || seen.has(raw.mediaRecordId)
     ) {
       return {
@@ -114,7 +122,6 @@ export function buildReleaseMediaFingerprint(item: MediaItem): string {
   return JSON.stringify([
     item.id,
     item.type,
-    item.status,
     identity,
     seasonKey,
   ]);
@@ -163,7 +170,7 @@ export function createReleaseCacheEntry(input: {
     provider: input.provider,
     fetchedAt: new Date(fetchedAtMs).toISOString(),
     expiresAt: new Date(fetchedAtMs + RELEASE_CACHE_TTL_MS).toISOString(),
-    events: input.events,
+    events: input.events.slice(0, RELEASE_CACHE_MAX_EVENTS_PER_MEDIA),
   };
 }
 

@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import {
+  isReleaseRouteTimeout,
+  releaseRouteSignal,
+} from "@/app/api/calendar/release-route-utils";
+
 const ANILIST_URL = "https://graphql.anilist.co";
 const AIRING_QUERY = `
 query ($mediaId: Int!, $page: Int!, $perPage: Int!) {
@@ -47,6 +52,7 @@ export async function GET(request: NextRequest) {
           variables: { mediaId, page, perPage: 50 },
         }),
         cache: "no-store",
+        signal: releaseRouteSignal(),
       });
       if (!response.ok) {
         const retryAfter = response.headers.get("retry-after");
@@ -89,14 +95,23 @@ export async function GET(request: NextRequest) {
       const reachedBeyondWindow = pageSchedules.some((entry) => entry.airingAt > limitSeconds);
       if (!raw.data.Page.pageInfo?.hasNextPage || reachedBeyondWindow) break;
     }
+    const uniqueSchedules = [...new Map(
+      schedules
+        .sort((left, right) => left.airingAt - right.airingAt || left.id - right.id)
+        .map((entry) => [entry.id, entry] as const),
+    ).values()];
     return NextResponse.json({
       mediaId,
-      schedules,
+      schedules: uniqueSchedules,
     });
-  } catch {
+  } catch (error) {
     return NextResponse.json(
-      { error: "AniList release servisine ulaşılamadı." },
-      { status: 502 },
+      {
+        error: isReleaseRouteTimeout(error)
+          ? "AniList release isteği zaman aşımına uğradı."
+          : "AniList release servisine ulaşılamadı.",
+      },
+      { status: isReleaseRouteTimeout(error) ? 504 : 502 },
     );
   }
 }

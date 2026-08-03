@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { X } from "lucide-react";
 
 import {
@@ -91,6 +91,7 @@ export function ManualReleaseEventDialog({
   onSave: (item: MediaItem) => boolean;
   onClose: () => void;
 }) {
+  const dialogRef = useRef<HTMLDivElement>(null);
   const eligibleMedia = useMemo(
     () => mediaList.filter(isReleaseEligible),
     [mediaList],
@@ -109,6 +110,41 @@ export function ManualReleaseEventDialog({
   const [note, setNote] = useState(editingEvent?.note ?? "");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const selectedMedia = mediaList.find((item) => item.id === mediaId);
+
+  useEffect(() => {
+    const previouslyFocused = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+    const dialog = dialogRef.current;
+    const focusable = () => Array.from(dialog?.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), select:not([disabled]), input:not([disabled]), textarea:not([disabled])',
+    ) ?? []);
+    focusable()[0]?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const controls = focusable();
+      if (controls.length === 0) return;
+      const first = controls[0];
+      const last = controls.at(-1);
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last?.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      previouslyFocused?.focus();
+    };
+  }, [onClose]);
 
   const submit = () => {
     const nextErrors: Record<string, string> = {};
@@ -156,9 +192,10 @@ export function ManualReleaseEventDialog({
       role="dialog"
       aria-modal="true"
       aria-labelledby="manual-release-title"
+      aria-describedby="manual-release-description"
       className="fixed inset-0 z-[80] grid place-items-center bg-black/70 p-4"
     >
-      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface-1)] shadow-2xl">
+      <div ref={dialogRef} className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface-1)] shadow-2xl">
         <div className="sticky top-0 flex items-center justify-between gap-3 border-b border-[var(--app-border)] bg-[var(--app-surface-1)] p-4">
           <h2 id="manual-release-title" className="text-base font-semibold text-[var(--app-text-primary)]">
             {editingEvent ? "Manuel yayını düzenle" : "Manuel yayın ekle"}
@@ -172,10 +209,15 @@ export function ManualReleaseEventDialog({
             <X className="h-4 w-4" aria-hidden="true" />
           </button>
         </div>
+        <p id="manual-release-description" className="sr-only">
+          Kütüphanedeki bir medya için kalıcı yayın tarihi oluştur veya düzenle.
+        </p>
         <div className="space-y-4 p-4">
           <label className="block text-xs text-[var(--app-text-secondary)]">
             Bağlı medya
             <select
+              aria-invalid={Boolean(errors.mediaId)}
+              aria-describedby={errors.mediaId ? "manual-release-media-error" : undefined}
               value={mediaId}
               disabled={Boolean(editingEvent)}
               onChange={(event) => setMediaId(event.target.value)}
@@ -186,7 +228,7 @@ export function ManualReleaseEventDialog({
                 <option key={media.id} value={media.id}>{media.title}</option>
               ))}
             </select>
-            {errors.mediaId && <span className="mt-1 block text-[11px] text-[var(--app-danger)]">{errors.mediaId}</span>}
+            {errors.mediaId && <span id="manual-release-media-error" className="mt-1 block text-[11px] text-[var(--app-danger)]">{errors.mediaId}</span>}
           </label>
           <label className="block text-xs text-[var(--app-text-secondary)]">
             Olay türü
@@ -203,12 +245,14 @@ export function ManualReleaseEventDialog({
           <label className="block text-xs text-[var(--app-text-secondary)]">
             Başlık
             <input
+              aria-invalid={Boolean(errors.title)}
+              aria-describedby={errors.title ? "manual-release-title-error" : undefined}
               value={title}
               maxLength={200}
               onChange={(event) => setTitle(event.target.value)}
               className="mt-1.5 w-full rounded-lg border border-[var(--app-border)] bg-[var(--app-surface-2)] px-3 py-2 text-sm"
             />
-            {errors.title && <span className="mt-1 block text-[11px] text-[var(--app-danger)]">{errors.title}</span>}
+            {errors.title && <span id="manual-release-title-error" className="mt-1 block text-[11px] text-[var(--app-danger)]">{errors.title}</span>}
           </label>
           <label className="block text-xs text-[var(--app-text-secondary)]">
             Tarih kesinliği
@@ -229,6 +273,8 @@ export function ManualReleaseEventDialog({
             <label className="block text-xs text-[var(--app-text-secondary)]">
               Tarih
               <input
+                aria-invalid={Boolean(errors.schedule)}
+                aria-describedby={errors.schedule ? "manual-release-schedule-error" : undefined}
                 type={dateInput}
                 value={scheduleValue}
                 min={precision === "year_only" ? "1" : undefined}
@@ -236,19 +282,21 @@ export function ManualReleaseEventDialog({
                 onChange={(event) => setScheduleValue(event.target.value)}
                 className="mt-1.5 w-full rounded-lg border border-[var(--app-border)] bg-[var(--app-surface-2)] px-3 py-2 text-sm"
               />
-              {errors.schedule && <span className="mt-1 block text-[11px] text-[var(--app-danger)]">{errors.schedule}</span>}
+              {errors.schedule && <span id="manual-release-schedule-error" className="mt-1 block text-[11px] text-[var(--app-danger)]">{errors.schedule}</span>}
             </label>
           )}
           <label className="block text-xs text-[var(--app-text-secondary)]">
             Not (opsiyonel)
             <textarea
+              aria-invalid={Boolean(errors.note)}
+              aria-describedby={errors.note ? "manual-release-note-error" : undefined}
               value={note}
               maxLength={1000}
               rows={3}
               onChange={(event) => setNote(event.target.value)}
               className="mt-1.5 w-full resize-y rounded-lg border border-[var(--app-border)] bg-[var(--app-surface-2)] px-3 py-2 text-sm"
             />
-            {errors.note && <span className="mt-1 block text-[11px] text-[var(--app-danger)]">{errors.note}</span>}
+            {errors.note && <span id="manual-release-note-error" className="mt-1 block text-[11px] text-[var(--app-danger)]">{errors.note}</span>}
           </label>
           {errors.form && <p role="alert" className="text-xs text-[var(--app-danger)]">{errors.form}</p>}
         </div>
@@ -264,4 +312,3 @@ export function ManualReleaseEventDialog({
     </div>
   );
 }
-

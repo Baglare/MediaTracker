@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import {
+  isDateInReleaseWindow,
+  isReleaseRouteTimeout,
+  releaseRouteSignal,
+} from "@/app/api/calendar/release-route-utils";
+
 interface TmdbReleaseDate {
   certification?: string;
   iso_639_1?: string | null;
@@ -44,6 +50,7 @@ export async function GET(request: NextRequest) {
         accept: "application/json",
       },
       cache: "no-store",
+      signal: releaseRouteSignal(),
     });
     if (!response.ok) {
       const retryAfter = response.headers.get("retry-after");
@@ -66,6 +73,7 @@ export async function GET(request: NextRequest) {
           typeof release.release_date !== "string"
           || typeof release.type !== "number"
         ) return [];
+        if (!isDateInReleaseWindow(release.release_date)) return [];
         return [{
           region: regionCode,
           dateTime: release.release_date,
@@ -76,13 +84,20 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       movieId,
       originalReleaseDate:
-        typeof payload.release_date === "string" ? payload.release_date : null,
+        typeof payload.release_date === "string"
+        && isDateInReleaseWindow(payload.release_date)
+          ? payload.release_date
+          : null,
       releases,
     });
-  } catch {
+  } catch (error) {
     return NextResponse.json(
-      { error: "TMDB release servisine ulaşılamadı." },
-      { status: 502 },
+      {
+        error: isReleaseRouteTimeout(error)
+          ? "TMDB release isteği zaman aşımına uğradı."
+          : "TMDB release servisine ulaşılamadı.",
+      },
+      { status: isReleaseRouteTimeout(error) ? 504 : 502 },
     );
   }
 }

@@ -41,6 +41,12 @@ Uygulamanın ana veri kaynağı tarayıcıdaki `localStorage` alanıdır. Supaba
   - Favori işareti
   - Etiketler
   - Kişisel notlar
+- Release Calendar:
+  - TV sezonları için TVMaze, anime için AniList ve filmler için TMDB kaynaklı 90 günlük yayın ajandası
+  - Aynı normalize olay kümesini kullanan ajanda ve Pazartesi başlangıçlı aylık görünüm
+  - Medyaya bağlı kalıcı manuel yayınlar ile stabil provider olaylarını gizleme/geri getirme
+  - Owner-scoped, 12 saat TTL ve stale-while-revalidate otomatik cache; provider cache portable backup veya cloud payload değildir
+  - Mimari ve doğrulama ayrıntıları: [`docs/RELEASE_CALENDAR_ARCHITECTURE.md`](docs/RELEASE_CALENDAR_ARCHITECTURE.md)
 - Kütüphane organizasyonu:
   - Dünya filtresi: Doğu, Kadraj, Arşiv
   - Durum, tür, sıralama ve grid/list görünümü
@@ -301,9 +307,21 @@ Vitest'i izleme modunda veya tek seferlik test paketi olarak çalıştırır.
 - `GET /api/anilist/search?q=...&category=...`
 - `GET /api/anilist/details?id=...&type=...`
 - `GET /api/openlibrary/search?q=...`
+- `GET /api/calendar/tvmaze?showId=...&season=...`
+- `GET /api/calendar/anilist?mediaId=...`
+- `GET /api/calendar/tmdb?movieId=...`
 - `POST /api/ai/recommend`
 
 Dış API anahtarları server-side route'larda kullanılır; tarayıcıya token gönderilmez.
+Release Calendar route'ları yalnız yapılandırılmış provider kimliklerini kabul eder;
+başlık eşleştirmesi yapmaz ve sonuçları önümüzdeki 90 günle sınırlar. TMDB release
+takvimi için `TMDB_READ_ACCESS_TOKEN` gerekir. AniList ve TVMaze public API'leri
+anahtarsızdır; provider erişilemezse geçerli stale cache gösterilmeye devam eder.
+
+Release Calendar yerel-first çalışır. Otomatik provider olayları yeniden
+üretilebilir cache'tir; manuel olaylar ve gizleme kararları ilgili `MediaItem`
+metadata'sında kalıcı kullanıcı verisi olarak saklanır. Push bildirimi, harici
+takvim export'u ve geçmiş/future horizon dışı arşiv bu sürümün kapsamında değildir.
 
 ## Opsiyonel ML Servisi
 
