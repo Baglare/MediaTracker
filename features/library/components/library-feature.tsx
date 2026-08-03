@@ -136,7 +136,7 @@ export default function LibraryFeature({
   const gridClass =
     libraryView === "list"
       ? "grid grid-cols-1 gap-3 items-start"
-      : "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start";
+      : "grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-4 items-start";
 
   const renderCard = (item: MediaItem) => {
     const related = resolveRelatedAction(item);
@@ -204,7 +204,7 @@ export default function LibraryFeature({
                 onOpenChange={onContinueSectionOpenChange}
               />
               {continueSectionOpen && (
-                <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2 xl:grid-cols-3">
+                <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2 2xl:grid-cols-3">
                   {model.continueItems.map(renderCard)}
                 </div>
               )}
@@ -221,7 +221,7 @@ export default function LibraryFeature({
                 onOpenChange={onSeriesSectionOpenChange}
               />
               {seriesSectionOpen && (
-                <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2 xl:grid-cols-3">
+                <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2 2xl:grid-cols-3">
                   {model.seriesGroups.map((group) => (
                     <SeriesGroupCard
                       key={group.key}

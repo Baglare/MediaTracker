@@ -36,7 +36,6 @@ import { MediaItem } from "@/lib/types";
 import {
   getProgressLabel,
   getProgressPercent,
-  getMediaTypeLabel,
   getStatusLabel,
   getIncrementLabel,
   isMovieLike,
@@ -44,7 +43,7 @@ import {
 import {
   resolveThemeAccent,
   topAccentGradient,
-  ThemeSubBadge,
+  MediaClassificationBadges,
 } from "@/components/theme-accent";
 
 interface MediaCardProps {
@@ -361,29 +360,16 @@ export default function MediaCard({
                 kart ribbon'unda (yukarıda) — bu cluster'da yok. Sağ tarafta
                 ribbon için pr-7 reserve. Cluster tek bir frosted şerit gibi
                 davranır: opacity-0 default + group-hover:opacity-100. */}
-            <div className="flex items-start gap-2 pr-7">
-              <div className="relative min-w-0 flex-1 h-[1.15rem]">
-                <h3
-                  className="
-                    absolute left-0 top-0 z-20 max-w-full
-                    font-semibold text-zinc-100 text-[14.5px] leading-tight tracking-tight cursor-default
-                    whitespace-nowrap overflow-hidden text-ellipsis
-                    transition-[max-width,padding,background-color,box-shadow,border-color] duration-150
-                    hover:z-40 hover:max-w-[26rem] hover:whitespace-normal hover:break-words
-                    hover:bg-zinc-950/95 hover:backdrop-blur
-                    hover:rounded-lg hover:px-2 hover:py-1.5
-                    hover:border hover:border-violet-500/40
-                    hover:shadow-lg hover:shadow-black/40
-                    hover:text-base
-                  "
-                >
-                  {item.title}
-                </h3>
-              </div>
+            <div className="min-w-0 pr-7">
+              <h3
+                className="line-clamp-2 min-h-[2.25rem] min-w-0 break-words text-[14.5px] font-semibold leading-[1.125rem] tracking-tight text-zinc-100"
+                title={item.title}
+              >
+                {item.title}
+              </h3>
               <div
                 className="
-                  flex items-center gap-px rounded-lg ring-1 ring-zinc-800/70 bg-zinc-950/70 backdrop-blur-sm
-                  shrink-0
+                  mt-1 ml-auto flex w-fit shrink-0 items-center gap-px rounded-lg ring-1 ring-zinc-800/70 bg-zinc-950/70 backdrop-blur-sm
                   opacity-100 lg:opacity-0 lg:group-hover:opacity-100 lg:focus-within:opacity-100
                   motion-safe:transition-opacity motion-safe:duration-150
                 "
@@ -429,13 +415,7 @@ export default function MediaCard({
                 R18.5: Rafine — daha küçük tipografi, yumuşak ring, status
                 rengi öne çıkıyor; type/subtype daha sakin. */}
             <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-              <span className="text-[10.5px] font-medium px-1.5 py-0.5 rounded-md bg-zinc-800/60 text-zinc-400 ring-1 ring-zinc-700/40">
-                {getMediaTypeLabel(item.type)}
-              </span>
-
-              {/* V5A.3: Doğu içerikleri için subType rozeti (manga/manhwa/manhua,
-                  Light Novel/Web Novel/Visual Novel, Anime · TV/Film/OVA…) */}
-              <ThemeSubBadge item={item} />
+              <MediaClassificationBadges item={item} />
 
               <span
                 className={`inline-flex items-center gap-1 text-[10.5px] font-medium px-1.5 py-0.5 rounded-md ring-1 ${getStatusColor(

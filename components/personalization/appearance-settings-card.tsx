@@ -15,6 +15,7 @@ import type {
   EffectsLevel,
 } from "@/lib/personalization/types";
 import { WORLD_THEME_REGISTRY } from "@/lib/personalization/world-theme-registry";
+import { CollapsibleSection } from "@/components/ui/collapsible-section";
 
 export interface AppearanceAccentOption {
   id: AccentMode;
@@ -60,6 +61,9 @@ export default function AppearanceSettingsCard({
 }) {
   const { preferences, hydrated, updatePreference, resetToDefaults } = useAppearanceRuntime();
   const [message, setMessage] = useState("Görünüm seçimleri bu cihazda anında kaydedilir.");
+  const activeThemeLabel = preferences.theme.kind === "preset"
+    ? BASE_THEME_REGISTRY[preferences.theme.id].label
+    : "Özel tema";
 
   const selectAccent = (accent: AccentMode) => {
     updatePreference("accentMode", accent);
@@ -110,7 +114,16 @@ export default function AppearanceSettingsCard({
         </button>
       </div>
 
-      <ThemeStudio onConfirm={onConfirm} />
+      <CollapsibleSection
+        storageKey="theme-preset-library"
+        title="Tema seçenekleri ve özel tema araçları"
+        description="Hazır tema listesini, özel tema düzenleyicisini, içe/dışa aktarma ve Cloud tema seçeneklerini aç."
+        badge={<span className="rounded-md border border-[var(--app-selected-border)] bg-[var(--app-selected-bg)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--app-selected-text)]">Etkin: {activeThemeLabel}</span>}
+        className="mt-6"
+        headingLevel="h3"
+      >
+        <ThemeStudio onConfirm={onConfirm} />
+      </CollapsibleSection>
 
       <fieldset className="mt-7 border-t border-[var(--app-border)] pt-6">
         <legend className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--app-text-muted)]">Dünya vurgusu</legend>

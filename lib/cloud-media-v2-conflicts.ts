@@ -125,7 +125,7 @@ export function describeCloudV2Conflict(
         ...common,
         title: "Bulut sürümü daha güncel",
         description:
-          "Yerel değişiklik daha eski bir revision üzerinden hazırlandı. Hiçbir veri otomatik ezilmedi.",
+          "Yerel değişiklik daha eski bir sürüm üzerinden hazırlandı. Hiçbir veri otomatik ezilmedi.",
         manualOnly: false,
         actions: ["use-remote", "retry-local", "defer"],
       };
@@ -134,25 +134,25 @@ export function describeCloudV2Conflict(
         ...common,
         title: "Kayıt bulutta silinmiş",
         description:
-          "Eski bir yerel değişiklik silinmiş cloud kaydını otomatik olarak geri getiremez.",
+          "Eski bir yerel değişiklik silinmiş Cloud kaydını otomatik olarak geri getiremez.",
         manualOnly: false,
         actions: ["keep-deleted", "restore", "defer"],
       };
     case "media_target_unavailable":
       return {
         ...common,
-        title: "Progress için üst medya bulunamadı",
+        title: "İlerleme için üst medya bulunamadı",
         description:
-          "Progress işlemi, aynı hesaba ait parent media cloud'da hazır olmadan gönderilemez.",
+          "İlerleme işlemi, aynı hesaba ait üst medya Cloud'da hazır olmadan gönderilemez.",
         manualOnly: false,
         actions: ["retry-parent-first", "defer"],
       };
     case "record_id_unavailable":
       return {
         ...common,
-        title: "Record ID cloud'da kullanılamıyor",
+        title: "Kayıt kimliği Cloud'da kullanılamıyor",
         description:
-          "Additive şemadaki global PK sınırı nedeniyle bu record ID başka bir owner satırıyla çakışıyor. Otomatik ID değişimi veya merge yapılmaz.",
+          "Eklemeli şemadaki genel birincil anahtar sınırı nedeniyle bu kayıt kimliği başka bir sahip satırıyla çakışıyor. Otomatik kimlik değişimi veya birleştirme yapılmaz.",
         manualOnly: true,
         actions: ["defer"],
       };
@@ -161,7 +161,7 @@ export function describeCloudV2Conflict(
         ...common,
         title: "Cloud işlemi kullanıcı kararı bekliyor",
         description:
-          "Bu conflict otomatik çözülemez. Yerel veri korunarak işlem blocked durumda bırakıldı.",
+          "Bu çakışma otomatik çözülemez. Yerel veri korunarak işlem engellenmiş durumda bırakıldı.",
         manualOnly: true,
         actions: ["defer"],
       };

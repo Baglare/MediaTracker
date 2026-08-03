@@ -179,7 +179,7 @@ function AgendaGroup({
               {event.origin.kind === "provider" && onHide && (
                 <button
                   type="button"
-                  aria-label={`${media.title} provider yayınını gizle`}
+                  aria-label={`${media.title} sağlayıcı yayınını gizle`}
                   onClick={() => onHide(viewItem)}
                   className="rounded-lg border border-[var(--app-border)] p-1.5 text-[var(--app-text-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)]"
                 >
@@ -433,7 +433,7 @@ export function ReleaseCalendarPanel({
       </div>
       {showHidden && (
         <div className="mb-3 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-2)] p-3">
-          <h3 className="text-xs font-semibold text-[var(--app-text-primary)]">Gizlenen provider yayınları</h3>
+          <h3 className="text-xs font-semibold text-[var(--app-text-primary)]">Gizlenen sağlayıcı yayınları</h3>
           {releases.hiddenItems.length === 0 ? (
             <p className="mt-2 text-xs text-[var(--app-text-muted)]">Gizlenen yayın yok.</p>
           ) : (
@@ -448,7 +448,7 @@ export function ReleaseCalendarPanel({
                       {item.media.title}
                     </span>
                     <span className="block truncate text-[10px] text-[var(--app-text-muted)]">
-                      {item.event?.title ?? "Provider cache’inde artık bulunmayan olay"}
+                      {item.event?.title ?? "Sağlayıcı önbelleğinde artık bulunmayan olay"}
                     </span>
                   </span>
                   <button
@@ -486,7 +486,7 @@ export function ReleaseCalendarPanel({
             Yaklaşan yayın bulunamadı
           </p>
           <p className="mt-1.5 text-xs leading-relaxed text-[var(--app-text-muted)]">
-            Seçili filtrelerde yayın yok. Provider sonuç döndürmediğinde tahmini TBA üretilmez.
+            Seçili filtrelerde yayın yok. Sağlayıcı sonuç döndürmediğinde tahmini tarihi belirsiz olay üretilmez.
           </p>
         </div>
       ) : (

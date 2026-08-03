@@ -28,7 +28,7 @@ export function ThemeTransferPanel() {
   const [preview, setPreview] = useState<ThemeImportPreview | null>(null);
   const [decisions, setDecisions] = useState<Record<number, ThemeImportConflictAction>>({});
   const [applyBundleTheme, setApplyBundleTheme] = useState(false);
-  const [message, setMessage] = useState("Import ve export yalnız bu cihazdaki canonical tema verisini kullanır.");
+  const [message, setMessage] = useState("İçe ve dışa aktarma yalnız bu cihazdaki standart tema verisini kullanır.");
 
   const activeCustomId = appearance.preferences.theme.kind === "custom"
     ? appearance.preferences.theme.id
@@ -110,7 +110,7 @@ export function ThemeTransferPanel() {
           <FileJson className="h-5 w-5" aria-hidden="true" />
         </span>
         <div>
-          <h4 id="theme-transfer-title" className="text-sm font-semibold text-[var(--app-text-primary)]">Tema import / export</h4>
+          <h4 id="theme-transfer-title" className="text-sm font-semibold text-[var(--app-text-primary)]">Tema içe / dışa aktarma</h4>
           <p className="mt-1 text-xs text-[var(--app-text-muted)]">
             Yalnız özel tema girdileri taşınır; profil, medya, cookie ve diğer tercihler dosyaya eklenmez.
           </p>
@@ -221,7 +221,7 @@ export function ThemeTransferPanel() {
               {preview.bundle?.activeTheme && (
                 <label className="mt-3 flex min-h-11 items-center gap-3 rounded-lg border border-[var(--app-border)] px-3 text-sm">
                   <input type="checkbox" checked={applyBundleTheme} onChange={(event) => setApplyBundleTheme(event.target.checked)} className="h-4 w-4 accent-[var(--app-accent)]" />
-                  Dosyada seçili olan temayı import sonunda uygula
+                  Dosyada seçili olan temayı içe aktarma sonunda uygula
                 </label>
               )}
               <div className="mt-3 flex flex-wrap gap-2">

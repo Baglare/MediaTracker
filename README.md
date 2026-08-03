@@ -45,6 +45,7 @@ Uygulamanın ana veri kaynağı tarayıcıdaki `localStorage` alanıdır. Supaba
   - TV sezonları için TVMaze, anime için AniList ve filmler için TMDB kaynaklı 90 günlük yayın ajandası
   - Aynı normalize olay kümesini kullanan ajanda ve Pazartesi başlangıçlı aylık görünüm
   - Medyaya bağlı kalıcı manuel yayınlar ile stabil provider olaylarını gizleme/geri getirme
+  - Aynı D3 veri kümesinden beslenen, sağ panelde ve dar Dashboard görünümünde en fazla üç olayı gösteren “Yakında” özeti
   - Owner-scoped, 12 saat TTL ve stale-while-revalidate otomatik cache; provider cache portable backup veya cloud payload değildir
   - Mimari ve doğrulama ayrıntıları: [`docs/RELEASE_CALENDAR_ARCHITECTURE.md`](docs/RELEASE_CALENDAR_ARCHITECTURE.md)
 - Kütüphane organizasyonu:
@@ -71,6 +72,7 @@ Uygulamanın ana veri kaynağı tarayıcıdaki `localStorage` alanıdır. Supaba
   - Cloud verisini yerel veriyle birleştirme
   - Mutasyonlar için sync queue ve online durumda flush altyapısı
   - Özel temalar için güvenli JSON import/export ve kullanıcı onaylı, revision kontrollü opsiyonel cloud senkronizasyonu
+  - Birbirinden ayrışan Porselen, Tozpembe, Lavanta, Kutup ve Sepya açık tema yüzeyleri ile açık/koyu temaya uyumlu logo
   - Tema aktarım/senkronizasyon ayrıntıları: [`docs/THEME_IMPORT_EXPORT_AND_SYNC.md`](docs/THEME_IMPORT_EXPORT_AND_SYNC.md)
 - Sosyal profil:
   - `/u/[username]` public/protected/personal profil route’u ve `/people` kullanıcı araması

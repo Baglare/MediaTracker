@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+.brand-mark {
+  background-color: var(--app-logo-color, var(--app-text-primary));
+  mask: url("/brand/media-tracker-mark.svg") center / contain no-repeat;
+  -webkit-mask: url("/brand/media-tracker-mark.svg") center / contain no-repeat;
+}
+
 /* ============================================ */
 /* R14 — WorldHero mikro polish & entrance      */
 /* ============================================ */
@@ -184,51 +190,52 @@
 }
 
 [data-theme="porcelain"] {
-  --app-bg: #f5f5f4;
-  --app-surface-1: #fafaf9;
-  --app-surface-2: #e7e5e4;
-  --app-surface-3: #d6d3d1;
-  --app-surface-elevated: #fffdfa;
-  --app-text-primary: #1c1917;
-  --app-text-secondary: #44403c;
-  --app-text-muted: #78716c;
-  --app-border: #d6d3d1;
-  --app-border-strong: #a8a29e;
-  --app-scrollbar-thumb-hover: #78716c;
-  --app-shadow: rgba(28, 25, 23, 0.14);
-  --app-overlay: rgba(28, 25, 23, 0.48);
-  --app-focus: #7c3aed;
-  --app-accent: #7c3aed;
-  --app-accent-strong: #6d28d9;
-  --app-accent-soft: rgba(124, 58, 237, 0.14);
-  --app-accent-contrast: #fafaf9;
-  --app-secondary-accent: #b45309;
-  --app-danger: #be123c;
-  --app-danger-soft: rgba(190, 18, 60, 0.10);
-  --app-success: #047857;
-  --app-success-soft: rgba(4, 120, 87, 0.10);
-  --app-warning: #b45309;
-  --app-warning-soft: rgba(180, 83, 9, 0.10);
-  --app-input-bg: #fafaf9;
-  --app-hover: #e7e5e4;
-  --app-selected: rgba(124, 58, 237, 0.12);
+  --app-logo-color: var(--app-accent);
+  --app-bg: #f1eee6;
+  --app-surface-1: #fbfaf6;
+  --app-surface-2: #e4e0d6;
+  --app-surface-3: #cec8bc;
+  --app-surface-elevated: #fffefa;
+  --app-text-primary: #172033;
+  --app-text-secondary: #334155;
+  --app-text-muted: #5c667a;
+  --app-border: #bac4d0;
+  --app-border-strong: #7c8ea3;
+  --app-scrollbar-thumb-hover: #60758d;
+  --app-shadow: rgba(23, 32, 51, 0.14);
+  --app-overlay: rgba(23, 32, 51, 0.48);
+  --app-focus: #245fa8;
+  --app-accent: #245fa8;
+  --app-accent-strong: #194b88;
+  --app-accent-soft: rgba(36, 95, 168, 0.14);
+  --app-accent-contrast: #ffffff;
+  --app-secondary-accent: #2f7c86;
+  --app-danger: #a1123f;
+  --app-danger-soft: rgba(161, 18, 63, 0.10);
+  --app-success: #08745c;
+  --app-success-soft: rgba(8, 116, 92, 0.10);
+  --app-warning: #925400;
+  --app-warning-soft: rgba(146, 84, 0, 0.11);
+  --app-input-bg: #f6f7f5;
+  --app-hover: #e9e6de;
+  --app-selected: rgba(36, 95, 168, 0.13);
   --app-action-success-text: #065f46;
   --app-action-success-bg: rgba(5, 150, 105, 0.12);
   --app-action-success-border: #6ee7b7;
   --app-action-accent-text: #5b21b6;
   --app-action-accent-bg: rgba(124, 58, 237, 0.10);
   --app-action-accent-border: #a78bfa;
-  --app-selected-text: #4c1d95;
-  --app-selected-bg: #ede9fe;
-  --app-selected-border: #8b5cf6;
-  --app-disabled-text: #57534e;
-  --app-disabled-bg: #e7e5e4;
-  --app-disabled-border: #c4b8b0;
-  --app-hero-bg: linear-gradient(135deg, #fffdfa 0%, #f1efec 100%);
-  --app-panel-bg: #fafaf9;
-  --app-card-bg: #fffdfa;
-  --app-card-hover: #f1efec;
-  --app-section-divider: #d6d3d1;
+  --app-selected-text: #172033;
+  --app-selected-bg: #dce6f2;
+  --app-selected-border: #245fa8;
+  --app-disabled-text: #737b87;
+  --app-disabled-bg: #dedbd3;
+  --app-disabled-border: #c2beb5;
+  --app-hero-bg: linear-gradient(135deg, #e1e7ed 0%, #f1eee6 100%);
+  --app-panel-bg: #fbfaf6;
+  --app-card-bg: #e4e0d6;
+  --app-card-hover: #d9d5cb;
+  --app-section-divider: #bac4d0;
   --app-subtle-highlight: rgba(120, 113, 108, 0.06);
 
   /* Mevcut zinc utility'lerini açık temada semantik role eşle. */

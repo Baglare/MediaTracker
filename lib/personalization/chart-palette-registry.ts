@@ -78,14 +78,14 @@ export const CHART_PALETTE_REGISTRY: Readonly<Record<ChartPaletteId, ChartPalett
   monochrome: {
     id: "monochrome",
     label: "Monokrom",
-    description: "Durumları nötr açık-koyu tonlarla gösterir.",
+    description: "Charcoal, slate ve silver aralığında belirgin açık-koyu basamakları kullanır.",
     followWorldCompletedColor: false,
     statuses: fixedStatuses({
-      completed: "var(--app-text-primary)",
-      inProgress: "color-mix(in srgb, var(--app-text-primary) 82%, var(--app-bg))",
-      planning: "color-mix(in srgb, var(--app-text-primary) 64%, var(--app-bg))",
-      paused: "color-mix(in srgb, var(--app-text-primary) 46%, var(--app-bg))",
-      dropped: "color-mix(in srgb, var(--app-text-primary) 30%, var(--app-bg))",
+      completed: "color-mix(in srgb, var(--app-text-primary) 94%, var(--app-bg))",
+      inProgress: "color-mix(in srgb, var(--app-text-primary) 76%, var(--app-bg))",
+      planning: "color-mix(in srgb, var(--app-text-primary) 56%, var(--app-bg))",
+      paused: "color-mix(in srgb, var(--app-text-primary) 36%, var(--app-bg))",
+      dropped: "color-mix(in srgb, var(--app-text-primary) 18%, var(--app-bg))",
     }),
   },
   world_aware: {

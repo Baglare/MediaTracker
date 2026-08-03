@@ -1,9 +1,9 @@
 "use client";
 
 import { ArrowLeft, Users } from "lucide-react";
-import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { BrandMark } from "@/components/brand-mark";
 
 import { AppearanceWorldScope } from "@/components/personalization/appearance-runtime";
 import AppSidebar from "@/components/app-sidebar";
@@ -38,7 +38,7 @@ function PublicTopbar() {
     <header className="sticky top-0 z-40 border-b border-[var(--app-border)] bg-[color-mix(in_srgb,var(--app-bg)_88%,transparent)] backdrop-blur-md">
       <div className="mx-auto flex h-14 max-w-7xl items-center gap-3 px-4 sm:px-6">
         <Link href="/" className="flex items-center gap-2 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-focus)]">
-          <Image src="/brand/media-tracker-mark.svg" alt="" aria-hidden="true" width={30} height={30} className="h-7 w-7" />
+          <BrandMark className="h-7 w-7" />
           <span className="font-semibold text-[var(--app-text-primary)]">MediaTracker</span>
         </Link>
         <nav aria-label="Public navigasyon" className="ml-auto flex items-center gap-2 text-sm">

@@ -11,6 +11,8 @@ import type {
 } from "@/lib/personalization/layout-types";
 import type { ChartPaletteId, WorldThemeKey } from "@/lib/personalization/types";
 import type { MediaItem, ProgressLog } from "@/lib/types";
+import { UpcomingReleaseSummary } from "@/features/calendar/components/upcoming-release-summary";
+import type { UseReleaseCalendarResult } from "@/features/calendar/hooks/use-release-calendar";
 
 interface DashboardFeatureProps {
   stats: DashboardStats;
@@ -28,10 +30,12 @@ interface DashboardFeatureProps {
   chartPaletteId: ChartPaletteId;
   followWorldCompletedColor: boolean;
   chartWorld: WorldThemeKey;
+  releases: UseReleaseCalendarResult;
 }
 
 export default function DashboardFeature({
   isLayoutHydrated,
+  releases,
   ...props
 }: DashboardFeatureProps) {
   return (
@@ -51,6 +55,7 @@ export default function DashboardFeature({
           </Link>
         }
       />
+      <UpcomingReleaseSummary releases={releases} compact className="mb-4 xl:hidden" />
       {isLayoutHydrated ? (
         <EnhancedDashboard {...props} />
       ) : (

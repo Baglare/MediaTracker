@@ -78,11 +78,11 @@ function ScrollBrushIcon({ className }: { className?: string }) {
 
 // ------ Sub-type → okunabilir rozet etiketi ------
 const SUB_TYPE_LABEL: Partial<Record<MediaSubType, string>> = {
-  anime_tv: "Anime · TV",
-  anime_movie: "Anime · Film",
+  anime_tv: "TV",
+  anime_movie: "Film",
   ova: "OVA",
   ona: "ONA",
-  special: "Special",
+  special: "Özel",
   manga: "Manga",
   manhwa: "Manhwa",
   manhua: "Manhua",
@@ -92,6 +92,86 @@ const SUB_TYPE_LABEL: Partial<Record<MediaSubType, string>> = {
   serialized_novel: "Novel",
   // tv_series / movie / book için rozet gösterme — type rozeti zaten var.
 };
+
+const MAIN_TYPE_LABEL = {
+  anime: "Anime",
+  manga: "Manga",
+  tv: "Dizi",
+  movie: "Film",
+  book: "Kitap",
+  novel: "Novel",
+} as const;
+
+const ANIME_FORMAT_SUBTYPE: Partial<Record<string, MediaSubType>> = {
+  TV: "anime_tv",
+  MOVIE: "anime_movie",
+  OVA: "ova",
+  ONA: "ona",
+  SPECIAL: "special",
+  MUSIC: "special",
+};
+
+const MANGA_FORMAT_SUBTYPE: Partial<Record<string, MediaSubType>> = {
+  MANGA: "manga",
+  MANHWA: "manhwa",
+  MANHUA: "manhua",
+  NOVEL: "serialized_novel",
+};
+
+export function resolveMediaBadgeLabels(item: ClassifiableInput): {
+  main: string;
+  subType: string | null;
+} {
+  const classification = withMediaClassification(item);
+  const main = MAIN_TYPE_LABEL[classification.mediaType];
+  const structuredFormat = item.format ?? (typeof item.metadata?.format === "string" ? item.metadata.format : undefined);
+  const formatSubtype = structuredFormat && item.type === "anime"
+    ? ANIME_FORMAT_SUBTYPE[structuredFormat.toUpperCase()]
+    : structuredFormat && (item.type === "manga" || item.type === "manhwa" || item.type === "manhua")
+      ? MANGA_FORMAT_SUBTYPE[structuredFormat.toUpperCase()]
+      : undefined;
+  const hasStructuredSubtype = Boolean(item.subType)
+    || Boolean(item.format)
+    || item.type === "manhwa"
+    || item.type === "manhua"
+    || item.type === "light_novel"
+    || item.type === "web_novel"
+    || item.type === "visual_novel";
+  const subType = hasStructuredSubtype
+    ? SUB_TYPE_LABEL[formatSubtype ?? classification.subType] ?? null
+    : null;
+  return {
+    main,
+    subType: subType && subType.toLocaleLowerCase("tr-TR") !== main.toLocaleLowerCase("tr-TR")
+      ? subType
+      : null,
+  };
+}
+
+export function MediaClassificationBadges({
+  item,
+  compact = false,
+}: {
+  item: ClassifiableInput;
+  compact?: boolean;
+}) {
+  const labels = resolveMediaBadgeLabels(item);
+  const sizeClass = compact
+    ? "text-[10px] px-1.5 py-0.5 rounded"
+    : "text-[10.5px] px-1.5 py-0.5 rounded-md";
+  return (
+    <>
+      <span className={`font-medium ring-1 ring-[var(--app-border)] bg-[var(--app-surface-2)] text-[var(--app-text-secondary)] ${sizeClass}`}>
+        {labels.main}
+      </span>
+      {labels.subType && (
+        <span className={`font-medium ring-1 ring-[var(--w-border)] bg-[var(--w-soft)] text-[var(--w-ink)] ${sizeClass}`}>
+          {labels.subType}
+        </span>
+      )}
+    </>
+  );
+}
 
 // Doğu üç ana ailesinin accent paleti.
 // "amber/fuchsia" Anime, "teal/emerald" Manga, "amber/stone" Novel.
@@ -197,19 +277,17 @@ export function ThemeSubBadge({
   // V5A.5: Quick Search gibi yoğun listelerde 10px varyant. Default 11px.
   compact?: boolean;
 }) {
-  const resolved = resolveThemeAccent(item);
-  if (!resolved.accent || !resolved.subTypeLabel) return null;
-  const Icon = resolved.accent.Icon;
+  const labels = resolveMediaBadgeLabels(item);
+  if (!labels.subType) return null;
   const sizeClass = compact
     ? "text-[10px] px-1.5 py-0.5 rounded"
     : "text-[11px] px-2 py-0.5 rounded-md";
   return (
     <span
-      className={`inline-flex items-center gap-1 font-medium ring-1 ${sizeClass} ${resolved.accent.badge}`}
-      title={`Doğu · ${resolved.subTypeLabel}`}
+      className={`inline-flex items-center font-medium ring-1 ring-[var(--w-border)] bg-[var(--w-soft)] text-[var(--w-ink)] ${sizeClass}`}
+      title={`Alt tür: ${labels.subType}`}
     >
-      <Icon className="w-3 h-3" />
-      {resolved.subTypeLabel}
+      {labels.subType}
     </span>
   );
 }

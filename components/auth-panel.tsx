@@ -76,7 +76,7 @@ export default function AuthPanel() {
           </div>
 
           <p className="text-xs text-zinc-500 leading-relaxed">
-            Veriler şu an hâlâ yerel olarak tutuluyor. Cloud sync sonraki aşamada eklenecek.
+            Veriler şu an hâlâ yerel olarak tutuluyor. Cloud eşitleme sonraki aşamada eklenecek.
           </p>
 
           {error && (
@@ -238,7 +238,7 @@ export default function AuthPanel() {
         </button>
 
         <p className="text-[11px] text-zinc-500 leading-relaxed pt-1">
-          Giriş sonrası yerel veri ana kaynak olarak kalır; cloud aktarım ve sync durumu Ayarlar bölümünden yönetilir.
+          Giriş sonrası yerel veri ana kaynak olarak kalır; Cloud aktarımı ve eşitleme durumu Ayarlar bölümünden yönetilir.
         </p>
       </form>
     </div>

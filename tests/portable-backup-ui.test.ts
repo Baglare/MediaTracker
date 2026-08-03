@@ -14,8 +14,8 @@ describe("Portable Backup V2 UI contract", () => {
     const dataManagement = source("components/data-management-panel.tsx");
 
     expect(dataManagement).toContain("<PortableBackupPanel");
-    expect(panel).toContain("Backup önizlemesi oluştur");
-    expect(panel).toContain("Checksum ile doğrulanmış export hazır");
+    expect(panel).toContain("Yedek önizlemesi oluştur");
+    expect(panel).toContain("Sağlama toplamı ile doğrulanmış dışa aktarım hazır");
     expect(panel).toContain("JSON dosyasını indir");
     expect(panel).toContain("portableBackupFilename");
   });
@@ -23,7 +23,7 @@ describe("Portable Backup V2 UI contract", () => {
   it("requires explicit personal-note selection and shows only safe counts", () => {
     const panel = source("components/portable-backup-panel.tsx");
 
-    expect(panel).toContain("Personal note içeriklerini backup");
+    expect(panel).toContain("Kişisel not içeriklerini yedeğe");
     expect(panel).toContain("checked={includePersonalNotes}");
     expect(panel).toContain("manifest.counts");
     expect(panel).not.toContain("item.personalNotes}");
@@ -34,7 +34,7 @@ describe("Portable Backup V2 UI contract", () => {
   it("keeps file inspection read-only and separate from legacy import writes", () => {
     const panel = source("components/portable-backup-panel.tsx");
 
-    expect(panel).toContain("Backup dosyasını read-only incele");
+    expect(panel).toContain("Yedek dosyasını salt okunur incele");
     expect(panel).toContain("Dosya inceleme verilerinizi değiştirmez");
     expect(panel).toContain("inspectPortableBackupText");
     expect(panel).not.toContain("onImport");
@@ -48,12 +48,12 @@ describe("Portable Backup V2 UI contract", () => {
     expect(dataManagement).toContain('key={ownerScope?.key ?? "owner-pending"}');
     expect(panel).toContain("preparePortableAdditiveImport");
     expect(panel).toContain("executePortableAdditiveImport");
-    expect(panel).toContain("Additive importu uygula");
-    expect(panel).toContain("Explicit seçim: ayrı local kayıt olarak ekle");
-    expect(panel).toContain("Son importu geri al");
+    expect(panel).toContain("Eklemeli içe aktarmayı uygula");
+    expect(panel).toContain("Açık seçim: ayrı yerel kayıt olarak ekle");
+    expect(panel).toContain("Son içe aktarmayı geri al");
     expect(panel).toContain("inspectPortableImportUndo");
     expect(panel).toContain("disabled={importBusy || !undoAvailability.available}");
-    expect(panel).toContain("Cloud sync başladıktan");
+    expect(panel).toContain("Cloud eşitleme başladıktan");
     expect(panel).toContain("SHA-256 yalnız dosya bütünlüğünü doğrular");
     expect(panel).not.toContain("personalNotes}");
     expect(panel).not.toContain("deleteMediaItem");

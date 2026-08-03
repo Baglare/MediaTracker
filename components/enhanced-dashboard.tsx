@@ -354,7 +354,7 @@ export default function EnhancedDashboard({
               data-dashboard-widget="continue"
             >
               <SectionTitle icon={PlayCircle} title="Devam Ettiklerin" count={startedOpenItems.length} hint="Son aktiviteye göre" />
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
+              <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-4 items-start">
                 {startedOpenItems.slice(0, 6).map((item) => renderCard(item, `continue-${item.id}`))}
               </div>
             </section>
@@ -367,7 +367,7 @@ export default function EnhancedDashboard({
               data-dashboard-widget="near-completion"
             >
               <SectionTitle icon={CheckCircle} title="Bitirmeye Yakın" count={nearCompletion.length} hint="%75 ve üzeri" />
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
+              <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-4 items-start">
                 {nearCompletion.slice(0, 6).map((item) => renderCard(item, `near-${item.id}`))}
               </div>
             </section>
@@ -380,7 +380,7 @@ export default function EnhancedDashboard({
               data-dashboard-widget="high-rated"
             >
               <SectionTitle icon={Star} title="Puanı Yüksekler" count={highRated.length} hint="En yüksek puanlar" />
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
+              <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-4 items-start">
                 {highRated.map((item) => renderCard(item, `rated-${item.id}`))}
               </div>
             </section>

@@ -31,6 +31,7 @@ import { useLayoutPreferences } from "@/hooks/use-layout-preferences";
 import { usePersistedPreferences } from "@/hooks/use-persisted-preferences";
 import { useXpProgression } from "@/hooks/use-xp-progression";
 import { useCloudRolloutGuard } from "@/hooks/use-cloud-rollout-guard";
+import { useReleaseCalendar } from "@/features/calendar/hooks/use-release-calendar";
 import CloudRolloutNotice from "@/components/cloud-rollout-notice";
 import { calculateDashboardStats } from "@/lib/dashboard-stats";
 import type { GlobalSearchCategory } from "@/lib/global-search-types";
@@ -78,6 +79,7 @@ export default function HomePage() {
   const { user, configured, loading: authLoading } = useAuth();
   const cloudRollout = useCloudRolloutGuard(!authLoading && configured ? user?.id ?? null : null);
   const library = useMediaLibrary(authLoading ? undefined : user?.id ?? null);
+  const releases = useReleaseCalendar({ ownerScope: library.ownerScope, mediaList: library.mediaList, libraryReady: library.isLoaded && library.libraryIntegrity === "valid" });
   const preferences = usePersistedPreferences();
   const layout = useLayoutPreferences();
   const [searchQuery, setSearchQuery] = useState("");
@@ -142,7 +144,6 @@ export default function HomePage() {
     [library.mediaList, library.progressLogs],
   );
   const { progression } = useXpProgression(user?.id ?? null, legacyProgression);
-
   const navigateToTab = useCallback(
     (tab: DashboardTabId) => {
       commands.closeOverlay();
@@ -177,7 +178,6 @@ export default function HomePage() {
     },
     [navigateToTab],
   );
-
   if (!library.isLoaded || (!startup.hydrated && explicitTab === null)) {
     return (
       <div className="grid min-h-64 place-items-center" aria-busy="true">
@@ -187,7 +187,6 @@ export default function HomePage() {
       </div>
     );
   }
-
   if (library.ownershipCandidate && user) {
     return (
       <main className="px-4 py-10">
@@ -203,7 +202,6 @@ export default function HomePage() {
       </main>
     );
   }
-
   if (library.libraryIntegrity !== "valid") {
     const recoveryMessage =
       library.libraryIntegrity === "corrupt"
@@ -237,7 +235,6 @@ export default function HomePage() {
       </main>
     );
   }
-
   const world = resolveWorldScope(activeTab, preferences.themeFilter);
   const showRightRail = shouldShowDashboardRightRail(activeTab);
   const content = (() => {
@@ -259,6 +256,7 @@ export default function HomePage() {
           chartPaletteId={appearance.preferences.chartPaletteId}
           followWorldCompletedColor={appearance.preferences.followWorldCompletedColor}
           chartWorld={world}
+          releases={releases}
         />
       );
     }
@@ -302,6 +300,7 @@ export default function HomePage() {
           commands={commands}
           resolveRelatedAction={discovery.resolveRelatedAction}
           onAddRelatedParts={discovery.addMissingTvmazeParts} ownerScope={library.ownerScope} libraryReady={library.isLoaded && library.libraryIntegrity === "valid"}
+          releases={releases}
         />
       );
     }
@@ -391,6 +390,7 @@ export default function HomePage() {
           followWorldCompletedColor={appearance.preferences.followWorldCompletedColor}
           chartWorld={world}
           onOpenDetail={commands.openDetail}
+          releases={releases}
         />
       )}
     </AppearanceWorldScope>

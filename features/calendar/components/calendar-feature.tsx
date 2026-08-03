@@ -6,7 +6,7 @@ import MediaCard from "@/components/media-card";
 import PageHeader from "@/components/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ReleaseCalendarPanel } from "@/features/calendar/components/release-calendar-panel";
-import { useReleaseCalendar } from "@/features/calendar/hooks/use-release-calendar";
+import type { UseReleaseCalendarResult } from "@/features/calendar/hooks/use-release-calendar";
 import { selectCalendarReadModel } from "@/features/calendar/domain/selectors";
 import type { RelatedMediaAction } from "@/features/library/components/library-feature";
 import type { MediaCommands } from "@/features/library/hooks/use-media-commands";
@@ -21,6 +21,7 @@ interface CalendarFeatureProps {
   onAddRelatedParts: (item: MediaItem) => void;
   ownerScope: LocalOwnerScope | null;
   libraryReady: boolean;
+  releases: UseReleaseCalendarResult;
 }
 
 function CalendarSection({
@@ -55,12 +56,12 @@ export default function CalendarFeature({
   onAddRelatedParts,
   ownerScope,
   libraryReady,
+  releases,
 }: CalendarFeatureProps) {
   const model = useMemo(
     () => selectCalendarReadModel(mediaList, progressLogs),
     [mediaList, progressLogs],
   );
-  const releases = useReleaseCalendar({ ownerScope, mediaList, libraryReady });
   const releaseCount = releases.items.length;
   const today = new Date().toLocaleDateString("tr-TR");
   const renderCard = (item: MediaItem) => {
@@ -158,7 +159,7 @@ export default function CalendarFeature({
             {model.plannedItems.length === 0 ? (
               <p className="text-sm text-[var(--app-text-muted)]">Planlanan içerik yok.</p>
             ) : (
-              <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2 2xl:grid-cols-3">
                 {model.plannedItems.map(renderCard)}
               </div>
             )}
@@ -167,7 +168,7 @@ export default function CalendarFeature({
             {model.activeItems.length === 0 ? (
               <p className="text-sm text-[var(--app-text-muted)]">Devam eden içerik yok.</p>
             ) : (
-              <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2 2xl:grid-cols-3">
                 {model.activeItems.map(renderCard)}
               </div>
             )}

@@ -1,8 +1,8 @@
 "use client";
 
 import { Bell, ChevronRight, Settings, Users } from "lucide-react";
-import Image from "next/image";
 import Link from "next/link";
+import { BrandMark } from "@/components/brand-mark";
 
 import {
   getAppNavigationItem,
@@ -32,7 +32,7 @@ export default function AppTopbar({ activeNavigationId, onChangeTab, profileName
       <div className="flex h-14 items-center gap-4 px-4 sm:px-6 lg:px-6">
         <Link href="/profile" className="flex min-w-0 items-center gap-2 rounded-lg text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-focus)] lg:hidden" aria-label="Profili aç">
           <ProfileAvatar profileName={profileName} preferences={profilePreferences} socialAvatarUrl={socialAvatarUrl} imageTransform={avatarTransform} size="sm" />
-          <Image src="/brand/media-tracker-mark.svg" alt="" aria-hidden="true" width={24} height={24} className="h-6 w-6 shrink-0 object-contain" />
+          <BrandMark className="h-6 w-6" />
           <div className="min-w-0">
             <span className="block truncate text-sm font-semibold tracking-tight text-[var(--app-text-primary)]">MediaTracker</span>
             <span className="block max-w-[8rem] truncate text-[10px] text-[var(--app-text-muted)] sm:max-w-[12rem]">{profileName}</span>

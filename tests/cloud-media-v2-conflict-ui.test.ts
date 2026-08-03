@@ -12,21 +12,21 @@ const panel = readFileSync(
 
 describe("Cloud Media V2 conflict UI contract", () => {
   it("shows adapter and owner-scoped sync counters", () => {
-    expect(card).toContain("Aktif Adapter");
-    expect(card).toContain("Legacy");
+    expect(card).toContain("Etkin bağlantı katmanı");
+    expect(card).toContain("Eski sürüm");
     expect(card).toContain("Cloud V2");
-    expect(card).toContain("in-flight");
-    expect(card).toContain("retryable");
-    expect(card).toContain("blocked");
-    expect(card).toContain("Son Sync");
+    expect(card).toContain("Gönderiliyor");
+    expect(card).toContain("Yeniden denenebilir");
+    expect(card).toContain("Engellendi");
+    expect(card).toContain("Son eşitleme");
   });
 
   it("exposes explicit conflict actions without a V2 enable toggle", () => {
     expect(panel).toContain("Buluttaki sürümü kullan");
-    expect(panel).toContain("Yerel değişikliği retry et");
+    expect(panel).toContain("Yerel değişikliği yeniden dene");
     expect(panel).toContain("Silinmiş olarak bırak");
-    expect(panel).toContain("Açık onayla restore et");
-    expect(panel).toContain("Parent media sonrası retry");
+    expect(panel).toContain("Açık onayla geri yükle");
+    expect(panel).toContain("Üst medyadan sonra yeniden dene");
     expect(panel).toContain("Şimdilik ertele");
     expect(panel).not.toContain("V2'yi aç");
     expect(panel).not.toContain("Cloud V2'yi etkinleştir");

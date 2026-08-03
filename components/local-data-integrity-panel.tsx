@@ -1,10 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import {
   AlertOctagon,
-  ChevronDown,
-  ChevronUp,
   RefreshCw,
   ShieldCheck,
   ShieldEllipsis,
@@ -12,6 +10,7 @@ import {
   Wrench,
   X,
 } from "lucide-react";
+import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { useLocalDataIntegrity } from "@/hooks/use-local-data-integrity";
 import type {
   IntegrityDomain,
@@ -44,21 +43,21 @@ const SEVERITY_STYLES: Record<IntegritySeverity, string> = {
 const REPAIRABILITY_LABELS: Record<IntegrityRepairability, string> = {
   safe: "Güvenli tamir adayı",
   "requires-confirmation": "Kullanıcı onayı gerekir",
-  "manual-only": "Manuel recovery gerekir",
+  "manual-only": "Elle kurtarma gerekir",
 };
 
 const DOMAIN_LABELS: Record<IntegrityDomain, string> = {
   media: "Medya",
   identity: "Kimlik",
-  "identity-alias": "Kimlik alias",
-  "record-redirect": "Record redirect",
-  "progress-log": "İlerleme logu",
+  "identity-alias": "Kimlik eşlemesi",
+  "record-redirect": "Kayıt yönlendirmesi",
+  "progress-log": "İlerleme günlüğü",
   group: "Grup / seri",
   "recommendation-link": "Öneri bağlantısı",
-  "duplicate-review": "Duplicate kararı",
-  "merge-journal": "Merge journal",
-  "cloud-queue": "Cloud queue",
-  envelope: "Storage envelope",
+  "duplicate-review": "Tekrarlanan kayıt kararı",
+  "merge-journal": "Birleştirme günlüğü",
+  "cloud-queue": "Cloud kuyruğu",
+  envelope: "Depolama zarfı",
 };
 
 export default function LocalDataIntegrityPanel({
@@ -67,49 +66,36 @@ export default function LocalDataIntegrityPanel({
   progressLogs,
 }: LocalDataIntegrityPanelProps) {
   const controller = useLocalDataIntegrity(ownerScope, mediaList, progressLogs);
-  const [isExpanded, setIsExpanded] = useState(false);
   const itemById = useMemo(
     () => new Map(mediaList.map((item) => [item.id, item])),
     [mediaList],
   );
   const issueCount = controller.report?.issues.length ?? 0;
+  const hasCriticalIssue = controller.status === "recovery-required"
+    || controller.report?.issues.some((issue) => issue.severity === "critical") === true;
   const domainCounts = controller.report
     ? Object.entries(controller.report.counts.domain)
         .filter((entry): entry is [IntegrityDomain, number] => typeof entry[1] === "number")
     : [];
 
   return (
-    <section className="mb-4">
-      <button
-        type="button"
-        onClick={() => setIsExpanded((value) => !value)}
-        className="flex w-full cursor-pointer items-center justify-between rounded-xl border border-zinc-800/50 bg-zinc-900/50 px-4 py-3 transition-colors hover:border-zinc-700/50"
-        aria-expanded={isExpanded}
-      >
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10">
-            <ShieldEllipsis className="h-4 w-4 text-emerald-300" />
-          </div>
-          <div className="text-left">
-            <span className="text-sm font-medium text-zinc-200">Veri Bütünlüğü</span>
-            <p className="text-[11px] text-zinc-500">
-              {controller.status === "pending"
-                ? "Aktif owner veri grafiği taranıyor"
-                : issueCount === 0
-                  ? "Yerel veri grafiği sağlıklı"
-                  : `${issueCount} açıklanabilir sorun bulundu`}
-            </p>
-          </div>
-        </div>
-        {isExpanded
-          ? <ChevronUp className="h-4 w-4 text-zinc-500" />
-          : <ChevronDown className="h-4 w-4 text-zinc-500" />}
-      </button>
-
-      {isExpanded && (
-        <div className="mt-3 space-y-4 rounded-xl border border-zinc-800/30 bg-zinc-900/30 p-4">
+    <CollapsibleSection
+      storageKey="local-data-integrity"
+      title="Veri bütünlüğü"
+      description={controller.status === "pending"
+        ? "Etkin sahip veri grafiği taranıyor."
+        : issueCount === 0
+          ? "Yerel veri grafiği sağlıklı."
+          : `${issueCount} açıklanabilir sorun bulundu.`}
+      defaultOpen={hasCriticalIssue}
+      alert={hasCriticalIssue}
+      badge={<span className="rounded-md border border-[var(--app-border)] px-1.5 py-0.5 text-[10px] text-[var(--app-text-secondary)]">{issueCount} bulgu</span>}
+      icon={<ShieldEllipsis className="h-4 w-4 text-[var(--app-success)]" />}
+      className="mb-4"
+      contentClassName="space-y-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-1)] p-4"
+    >
           <p className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 text-xs leading-5 text-emerald-200">
-            Bu tarama salt okunurdur. Medya, log, registry, queue veya recovery
+            Bu tarama salt okunurdur. Medya, günlük, kayıt defteri, kuyruk veya kurtarma
             kayıtlarını değiştirmez ve otomatik tamir uygulamaz.
           </p>
 
@@ -119,8 +105,8 @@ export default function LocalDataIntegrityPanel({
               className="flex gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs leading-5 text-rose-100"
             >
               <AlertOctagon className="mt-0.5 h-4 w-4 shrink-0" />
-              Recovery gerektiren kritik local veri durumu bulundu. Yeni veri
-              yazmadan önce aşağıdaki journal, owner veya envelope sorununu incele.
+              Kurtarma gerektiren kritik yerel veri durumu bulundu. Yeni veri
+              yazmadan önce aşağıdaki günlük, sahip veya depolama zarfı sorununu incele.
             </div>
           )}
 
@@ -140,7 +126,7 @@ export default function LocalDataIntegrityPanel({
               className="flex items-center gap-1.5 rounded-lg bg-rose-500/15 px-3 py-2 text-xs font-medium text-rose-200 hover:bg-rose-500/25"
             >
               <Undo2 className="h-3.5 w-3.5" />
-              Güvenli rollback&apos;u dene
+              Güvenli geri almayı dene
             </button>
           )}
 
@@ -152,7 +138,7 @@ export default function LocalDataIntegrityPanel({
               className="flex items-center gap-1.5 rounded-lg bg-sky-500/10 px-3 py-2 text-xs font-medium text-sky-200 hover:bg-sky-500/20"
             >
               <Undo2 className="h-3.5 w-3.5" />
-              Son repair&apos;i geri al
+              Son düzeltmeyi geri al
             </button>
           )}
 
@@ -212,8 +198,8 @@ export default function LocalDataIntegrityPanel({
                 ))}
               </div>
               <p className="text-[10px] leading-4 text-amber-200/80">
-                Yalnız bu issue onarılacak. İşlem owner ve source fingerprint&apos;ini
-                yeniden doğrular; hata halinde before state&apos;e rollback dener.
+                Yalnız bu bulgu onarılacak. İşlem sahip ve kaynak parmak izini
+                yeniden doğrular; hata halinde işlem öncesi duruma dönmeyi dener.
               </p>
               <button
                 type="button"
@@ -221,7 +207,7 @@ export default function LocalDataIntegrityPanel({
                 className="flex items-center gap-1.5 rounded-lg bg-emerald-500/20 px-3 py-2 text-xs font-semibold text-emerald-100 hover:bg-emerald-500/30"
               >
                 <Wrench className="h-3.5 w-3.5" />
-                Onayla ve bu repair&apos;i uygula
+                Onayla ve bu düzeltmeyi uygula
               </button>
             </div>
           )}
@@ -276,13 +262,13 @@ export default function LocalDataIntegrityPanel({
 
           {controller.status === "pending" ? (
             <div className="rounded-xl border border-zinc-800 p-4 text-center text-sm text-zinc-500">
-              Aktif owner verisi taranıyor…
+              Etkin sahip verisi taranıyor…
             </div>
           ) : issueCount === 0 ? (
             <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4 text-center">
               <ShieldCheck className="mx-auto mb-2 h-5 w-5 text-emerald-400" />
               <p className="text-sm text-emerald-200">
-                Taranan local veri grafiğinde bütünlük sorunu bulunmadı.
+                Taranan yerel veri grafiğinde bütünlük sorunu bulunmadı.
               </p>
             </div>
           ) : (
@@ -338,8 +324,6 @@ export default function LocalDataIntegrityPanel({
               })}
             </div>
           )}
-        </div>
-      )}
-    </section>
+    </CollapsibleSection>
   );
 }

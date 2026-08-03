@@ -26,7 +26,6 @@ import { useMemo, useState } from "react";
 import {
   Target,
   Activity,
-  Calendar,
   Sparkles,
   ListTodo,
   TrendingUp,
@@ -68,6 +67,8 @@ import {
   formatProgressLogRelativeTime,
   getDisplayProgressLogs,
 } from "@/lib/activity-log";
+import { UpcomingReleaseSummary } from "@/features/calendar/components/upcoming-release-summary";
+import type { UseReleaseCalendarResult } from "@/features/calendar/hooks/use-release-calendar";
 
 interface RightRailProps {
   mediaList: MediaItem[];
@@ -83,6 +84,7 @@ interface RightRailProps {
   // filtrelerine bilinçli olarak duyarsızız.
   themeFilter: WorldScope;
   onOpenDetail?: (item: MediaItem) => void;
+  releases: UseReleaseCalendarResult;
 }
 
 // --- Helpers ---------------------------------------------------------------
@@ -257,7 +259,7 @@ function OverallWidget({
       color: string;
     }>;
     let cumulative = 0;
-    const GAP = total > 1 ? 1 : 0; // birden fazla dilim varsa minik ayrım
+    const GAP = total > 1 ? 2.4 : 0; // segment sınırları tema renginden bağımsız seçilsin
     return STATUS_ORDER.map((key) => {
       const count = buckets[key].count;
       if (count === 0) return null;
@@ -625,21 +627,6 @@ function DailyGoalWidget({
 // ===========================================================================
 // 3) Yaklaşan Bölümler (placeholder)
 // ===========================================================================
-
-function UpcomingWidget() {
-  return (
-    <Widget title="Yaklaşan Bölümler" icon={Calendar} eyebrow="Yakında">
-      <div className="rounded-lg border border-dashed border-zinc-800/80 bg-zinc-950/40 px-3 py-3">
-        <p className="text-[11px] text-zinc-400 leading-relaxed">
-          TVMaze yayın takvimi ve AniList airing burada listelenecek.
-        </p>
-        <p className="text-[10px] text-zinc-600 mt-1.5">
-          Bu widget sonraki turda bağlanacak.
-        </p>
-      </div>
-    </Widget>
-  );
-}
 
 // ===========================================================================
 // 4) Önerilen Devam (R15: dünya bazlı + reason etiketi)
@@ -1103,6 +1090,7 @@ export default function RightRail({
   progression,
   themeFilter,
   onOpenDetail,
+  releases,
 }: RightRailProps) {
   // R15: Dünya scope'lu türetimler. Tek hesap noktası; tüm widget'lar bu
   // listeleri tüketir. matchesWorldScope SADECE classification'a bakar
@@ -1179,7 +1167,7 @@ export default function RightRail({
       <SuggestionWidget entries={suggestions} onOpenDetail={onOpenDetail} />
     ),
     recentActivities: () => <ActivityWidget logs={recentLogs} />,
-    upcomingEpisodes: () => <UpcomingWidget />,
+    upcomingEpisodes: () => <UpcomingReleaseSummary releases={releases} compact />,
     nearCompletion: () => (
       <NearCompletionWidget items={scopedItems} onOpenDetail={onOpenDetail} />
     ),

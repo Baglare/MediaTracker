@@ -12,7 +12,7 @@ const STARTUP_LABELS: Readonly<Record<DefaultDashboardTab, {
   label: string;
   description: string;
 }>> = {
-  dashboard: { label: "Dashboard", description: "Genel özet ve kişisel widget düzenin." },
+  dashboard: { label: "Ana panel", description: "Genel özet ve kişisel panel düzenin." },
   library: { label: "Kütüphane", description: "Medya koleksiyonunu doğrudan açar." },
   discover: { label: "Keşfet", description: "Arama ve keşif araçlarıyla başlar." },
   calendar: { label: "Takvim", description: "Takvim görünümünü başlangıç alanı yapar." },
@@ -27,7 +27,7 @@ export default function StartupSettingsCard() {
     resetToDefaults,
   } = useStartupRuntime();
   const [message, setMessage] = useState(
-    "Bu seçim yalnız MediaTracker ana adresi query parametresi olmadan açıldığında kullanılır.",
+    "Bu seçim yalnız MediaTracker ana adresi ek bir adres parametresi olmadan açıldığında kullanılır.",
   );
 
   const select = (tab: DefaultDashboardTab) => {
@@ -53,7 +53,7 @@ export default function StartupSettingsCard() {
           type="button"
           onClick={() => {
             resetToDefaults();
-            setMessage("Başlangıç alanı Dashboard varsayılanına döndü.");
+            setMessage("Başlangıç alanı Ana panel varsayılanına döndü.");
           }}
           className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-[var(--app-border)] bg-[var(--app-surface-1)] px-3 text-xs font-medium text-[var(--app-text-secondary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-focus)]"
         >

@@ -122,7 +122,7 @@ export default function DuplicateMergeWorkflow({
       return;
     }
     setPlan(result.plan);
-    setMessage("Plan güncel local state ile doğrulandı. Uygulamadan önce son özeti kontrol et.");
+    setMessage("Plan güncel yerel durumla doğrulandı. Uygulamadan önce son özeti kontrol et.");
   }
 
   function applyMerge() {
@@ -139,8 +139,8 @@ export default function DuplicateMergeWorkflow({
     }
     setMessage(
       result.state === "sync-pending"
-        ? "Local merge tamamlandı; cloud işlemleri durable queue içinde bekliyor."
-        : "Local merge tamamlandı ve read-back doğrulandı.",
+        ? "Yerel birleştirme tamamlandı; Cloud işlemleri kalıcı kuyrukta bekliyor."
+        : "Yerel birleştirme tamamlandı ve yeniden okuma ile doğrulandı.",
     );
   }
 
@@ -160,8 +160,8 @@ export default function DuplicateMergeWorkflow({
           <div className="flex gap-2 rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 text-[11px] leading-5 text-amber-200">
             <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
             <p>
-              Kayıt seçimi otomatik yapılmaz. Birleştirme kaybeden local kayıtları kaldırır,
-              ilişkilerini survivor kayda taşır. XP korunacak; bu işlem XP toplamını değiştirmez.
+              Kayıt seçimi otomatik yapılmaz. Birleştirme, kaldırılacak yerel kayıtların
+              ilişkilerini korunacak kayda taşır. XP korunacak; bu işlem XP toplamını değiştirmez.
             </p>
           </div>
 
@@ -207,7 +207,7 @@ export default function DuplicateMergeWorkflow({
             <>
               <div className="grid gap-3 md:grid-cols-2">
                 <label className="text-xs text-zinc-400">
-                  2. Survivor local kayıt
+                  2. Korunacak yerel kayıt
                   <select
                     value={survivorRecordId}
                     onChange={(event) => {
@@ -223,7 +223,7 @@ export default function DuplicateMergeWorkflow({
                   </select>
                 </label>
                 <label className="text-xs text-zinc-400">
-                  3. Canonical identity
+                  3. Ana kimlik
                   <select
                     value={canonicalIdentityKey}
                     onChange={(event) => {
@@ -291,7 +291,7 @@ export default function DuplicateMergeWorkflow({
                           </option>
                         ))}
                         {conflict.collection && (
-                          <option value="__union__">Seçili kayıtların açık union’ı</option>
+                          <option value="__union__">Seçili kayıtların açık birleşimi</option>
                         )}
                       </select>
                     </div>
@@ -300,21 +300,21 @@ export default function DuplicateMergeWorkflow({
               </div>
 
               <div className="rounded-lg border border-zinc-800 bg-zinc-950/40 p-3 text-[11px] leading-5 text-zinc-400">
-                <p>Taşınacak log: {preparation.relationshipSummary.progressLogCountBefore}</p>
+                <p>Taşınacak günlük: {preparation.relationshipSummary.progressLogCountBefore}</p>
                 <p>
                   Etkilenen grup: {
                     new Set(Object.values(preparation.relationshipSummary.groupMemberships).flat()).size
                   }
                 </p>
                 <p>
-                  Korunacak legacy XP anahtarı: {
+                  Korunacak eski XP anahtarı: {
                     new Set(Object.values(preparation.relationshipSummary.xpCompatibilityKeys)).size
                   }
                 </p>
                 <p>
                   Cloud: {ownerScope.kind === "guest"
-                    ? "Guest için işlem üretilmez"
-                    : "Upsert/delete durable queue'ya yazılır"}
+                    ? "Misafir için işlem üretilmez"
+                    : "Ekleme/güncelleme ve silme işlemleri kalıcı kuyruğa yazılır"}
                 </p>
               </div>
 
@@ -340,7 +340,7 @@ export default function DuplicateMergeWorkflow({
                     setPlan(null);
                   }}
                 />
-                Kaybeden kayıtların kaldırılacağını ve ilişkilerin survivor kayda taşınacağını onaylıyorum.
+                Diğer kayıtların kaldırılacağını ve ilişkilerin korunacak kayda taşınacağını onaylıyorum.
               </label>
 
               <div className="flex flex-wrap gap-2">
@@ -359,7 +359,7 @@ export default function DuplicateMergeWorkflow({
                   disabled={!plan}
                   className="rounded-lg bg-rose-500/15 px-3 py-1.5 text-xs font-medium text-rose-200 hover:bg-rose-500/25 disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  6. Merge’i uygula
+                  6. Birleştirmeyi uygula
                 </button>
               </div>
             </>

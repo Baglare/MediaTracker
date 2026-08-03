@@ -56,11 +56,11 @@ export function ThemeCloudSyncPanel({ onConfirm }: { onConfirm: ConfirmAction })
 
       {!sync.auth.configured ? (
         <p className="mt-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-2)] p-3 text-sm text-[var(--app-text-muted)]">
-          Supabase yapılandırılmamış. Import/export ve yerel temalar çalışmaya devam eder.
+          Supabase yapılandırılmamış. İçe/dışa aktarma ve yerel temalar çalışmaya devam eder.
         </p>
       ) : !sync.auth.user ? (
         <p className="mt-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-2)] p-3 text-sm text-[var(--app-text-muted)]">
-          Cloud tema senkronizasyonu için hesabınla giriş yap. Yerel tema kullanımı ve import/export giriş gerektirmez.
+          Cloud tema eşitlemesi için hesabınla giriş yap. Yerel tema kullanımı ve içe/dışa aktarma giriş gerektirmez.
         </p>
       ) : (
         <>
@@ -68,7 +68,7 @@ export function ThemeCloudSyncPanel({ onConfirm }: { onConfirm: ConfirmAction })
             <div className="rounded-lg bg-[var(--app-surface-2)] p-3"><dt className="text-[var(--app-text-muted)]">Durum</dt><dd className="mt-1 font-semibold text-[var(--app-text-primary)]">{sync.preferences.enabled ? "Açık" : "Kapalı"}</dd></div>
             <div className="rounded-lg bg-[var(--app-surface-2)] p-3"><dt className="text-[var(--app-text-muted)]">Yerel tema</dt><dd className="mt-1 font-semibold text-[var(--app-text-primary)]">{customThemes.themes.length}</dd></div>
             <div className="rounded-lg bg-[var(--app-surface-2)] p-3"><dt className="text-[var(--app-text-muted)]">Bulut tema</dt><dd className="mt-1 font-semibold text-[var(--app-text-primary)]">{sync.remote?.customThemes.length ?? "—"}</dd></div>
-            <div className="rounded-lg bg-[var(--app-surface-2)] p-3"><dt className="text-[var(--app-text-muted)]">Revision</dt><dd className="mt-1 font-semibold text-[var(--app-text-primary)]">{sync.remote?.revision ?? sync.preferences.lastRemoteRevision ?? 0}</dd></div>
+            <div className="rounded-lg bg-[var(--app-surface-2)] p-3"><dt className="text-[var(--app-text-muted)]">Cloud sürümü</dt><dd className="mt-1 font-semibold text-[var(--app-text-primary)]">{sync.remote?.revision ?? sync.preferences.lastRemoteRevision ?? 0}</dd></div>
             <div className="rounded-lg bg-[var(--app-surface-2)] p-3"><dt className="text-[var(--app-text-muted)]">Yerel değişiklik</dt><dd className="mt-1 font-semibold text-[var(--app-text-primary)]">{sync.preferences.pendingLocalChanges ? "Bekliyor" : "Yok"}</dd></div>
           </dl>
 
@@ -79,7 +79,7 @@ export function ThemeCloudSyncPanel({ onConfirm }: { onConfirm: ConfirmAction })
                 Yerel: {customThemes.themes.length} tema · Bulut: {sync.remote.customThemes.length} tema · Önerilen: {
                   sync.recommendedInitialChoice === "device" ? "Bu cihaz"
                     : sync.recommendedInitialChoice === "cloud" ? "Bulut"
-                      : sync.recommendedInitialChoice === "merge" ? "Birleştir" : "Boş state"
+                      : sync.recommendedInitialChoice === "merge" ? "Birleştir" : "Boş durum"
                 }
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
@@ -93,8 +93,8 @@ export function ThemeCloudSyncPanel({ onConfirm }: { onConfirm: ConfirmAction })
 
           {sync.status === "conflict" && sync.remote && (
             <div className="mt-4 rounded-xl border border-[var(--app-warning)] bg-[var(--app-warning-soft)] p-3" role="alert">
-              <h5 className="text-sm font-semibold text-[var(--app-warning)]">Revision çakışması</h5>
-              <p className="mt-1 text-xs text-[var(--app-text-secondary)]">Bulutta daha yeni tema değişiklikleri bulundu. Sessiz overwrite yapılmadı.</p>
+              <h5 className="text-sm font-semibold text-[var(--app-warning)]">Cloud sürümü çakışması</h5>
+              <p className="mt-1 text-xs text-[var(--app-text-secondary)]">Bulutta daha yeni tema değişiklikleri bulundu. Sessizce üzerine yazılmadı.</p>
               <details className="mt-2 text-xs text-[var(--app-text-secondary)]">
                 <summary className="cursor-pointer font-medium">Bulut temalarını incele</summary>
                 <ul className="mt-2 list-disc pl-5">

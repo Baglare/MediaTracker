@@ -180,7 +180,7 @@ export function ThemeStudio({ onConfirm }: { onConfirm: ConfirmAction }) {
                 <span className="flex h-8 overflow-hidden rounded-lg border border-black/10" aria-hidden="true">
                   {[
                     preview.tokens.background,
-                    preview.tokens.surface1,
+                    preview.tokens.surface2,
                     preview.tokens.accent,
                     preview.tokens.secondaryAccent,
                   ].map((color) => <span key={color} className="flex-1" style={{ backgroundColor: color }} />)}

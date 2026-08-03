@@ -3,8 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
-  ChevronDown,
-  ChevronUp,
   Clock3,
   CopyCheck,
   Eye,
@@ -12,6 +10,7 @@ import {
   ShieldCheck,
   Undo2,
 } from "lucide-react";
+import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import DuplicateMergeWorkflow from "@/components/duplicate-merge-workflow";
 import { useDuplicateReview } from "@/hooks/use-duplicate-review";
 import {
@@ -43,8 +42,17 @@ const STATUS_LABELS: Record<DuplicateReviewStatus, string> = {
 };
 
 function sourceLabel(item: MediaItem): string {
-  if (item.identity) return `${item.identity.source} / ${item.identity.namespace}`;
-  if (item.externalSource) return `${item.externalSource} / çözümlenemedi`;
+  const labels: Record<string, string> = {
+    anilist: "AniList",
+    tvmaze: "TVmaze",
+    tmdb: "TMDB",
+    omdb: "OMDb",
+    openlibrary: "Open Library",
+    manual: "Manuel",
+    legacy: "Eski kayıt",
+  };
+  if (item.identity) return `${labels[item.identity.source] ?? "Sağlayıcı"} / yapılandırılmış kimlik`;
+  if (item.externalSource) return `${labels[item.externalSource] ?? "Sağlayıcı"} / kimlik çözümlenemedi`;
   return "manuel / çözümlenemedi";
 }
 
@@ -54,7 +62,6 @@ export default function DuplicateReviewPanel({
   progressLogs,
 }: DuplicateReviewPanelProps) {
   const controller = useDuplicateReview(ownerScope, mediaList);
-  const [isExpanded, setIsExpanded] = useState(false);
   const [expandedCandidate, setExpandedCandidate] = useState<string | null>(null);
   const [showReviewed, setShowReviewed] = useState(false);
   const [lastMerge, setLastMerge] = useState<DuplicateMergeJournal | null>(null);
@@ -72,7 +79,7 @@ export default function DuplicateReviewPanel({
       const journal = readDuplicateMergeJournal(ownerScope);
       setLastMerge(journal.status === "valid" ? journal.data : null);
       if (journal.status !== "missing" && journal.status !== "valid") {
-        setMergeStatusMessage("Merge journal güvenli biçimde okunamadı; recovery gerekiyor.");
+        setMergeStatusMessage("Birleştirme günlüğü güvenli biçimde okunamadı; kurtarma gerekiyor.");
       }
     }, 0);
     return () => window.clearTimeout(timer);
@@ -86,7 +93,7 @@ export default function DuplicateReviewPanel({
       },
     });
     setMergeStatusMessage(result.ok
-      ? "Son merge local snapshot’tan geri alındı."
+      ? "Son birleştirme yerel anlık görüntüden geri alındı."
       : result.message);
     const journal = readDuplicateMergeJournal(ownerScope);
     setLastMerge(journal.status === "valid" ? journal.data : null);
@@ -114,39 +121,22 @@ export default function DuplicateReviewPanel({
   );
 
   return (
-    <section className="mb-4">
-      <button
-        type="button"
-        onClick={() => setIsExpanded((value) => !value)}
-        className="flex w-full cursor-pointer items-center justify-between rounded-xl border border-zinc-800/50 bg-zinc-900/50 px-4 py-3 transition-colors hover:border-zinc-700/50"
-        aria-expanded={isExpanded}
-      >
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-500/10">
-            <CopyCheck className="h-4 w-4 text-violet-300" />
-          </div>
-          <div className="text-left">
-            <span className="text-sm font-medium text-zinc-200">
-              Tekrarlanan Kayıt İncelemesi
-            </span>
-            <p className="text-[11px] text-zinc-500">
-              {controller.status === "pending"
-                ? "Aktif kütüphane güvenli biçimde taranıyor"
-                : `${openReviews.length} açık inceleme adayı`}
-            </p>
-          </div>
-        </div>
-        {isExpanded
-          ? <ChevronUp className="h-4 w-4 text-zinc-500" />
-          : <ChevronDown className="h-4 w-4 text-zinc-500" />}
-      </button>
-
-      {isExpanded && (
-        <div className="mt-3 space-y-4 rounded-xl border border-zinc-800/30 bg-zinc-900/30 p-4">
+    <CollapsibleSection
+      storageKey="duplicate-review-details"
+      title="Tekrarlanan kayıt incelemesi"
+      description={controller.status === "pending"
+        ? "Etkin kütüphane güvenli biçimde taranıyor."
+        : `${openReviews.length} açık inceleme adayı.`}
+      alert={Boolean(mergeStatusMessage)}
+      badge={<span className="rounded-md border border-[var(--app-border)] px-1.5 py-0.5 text-[10px] text-[var(--app-text-secondary)]">{openReviews.length} açık</span>}
+      icon={<CopyCheck className="h-4 w-4 text-[var(--app-accent-strong)]" />}
+      className="mb-4"
+      contentClassName="space-y-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-1)] p-4"
+    >
           <div className="rounded-xl border border-violet-500/20 bg-violet-500/5 p-3">
             <p className="text-xs leading-5 text-violet-200">
-              Kayıtlar otomatik olarak değiştirilmez. Merge yalnız seçtiğin alt küme,
-              survivor, identity ve alan kararları yeniden doğrulandıktan sonra uygulanır.
+              Kayıtlar otomatik olarak değiştirilmez. Birleştirme yalnız seçtiğin alt küme,
+              korunacak kayıt, kimlik ve alan kararları yeniden doğrulandıktan sonra uygulanır.
             </p>
           </div>
 
@@ -154,11 +144,11 @@ export default function DuplicateReviewPanel({
             <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="text-xs leading-5 text-emerald-200">
-                  <p className="font-medium">Son merge tamamlandı</p>
+                  <p className="font-medium">Son birleştirme tamamlandı</p>
                   <p>
                     {lastMerge.receipt.mediaCountBefore} → {lastMerge.receipt.mediaCountAfter} kayıt,
-                    {" "}{lastMerge.receipt.remappedLogCount} log taşındı.
-                    {lastMerge.state === "sync-pending" ? " Cloud sync bekliyor." : ""}
+                    {" "}{lastMerge.receipt.remappedLogCount} günlük kaydı taşındı.
+                    {lastMerge.state === "sync-pending" ? " Cloud eşitleme bekliyor." : ""}
                   </p>
                 </div>
                 <button
@@ -167,12 +157,12 @@ export default function DuplicateReviewPanel({
                   className="flex items-center gap-1.5 rounded-lg bg-emerald-500/15 px-3 py-1.5 text-xs text-emerald-200 hover:bg-emerald-500/25"
                 >
                   <Undo2 className="h-3.5 w-3.5" />
-                  Son merge’i geri al
+                  Son birleştirmeyi geri al
                 </button>
               </div>
               <p className="mt-2 text-[10px] text-emerald-300/70">
-                Merge sonrası ilgili local kayıtlar değiştiyse undo güvenlik nedeniyle bloke edilir.
-                Cross-device undo revision/tombstone olmadan garanti edilmez.
+                Birleştirme sonrası ilgili yerel kayıtlar değiştiyse geri alma güvenlik nedeniyle engellenir.
+                Cihazlar arası geri alma, sürüm ve silinme kaydı olmadan garanti edilmez.
               </p>
             </div>
           )}
@@ -235,7 +225,7 @@ export default function DuplicateReviewPanel({
 
           {controller.status === "pending" ? (
             <div className="rounded-xl border border-zinc-800 p-4 text-center text-sm text-zinc-500">
-              Aktif owner kütüphanesi taranıyor…
+              Etkin sahip kütüphanesi taranıyor…
             </div>
           ) : visibleReviews.length === 0 ? (
             <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4 text-center">
@@ -382,8 +372,6 @@ export default function DuplicateReviewPanel({
               {showReviewed ? "Karar verilenleri gizle" : "Karar verilenleri göster"}
             </button>
           )}
-        </div>
-      )}
-    </section>
+    </CollapsibleSection>
   );
 }

@@ -13,6 +13,7 @@ import { clearOrphanedQueue, syncNow } from "@/lib/sync-manager";
 import type { LocalOwnerScope } from "@/lib/local-owner-scope";
 import type { MediaItem, ProgressLog } from "@/lib/types";
 import CloudV2ConflictPanel from "@/components/cloud-v2-conflict-panel";
+import { CollapsibleSection } from "@/components/ui/collapsible-section";
 
 interface CloudSyncStatusCardProps {
   ownerScope: LocalOwnerScope | null;
@@ -47,37 +48,42 @@ export default function CloudSyncStatusCard({
 
   let description: string;
   if (!configured) {
-    description = "Cloud sync henüz yapılandırılmadı. Verilerin bu tarayıcıda saklanıyor.";
+    description = "Cloud eşitleme henüz yapılandırılmadı. Verilerin bu tarayıcıda saklanıyor.";
   } else if (!user) {
-    description = "Supabase yapılandırıldı. Cloud sync için giriş yapabilirsin.";
+    description = "Supabase yapılandırıldı. Cloud eşitleme için giriş yapabilirsin.";
   } else if (sync.rolloutStatus !== "ready") {
     description =
       "Cloud şema ve istemci uyumluluğu doğrulanana kadar bekleyen işlemler gönderilmeyecek.";
   } else if (sync.blocked > 0) {
     description =
-      "Bazı Cloud V2 işlemleri kullanıcı kararı bekliyor. Blocked işlemler otomatik retry edilmez.";
+      "Bazı Cloud V2 işlemleri kullanıcı kararı bekliyor. Engellenen işlemler otomatik yeniden denenmez.";
   } else if (sync.pending > 0 && !sync.online) {
-    description = "Çevrimdışısın. Bekleyen cloud işlemleri internet geldiğinde otomatik gönderilecek.";
+    description = "Çevrimdışısın. Bekleyen Cloud işlemleri internet geldiğinde otomatik gönderilecek.";
   } else if (sync.inFlight > 0) {
-    description = "Yerel kayıt korundu; cloud kuyruğundaki işlemler şu anda gönderiliyor.";
+    description = "Yerel kayıt korundu; Cloud kuyruğundaki işlemler şu anda gönderiliyor.";
   } else if (sync.retryable > 0) {
     description = "Yerel kayıt korundu. Cloud işlemi ağ yeniden uygun olduğunda tekrar denenecek.";
   } else if (sync.pending > 0) {
     description =
-      "Bekleyen cloud işlemleri arka planda gönderiliyor. " +
-      "Bir +1 işlemi 2 cloud işlemi (içerik + aktivite) üretebilir; bu normaldir.";
+      "Bekleyen Cloud işlemleri arka planda gönderiliyor. " +
+      "Bir +1 işlemi 2 Cloud işlemi (içerik + aktivite) üretebilir; bu normaldir.";
   } else {
-    description = "Tüm değişiklikler senkronize. Yeni mutasyonlar otomatik gönderilecek.";
+    description = "Tüm değişiklikler eşitlendi. Yeni değişiklikler otomatik gönderilecek.";
   }
 
   const Icon = isCloudReady ? Cloud : CloudOff;
   const iconCls = isCloudReady ? "text-emerald-400" : "text-zinc-500";
+  const schemaStageLabel = sync.schemaStage === "d2c1"
+    ? "Cloud V2"
+    : sync.schemaStage === "d2b1"
+      ? "Geçiş aşaması"
+      : "Eski şema";
 
   // Status badge (mod altında)
   let statusBadge: { text: string; cls: string } | null = null;
   if (sync.syncing) {
     statusBadge = {
-      text: "Senkron ediliyor",
+      text: "Eşitleniyor",
       cls: "text-violet-300 bg-violet-500/10 ring-1 ring-violet-500/30",
     };
   } else if (!sync.online) {
@@ -113,12 +119,16 @@ export default function CloudSyncStatusCard({
     && sync.pending > sync.blocked
     && sync.rolloutStatus === "ready"
     && sync.incompatible === 0;
+  const hasCloudAlert = Boolean(sync.lastError)
+    || sync.blocked > 0
+    || sync.orphaned > 0
+    || sync.incompatible > 0;
 
   return (
     <div className="bg-zinc-900/50 rounded-2xl border border-zinc-800/50 p-6">
       <div className="flex items-center gap-2 mb-4">
         <Icon className={`w-5 h-5 ${iconCls}`} />
-        <h3 className="text-lg font-semibold text-zinc-100">Cloud Sync Durumu</h3>
+        <h3 className="text-lg font-semibold text-zinc-100">Cloud eşitleme durumu</h3>
       </div>
 
       <div className="space-y-3 text-sm">
@@ -148,10 +158,22 @@ export default function CloudSyncStatusCard({
           </span>
         </div>
 
+        <p className="text-xs leading-relaxed text-zinc-500">{description}</p>
+
+        <CollapsibleSection
+          storageKey="advanced-cloud-diagnostics"
+          title="Gelişmiş Cloud teşhisi"
+          description="Uyumluluk, kuyruk, son eşitleme ve çakışma ayrıntılarını göster."
+          alert={hasCloudAlert}
+          badge={<span className="rounded-md border border-[var(--app-border)] px-1.5 py-0.5 text-[10px] text-[var(--app-text-secondary)]">{sync.pending} bekleyen</span>}
+          headingLevel="h4"
+        >
+          <div className="space-y-3 pt-1">
+
         <div className="flex items-center justify-between gap-4">
-          <span className="text-zinc-400">Aktif Adapter</span>
+          <span className="text-zinc-400">Etkin bağlantı katmanı</span>
           <span className="text-zinc-200 text-xs px-2 py-1 rounded-md bg-zinc-800/60 ring-1 ring-zinc-700/40">
-            {sync.adapter === "v2" ? "Cloud V2" : "Legacy"}
+            {sync.adapter === "v2" ? "Cloud V2" : "Eski sürüm"}
           </span>
         </div>
 
@@ -165,7 +187,7 @@ export default function CloudSyncStatusCard({
             }
           >
             {sync.rolloutStatus === "ready"
-              ? sync.schemaStage.toUpperCase()
+              ? schemaStageLabel
               : "Durduruldu"}
           </span>
         </div>
@@ -209,20 +231,20 @@ export default function CloudSyncStatusCard({
         <div className="grid grid-cols-3 gap-2 text-center">
           <div className="rounded-md bg-zinc-800/50 px-2 py-2">
             <div className="text-xs font-semibold text-violet-300">{sync.inFlight}</div>
-            <div className="text-[10px] text-zinc-500">in-flight</div>
+            <div className="text-[10px] text-zinc-500">Gönderiliyor</div>
           </div>
           <div className="rounded-md bg-zinc-800/50 px-2 py-2">
             <div className="text-xs font-semibold text-amber-300">{sync.retryable}</div>
-            <div className="text-[10px] text-zinc-500">retryable</div>
+            <div className="text-[10px] text-zinc-500">Yeniden denenebilir</div>
           </div>
           <div className="rounded-md bg-zinc-800/50 px-2 py-2">
             <div className="text-xs font-semibold text-rose-300">{sync.blocked}</div>
-            <div className="text-[10px] text-zinc-500">blocked</div>
+            <div className="text-[10px] text-zinc-500">Engellendi</div>
           </div>
         </div>
 
         <div className="flex items-center justify-between gap-4">
-          <span className="text-zinc-400">Son Sync</span>
+          <span className="text-zinc-400">Son eşitleme</span>
           <span className="text-xs text-zinc-300">{formatLastSync(sync.lastSyncAt)}</span>
         </div>
 
@@ -231,7 +253,7 @@ export default function CloudSyncStatusCard({
             <div className="flex items-start gap-1.5">
               <UserX className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
               <span>
-                Bu cihazda farklı bir hesaba ait <b>{sync.orphaned}</b> bekleyen cloud işlemi var.
+                Bu cihazda farklı bir hesaba ait <b>{sync.orphaned}</b> bekleyen Cloud işlemi var.
                 Mevcut hesabınla otomatik gönderilmeyecek; ilgili hesaba tekrar giriş yapman gerekir.
               </span>
             </div>
@@ -251,10 +273,6 @@ export default function CloudSyncStatusCard({
           </div>
         )}
 
-        <div className="h-px bg-zinc-800/50 my-2" />
-
-        <p className="text-xs text-zinc-500 leading-relaxed">{description}</p>
-
         {isCloudReady && (
           <div className="pt-2">
             <button
@@ -268,7 +286,7 @@ export default function CloudSyncStatusCard({
               ) : (
                 <RefreshCcw className="w-3.5 h-3.5" />
               )}
-              Şimdi Senkronize Et
+              Şimdi eşitle
             </button>
           </div>
         )}
@@ -280,6 +298,8 @@ export default function CloudSyncStatusCard({
           onApplyResolution={onApplyResolution}
           onConfirm={onConfirm}
         />
+          </div>
+        </CollapsibleSection>
       </div>
     </div>
   );

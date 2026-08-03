@@ -15,9 +15,9 @@ import { useState } from "react";
 import { ChevronDown, ChevronUp, Layers, Plus, Pencil } from "lucide-react";
 import { MediaItem } from "@/lib/types";
 import { MediaItemGroup } from "@/lib/series-group";
-import { getMediaTypeLabel, getProgressLabel } from "@/lib/progress";
+import { getProgressLabel } from "@/lib/progress";
 import MediaCard from "@/components/media-card";
-import { resolveThemeAccent } from "@/components/theme-accent";
+import { MediaClassificationBadges, resolveThemeAccent } from "@/components/theme-accent";
 
 interface SeriesGroupCardProps {
   group: MediaItemGroup;
@@ -189,11 +189,6 @@ export default function SeriesGroupCard({
   const sameEastFamily =
     firstFamily !== null && accents.every((a) => a.family === firstFamily);
   const groupAccent = sameEastFamily ? accents[0]?.accent ?? null : null;
-  const familyLabel: Record<"anime" | "manga" | "novel", string> = {
-    anime: "Anime",
-    manga: "Manga",
-    novel: "Novel",
-  };
 
   // Grup seviyesinde "Sezon/Parça Ekle" — temsilci olarak ilk item kullanılır
   // (TVmaze season grupları için hepsi aynı showId'yi paylaşır).
@@ -319,18 +314,7 @@ export default function SeriesGroupCard({
               Seri
             </span>
             {sameType && (
-              <span className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-zinc-800/80 text-zinc-400 ring-1 ring-zinc-700/50">
-                {getMediaTypeLabel(firstType!)}
-              </span>
-            )}
-            {groupAccent && firstFamily && (
-              <span
-                className={`inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-md ring-1 ${groupAccent.badge}`}
-                title={`Doğu · ${familyLabel[firstFamily]}`}
-              >
-                <groupAccent.Icon className="w-3 h-3" />
-                {familyLabel[firstFamily]}
-              </span>
+              <MediaClassificationBadges item={group.items[0]} compact />
             )}
           </div>
 

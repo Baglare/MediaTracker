@@ -1,7 +1,7 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
+import { BrandMark } from "@/components/brand-mark";
 
 import {
   APP_NAVIGATION_ITEMS,
@@ -119,7 +119,7 @@ export default function AppSidebar({ activeNavigationId, onChange, profileName, 
   return (
     <aside className="app-panel hidden h-screen w-64 shrink-0 flex-col gap-3 border-r px-4 py-4 shadow-none lg:sticky lg:top-0 lg:flex" aria-label="Birincil navigasyon">
       <Link href="/" className="flex h-9 min-w-0 items-center gap-2 rounded px-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-focus)]">
-        <Image src="/brand/media-tracker-mark.svg" alt="" aria-hidden="true" width={36} height={36} className="h-9 w-9 shrink-0 object-contain" />
+        <BrandMark className="h-9 w-9" />
         <span className="truncate text-base font-semibold tracking-tight text-[var(--app-text-primary)]">MediaTracker</span>
       </Link>
 

@@ -11,10 +11,10 @@ function source(relativePath: string): string {
 describe("local data integrity UI and owner transition contract", () => {
   it("shows counters, rescan, repairability, healthy and recovery-required states", () => {
     const panel = source("components/local-data-integrity-panel.tsx");
-    expect(panel).toContain("Veri Bütünlüğü");
+    expect(panel).toContain("Veri bütünlüğü");
     expect(panel).toContain("Yeniden tara");
     expect(panel).toContain("REPAIRABILITY_LABELS");
-    expect(panel).toContain("Taranan local veri grafiğinde bütünlük sorunu bulunmadı.");
+    expect(panel).toContain("Yerel veri grafiği sağlıklı.");
     expect(panel).toContain('controller.status === "recovery-required"');
   });
 
@@ -23,12 +23,12 @@ describe("local data integrity UI and owner transition contract", () => {
     expect(panel).toContain("Bu tarama salt okunurdur.");
     expect(panel).toContain("otomatik tamir uygulamaz");
     expect(panel).toContain("Düzeltmeyi hazırla");
-    expect(panel).toContain("Onayla ve bu repair");
+    expect(panel).toContain("Onayla ve bu düzeltmeyi uygula");
     expect(panel).toContain("affectedRecordCount");
     expect(panel).toContain("affectedLogCount");
     expect(panel).toContain("affectedGroupCount");
-    expect(panel).toContain("Son repair");
-    expect(panel).toContain("Güvenli rollback");
+    expect(panel).toContain("Son düzeltmeyi geri al");
+    expect(panel).toContain("Güvenli geri almayı dene");
     expect(panel).not.toContain("Hepsini düzelt");
     expect(panel).not.toContain("personalNotes");
     expect(panel).not.toContain("providerPayload");

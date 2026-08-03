@@ -195,7 +195,7 @@ export default function LayoutSettingsCard({
   onResetAll,
 }: LayoutSettingsCardProps) {
   return (
-    <section id="layout" className="app-panel scroll-mt-24 rounded-2xl border p-4 sm:p-6 lg:col-span-2">
+    <section className="app-panel rounded-2xl border p-4 sm:p-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="flex items-center gap-2">
@@ -242,8 +242,8 @@ export default function LayoutSettingsCard({
         />
         <WidgetOrderEditor
           title="Sağ Panel"
-          description="Desktop görünümündeki yardımcı panelleri yönet."
-          mobileNote="Sağ panel küçük ekranlarda gösterilmez; tercihin desktop için saklanır."
+          description="Masaüstü görünümündeki yardımcı panelleri yönet."
+          mobileNote="Sağ panel küçük ekranlarda gösterilmez; tercihin masaüstü için saklanır."
           surface="rightRail"
           icon={Sidebar}
           preferences={preferences.rightRail}

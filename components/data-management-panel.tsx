@@ -11,8 +11,6 @@ import {
   Download,
   Upload,
   RotateCcw,
-  ChevronDown,
-  ChevronUp,
   Database,
   CheckCircle,
   AlertCircle,
@@ -25,6 +23,7 @@ import {
 } from "@/lib/backup";
 import type { LocalOwnerScope } from "@/lib/local-owner-scope";
 import PortableBackupPanel from "@/components/portable-backup-panel";
+import { CollapsibleSection } from "@/components/ui/collapsible-section";
 
 interface DataManagementPanelProps {
   ownerScope: LocalOwnerScope | null;
@@ -43,7 +42,6 @@ export default function DataManagementPanel({
   onReset,
   onConfirm,
 }: DataManagementPanelProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
   const [importMode, setImportMode] = useState<"merge" | "replace">("merge");
   const [feedback, setFeedback] = useState<{
     type: "success" | "error";
@@ -140,35 +138,15 @@ export default function DataManagementPanel({
   }
 
   return (
-    <div className="mb-4">
-      {/* Başlık çubuğu */}
-      <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center justify-between px-4 py-3 bg-zinc-900/50 rounded-xl border border-zinc-800/50 hover:border-zinc-700/50 transition-colors cursor-pointer"
-      >
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
-            <Database className="w-4 h-4 text-amber-400" />
-          </div>
-          <div className="text-left">
-            <span className="text-sm font-medium text-zinc-200">
-              Veri Yönetimi
-            </span>
-            <p className="text-[11px] text-zinc-500">
-              Verileri dışa/içe aktarın veya sıfırlayın
-            </p>
-          </div>
-        </div>
-        {isExpanded ? (
-          <ChevronUp className="w-4 h-4 text-zinc-500" />
-        ) : (
-          <ChevronDown className="w-4 h-4 text-zinc-500" />
-        )}
-      </button>
-
-      {/* Genişletilmiş panel */}
-      {isExpanded && (
-        <div className="mt-3 p-4 bg-zinc-900/30 rounded-xl border border-zinc-800/30 space-y-4">
+    <CollapsibleSection
+      storageKey="advanced-data-management"
+      title="Gelişmiş veri yönetimi"
+      description="Verileri yedekle, içe veya dışa aktar ve yerel örnek verileri yönet."
+      badge={<span className="rounded-md border border-[var(--app-border)] px-1.5 py-0.5 text-[10px] text-[var(--app-text-secondary)]">{mediaList.length} medya</span>}
+      icon={<Database className="h-4 w-4 text-[var(--app-warning)]" />}
+      className="mb-4"
+      contentClassName="space-y-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-1)] p-4"
+    >
           <PortableBackupPanel
             key={ownerScope?.key ?? "owner-pending"}
             ownerScope={ownerScope}
@@ -204,7 +182,7 @@ export default function DataManagementPanel({
               Verileri Dışa Aktar (JSON)
             </button>
             <p className="text-[11px] text-zinc-600 mt-1.5 text-center">
-              {mediaList.length} içerik export edilecek
+              {mediaList.length} içerik dışa aktarılacak
             </p>
           </div>
 
@@ -269,8 +247,6 @@ export default function DataManagementPanel({
             <RotateCcw className="w-4 h-4" />
             Mock Verilere Sıfırla
           </button>
-        </div>
-      )}
-    </div>
+    </CollapsibleSection>
   );
 }

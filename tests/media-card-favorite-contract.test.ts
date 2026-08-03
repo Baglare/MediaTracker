@@ -45,6 +45,7 @@ describe("media card favorite ribbon", () => {
   });
 
   it("reserves title space so the control does not overlap it", () => {
-    expect(card).toContain('className="flex items-start gap-2 pr-7"');
+    expect(card).toContain('className="min-w-0 pr-7"');
+    expect(card).toContain("line-clamp-2 min-h-[2.25rem]");
   });
 });

@@ -1,9 +1,9 @@
 "use client";
 
-import Image from "next/image";
 import type { User } from "@supabase/supabase-js";
-import { Settings as SettingsIcon } from "lucide-react";
+import { CloudCog, Home, PanelsTopLeft, Settings as SettingsIcon } from "lucide-react";
 import AuthPanel from "@/components/auth-panel";
+import { BrandMark } from "@/components/brand-mark";
 import CloudDataStatusCard from "@/components/cloud-data-status-card";
 import CloudSyncStatusCard from "@/components/cloud-sync-status-card";
 import DataManagementPanel from "@/components/data-management-panel";
@@ -14,6 +14,7 @@ import AppearanceSettingsCard from "@/components/personalization/appearance-sett
 import LayoutSettingsCard from "@/components/personalization/layout-settings-card";
 import StartupSettingsCard from "@/components/personalization/startup-settings-card";
 import { PersonalDataOwnershipPanel } from "@/components/personal-data-ownership-panel";
+import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import type { useLayoutPreferences } from "@/hooks/use-layout-preferences";
 import type { MediaItem, ProgressLog } from "@/lib/types";
 import type { LocalOwnerScope } from "@/lib/local-owner-scope";
@@ -53,26 +54,45 @@ export default function SettingsFeature({
       <PageHeader
         icon={SettingsIcon}
         title="Ayarlar"
-        subtitle="Hesap, cloud sync, veri yönetimi ve uygulama bilgisi"
+        subtitle="Hesap, Cloud eşitleme, veri yönetimi ve uygulama bilgisi"
       />
       <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2 lg:gap-5">
         <PersonalDataOwnershipPanel />
         <AppearanceSettingsCard onConfirm={onConfirm} />
-        <LayoutSettingsCard
-          preferences={layout.preferences}
-          isHydrated={layout.isHydrated}
-          statusMessage={layout.statusMessage}
-          onVisibilityChange={layout.updateVisibility}
-          onMove={layout.moveWidget}
-          onResetDashboard={layout.resetDashboard}
-          onResetRightRail={layout.resetRightRail}
-          onResetAll={() => onConfirm(
-            "Tüm düzeni sıfırla",
-            "Dashboard ve sağ panel görünürlüğü ile sırası varsayılana dönecek.",
-            layout.resetAll,
-          )}
-        />
-        <StartupSettingsCard />
+        <CollapsibleSection
+          storageKey="layout-presets"
+          anchorId="layout"
+          title="Düzen ve panel listeleri"
+          description="Dashboard ve sağ panel görünürlüğünü, sırasını ve hazır düzenlerini yönet."
+          badge={<span className="rounded-md border border-[var(--app-border)] px-1.5 py-0.5 text-[10px] text-[var(--app-text-secondary)]">Seyrek kullanılan</span>}
+          icon={<PanelsTopLeft className="h-4 w-4 text-[var(--app-accent-strong)]" />}
+          className="lg:col-span-2"
+        >
+          <LayoutSettingsCard
+            preferences={layout.preferences}
+            isHydrated={layout.isHydrated}
+            statusMessage={layout.statusMessage}
+            onVisibilityChange={layout.updateVisibility}
+            onMove={layout.moveWidget}
+            onResetDashboard={layout.resetDashboard}
+            onResetRightRail={layout.resetRightRail}
+            onResetAll={() => onConfirm(
+              "Tüm düzeni sıfırla",
+              "Dashboard ve sağ panel görünürlüğü ile sırası varsayılana dönecek.",
+              layout.resetAll,
+            )}
+          />
+        </CollapsibleSection>
+        <CollapsibleSection
+          storageKey="startup-preferences"
+          title="Başlangıç görünümü"
+          description="Uygulama açıldığında gösterilecek ilk bölümü değiştir."
+          badge={<span className="rounded-md border border-[var(--app-border)] px-1.5 py-0.5 text-[10px] text-[var(--app-text-secondary)]">İsteğe bağlı</span>}
+          icon={<Home className="h-4 w-4 text-[var(--app-accent-strong)]" />}
+          className="lg:col-span-2"
+        >
+          <StartupSettingsCard />
+        </CollapsibleSection>
         <div className="space-y-4 lg:space-y-5">
           <AuthPanel />
           <CloudSyncStatusCard
@@ -84,14 +104,22 @@ export default function SettingsFeature({
           />
         </div>
         <div className="space-y-4 lg:space-y-5">
-          <CloudDataStatusCard
-            user={user}
-            configured={configured}
-            mediaItems={mediaList}
-            progressLogs={progressLogs}
-            onReplaceData={onReplaceData}
-            onConfirm={onConfirm}
-          />
+          <CollapsibleSection
+            storageKey="advanced-cloud-data"
+            title="Gelişmiş Cloud veri işlemleri"
+            description="Cloud ve yerel kayıt sayılarını karşılaştır; elle aktarım seçeneklerini gerektiğinde aç."
+            badge={<span className="rounded-md border border-[var(--app-border)] px-1.5 py-0.5 text-[10px] text-[var(--app-text-secondary)]">İsteğe bağlı</span>}
+            icon={<CloudCog className="h-4 w-4 text-[var(--app-accent-strong)]" />}
+          >
+            <CloudDataStatusCard
+              user={user}
+              configured={configured}
+              mediaItems={mediaList}
+              progressLogs={progressLogs}
+              onReplaceData={onReplaceData}
+              onConfirm={onConfirm}
+            />
+          </CollapsibleSection>
           <DataManagementPanel
             ownerScope={ownerScope}
             mediaList={mediaList}
@@ -113,14 +141,7 @@ export default function SettingsFeature({
         </div>
         <div className="app-panel rounded-2xl border p-[var(--app-panel-padding)] lg:col-span-2">
           <div className="mb-4 flex items-center gap-2.5">
-            <Image
-              src="/brand/media-tracker-mark.svg"
-              alt=""
-              aria-hidden="true"
-              width={28}
-              height={28}
-              className="h-7 w-7 shrink-0 object-contain"
-            />
+            <BrandMark className="h-7 w-7" />
             <h3 className="text-base font-semibold tracking-tight text-[var(--app-text-primary)]">
               Uygulama Bilgisi
             </h3>
@@ -132,32 +153,32 @@ export default function SettingsFeature({
               hesap üzerinden yürütülür.
             </p>
             <div className="my-4 h-px bg-[var(--app-border)]" />
-            <h4 className="font-medium text-[var(--app-text-primary)]">Veri Kaynakları (APIs)</h4>
+            <h4 className="font-medium text-[var(--app-text-primary)]">Veri kaynakları</h4>
             <ul className="grid list-disc grid-cols-1 gap-x-6 gap-y-2 pl-5 lg:grid-cols-2">
               <li>
-                TV show data powered by{" "}
+                Dizi verileri{" "}
                 <a href="https://www.tvmaze.com/" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-[var(--app-accent)]">
                   TVmaze
                 </a>.
               </li>
               <li>
-                Anime and manga data from{" "}
+                Anime ve manga verileri{" "}
                 <a href="https://anilist.co/" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-[var(--app-accent)]">
                   AniList
                 </a>.
               </li>
               <li>
-                Book data from{" "}
+                Kitap verileri{" "}
                 <a href="https://openlibrary.org/" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-[var(--app-accent)]">
                   Open Library
                 </a>.
               </li>
               <li>
-                This product uses the{" "}
+                Bu ürün{" "}
                 <a href="https://www.themoviedb.org/" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-[var(--app-accent)]">
                   TMDB API
                 </a>{" "}
-                but is not endorsed or certified by TMDB.
+                hizmetini kullanır; TMDB tarafından desteklenmez veya onaylanmaz.
               </li>
             </ul>
           </div>

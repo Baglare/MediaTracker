@@ -41,6 +41,29 @@ function formatRevision(summary: CloudV2RemoteSummary | undefined): string {
   return summary ? `r${summary.revision}` : "Yenilenmedi";
 }
 
+function conflictReasonLabel(reason: CloudV2ConflictCard["reason"]): string {
+  const labels: Record<CloudV2ConflictCard["reason"], string> = {
+    revision_mismatch: "Sürüm uyuşmazlığı",
+    tombstoned: "Silinmiş kayıt",
+    record_id_unavailable: "Kayıt kimliği kullanılamıyor",
+    media_target_unavailable: "Üst medya bulunamadı",
+    not_found: "Kayıt bulunamadı",
+    already_tombstoned: "Kayıt zaten silinmiş",
+    not_tombstoned: "Kayıt silinmiş değil",
+    immutable_log_conflict: "Değiştirilemez günlük çakışması",
+    unknown: "Bilinmeyen çakışma",
+  };
+  return labels[reason];
+}
+
+function mediaStatusLabel(value: string): string {
+  const labels: Record<string, string> = {
+    watching: "İzleniyor", reading: "Okunuyor", completed: "Tamamlandı",
+    planned: "Planlandı", on_hold: "Beklemede", dropped: "Bırakıldı",
+  };
+  return labels[value] ?? "Durum bilgisi mevcut";
+}
+
 export default function CloudV2ConflictPanel({
   ownerScope,
   mediaItems,
@@ -88,7 +111,7 @@ export default function CloudV2ConflictPanel({
       return;
     }
     setRemote((current) => ({ ...current, [card.itemId]: result.summary }));
-    setFeedback({ kind: "success", text: "Cloud revision ve özet yenilendi." });
+    setFeedback({ kind: "success", text: "Cloud sürümü ve özeti yenilendi." });
   };
 
   const acceptRemote = async (card: CloudV2ConflictCard) => {
@@ -105,29 +128,29 @@ export default function CloudV2ConflictPanel({
       return;
     }
     if (!mediaItems.some((item) => item.id === card.recordId)) {
-      setFeedback({ kind: "error", text: "Eşleşen local record artık mevcut değil." });
+      setFeedback({ kind: "error", text: "Eşleşen yerel kayıt artık mevcut değil." });
       return;
     }
     const next = mediaItems.map((item) =>
       item.id === card.recordId ? result.item : item);
     if (!onApplyResolution(next, progressLogs)) {
-      setFeedback({ kind: "error", text: "Cloud sürümü local storage'a yazılamadı." });
+      setFeedback({ kind: "error", text: "Cloud sürümü yerel depolamaya yazılamadı." });
       return;
     }
     showResult(
       acknowledgeCloudV2Conflict(ownerScope, card.itemId),
-      "Buluttaki sürüm güvenli local state olarak kabul edildi.",
+      "Buluttaki sürüm güvenli yerel durum olarak kabul edildi.",
     );
   };
 
   const keepDeleted = (card: CloudV2ConflictCard) => {
     onConfirm(
       "Cloud silme durumunu kabul et",
-      "Bu local kayıt görünür kütüphaneden kaldırılacak. XP/social geçmişi ve progress logları bu işlemle değiştirilmez.",
+      "Bu yerel kayıt görünür kütüphaneden kaldırılacak. XP, sosyal geçmiş ve ilerleme günlükleri bu işlemle değiştirilmez.",
       () => {
         const next = mediaItems.filter((item) => item.id !== card.recordId);
         if (!onApplyResolution(next, progressLogs)) {
-          setFeedback({ kind: "error", text: "Local silme durumu yazılamadı." });
+          setFeedback({ kind: "error", text: "Yerel silme durumu yazılamadı." });
           return;
         }
         showResult(
@@ -141,10 +164,10 @@ export default function CloudV2ConflictPanel({
   const restore = (card: CloudV2ConflictCard) => {
     onConfirm(
       "Cloud kaydını geri yükle",
-      "Silinmiş cloud kayıt güncel revision üzerinden açıkça restore edilecek.",
+      "Silinmiş Cloud kaydı güncel sürüm üzerinden açıkça geri yüklenecek.",
       () => showResult(
         restoreCloudV2Tombstone(ownerScope, card.itemId),
-        "Restore işlemi güvenli queue'ya eklendi.",
+        "Geri yükleme işlemi güvenli kuyruğa eklendi.",
       ),
     );
   };
@@ -154,13 +177,13 @@ export default function CloudV2ConflictPanel({
     if (!summary) {
       setFeedback({
         kind: "info",
-        text: "Retry öncesinde Remote yenile ile güncel revision alınmalı.",
+        text: "Yeniden denemeden önce bulut özeti yenilenerek güncel sürüm alınmalı.",
       });
       return;
     }
     showResult(
       retryCloudV2Conflict(ownerScope, card.itemId, summary.revision),
-      "Yerel değişiklik güncel revision ile yeni bir logical operation olarak kuyruğa alındı.",
+      "Yerel değişiklik güncel sürümle yeni bir işlem olarak kuyruğa alındı.",
     );
   };
 
@@ -169,13 +192,13 @@ export default function CloudV2ConflictPanel({
     if (!parent) {
       setFeedback({
         kind: "error",
-        text: "Parent media local kütüphanede bulunamadı; progress blocked kalacak.",
+        text: "Üst medya yerel kütüphanede bulunamadı; ilerleme işlemi engelli kalacak.",
       });
       return;
     }
     showResult(
       retryProgressAfterParent(ownerScope, card.itemId, parent),
-      "Parent media önce, progress işlemi ardından çalışacak şekilde kuyruğa alındı.",
+      "Önce üst medya, ardından ilerleme işlemi çalışacak şekilde kuyruğa alındı.",
     );
   };
 
@@ -183,13 +206,13 @@ export default function CloudV2ConflictPanel({
     <div className="mt-4 space-y-3 border-t border-zinc-800/60 pt-4">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h4 className="text-sm font-semibold text-zinc-200">Cloud Conflict İncelemesi</h4>
+          <h4 className="text-sm font-semibold text-zinc-200">Cloud çakışma incelemesi</h4>
           <p className="text-[11px] text-zinc-500">
-            Blocked işlemler otomatik retry edilmez ve local veri sessizce ezilmez.
+            Engellenen işlemler otomatik yeniden denenmez ve yerel veri sessizce ezilmez.
           </p>
         </div>
         <span className="rounded-md bg-rose-500/10 px-2 py-1 text-xs text-rose-300 ring-1 ring-rose-500/30">
-          {conflicts.length} blocked
+          {conflicts.length} engelli
         </span>
       </div>
 
@@ -207,7 +230,7 @@ export default function CloudV2ConflictPanel({
 
       {conflicts.length === 0 ? (
         <p className="rounded-lg bg-zinc-800/40 px-3 py-2 text-xs text-zinc-500">
-          Kullanıcı kararı bekleyen Cloud V2 conflict yok.
+          Kullanıcı kararı bekleyen Cloud V2 çakışması yok.
         </p>
       ) : conflicts.map((card) => {
         const summary = remote[card.itemId];
@@ -230,23 +253,23 @@ export default function CloudV2ConflictPanel({
                 </p>
               </div>
               <span className="shrink-0 rounded bg-zinc-800/70 px-2 py-1 text-[10px] text-zinc-400">
-                {card.reason}
+                {conflictReasonLabel(card.reason)}
               </span>
             </div>
 
             <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] sm:grid-cols-4">
-              <span className="text-zinc-500">Local: r{card.expectedRevision}</span>
-              <span className="text-zinc-500">Server: r{card.serverRevision}</span>
-              <span className="text-zinc-500">Remote: {formatRevision(summary)}</span>
+              <span className="text-zinc-500">Yerel: r{card.expectedRevision}</span>
+              <span className="text-zinc-500">Sunucu: r{card.serverRevision}</span>
+              <span className="text-zinc-500">Bulut: {formatRevision(summary)}</span>
               <span className="text-zinc-500">
-                {card.safeLocalSummary.type ?? card.entity}
+                {card.entity === "media_item" ? "Medya" : "İlerleme günlüğü"}
               </span>
             </div>
             {(card.safeLocalSummary.title || card.safeLocalSummary.progress) && (
               <p className="mt-2 text-xs text-zinc-300">
                 {card.safeLocalSummary.title ?? "Başlıksız kayıt"}
                 {card.safeLocalSummary.status
-                  ? ` · ${card.safeLocalSummary.status}`
+                  ? ` · ${mediaStatusLabel(card.safeLocalSummary.status)}`
                   : ""}
                 {card.safeLocalSummary.progress
                   ? ` · ${card.safeLocalSummary.progress}`
@@ -256,7 +279,7 @@ export default function CloudV2ConflictPanel({
             {summary && (
               <p className="mt-1 text-[11px] text-blue-300">
                 Cloud: {summary.title ?? "Kayıt"} · r{summary.revision}
-                {summary.status ? ` · ${summary.status}` : ""}
+                {summary.status ? ` · ${mediaStatusLabel(summary.status)}` : ""}
                 {summary.progress ? ` · ${summary.progress}` : ""}
               </p>
             )}
@@ -272,7 +295,7 @@ export default function CloudV2ConflictPanel({
                   {isBusy
                     ? <Loader2 className="h-3 w-3 animate-spin" />
                     : <RefreshCw className="h-3 w-3" />}
-                  Remote yenile
+                  Bulut özetini yenile
                 </button>
               )}
               {card.actions.includes("use-remote") && (
@@ -293,7 +316,7 @@ export default function CloudV2ConflictPanel({
                   className="inline-flex items-center gap-1.5 rounded-md bg-violet-500/15 px-2.5 py-1.5 text-[11px] text-violet-300 ring-1 ring-violet-500/30"
                 >
                   <RotateCcw className="h-3 w-3" />
-                  Yerel değişikliği retry et
+                  Yerel değişikliği yeniden dene
                 </button>
               )}
               {card.actions.includes("keep-deleted") && (
@@ -311,7 +334,7 @@ export default function CloudV2ConflictPanel({
                   onClick={() => restore(card)}
                   className="rounded-md bg-amber-500/15 px-2.5 py-1.5 text-[11px] text-amber-300 ring-1 ring-amber-500/30"
                 >
-                  Açık onayla restore et
+                  Açık onayla geri yükle
                 </button>
               )}
               {card.actions.includes("retry-parent-first") && (
@@ -320,14 +343,14 @@ export default function CloudV2ConflictPanel({
                   onClick={() => retryParent(card)}
                   className="rounded-md bg-violet-500/15 px-2.5 py-1.5 text-[11px] text-violet-300 ring-1 ring-violet-500/30"
                 >
-                  Parent media sonrası retry
+                  Üst medyadan sonra yeniden dene
                 </button>
               )}
               <button
                 type="button"
                 onClick={() => setFeedback({
                   kind: "info",
-                  text: "İşlem ertelendi; blocked kayıt güvenli biçimde korunuyor.",
+                  text: "İşlem ertelendi; engellenen kayıt güvenli biçimde korunuyor.",
                 })}
                 className="inline-flex items-center gap-1.5 rounded-md bg-zinc-800 px-2.5 py-1.5 text-[11px] text-zinc-400"
               >

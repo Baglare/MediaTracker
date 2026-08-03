@@ -43,11 +43,29 @@ interface PortableBackupPanelProps {
 
 const DOMAIN_LABELS: Record<PortableBackupDomain, string> = {
   mediaItems: "Medya ve grup/seri ilişkileri",
-  progressLogs: "İlerleme logları",
-  identityAliases: "Identity alias registry",
-  recordRedirects: "Record redirect registry",
-  recommendationLinks: "Recommendation local linkleri",
+  progressLogs: "İlerleme günlükleri",
+  identityAliases: "Kimlik eşleme kayıtları",
+  recordRedirects: "Kayıt yönlendirmeleri",
+  recommendationLinks: "Yerel öneri bağlantıları",
 };
+
+function ownerTypeLabel(value: string): string {
+  if (value === "user") return "Hesap";
+  if (value === "guest") return "Misafir";
+  return "Bilinmiyor";
+}
+
+function importDecisionLabel(value: string): string {
+  const labels: Record<string, string> = {
+    add: "Ekle",
+    "skip-existing-id": "Mevcut kimliği atla",
+    "skip-exact": "Kesin kopyayı atla",
+    "add-exact-copy": "Kesin kopyayı ayrı ekle",
+    remap: "İlişkiyi yeniden eşle",
+    skip: "Atla",
+  };
+  return labels[value] ?? "İnceleme gerekli";
+}
 
 export default function PortableBackupPanel({
   ownerScope,
@@ -77,7 +95,7 @@ export default function PortableBackupPanel({
     : {
         available: false as const,
         code: "no_import" as const,
-        message: "Aktif owner belirlenmeden undo kullanılamaz.",
+        message: "Etkin sahip belirlenmeden geri alma kullanılamaz.",
         pendingQueueCount: 0,
       };
   const noteCount = mediaList.filter((item) =>
@@ -98,7 +116,7 @@ export default function PortableBackupPanel({
 
   async function prepareExport() {
     if (!ownerScope) {
-      setMessage("Aktif local owner belirlenmeden backup oluşturulamaz.");
+      setMessage("Etkin yerel sahip belirlenmeden yedek oluşturulamaz.");
       return;
     }
     const source = collectPortableBackupSource(
@@ -120,7 +138,7 @@ export default function PortableBackupPanel({
       setMessage(null);
     } catch {
       setCreated(null);
-      setMessage("Portable backup güvenli biçimde oluşturulamadı.");
+      setMessage("Taşınabilir yedek güvenli biçimde oluşturulamadı.");
     }
   }
 
@@ -143,7 +161,7 @@ export default function PortableBackupPanel({
   ) {
     const scope = ownerScope;
     if (!scope) {
-      setMessage("Aktif local owner belirlenmeden import planlanamaz.");
+      setMessage("Etkin yerel sahip belirlenmeden içe aktarma planlanamaz.");
       return;
     }
     const generationKey = scope.key;
@@ -170,7 +188,7 @@ export default function PortableBackupPanel({
       setInspection(null);
       setInspectedText(null);
       setImportPlan(null);
-      setMessage("Backup dosyası 10 MiB sınırını aşıyor.");
+      setMessage("Yedek dosyası 10 MiB sınırını aşıyor.");
       return;
     }
     try {
@@ -186,7 +204,7 @@ export default function PortableBackupPanel({
       setInspection(null);
       setInspectedText(null);
       setImportPlan(null);
-      setMessage("Backup dosyası read-only inceleme için okunamadı.");
+      setMessage("Yedek dosyası salt okunur inceleme için okunamadı.");
     }
   }
 
@@ -225,10 +243,10 @@ export default function PortableBackupPanel({
     setRecoveryRequired(false);
     const successMessage =
       result.state === "sync-pending"
-        ? "Additive import doğrulandı; cloud işlemleri durable queue içinde bekliyor."
+        ? "Eklemeli içe aktarma doğrulandı; Cloud işlemleri kalıcı kuyrukta bekliyor."
         : result.idempotent
-          ? "Bu backup zaten uygulanmış; yeni kopya oluşturulmadı."
-          : "Additive import tamamlandı ve read-back doğrulandı.";
+          ? "Bu yedek zaten uygulanmış; yeni kopya oluşturulmadı."
+          : "Eklemeli içe aktarma tamamlandı ve yeniden okuma ile doğrulandı.";
     setImportConfirmed(false);
     await prepareImportPlan(inspectedText, exactCopies);
     if (ownerKeyRef.current === generationKey) setImportStatus(successMessage);
@@ -249,7 +267,7 @@ export default function PortableBackupPanel({
       await prepareImportPlan(inspectedText, exactCopies);
     }
     if (ownerKeyRef.current === generationKey) {
-      setImportStatus("Import recovery before snapshot ile tamamlandı.");
+      setImportStatus("İçe aktarma kurtarması, işlem öncesi anlık görüntü ile tamamlandı.");
     }
   }
 
@@ -268,21 +286,21 @@ export default function PortableBackupPanel({
       await prepareImportPlan(inspectedText, exactCopies);
     }
     if (ownerKeyRef.current === generationKey) {
-      setImportStatus("Son additive import geri alındı; import öncesi state doğrulandı.");
+      setImportStatus("Son eklemeli içe aktarma geri alındı; işlem öncesi durum doğrulandı.");
     }
   }
 
   return (
     <div className="space-y-4 rounded-xl border border-zinc-800/60 bg-zinc-950/25 p-3">
       <div>
-        <h4 className="text-sm font-semibold text-zinc-200">Portable Backup V2</h4>
+        <h4 className="text-sm font-semibold text-zinc-200">Taşınabilir Yedek V2</h4>
         <p className="mt-1 text-[11px] leading-5 text-zinc-500">
-          Owner-neutral JSON export ve yazma yapmayan dosya incelemesi.
+          Sahipten bağımsız JSON dışa aktarma ve yazma yapmayan dosya incelemesi.
         </p>
       </div>
 
       <div className="space-y-2">
-        <p className="text-xs font-medium text-zinc-300">Export domain&apos;leri</p>
+        <p className="text-xs font-medium text-zinc-300">Dışa aktarılacak veri alanları</p>
         <div className="grid gap-2 sm:grid-cols-2">
           {PORTABLE_BACKUP_DOMAINS.map((domain) => (
             <label
@@ -306,10 +324,10 @@ export default function PortableBackupPanel({
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
           <div>
             <p className="text-xs font-medium text-amber-200">
-              Personal note&apos;lar özel veri içerebilir
+              Kişisel notlar özel veri içerebilir
             </p>
             <p className="mt-1 text-[11px] leading-5 text-amber-200/70">
-              {noteCount} medya kaydında not var. Varsayılan export bu içerikleri
+              {noteCount} medya kaydında not var. Varsayılan dışa aktarma bu içerikleri
               dışarıda bırakır.
             </p>
           </div>
@@ -325,7 +343,7 @@ export default function PortableBackupPanel({
             }}
             className="accent-amber-500"
           />
-          Personal note içeriklerini backup&apos;a dahil et
+          Kişisel not içeriklerini yedeğe dahil et
         </label>
       </div>
 
@@ -336,14 +354,14 @@ export default function PortableBackupPanel({
         className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-500/15 px-4 py-2.5 text-sm font-medium text-emerald-300 ring-1 ring-emerald-500/30 hover:bg-emerald-500/25 disabled:cursor-not-allowed disabled:opacity-40"
       >
         <ShieldCheck className="h-4 w-4" />
-        Backup önizlemesi oluştur
+        Yedek önizlemesi oluştur
       </button>
 
       {created && (
         <div className="space-y-3 rounded-xl border border-emerald-500/25 bg-emerald-500/5 p-3">
           <div className="flex items-center gap-2 text-xs font-medium text-emerald-200">
             <CheckCircle2 className="h-4 w-4" />
-            Checksum ile doğrulanmış export hazır
+            Sağlama toplamı ile doğrulanmış dışa aktarım hazır
           </div>
           <div className="grid grid-cols-2 gap-2 text-[10px] text-zinc-400 sm:grid-cols-3">
             {created.backup.manifest.domains.map((domain) => (
@@ -362,7 +380,7 @@ export default function PortableBackupPanel({
             </div>
           </div>
           <p className="text-[10px] text-zinc-500">
-            Owner türü: {created.backup.manifest.ownerType} · Personal note:{" "}
+            Sahip türü: {ownerTypeLabel(created.backup.manifest.ownerType)} · Kişisel not:{" "}
             {created.backup.manifest.privacy.personalNotesIncluded
               ? "dahil"
               : "hariç"}
@@ -385,7 +403,7 @@ export default function PortableBackupPanel({
           className="flex w-full items-center justify-center gap-2 rounded-xl bg-sky-500/15 px-4 py-2.5 text-sm font-medium text-sky-300 ring-1 ring-sky-500/30 hover:bg-sky-500/25"
         >
           <FileSearch className="h-4 w-4" />
-          Backup dosyasını read-only incele
+          Yedek dosyasını salt okunur incele
         </button>
         <input
           ref={fileInputRef}
@@ -411,8 +429,8 @@ export default function PortableBackupPanel({
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-xs font-semibold text-zinc-200">
               {inspection.summary.kind === "legacy"
-                ? "Legacy backup tanındı"
-                : `Portable V${inspection.summary.version ?? "?"} incelemesi`}
+                 ? "Eski yedek tanındı"
+                 : `Taşınabilir V${inspection.summary.version ?? "?"} incelemesi`}
             </p>
             <div className="flex gap-2 text-[10px]">
               <span className="rounded-full bg-red-500/10 px-2 py-1 text-red-300">
@@ -427,20 +445,20 @@ export default function PortableBackupPanel({
             {Object.entries(inspection.summary.counts).map(([domain, count]) => (
               <div key={domain} className="rounded-lg bg-zinc-950/50 p-2">
                 <strong className="block text-sm text-zinc-200">{count}</strong>
-                {DOMAIN_LABELS[domain as PortableBackupDomain] ?? domain}
+                {DOMAIN_LABELS[domain as PortableBackupDomain] ?? "Bilinmeyen veri alanı"}
               </div>
             ))}
             <div className="rounded-lg bg-zinc-950/50 p-2">
               <strong className="block text-sm text-zinc-200">
                 {inspection.summary.identity.unresolved}
               </strong>
-              Unresolved identity
+               Çözümlenemeyen kimlik
             </div>
             <div className="rounded-lg bg-zinc-950/50 p-2">
               <strong className="block text-sm text-zinc-200">
                 {inspection.summary.relationships.orphanProgressLogs}
               </strong>
-              Orphan log
+               Sahipsiz günlük
             </div>
           </div>
           {inspection.issues.length > 0 && (
@@ -465,18 +483,18 @@ export default function PortableBackupPanel({
           <div>
             <div className="flex items-center gap-2 text-xs font-semibold text-violet-200">
               <Upload className="h-4 w-4" />
-              Kontrollü additive import
+              Kontrollü eklemeli içe aktarma
             </div>
             <p className="mt-1 text-[11px] leading-5 text-violet-100/70">
-              Önce dry-run planı gösterilir. Mevcut kayıtlar silinmez, replace veya
-              duplicate merge yapılmaz.
+               Önce deneme planı gösterilir. Mevcut kayıtlar silinmez, değiştirme veya
+              tekrarlanan kayıt birleştirmesi yapılmaz.
             </p>
           </div>
 
           {importBusy && (
             <div className="flex items-center gap-2 text-xs text-zinc-400">
               <LoaderCircle className="h-4 w-4 animate-spin" />
-              Plan güncel owner state&apos;iyle doğrulanıyor…
+              Plan güncel sahip durumuyla doğrulanıyor…
             </div>
           )}
 
@@ -499,55 +517,55 @@ export default function PortableBackupPanel({
                   <strong className="block text-sm text-amber-300">
                     {importPlan.counts.mediaExact}
                   </strong>
-                  Exact duplicate
+                   Kesin kopya
                 </div>
                 <div className="rounded-lg bg-zinc-950/50 p-2">
                   <strong className="block text-sm text-emerald-300">
                     {importPlan.counts.logAdd}
                   </strong>
-                  Eklenecek log
+                   Eklenecek günlük
                 </div>
                 <div className="rounded-lg bg-zinc-950/50 p-2">
                   <strong className="block text-sm text-sky-300">
                     {importPlan.counts.relationshipRemaps}
                   </strong>
-                  İlişki remap
+                   Yeniden eşlenen ilişki
                 </div>
                 <div className="rounded-lg bg-zinc-950/50 p-2">
                   <strong className="block text-sm text-red-300">
                     {importPlan.blockers.length}
                   </strong>
-                  Blocker
+                   Engelleyici
                 </div>
               </div>
 
               <div className="rounded-lg border border-zinc-800 bg-zinc-950/40 p-2 text-[10px] leading-5 text-zinc-400">
-                <p>Backup owner türü: {importPlan.backupOwnerType}</p>
-                <p>Seçili domain: {importPlan.selectedDomains.length}</p>
-                <p>Alias eklenecek: {importPlan.counts.aliasesAdd}</p>
-                <p>Redirect eklenecek: {importPlan.counts.redirectsAdd}</p>
-                <p>Recommendation link eklenecek: {importPlan.counts.recommendationLinksAdd}</p>
+                <p>Yedek sahip türü: {ownerTypeLabel(importPlan.backupOwnerType)}</p>
+                <p>Seçili veri alanı: {importPlan.selectedDomains.length}</p>
+                <p>Kimlik eşlemesi eklenecek: {importPlan.counts.aliasesAdd}</p>
+                <p>Kayıt yönlendirmesi eklenecek: {importPlan.counts.redirectsAdd}</p>
+                <p>Öneri bağlantısı eklenecek: {importPlan.counts.recommendationLinksAdd}</p>
                 <p>
-                  Cloud: {ownerScope?.kind === "user"
-                    ? `${importPlan.cloudOperationCount} durable upsert`
-                    : "Guest scope için queue üretilmez"}
+                   Cloud: {ownerScope?.kind === "user"
+                     ? `${importPlan.cloudOperationCount} kalıcı kayıt işlemi`
+                     : "Misafir kapsamı için kuyruk üretilmez"}
                 </p>
               </div>
 
               {ownerScope?.kind === "user" && importPlan.cloudOperationCount > 0 && (
                 <div className="flex gap-2 rounded-lg border border-amber-500/25 bg-amber-500/5 p-2 text-[11px] leading-5 text-amber-200">
                   <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                  Cloud sync başladıktan, tamamlandıktan veya sonucu belirsiz kaldıktan
-                  sonra bu import local undo ile geri alınamaz. Undo yalnız queue
-                  işlemleri henüz dispatch edilmediyse kullanılabilir.
+                   Cloud eşitleme başladıktan, tamamlandıktan veya sonucu belirsiz kaldıktan
+                   sonra bu içe aktarma yerel geri alma ile geri alınamaz. Geri alma yalnız kuyruk
+                   işlemleri henüz gönderilmediyse kullanılabilir.
                 </div>
               )}
 
               {importPlan.personalNotesPresent && (
                 <div className="flex gap-2 rounded-lg border border-amber-500/25 bg-amber-500/5 p-2 text-[11px] text-amber-200">
                   <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                  Backup personal note içeriyor. İçerik bu özette gösterilmez; seçili
-                  medya kaydıyla birlikte local owner scope&apos;una eklenir.
+                  Yedek kişisel not içeriyor. İçerik bu özette gösterilmez; seçili
+                  medya kaydıyla birlikte yerel sahip kapsamına eklenir.
                 </div>
               )}
 
@@ -571,11 +589,11 @@ export default function PortableBackupPanel({
                             </p>
                           )}
                           <p className="text-zinc-600">
-                            Personal note: {decision.hasPersonalNote ? "var" : "yok"}
+                             Kişisel not: {decision.hasPersonalNote ? "var" : "yok"}
                           </p>
                         </div>
                         <span className="rounded-full bg-zinc-800 px-2 py-1 text-zinc-300">
-                          {decision.status}
+                           {importDecisionLabel(decision.status)}
                         </span>
                       </div>
                       {(decision.status === "skip-exact"
@@ -588,7 +606,7 @@ export default function PortableBackupPanel({
                             onChange={() => { void toggleExactCopy(decision.sourceRecordId); }}
                             className="accent-amber-500"
                           />
-                          Explicit seçim: ayrı local kayıt olarak ekle
+                          Açık seçim: ayrı yerel kayıt olarak ekle
                         </label>
                       )}
                     </div>
@@ -599,7 +617,7 @@ export default function PortableBackupPanel({
               {importPlan.logDecisions.length > 0 && (
                 <details className="rounded-lg border border-zinc-800 p-2 text-[10px]">
                   <summary className="cursor-pointer text-zinc-300">
-                    ProgressLog dry-run kararları ({importPlan.logDecisions.length})
+                    İlerleme günlüğü deneme kararları ({importPlan.logDecisions.length})
                   </summary>
                   <ul className="mt-2 max-h-32 space-y-1 overflow-y-auto text-zinc-500">
                     {importPlan.logDecisions.map((decision) => (
@@ -630,7 +648,7 @@ export default function PortableBackupPanel({
                   onChange={(event) => setImportConfirmed(event.target.checked)}
                   className="accent-violet-500"
                 />
-                Bu dry-run planının yalnız yeni ve açıkça seçilmiş kayıtları eklemesini
+                 Bu deneme planının yalnız yeni ve açıkça seçilmiş kayıtları eklemesini
                 onaylıyorum.
               </label>
 
@@ -654,7 +672,7 @@ export default function PortableBackupPanel({
                   }
                   className="rounded-lg bg-violet-500/20 px-3 py-2 text-xs font-semibold text-violet-100 hover:bg-violet-500/30 disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  Additive importu uygula
+                  Eklemeli içe aktarmayı uygula
                 </button>
                 <button
                   type="button"
@@ -663,7 +681,7 @@ export default function PortableBackupPanel({
                   className="flex items-center gap-1 rounded-lg bg-amber-500/15 px-3 py-2 text-xs text-amber-200 hover:bg-amber-500/25 disabled:opacity-40"
                 >
                   <RotateCcw className="h-3.5 w-3.5" />
-                  Son importu geri al
+                  Son içe aktarmayı geri al
                 </button>
               </div>
               <p
@@ -671,7 +689,7 @@ export default function PortableBackupPanel({
                   undoAvailability.available ? "text-emerald-300" : "text-amber-300"
                 }`}
               >
-                Undo: {undoAvailability.message}
+                 Geri alma: {undoAvailability.message}
               </p>
             </>
           )}
@@ -682,7 +700,7 @@ export default function PortableBackupPanel({
               onClick={() => { void recoverImport(); }}
               className="w-full rounded-lg bg-red-500/15 px-3 py-2 text-xs font-semibold text-red-200 hover:bg-red-500/25"
             >
-              Recovery journal&apos;ını before snapshot ile geri al
+              Kurtarma günlüğünü işlem öncesi anlık görüntü ile geri al
             </button>
           )}
 
