@@ -61,6 +61,7 @@ export interface AniListRawMedia {
   format?: string;          // TV, OVA, MOVIE, SPECIAL, ONA, MUSIC, MANGA, ONE_SHOT, NOVEL
   status?: string;          // FINISHED, RELEASING, NOT_YET_RELEASED, CANCELLED, HIATUS
   title: AniListRawTitle;
+  synonyms?: string[];
   description?: string;     // Kısa açıklama (HTML olabilir)
   startDate?: AniListRawDate;
   coverImage?: AniListRawCoverImage;
@@ -106,6 +107,7 @@ export interface AniListNormalizedResult {
   title: string;
   originalTitle?: string;      // Romaji
   nativeTitle?: string;        // Native (Kanji/Hangul/vb.)
+  synonyms?: string[];         // Güvenli, bounded alternatif başlıklar
   overview?: string;           // Açıklama
   releaseYear?: number;
   coverUrl?: string;           // Kapak URL'si

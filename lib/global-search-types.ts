@@ -14,6 +14,7 @@ export interface GlobalSearchResult {
   type: MediaType;
   title: string;
   subtitle?: string;        // Orijinal başlık, yazar vb.
+  nativeTitle?: string;     // AniList için ayrı native/Kanji başlığı
   overview?: string;
   releaseYear?: number;
   coverUrl?: string;

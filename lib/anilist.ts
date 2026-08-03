@@ -64,6 +64,90 @@ export function getBestAniListTitle(title: AniListRawTitle): string {
   return title.english || title.romaji || title.native || "Bilinmiyor";
 }
 
+export function normalizeAniListSynonyms(
+  synonyms: unknown,
+): string[] | undefined {
+  if (!Array.isArray(synonyms)) return undefined;
+  const seen = new Set<string>();
+  const normalized: string[] = [];
+  for (const value of synonyms) {
+    if (typeof value !== "string") continue;
+    const title = value.normalize("NFKC").replace(/\s+/g, " ").trim().slice(0, 200);
+    const key = title.toLocaleLowerCase("en-US");
+    if (!title || seen.has(key)) continue;
+    seen.add(key);
+    normalized.push(title);
+    if (normalized.length === 12) break;
+  }
+  return normalized.length > 0 ? normalized : undefined;
+}
+
+export function normalizeAniListSearchText(value: string): string {
+  return value
+    .normalize("NFKC")
+    .toLocaleLowerCase("en-US")
+    .replace(/[\p{P}\p{S}]+/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function compactAniListSearchText(value: string): string {
+  return normalizeAniListSearchText(value).replace(/\s+/g, "");
+}
+
+/**
+ * Yalnız başarılı boş aramadan sonra kullanılacak tek konservatif fallback.
+ * Kısa sorgular genişletilmez; boşluk varyantı veya uzun başlığın sınırlı
+ * başlangıcı kullanılır.
+ */
+export function buildAniListSearchFallback(value: string): string | null {
+  const normalized = normalizeAniListSearchText(value);
+  if (!normalized) return null;
+  const compact = normalized.replace(/\s+/g, "");
+  if (compact !== normalized && compact.length >= 4 && compact.length <= 32) {
+    return compact;
+  }
+  if (normalized.length < 12) return null;
+  const words = normalized.split(" ");
+  const wordPrefix = words.slice(0, Math.min(3, words.length)).join(" ");
+  if (wordPrefix.length >= 4 && wordPrefix !== normalized) return wordPrefix;
+  const characterPrefix = [...normalized].slice(0, 12).join("").trim();
+  return characterPrefix.length >= 4 && characterPrefix !== normalized
+    ? characterPrefix
+    : null;
+}
+
+function aniListCandidateScore(media: AniListRawMedia, query: string): number {
+  const normalizedQuery = normalizeAniListSearchText(query);
+  const compactQuery = compactAniListSearchText(query);
+  const titles = [
+    media.title.english,
+    media.title.romaji,
+    media.title.native,
+    ...(Array.isArray(media.synonyms) ? media.synonyms.slice(0, 20) : []),
+  ].filter((value): value is string => typeof value === "string" && value.trim().length > 0);
+  let best = 4;
+  for (const title of titles) {
+    const normalized = normalizeAniListSearchText(title);
+    const compact = compactAniListSearchText(title);
+    if (normalized === normalizedQuery) best = Math.min(best, 0);
+    else if (compact === compactQuery) best = Math.min(best, 1);
+    else if (normalized.startsWith(normalizedQuery)) best = Math.min(best, 2);
+    else if (compact.startsWith(compactQuery)) best = Math.min(best, 3);
+  }
+  return best;
+}
+
+export function rankAniListSearchResults(
+  media: readonly AniListRawMedia[],
+  query: string,
+): AniListRawMedia[] {
+  return [...media].sort((left, right) =>
+    aniListCandidateScore(left, query) - aniListCandidateScore(right, query)
+    || (right.popularity ?? 0) - (left.popularity ?? 0)
+    || left.id - right.id);
+}
+
 /**
  * AniList medya tipini MediaType'a çevirir.
  * MANGA türü countryOfOrigin'e göre manga/manhwa/manhua olarak ayrılır.
@@ -137,6 +221,7 @@ export function normalizeAniListMedia(
     title: bestTitle,
     originalTitle: media.title.romaji || undefined,
     nativeTitle: media.title.native || undefined,
+    synonyms: normalizeAniListSynonyms(media.synonyms),
     overview,
     releaseYear: media.startDate?.year || undefined,
     coverUrl,

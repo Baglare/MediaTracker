@@ -20,7 +20,11 @@ import {
   AniListSearchResponse,
   AniListCategory,
 } from "@/lib/anilist-types";
-import { normalizeAniListMedia } from "@/lib/anilist";
+import {
+  buildAniListSearchFallback,
+  normalizeAniListMedia,
+  rankAniListSearchResults,
+} from "@/lib/anilist";
 
 // ---- GraphQL Sorgu Metinleri ----
 // `media(...)` alanı altında MEDIA_FIELDS aynı kalır; sadece dış argümanlar/sort
@@ -31,6 +35,7 @@ const MEDIA_FIELDS = `
   format
   status
   title { romaji english native }
+  synonyms
   description(asHtml: false)
   startDate { year }
   coverImage { large extraLarge }
@@ -82,6 +87,23 @@ query (
 /** AniList GraphQL endpoint */
 const ANILIST_URL = "https://graphql.anilist.co";
 
+class AniListHttpError extends Error {
+  constructor(
+    readonly status: number,
+    readonly retryAfter?: string,
+  ) {
+    super(`AniList API hatası: ${status}`);
+    this.name = "AniListHttpError";
+  }
+}
+
+class AniListGraphqlError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AniListGraphqlError";
+  }
+}
+
 /**
  * AniList'e tek bir GraphQL sorgusu atar.
  */
@@ -111,7 +133,10 @@ async function queryAniList(
   });
 
   if (!response.ok) {
-    throw new Error(`AniList API hatası: ${response.status}`);
+    throw new AniListHttpError(
+      response.status,
+      response.headers.get("retry-after") ?? undefined,
+    );
   }
 
   // GraphQL "200 OK + errors[]" durumunu da yakala — eskiden sessizce yutuluyordu.
@@ -120,7 +145,7 @@ async function queryAniList(
   };
   if (json.errors && json.errors.length > 0) {
     const msg = json.errors.map((e) => e.message).join("; ");
-    throw new Error(`AniList GraphQL hatası: ${msg}`);
+    throw new AniListGraphqlError(`AniList GraphQL hatası: ${msg}`);
   }
   return json.data?.Page?.media || [];
 }
@@ -187,14 +212,17 @@ async function discoverAniList(args: {
   });
 
   if (!response.ok) {
-    throw new Error(`AniList API hatası: ${response.status}`);
+    throw new AniListHttpError(
+      response.status,
+      response.headers.get("retry-after") ?? undefined,
+    );
   }
   const json = (await response.json()) as AniListSearchResponse & {
     errors?: { message: string }[];
   };
   if (json.errors && json.errors.length > 0) {
     const msg = json.errors.map((e) => e.message).join("; ");
-    throw new Error(`AniList GraphQL hatası: ${msg}`);
+    throw new AniListGraphqlError(`AniList GraphQL hatası: ${msg}`);
   }
   return json.data?.Page?.media || [];
 }
@@ -246,6 +274,7 @@ export async function GET(request: NextRequest) {
 
   try {
     let results: AniListRawMedia[] = [];
+    let fallbackUsed = false;
 
     if (!trimmedQuery && hasStructuredFilter) {
       // R37.1 — Discover modu: title-search yok, sadece structured filtreler.
@@ -263,23 +292,30 @@ export async function GET(request: NextRequest) {
       if (category !== "all" && category !== "anime") {
         results = filterByCountry(results, category);
       }
-    } else if (category === "all") {
-      // "all" → Hem ANIME hem MANGA sonuçlarını çek (paralel)
-      const [animeResults, mangaResults] = await Promise.all([
-        queryAniList(trimmedQuery, "ANIME", 12),
-        queryAniList(trimmedQuery, "MANGA", 12),
-      ]);
-      // Anime sonuçlarını önce, manga sonuçlarını sonra koy
-      results = [...animeResults, ...mangaResults];
-    } else if (category === "anime") {
-      results = await queryAniList(trimmedQuery, "ANIME", 12);
     } else {
-      // manga, manhwa, manhua → Hepsi AniList'te MANGA türü
-      // Daha fazla çekip server-side filtrele (40, çünkü country filtresi sonrası
-      // ana eserin top 12'ye girebilmesi gerekiyor — Attack on Titan / Oshi no Ko gibi
-      // popüler başlıkların türetilmiş işleri tarafından bastırılmasını önler).
-      results = await queryAniList(trimmedQuery, "MANGA", 40);
-      results = filterByCountry(results, category);
+      const runTextSearch = async (search: string): Promise<AniListRawMedia[]> => {
+        if (category === "all") {
+          const [animeResults, mangaResults] = await Promise.all([
+            queryAniList(search, "ANIME", 12),
+            queryAniList(search, "MANGA", 12),
+          ]);
+          return [...animeResults, ...mangaResults];
+        }
+        if (category === "anime") {
+          return queryAniList(search, "ANIME", 12);
+        }
+        const mangaResults = await queryAniList(search, "MANGA", 40);
+        return filterByCountry(mangaResults, category);
+      };
+      results = await runTextSearch(trimmedQuery);
+      const fallbackQuery = results.length === 0
+        ? buildAniListSearchFallback(trimmedQuery)
+        : null;
+      if (fallbackQuery && fallbackQuery !== trimmedQuery) {
+        results = await runTextSearch(fallbackQuery);
+        fallbackUsed = true;
+      }
+      results = rankAniListSearchResults(results, trimmedQuery);
     }
 
     // Normalize et ve en fazla 12 sonuç döndür
@@ -308,21 +344,41 @@ export async function GET(request: NextRequest) {
         query: trimmedQuery,
         category,
         mode: !trimmedQuery && hasStructuredFilter ? "discover" : "search",
+        fallbackUsed,
         filters: hasStructuredFilter ? { genres, tags, episodesLesser, sort: sortParam } : undefined,
       },
     });
   } catch (err) {
     console.error("AniList arama hatası:", err);
+    const status = err instanceof AniListHttpError
+      ? err.status === 429 || err.status === 403
+        ? err.status
+        : 502
+      : 502;
+    const reason = err instanceof AniListHttpError
+      ? err.status === 429
+        ? "rate_limited"
+        : err.status === 403
+          ? "forbidden"
+          : "upstream_error"
+      : err instanceof AniListGraphqlError
+        ? "graphql_error"
+        : "network_error";
     return NextResponse.json(
       {
         error: "AniList'e bağlanırken bir hata oluştu.",
         meta: {
           source: "anilist",
           failed: true,
-          reason: err instanceof Error ? err.message : String(err),
+          reason,
         },
       },
-      { status: 502 }
+      {
+        status,
+        headers: err instanceof AniListHttpError && err.retryAfter
+          ? { "Retry-After": err.retryAfter }
+          : undefined,
+      }
     );
   }
 }

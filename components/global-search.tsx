@@ -13,10 +13,15 @@ import {
 } from "@/lib/global-search-types";
 import GlobalSearchResultCard from "./global-search-result-card";
 import { TvmazeNormalizedResult } from "@/lib/tvmaze-types";
-import { AniListNormalizedResult } from "@/lib/anilist-types";
 import { OpenLibraryNormalizedResult } from "@/lib/openlibrary-types";
 import { OmdbNormalizedResult } from "@/lib/omdb-types";
 import { TmdbNormalizedResult } from "@/lib/tmdb-types";
+import {
+  anilistDiagnosticMessage,
+  collectFulfilledSearchResults,
+  fetchAniListGlobalSearch,
+  type AniListSearchDiagnostic,
+} from "@/lib/anilist-search-diagnostic";
 
 interface GlobalSearchProps {
   getLibraryStatus: (item: GlobalSearchResult) => Promise<GlobalSearchLibraryStatus> | GlobalSearchLibraryStatus;
@@ -71,15 +76,6 @@ const DEFAULT_LIBRARY_STATUS: GlobalSearchLibraryStatus = {
   hasAddableParts: false,
 };
 
-// Source-spesifik diagnostic — AniList gibi alt sistem 0 sonuç ya da
-// hata dönerse UI'da küçük bir not gösterebilmek için kullanılır.
-interface SourceDiag {
-  called: boolean;
-  count: number;
-  failed?: boolean;
-  reason?: string;
-}
-
 export default function GlobalSearch({ getLibraryStatus, onAddToLibrary, prefill }: GlobalSearchProps) {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<GlobalSearchCategory>("all");
@@ -92,7 +88,7 @@ export default function GlobalSearch({ getLibraryStatus, onAddToLibrary, prefill
   // V5A.x bug fix: AniList kaynağının sessiz "0 sonuç" durumu — section
   // hiç render edilmediği için kullanıcı kaynak çağrılmamış sandı. Artık
   // diag tutup empty/error notunu kullanıcıya gösteriyoruz.
-  const [anilistDiag, setAnilistDiag] = useState<SourceDiag | null>(null);
+  const [anilistDiag, setAnilistDiag] = useState<AniListSearchDiagnostic | null>(null);
   // R40 — Prefill: render fazında query/category setter'ları, auto-search
   // useEffect içinde ref-gate ile bir kez tetiklenir. State setter'ı effect
   // içinde çağrılmaz (kuralı tetiklemez); handleSearch async olduğundan
@@ -261,40 +257,16 @@ export default function GlobalSearch({ getLibraryStatus, onAddToLibrary, prefill
       ) {
         const anilistParam = activeCategory === "anime" ? "anime" : "all";
         fetchPromises.push(
-          fetch(`/api/anilist/search?q=${encodeURIComponent(query)}&category=${anilistParam}`)
-            .then(async (res) => {
-              const data = (await res.json().catch(() => ({}))) as {
-                results?: AniListNormalizedResult[];
-                error?: string;
-                meta?: { failed?: boolean; reason?: string; count?: number };
-              };
-              if (!res.ok) {
-                // Diag'i kullanıcıya görünür kıl; pipeline'ı kırma.
-                setAnilistDiag({
-                  called: true,
-                  count: 0,
-                  failed: true,
-                  reason: data?.meta?.reason || data?.error || `HTTP ${res.status}`,
-                });
-                console.warn("[anilist] route hata döndü:", data?.error || res.status);
-                return { results: [] as AniListNormalizedResult[] };
-              }
-              return { results: data.results || [] };
-            })
-            .then(({ results }) => {
-              const resArray = results || [];
-              setAnilistDiag({ called: true, count: resArray.length });
-              if (resArray.length === 0) {
-                console.warn(
-                  `[anilist] 0 sonuç döndü (q="${query}", category="${activeCategory}") — search index geçici sorun yaşıyor olabilir.`,
-                );
-              }
+          fetchAniListGlobalSearch({ query, category: anilistParam })
+            .then(({ results: resArray, diagnostic }) => {
+              setAnilistDiag(diagnostic);
               return resArray.map((item): GlobalSearchResult => ({
                 source: "anilist",
                 externalId: item.externalId,
                 type: item.type,
                 title: item.title,
-                subtitle: item.nativeTitle,
+                subtitle: item.originalTitle,
+                nativeTitle: item.nativeTitle,
                 overview: item.overview,
                 releaseYear: item.releaseYear,
                 coverUrl: item.coverUrl,
@@ -302,16 +274,6 @@ export default function GlobalSearch({ getLibraryStatus, onAddToLibrary, prefill
                 totalProgress: item.totalProgress,
                 raw: item,
               }));
-            })
-            .catch((err) => {
-              setAnilistDiag({
-                called: true,
-                count: 0,
-                failed: true,
-                reason: err instanceof Error ? err.message : String(err),
-              });
-              console.warn("[anilist] fetch exception:", err);
-              return [];
             })
         );
       }
@@ -349,12 +311,7 @@ export default function GlobalSearch({ getLibraryStatus, onAddToLibrary, prefill
         }
       }
 
-      let combined: GlobalSearchResult[] = [];
-      resultsArrays.forEach((result) => {
-        if (result.status === "fulfilled") {
-          combined = [...combined, ...result.value];
-        }
-      });
+      const combined = collectFulfilledSearchResults(resultsArrays);
       // NOT: Listede zaten olan item'ları sonuçlardan ÇIKARMIYORUZ. Kütüphane
       // durumu ayrıca getLibraryStatus üzerinden çözülüp karta "Listede" rozeti
       // veya "Sezon/Parça Ekle" aksiyonu olarak yansıtılıyor — sonuç görünür kalmalı.
@@ -579,29 +536,14 @@ export default function GlobalSearch({ getLibraryStatus, onAddToLibrary, prefill
       <div className="mt-4">
         {/* AniList kaynağına özel diag notu — sadece AniList çağrıldı ve 0 sonuç
             ya da hata döndüyse görünür. Diğer kaynakların sonuçlarını gizlemez. */}
-        {hasSearched && !isSearching && anilistDiag?.called && anilistDiag.count === 0 && (
-          <div className="mb-4 px-3 py-2.5 rounded-lg text-xs bg-rose-500/5 ring-1 ring-rose-500/20 text-rose-300/90 flex items-start justify-between gap-3 flex-wrap">
+        {hasSearched && !isSearching && anilistDiag && anilistDiag.kind !== "results" && (
+          <div className={`mb-4 px-3 py-2.5 rounded-lg text-xs flex items-start justify-between gap-3 flex-wrap ${
+            anilistDiag.kind === "empty"
+              ? "bg-zinc-500/5 ring-1 ring-zinc-500/20 text-zinc-300"
+              : "bg-rose-500/5 ring-1 ring-rose-500/20 text-rose-300/90"
+          }`}>
             <div className="flex-1 min-w-0">
-              {anilistDiag.failed ? (
-                <>
-                  <span className="font-medium text-rose-200">
-                    AniList kaynağına ulaşılamadı
-                  </span>
-                  {anilistDiag.reason ? (
-                    <span className="text-rose-200/60"> · {anilistDiag.reason}</span>
-                  ) : null}
-                  . Anime / Manga sonuçları bu sorgu için listelenemiyor.
-                </>
-              ) : (
-                <>
-                  <span className="font-medium text-rose-200">
-                    AniList anime/manga sonucu döndürmedi
-                  </span>{" "}
-                  (server <span className="font-medium">0 sonuç</span> raporladı).
-                  {" Bu MediaTracker tarafında bir hata değil — AniList GraphQL’in `search` alanı şu sıralar global olarak yanıt vermiyor (doğrulandı: id ile arama çalışıyor, metin araması her sorgu için 0 dönüyor)."}
-                  {" Diğer kaynaklar etkilenmedi; birkaç dakika sonra tekrar deneyin."}
-                </>
-              )}
+              {anilistDiagnosticMessage(anilistDiag)}
             </div>
             <button
               type="button"

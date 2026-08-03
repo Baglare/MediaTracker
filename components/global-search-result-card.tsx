@@ -35,6 +35,7 @@ import {
 import { GlobalSearchLibraryStatus, GlobalSearchResult } from "@/lib/global-search-types";
 import { getMediaTypeLabel } from "@/lib/progress";
 import { ThemeSubBadge } from "@/components/theme-accent";
+import { getGlobalSearchTitleDisplay } from "@/lib/global-search-title-display";
 
 interface Props {
   result: GlobalSearchResult;
@@ -105,6 +106,7 @@ export default function GlobalSearchResultCard({
 }: Props) {
   const sourceBadge = getSourceBadge(result.source);
   const tags = result.genres || result.subjects || [];
+  const titleDisplay = getGlobalSearchTitleDisplay(result);
 
   // V5A.5: AniList raw'ındaki `format` ThemeSubBadge'i besler (Anime · Film/OVA,
   // Manga/Manhwa/Light Novel vb.). Diğer kaynaklarda format yoksa rozet bastırılır.
@@ -182,8 +184,13 @@ export default function GlobalSearchResultCard({
           )}
         </div>
 
-        {result.subtitle && (
-          <p className="text-[11.5px] text-zinc-400 truncate">{result.subtitle}</p>
+        {titleDisplay.secondary && (
+          <p className="text-[11.5px] text-zinc-400 truncate">{titleDisplay.secondary}</p>
+        )}
+        {titleDisplay.native && (
+          <p className="text-[10.5px] text-zinc-500 truncate">
+            {titleDisplay.native}
+          </p>
         )}
 
         {/* Badge satırı: tür + Doğu subType + (mobilde kaynak fallback eyebrow) */}
