@@ -31,19 +31,19 @@ interface AppSidebarProps {
 
 const JOURNEY_ACCENTS: Record<
   UserProgressionWorld,
-  { panel: string; text: string; fill: string; glow: string; tierGlow: string }
+  { fill: string }
 > = {
-  east: { panel: "border-amber-500/20 bg-amber-500/[0.06]", text: "text-amber-200", fill: "from-amber-300 to-yellow-500", glow: "shadow-amber-950/20", tierGlow: "shadow-amber-500/10" },
-  screen: { panel: "border-cyan-500/20 bg-cyan-500/[0.06]", text: "text-cyan-200", fill: "from-cyan-300 to-blue-500", glow: "shadow-cyan-950/20", tierGlow: "shadow-cyan-500/10" },
-  arch: { panel: "border-red-400/20 bg-red-400/[0.05]", text: "text-orange-200", fill: "from-orange-300 to-red-500", glow: "shadow-red-950/20", tierGlow: "shadow-orange-500/10" },
-  mixed: { panel: "border-violet-500/20 bg-violet-500/[0.06]", text: "text-violet-200", fill: "from-violet-300 to-zinc-300", glow: "shadow-violet-950/20", tierGlow: "shadow-violet-500/10" },
+  east: { fill: "from-amber-300 to-yellow-500" },
+  screen: { fill: "from-cyan-300 to-blue-500" },
+  arch: { fill: "from-orange-300 to-red-500" },
+  mixed: { fill: "from-violet-300 to-zinc-300" },
 };
 
 const TIER_LABELS: Record<UserProgressionTier, string> = {
-  basic: "Basic",
-  refined: "Refined",
-  elite: "Elite",
-  master: "Master",
+  basic: "Temel",
+  refined: "Rafine",
+  elite: "Elit",
+  master: "Usta",
 };
 
 const TIER_CLASSES: Record<UserProgressionTier, string> = {
@@ -91,7 +91,7 @@ function JourneyCard({ progression, journeyTitle, active, onClick }: { progressi
     <button
       type="button"
       onClick={onClick}
-      className={`w-full cursor-pointer rounded-xl border p-3 text-left shadow-sm transition-colors hover:bg-[var(--app-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-focus)] ${accent.panel} ${accent.glow} ${TIER_CARD_CLASSES[progression.tier]} ${active ? "ring-1 ring-[var(--app-focus)]" : ""}`}
+      className={`w-full cursor-pointer rounded-xl border border-[var(--app-border-strong)] bg-[var(--app-card-bg)] p-3 text-left shadow-sm transition-colors hover:bg-[var(--app-card-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-focus)] ${TIER_CARD_CLASSES[progression.tier]} ${active ? "ring-1 ring-[var(--app-focus)]" : ""}`}
       aria-current={active ? "page" : undefined}
       title="İstatistiklere git"
     >
@@ -99,11 +99,11 @@ function JourneyCard({ progression, journeyTitle, active, onClick }: { progressi
         <div className="min-w-0">
           <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--app-text-muted)]">Yolculuk</p>
           <p className="mt-1 truncate text-[13px] font-semibold text-[var(--app-text-primary)]">Seviye {progression.level}</p>
-          <p className={`mt-0.5 truncate text-[11px] font-medium ${accent.text}`}>{journeyTitle}</p>
+          <p className="mt-0.5 truncate text-[11px] font-semibold text-[var(--app-warning)]">{journeyTitle}</p>
         </div>
-        <span className={`shrink-0 rounded-full bg-[var(--app-surface-3)] px-2.5 py-1 text-[11px] font-semibold tabular-nums ring-1 ${TIER_CLASSES[progression.tier]} ${accent.text} ${accent.tierGlow}`}>Level {progression.level}</span>
+        <span className={`shrink-0 rounded-full bg-[var(--app-surface-elevated)] px-2.5 py-1 text-[11px] font-bold tabular-nums text-[var(--app-text-primary)] ring-1 ${TIER_CLASSES[progression.tier]}`}>Seviye {progression.level}</span>
       </div>
-      <span className={`mt-2 inline-flex rounded-full bg-[var(--app-surface-3)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] ring-1 ring-[var(--app-border)] ${accent.text}`}>{TIER_LABELS[progression.tier]}</span>
+      <span className="mt-2 inline-flex rounded-full bg-[var(--app-selected-bg)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--app-selected-text)] ring-1 ring-[var(--app-selected-border)]">{TIER_LABELS[progression.tier]}</span>
       <div className="mt-3 h-2 overflow-hidden rounded-full bg-[var(--app-surface-3)] ring-1 ring-[var(--app-border)]">
         <div className={`h-full rounded-full bg-gradient-to-r ${accent.fill}`} style={{ width: `${Math.round(progression.progressPercent * 100)}%` }} />
       </div>

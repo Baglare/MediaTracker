@@ -4,6 +4,7 @@ import { Cloud, CloudOff, RefreshCw, Trash2 } from "lucide-react";
 
 import { useCustomThemesRuntime } from "./custom-themes-runtime";
 import { useThemeCloudSync } from "@/hooks/use-theme-cloud-sync";
+import { CollapsibleSection } from "@/components/ui/collapsible-section";
 
 type ConfirmAction = (title: string, message: string, onOk: () => void) => void;
 
@@ -28,19 +29,18 @@ export function ThemeCloudSyncPanel({ onConfirm }: { onConfirm: ConfirmAction })
   };
 
   return (
-    <section className="mt-6 rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface-1)] p-[var(--app-panel-padding)]" aria-labelledby="theme-cloud-sync-title">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex items-start gap-3">
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[var(--app-accent-soft)] text-[var(--app-accent-strong)]">
-            {sync.preferences.enabled ? <Cloud className="h-5 w-5" aria-hidden="true" /> : <CloudOff className="h-5 w-5" aria-hidden="true" />}
-          </span>
-          <div>
-            <h4 id="theme-cloud-sync-title" className="text-sm font-semibold text-[var(--app-text-primary)]">Cihazlar Arası Senkronizasyon</h4>
-            <p className="mt-1 max-w-2xl text-xs text-[var(--app-text-muted)]">
-              İsteğe bağlıdır ve bu cihaz için varsayılan olarak kapalıdır. Tema her zaman önce yerelde uygulanır.
-            </p>
-          </div>
-        </div>
+    <CollapsibleSection
+      storageKey="theme-cloud-sync"
+      title="Cihazlar arası tema eşitleme"
+      description="İsteğe bağlıdır, varsayılan olarak kapalıdır ve tema her zaman önce yerelde uygulanır."
+      alert={sync.status === "conflict" || sync.status === "error"}
+      badge={<span className="rounded-md border border-[var(--app-border)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--app-text-secondary)]">{sync.preferences.enabled ? "Açık" : "Kapalı"}</span>}
+      icon={sync.preferences.enabled ? <Cloud className="h-4 w-4 text-[var(--app-accent-strong)]" /> : <CloudOff className="h-4 w-4 text-[var(--app-text-muted)]" />}
+      className="mt-4"
+      contentClassName="rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface-1)] p-[var(--app-panel-padding)]"
+      headingLevel="h4"
+    >
+      <div className="flex justify-end">
         {sync.auth.user ? (
           sync.preferences.enabled ? (
             <button type="button" onClick={sync.disable} className="min-h-11 rounded-lg border border-[var(--app-border-strong)] px-3 text-sm hover:bg-[var(--app-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-focus)]">
@@ -129,6 +129,6 @@ export function ThemeCloudSyncPanel({ onConfirm }: { onConfirm: ConfirmAction })
         {sync.message}
         {sync.preferences.lastSyncedAt ? ` Son senkronizasyon: ${new Date(sync.preferences.lastSyncedAt).toLocaleString("tr-TR")}.` : ""}
       </p>
-    </section>
+    </CollapsibleSection>
   );
 }

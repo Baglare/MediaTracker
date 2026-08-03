@@ -78,7 +78,7 @@ export const CHART_PALETTE_REGISTRY: Readonly<Record<ChartPaletteId, ChartPalett
   monochrome: {
     id: "monochrome",
     label: "Monokrom",
-    description: "Charcoal, slate ve silver aralığında belirgin açık-koyu basamakları kullanır.",
+    description: "Kömür, arduvaz ve gümüş aralığında belirgin açık-koyu basamakları kullanır.",
     followWorldCompletedColor: false,
     statuses: fixedStatuses({
       completed: "color-mix(in srgb, var(--app-text-primary) 94%, var(--app-bg))",

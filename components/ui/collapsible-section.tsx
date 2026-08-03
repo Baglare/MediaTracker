@@ -70,7 +70,7 @@ export function CollapsibleSection({
         onClick={toggle}
         aria-expanded={open}
         aria-controls={contentId}
-        className="flex w-full items-start justify-between gap-3 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-1)] px-4 py-3 text-left transition-colors hover:bg-[var(--app-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-focus)]"
+        className="flex w-full items-start justify-between gap-3 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-1)] px-4 py-3 text-left transition-colors hover:bg-[var(--app-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-focus)] motion-reduce:transition-none"
       >
         <span className="flex min-w-0 items-start gap-3">
           {icon && <span className="mt-0.5 shrink-0" aria-hidden="true">{icon}</span>}
@@ -92,7 +92,7 @@ export function CollapsibleSection({
           </span>
         </span>
         <ChevronDown
-          className={`mt-1 h-4 w-4 shrink-0 text-[var(--app-text-muted)] transition-transform ${open ? "rotate-180" : ""}`}
+          className={`mt-1 h-4 w-4 shrink-0 text-[var(--app-text-muted)] transition-transform motion-reduce:transition-none ${open ? "rotate-180" : ""}`}
           aria-hidden="true"
         />
       </button>

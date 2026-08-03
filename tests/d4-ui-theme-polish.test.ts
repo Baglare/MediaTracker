@@ -37,10 +37,11 @@ describe("D4-2 card title and badge taxonomy", () => {
   const group = read("components/series-group-card.tsx");
   const library = read("features/library/components/library-feature.tsx");
 
-  it("reserves two title lines without hover dependence", () => {
-    expect(card).toContain("line-clamp-2 min-h-[2.25rem] min-w-0 break-words");
+  it("reserves two title lines without a detached hover label", () => {
+    expect(card).toContain("expandable-card-title min-h-[2.25rem] min-w-0 break-words");
     expect(card).not.toContain("hover:max-w-[26rem]");
-    expect(group).toContain("line-clamp-2");
+    expect(card).not.toContain("title={item.title}");
+    expect(group).toContain("expandable-card-title");
     expect(library).toContain("2xl:grid-cols-3");
     expect(library).not.toMatch(/(^|[^2])xl:grid-cols-3/);
   });
@@ -82,7 +83,7 @@ describe("D4-2 light theme identity and contrast", () => {
   });
 
   it("copies updated preset inputs without migrating existing custom themes", () => {
-    expect(PRESET_THEME_INPUTS.porcelain).toMatchObject({ background: "#F1EEE6", surface: "#FBFAF6", accent: "#245FA8" });
+    expect(PRESET_THEME_INPUTS.porcelain).toMatchObject({ background: "#E8E1D4", surface: "#F8F4EA", accent: "#245FA8" });
     expect(read("components/personalization/theme-studio.tsx")).toContain("inputs: { ...PRESET_THEME_INPUTS[resolvedId] }");
     expect(read("lib/personalization/custom-themes.ts")).not.toContain("PRESET_THEME_INPUTS");
   });

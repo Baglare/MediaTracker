@@ -66,26 +66,26 @@ function DashboardMetric({
 }) {
   const toneClass =
     tone === "amber"
-      ? "text-amber-200"
+      ? "text-[var(--app-warning)]"
       : tone === "emerald"
-        ? "text-emerald-200"
+        ? "text-[var(--app-success)]"
         : tone === "violet"
-          ? "text-violet-200"
+          ? "text-[var(--app-accent-strong)]"
           : tone === "sky"
-            ? "text-sky-200"
+            ? "text-[var(--app-secondary-accent)]"
             : tone === "rose"
-              ? "text-rose-200"
-              : "text-zinc-100";
+              ? "text-[var(--app-danger)]"
+              : "text-[var(--app-text-primary)]";
 
   return (
-    <div className="density-card min-w-0 rounded-xl border border-zinc-800/60 bg-zinc-950/35">
-      <div className="text-[10px] uppercase tracking-[0.14em] text-zinc-500 font-semibold truncate">
+    <div className="density-card min-w-0 rounded-xl border border-[var(--app-border-strong)] bg-[var(--app-card-bg)] shadow-sm">
+      <div className="text-[10px] uppercase tracking-[0.14em] text-[var(--app-text-secondary)] font-bold truncate">
         {label}
       </div>
-      <div className={`mt-1.5 text-2xl font-semibold tabular-nums truncate ${toneClass}`}>
+      <div className={`mt-1.5 text-2xl font-bold tabular-nums truncate ${toneClass}`}>
         {value}
       </div>
-      {hint && <div className="mt-1 text-[11px] text-zinc-500 truncate">{hint}</div>}
+      {hint && <div className="mt-1 text-[11px] text-[var(--app-text-muted)] truncate">{hint}</div>}
     </div>
   );
 }
@@ -125,12 +125,14 @@ function MiniBar({
   total,
   tone = "amber",
   color,
+  valueUnit,
 }: {
   label: string;
   value: number;
   total: number;
   tone?: SegmentTone;
   color?: string;
+  valueUnit?: string;
 }) {
   const width = total > 0 ? Math.max(value > 0 ? 4 : 0, Math.round((value / total) * 100)) : 0;
   const toneClass =
@@ -150,7 +152,7 @@ function MiniBar({
     <div className="min-w-0">
       <div className="flex items-center justify-between gap-3 mb-1">
         <span className="text-xs text-zinc-300 truncate">{label}</span>
-        <span className="text-xs font-mono tabular-nums text-zinc-500 shrink-0">{value}</span>
+        <span className="text-xs font-mono tabular-nums text-zinc-500 shrink-0">{value}{valueUnit ? ` ${valueUnit}` : ""}</span>
       </div>
       <div className="h-2 rounded-full bg-zinc-800/70 overflow-hidden">
         <div
@@ -296,34 +298,34 @@ export default function EnhancedDashboard({
     <div className="grid min-w-0 grid-cols-1 gap-[var(--app-section-gap)] xl:grid-cols-3">
       {isWidgetVisible("summary") && (
       <section
-        className="overflow-hidden rounded-2xl border border-zinc-800/60 bg-zinc-900/30 xl:col-span-3"
+        className="app-panel overflow-hidden rounded-2xl border xl:col-span-3"
         style={widgetOrder("summary")}
         data-dashboard-widget="summary"
       >
         <div className="p-[var(--app-panel-padding)]">
           <div className="grid grid-cols-1 xl:grid-cols-[1.2fr_0.8fr] gap-6">
             <div className="min-w-0">
-              <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.16em] text-amber-300/80 font-semibold">
+              <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.16em] text-[var(--app-warning)] font-bold">
                 <BarChart3 className="w-4 h-4" />
                 Kütüphane özeti
               </div>
               <div className="mt-4 flex flex-col sm:flex-row sm:items-end gap-4">
                 <div>
-                  <div className="text-5xl sm:text-6xl font-semibold tracking-tight text-zinc-50 tabular-nums">
+                  <div className="text-5xl sm:text-6xl font-bold tracking-tight text-[var(--app-text-primary)] tabular-nums">
                     {completionPct}%
                   </div>
-                  <p className="mt-2 text-sm text-zinc-500">
+                  <p className="mt-2 text-sm text-[var(--app-text-muted)]">
                     Tamamlanan oranı · {stats.completedItems} / {stats.totalItems}
                   </p>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="h-3 rounded-full bg-zinc-800/80 overflow-hidden">
+                  <div className="h-3 rounded-full bg-[var(--app-surface-3)] overflow-hidden ring-1 ring-[var(--app-border)]">
                     <div
-                      className="h-full rounded-full bg-gradient-to-r from-amber-400 via-emerald-400 to-sky-400"
-                      style={{ width: `${completionPct}%` }}
+                      className="h-full rounded-full"
+                      style={{ width: `${completionPct}%`, background: "linear-gradient(90deg, var(--app-warning), var(--app-success), var(--app-secondary-accent))" }}
                     />
                   </div>
-                  <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs text-zinc-500">
+                  <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs font-medium text-[var(--app-text-secondary)]">
                     <span>{stats.inProgressItems} devam</span>
                     <span>{nearCompletion.length} bitmeye yakın</span>
                     <span>{stats.logsThisWeek} aktivite / 7 gün</span>
@@ -427,13 +429,13 @@ export default function EnhancedDashboard({
             style={widgetOrder("world-distribution")}
             data-dashboard-widget="world-distribution"
           >
-            <SectionTitle icon={BookOpen} title="Dünya Dağılımı" count={stats.totalItems} />
+            <SectionTitle icon={BookOpen} title="Kütüphane dünya dağılımı" count={stats.totalItems} hint="Medya adedi" />
             <div className="mt-4 space-y-3">
-              <MiniBar label="Doğu" value={worldCounts.east} total={stats.totalItems} tone="rose" />
-              <MiniBar label="Kadraj" value={worldCounts.screen} total={stats.totalItems} tone="violet" />
-              <MiniBar label="Arşiv" value={worldCounts.library} total={stats.totalItems} tone="emerald" />
+              <MiniBar label="Doğu" value={worldCounts.east} total={stats.totalItems} tone="rose" valueUnit="medya" />
+              <MiniBar label="Kadraj" value={worldCounts.screen} total={stats.totalItems} tone="violet" valueUnit="medya" />
+              <MiniBar label="Arşiv" value={worldCounts.library} total={stats.totalItems} tone="emerald" valueUnit="medya" />
               {worldCounts.other > 0 && (
-                <MiniBar label="Diğer" value={worldCounts.other} total={stats.totalItems} tone="zinc" />
+                <MiniBar label="Diğer" value={worldCounts.other} total={stats.totalItems} tone="zinc" valueUnit="medya" />
               )}
             </div>
           </section>

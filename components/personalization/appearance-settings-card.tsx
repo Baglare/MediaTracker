@@ -125,8 +125,16 @@ export default function AppearanceSettingsCard({
         <ThemeStudio onConfirm={onConfirm} />
       </CollapsibleSection>
 
-      <fieldset className="mt-7 border-t border-[var(--app-border)] pt-6">
-        <legend className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--app-text-muted)]">Dünya vurgusu</legend>
+      <CollapsibleSection
+        storageKey="appearance-world-accent"
+        title="Dünya vurgusu"
+        description="Tema rengini otomatik, sabit dünya veya nötr vurgu olarak ayarla."
+        badge={<span className="rounded-md border border-[var(--app-border)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--app-text-secondary)]">{APPEARANCE_ACCENT_OPTIONS.find((option) => option.id === preferences.accentMode)?.label}</span>}
+        className="mt-4"
+        headingLevel="h3"
+      >
+      <fieldset>
+        <legend className="sr-only">Dünya vurgusu</legend>
         <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
           {APPEARANCE_ACCENT_OPTIONS.map((option) => {
             const selected = preferences.accentMode === option.id;
@@ -152,12 +160,19 @@ export default function AppearanceSettingsCard({
           })}
         </div>
       </fieldset>
+      </CollapsibleSection>
 
-      <fieldset className="mt-7 border-t border-[var(--app-border)] pt-6">
-        <legend className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--app-text-muted)]">
-          <BarChart3 className="h-4 w-4" aria-hidden="true" />
-          Grafik renkleri
-        </legend>
+      <CollapsibleSection
+        storageKey="appearance-chart-colors"
+        title="Grafik renkleri"
+        description="Grafik paletini ve tamamlanan segmentin dünya rengi davranışını yönet."
+        badge={<span className="rounded-md border border-[var(--app-border)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--app-text-secondary)]">{CHART_PALETTE_REGISTRY[preferences.chartPaletteId].label}</span>}
+        icon={<BarChart3 className="h-4 w-4 text-[var(--app-accent-strong)]" />}
+        className="mt-4"
+        headingLevel="h3"
+      >
+      <fieldset>
+        <legend className="sr-only">Grafik renkleri</legend>
         <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {Object.values(CHART_PALETTE_REGISTRY).map((palette) => {
             const selected = preferences.chartPaletteId === palette.id;
@@ -213,8 +228,17 @@ export default function AppearanceSettingsCard({
           </span>
         </label>
       </fieldset>
+      </CollapsibleSection>
 
-      <div className="mt-7 grid gap-6 border-t border-[var(--app-border)] pt-6 lg:grid-cols-2">
+      <CollapsibleSection
+        storageKey="appearance-density-effects"
+        title="Yoğunluk ve görsel efektler"
+        description="Panel aralıklarını ve dekoratif hareket seviyesini ikincil tercih olarak düzenle."
+        badge={<span className="rounded-md border border-[var(--app-border)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--app-text-secondary)]">{DENSITY_OPTIONS.find((option) => option.id === preferences.density)?.label} · {EFFECT_OPTIONS.find((option) => option.id === preferences.effectsLevel)?.label}</span>}
+        className="mt-4"
+        headingLevel="h3"
+      >
+      <div className="grid gap-6 lg:grid-cols-2">
         <fieldset>
           <legend className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--app-text-muted)]">
             <Gauge className="h-4 w-4" aria-hidden="true" />
@@ -281,6 +305,7 @@ export default function AppearanceSettingsCard({
           </div>
         </fieldset>
       </div>
+      </CollapsibleSection>
 
       <p className="mt-4 text-xs text-[var(--app-text-muted)]" role="status" aria-live="polite">
         {hydrated ? message : "Görünüm tercihi yükleniyor…"}

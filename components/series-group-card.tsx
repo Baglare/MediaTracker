@@ -258,7 +258,7 @@ export default function SeriesGroupCard({
 
   return (
     <div
-      className={`relative rounded-2xl border bg-gradient-to-b ${palette.bgGradient} to-zinc-900/60 ring-1 transition-colors overflow-hidden ${
+      className={`expandable-title-card relative rounded-2xl border bg-gradient-to-b ${palette.bgGradient} to-zinc-900/60 ring-1 transition-colors overflow-hidden ${
         open
           ? `${palette.ringOpen}`
           : `${palette.ringBorder} ring-transparent ${palette.ringHover}`
@@ -318,7 +318,7 @@ export default function SeriesGroupCard({
             )}
           </div>
 
-          <h3 className="font-semibold text-zinc-50 text-base sm:text-[17px] leading-tight tracking-tight line-clamp-2">
+          <h3 className="expandable-card-title min-h-[2.5rem] font-semibold text-zinc-50 text-base sm:text-[17px] leading-tight tracking-tight">
             {title}
           </h3>
 

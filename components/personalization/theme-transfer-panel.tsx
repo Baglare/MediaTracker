@@ -6,6 +6,7 @@ import { useRef, useState } from "react";
 import { useAppearanceRuntime } from "./appearance-runtime";
 import { useCustomThemesRuntime } from "./custom-themes-runtime";
 import { createSecureCustomThemeId } from "@/hooks/use-custom-themes";
+import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import {
   allThemesExportFilename,
   applyThemeImport,
@@ -104,18 +105,16 @@ export function ThemeTransferPanel() {
   };
 
   return (
-    <section className="mt-6 rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface-1)] p-[var(--app-panel-padding)]" aria-labelledby="theme-transfer-title">
-      <div className="flex items-start gap-3">
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[var(--app-accent-soft)] text-[var(--app-accent-strong)]">
-          <FileJson className="h-5 w-5" aria-hidden="true" />
-        </span>
-        <div>
-          <h4 id="theme-transfer-title" className="text-sm font-semibold text-[var(--app-text-primary)]">Tema içe / dışa aktarma</h4>
-          <p className="mt-1 text-xs text-[var(--app-text-muted)]">
-            Yalnız özel tema girdileri taşınır; profil, medya, cookie ve diğer tercihler dosyaya eklenmez.
-          </p>
-        </div>
-      </div>
+    <CollapsibleSection
+      storageKey="theme-transfer-tools"
+      title="Tema içe / dışa aktarma"
+      description="Yalnız özel tema girdilerini JSON olarak taşı; profil, medya ve diğer tercihler ayrı kalır."
+      badge={<span className="rounded-md border border-[var(--app-border)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--app-text-secondary)]">{customThemes.themes.length} özel tema</span>}
+      icon={<FileJson className="h-4 w-4 text-[var(--app-accent-strong)]" />}
+      className="mt-4"
+      contentClassName="rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface-1)] p-[var(--app-panel-padding)]"
+      headingLevel="h4"
+    >
 
       <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto_auto]">
         <label className="text-xs text-[var(--app-text-muted)]">
@@ -234,6 +233,6 @@ export function ThemeTransferPanel() {
       )}
 
       <p className="mt-3 text-xs text-[var(--app-text-muted)]" role="status" aria-live="polite">{message}</p>
-    </section>
+    </CollapsibleSection>
   );
 }

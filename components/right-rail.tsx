@@ -964,8 +964,10 @@ function RatingSummaryWidget({ items }: { items: MediaItem[] }) {
 
 function MiniBarRows({
   rows,
+  valueUnit,
 }: {
   rows: { label: string; value: number; className?: string; color?: string }[];
+  valueUnit?: string;
 }) {
   const max = Math.max(1, ...rows.map((row) => row.value));
   return (
@@ -977,7 +979,7 @@ function MiniBarRows({
             <div className="mb-1 flex items-center justify-between gap-2">
               <span className="truncate text-[11px] text-zinc-400">{row.label}</span>
               <span className="shrink-0 font-mono text-[10px] tabular-nums text-zinc-500">
-                {row.value}
+                {row.value}{valueUnit ? ` ${valueUnit}` : ""}
               </span>
             </div>
             <div className="h-1.5 overflow-hidden rounded-full bg-zinc-800/80">
@@ -1003,8 +1005,9 @@ function WorldDistributionWidget({ items }: { items: MediaItem[] }) {
   }
 
   return (
-    <Widget title="Dünya Dağılımı" icon={Compass}>
+    <Widget title="Kütüphane dünya dağılımı" icon={Compass}>
       <MiniBarRows
+        valueUnit="medya"
         rows={[
           { label: "Doğu", value: counts.east, className: "bg-amber-300" },
           { label: "Kadraj", value: counts.screen, className: "bg-cyan-300" },

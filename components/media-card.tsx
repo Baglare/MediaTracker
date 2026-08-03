@@ -129,7 +129,7 @@ export default function MediaCard({
   onToggleFavorite,
   onOpenDetail,
   onAddRelatedParts,
-  relatedPartsLabel = "Parca Ekle",
+  relatedPartsLabel = "Parça Ekle",
   canAddRelatedParts = false,
   onOpenGroupEdit,
   onUpdateRating,
@@ -192,7 +192,7 @@ export default function MediaCard({
     //   - bg artık iki katmanlı (gradient + zinc) — flat 2015 hissi gitti.
     //   - hover'da hafif lift (translate-y) + accent border + soft shadow.
     //   - overflow-hidden korunuyor (ribbon kart sınırı içinde yaşıyor).
-    <div className="group relative flex flex-col rounded-2xl border border-zinc-800/60 bg-gradient-to-b from-zinc-900/60 to-zinc-900/30 overflow-hidden transition-all duration-300 hover:border-[color-mix(in_srgb,var(--w-primary)_38%,#52525b)] hover:shadow-lg hover:shadow-black/40 motion-safe:hover:-translate-y-0.5">
+    <div className="media-card expandable-title-card group relative flex flex-col rounded-2xl border border-zinc-800/60 bg-gradient-to-b from-zinc-900/60 to-zinc-900/30 overflow-hidden transition-all duration-300 hover:border-[color-mix(in_srgb,var(--w-primary)_38%,#52525b)] hover:shadow-lg hover:shadow-black/40 motion-safe:hover:-translate-y-0.5">
       {/* Üst accent — hover'da öne çıkan ince çizgi. */}
       <div
         aria-hidden
@@ -362,8 +362,7 @@ export default function MediaCard({
                 davranır: opacity-0 default + group-hover:opacity-100. */}
             <div className="min-w-0 pr-7">
               <h3
-                className="line-clamp-2 min-h-[2.25rem] min-w-0 break-words text-[14.5px] font-semibold leading-[1.125rem] tracking-tight text-zinc-100"
-                title={item.title}
+                className="expandable-card-title min-h-[2.25rem] min-w-0 break-words text-[14.5px] font-semibold leading-[1.125rem] tracking-tight text-zinc-100"
               >
                 {item.title}
               </h3>
@@ -476,7 +475,7 @@ export default function MediaCard({
                   <span className="text-[10px] text-zinc-700">•</span>
                 )}
                 {item.editionCount && (
-                  <span className="text-[10px] text-zinc-600">{item.editionCount} baski</span>
+                  <span className="text-[10px] text-zinc-600">{item.editionCount} baskı</span>
                 )}
               </div>
             )}

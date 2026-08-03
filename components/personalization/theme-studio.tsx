@@ -9,6 +9,7 @@ import { ThemePreview } from "./theme-preview";
 import { ThemeTransferPanel } from "./theme-transfer-panel";
 import { useAppearanceRuntime } from "./appearance-runtime";
 import { useCustomThemesRuntime } from "./custom-themes-runtime";
+import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import {
   deriveCustomThemeTokens,
   evaluateThemeContrast,
@@ -141,7 +142,7 @@ export function ThemeStudio({ onConfirm }: { onConfirm: ConfirmAction }) {
         <div>
           <h3 className="text-sm font-semibold text-[var(--app-text-primary)]">Tema Stüdyosu</h3>
           <p className="mt-1 text-xs text-[var(--app-text-muted)]">
-            Hazır temaları kullan veya dört kontrollü renkten kendi semantic temanı üret.
+            Hazır temaları kullan veya dört kontrollü renkten kendi anlamsal temanı üret.
           </p>
         </div>
         <button
@@ -155,8 +156,15 @@ export function ThemeStudio({ onConfirm }: { onConfirm: ConfirmAction }) {
         </button>
       </div>
 
-      <h4 className="mt-5 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--app-text-muted)]">Hazır temalar</h4>
-      <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      <CollapsibleSection
+        storageKey="theme-ready-presets"
+        title="Hazır temalar"
+        description="Sistem ve sekiz hazır temayı önizle, seç veya özel tema başlangıcı olarak kopyala."
+        badge={<span className="rounded-md border border-[var(--app-border)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--app-text-secondary)]">{Object.keys(BASE_THEME_REGISTRY).length} seçenek</span>}
+        className="mt-5"
+        headingLevel="h4"
+      >
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {Object.values(BASE_THEME_REGISTRY).map((theme) => {
           const selected = appearance.preferences.theme.kind === "preset"
             && appearance.preferences.theme.id === theme.id;
@@ -203,17 +211,22 @@ export function ThemeStudio({ onConfirm }: { onConfirm: ConfirmAction }) {
           );
         })}
       </div>
+      </CollapsibleSection>
 
-      <div className="mt-6 flex items-center justify-between gap-3">
-        <h4 className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--app-text-muted)]">Özel temalar</h4>
-        <span className="text-xs text-[var(--app-text-muted)]">{customThemes.themes.length}/20</span>
-      </div>
+      <CollapsibleSection
+        storageKey="theme-custom-library"
+        title="Özel temalar"
+        description="Kaydedilmiş özel temaları etkinleştir, düzenle, çoğalt veya sil."
+        badge={<span className="rounded-md border border-[var(--app-border)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--app-text-secondary)]">{customThemes.themes.length}/20</span>}
+        className="mt-4"
+        headingLevel="h4"
+      >
       {customThemes.themes.length === 0 ? (
-        <p className="mt-3 rounded-xl border border-dashed border-[var(--app-border-strong)] bg-[var(--app-surface-2)] p-4 text-sm text-[var(--app-text-muted)]">
+        <p className="rounded-xl border border-dashed border-[var(--app-border-strong)] bg-[var(--app-surface-2)] p-4 text-sm text-[var(--app-text-muted)]">
           Henüz özel tema yok. Sıfırdan oluşturabilir veya bir hazır temayı kopyalayabilirsin.
         </p>
       ) : (
-        <div className="mt-3 grid gap-3 lg:grid-cols-2">
+        <div className="grid gap-3 lg:grid-cols-2">
           {customThemes.themes.map((theme) => {
             const report = evaluateThemeContrast(deriveCustomThemeTokens(theme.inputs, theme.corrections));
             const selected = appearance.preferences.theme.kind === "custom"
@@ -245,6 +258,7 @@ export function ThemeStudio({ onConfirm }: { onConfirm: ConfirmAction }) {
           })}
         </div>
       )}
+      </CollapsibleSection>
 
       {draft && tokens && contrast && (
         <section className="mt-6 rounded-2xl border border-[var(--app-border-strong)] bg-[var(--app-surface-1)] p-[var(--app-panel-padding)]" aria-labelledby="theme-editor-title">

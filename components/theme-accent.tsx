@@ -161,11 +161,11 @@ export function MediaClassificationBadges({
     : "text-[10.5px] px-1.5 py-0.5 rounded-md";
   return (
     <>
-      <span className={`font-medium ring-1 ring-[var(--app-border)] bg-[var(--app-surface-2)] text-[var(--app-text-secondary)] ${sizeClass}`}>
+      <span className={`font-semibold ring-1 ring-[var(--app-border-strong)] bg-[var(--app-surface-elevated)] text-[var(--app-text-primary)] ${sizeClass}`}>
         {labels.main}
       </span>
       {labels.subType && (
-        <span className={`font-medium ring-1 ring-[var(--w-border)] bg-[var(--w-soft)] text-[var(--w-ink)] ${sizeClass}`}>
+        <span className={`font-semibold shadow-sm ring-1 ring-[color-mix(in_srgb,var(--w-primary)_55%,var(--app-border-strong))] bg-[color-mix(in_srgb,var(--w-primary)_14%,var(--app-surface-elevated))] text-[var(--app-text-primary)] ${sizeClass}`}>
           {labels.subType}
         </span>
       )}
@@ -284,8 +284,7 @@ export function ThemeSubBadge({
     : "text-[11px] px-2 py-0.5 rounded-md";
   return (
     <span
-      className={`inline-flex items-center font-medium ring-1 ring-[var(--w-border)] bg-[var(--w-soft)] text-[var(--w-ink)] ${sizeClass}`}
-      title={`Alt tür: ${labels.subType}`}
+      className={`inline-flex items-center font-semibold shadow-sm ring-1 ring-[color-mix(in_srgb,var(--w-primary)_55%,var(--app-border-strong))] bg-[color-mix(in_srgb,var(--w-primary)_14%,var(--app-surface-elevated))] text-[var(--app-text-primary)] ${sizeClass}`}
     >
       {labels.subType}
     </span>
