@@ -1,4 +1,6 @@
-# Portable Backup V2
+# Portable Backup V2 ve V3
+
+> D5-4 ile güncel export sürümü V3'tür. V2 import uyumluluğu korunur. V3 `goals` domain'inde yalnız Goal tanımlarını taşır; evaluation, yüzde, suggestion state, Cloud revision/queue/conflict/ledger ve tombstone export edilmez. Goal ID conflict ve exact media ID remap ayrıntıları [Goal Cloud Sync belgesindedir](./GOAL_SYSTEM_CLOUD_SYNC.md).
 
 ## Amaç ve sınır
 
@@ -19,13 +21,14 @@ Panel yalnız dry-run seçeneklerini ve açık kullanıcı onayını iletir.
 ## Format
 
 Kök obje yalnız `manifest` ve `data` alanlarını taşır. Format adı
-`mediatracker-portable-backup`, sürüm `2`'dir.
+`mediatracker-portable-backup`tır. Güncel export sürümü `3`; desteklenen import
+sürümleri `2` ve `3`'tür.
 
 ```json
 {
   "manifest": {
     "format": "mediatracker-portable-backup",
-    "version": 2,
+    "version": 3,
     "exportedAt": "2026-07-30T10:00:00.000Z",
     "application": {
       "name": "MediaTracker",
@@ -37,15 +40,17 @@ Kök obje yalnız `manifest` ve `data` alanlarını taşır. Format adı
       "progressLog": 1,
       "identityAliasRegistry": 1,
       "recordRedirectRegistry": 1,
-      "recommendationLink": 1
+      "recommendationLink": 1,
+      "goal": 1
     },
-    "domains": ["mediaItems", "progressLogs"],
+    "domains": ["mediaItems", "progressLogs", "goals"],
     "counts": {
       "mediaItems": 10,
       "progressLogs": 24,
       "identityAliases": 0,
       "recordRedirects": 0,
-      "recommendationLinks": 0
+      "recommendationLinks": 0,
+      "goals": 2
     },
     "ownerType": "authenticated",
     "privacy": {
@@ -59,7 +64,8 @@ Kök obje yalnız `manifest` ve `data` alanlarını taşır. Format adı
   },
   "data": {
     "mediaItems": [],
-    "progressLogs": []
+    "progressLogs": [],
+    "goals": []
   }
 }
 ```

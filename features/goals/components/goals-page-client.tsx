@@ -15,6 +15,7 @@ import { useGoalEvaluations } from "@/features/goals/hooks/use-goal-evaluations"
 import { useGoals } from "@/features/goals/hooks/use-goals";
 import { useAuth } from "@/hooks/use-auth";
 import { useMediaLibrary } from "@/hooks/use-media-library";
+import { GoalCloudConflictPanel } from "@/features/goals/components/goal-cloud-conflict-panel";
 
 const TABS: Array<{ id: GoalLifecycle; label: string }> = [
   { id: "active", label: "Aktif hedefler" },
@@ -119,6 +120,7 @@ export function GoalsPageClient() {
         {TABS.map((item) => <button key={item.id} type="button" role="tab" aria-selected={tab === item.id} onClick={() => setTab(item.id)} className={`rounded-lg border px-3 py-2 text-xs font-medium ${tab === item.id ? "border-[var(--app-selected-border)] bg-[var(--app-selected-bg)] text-[var(--app-selected-text)]" : "border-[var(--app-border)] bg-[var(--app-surface-1)] text-[var(--app-text-secondary)]"}`}>{item.label} <span className="ml-1 tabular-nums">{goals.goals.filter((goal) => goal.lifecycle === item.id).length}</span></button>)}
       </div>
       {(error || goals.error) && <p role="alert" className="mb-4 rounded-lg border border-[var(--app-danger)] bg-[var(--app-danger-soft)] p-3 text-xs text-[var(--app-danger)]">{error ?? goals.error}</p>}
+      <GoalCloudConflictPanel ownerScope={goals.ownerScope} />
       {tab === "active" && visibleSuggestions.length > 0 && (
         <section aria-labelledby="goal-suggestions-title" className="mb-5 rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface-1)] p-4">
           <h2 id="goal-suggestions-title" className="text-sm font-semibold text-[var(--app-text-primary)]">Önerilen hedefler</h2>

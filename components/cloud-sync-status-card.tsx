@@ -14,6 +14,7 @@ import type { LocalOwnerScope } from "@/lib/local-owner-scope";
 import type { MediaItem, ProgressLog } from "@/lib/types";
 import CloudV2ConflictPanel from "@/components/cloud-v2-conflict-panel";
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
+import { flushGoalCloudQueue } from "@/features/goals/cloud/manager";
 
 interface CloudSyncStatusCardProps {
   ownerScope: LocalOwnerScope | null;
@@ -54,6 +55,8 @@ export default function CloudSyncStatusCard({
   } else if (sync.rolloutStatus !== "ready") {
     description =
       "Cloud şema ve istemci uyumluluğu doğrulanana kadar bekleyen işlemler gönderilmeyecek.";
+  } else if (sync.goal.status === "incompatible") {
+    description = sync.goal.message ?? "Hedef senkronizasyonu durduruldu. Yerel hedeflerin korunuyor.";
   } else if (sync.blocked > 0) {
     description =
       "Bazı Cloud V2 işlemleri kullanıcı kararı bekliyor. Engellenen işlemler otomatik yeniden denenmez.";
@@ -116,13 +119,18 @@ export default function CloudSyncStatusCard({
   const canSyncNow = isCloudReady
     && sync.online
     && !sync.syncing
-    && sync.pending > sync.blocked
+    && (sync.pending > sync.blocked || sync.goal.pending > 0)
     && sync.rolloutStatus === "ready"
-    && sync.incompatible === 0;
+    && sync.incompatible === 0
+    && sync.goal.status !== "incompatible";
   const hasCloudAlert = Boolean(sync.lastError)
     || sync.blocked > 0
     || sync.orphaned > 0
-    || sync.incompatible > 0;
+    || sync.incompatible > 0
+    || sync.goal.status === "incompatible"
+    || sync.goal.blocked > 0
+    || sync.goal.permanent > 0;
+  const aggregatePending = sync.pending + sync.goal.pending + sync.goal.blocked + sync.goal.permanent;
 
   return (
     <div className="bg-zinc-900/50 rounded-2xl border border-zinc-800/50 p-6">
@@ -165,7 +173,7 @@ export default function CloudSyncStatusCard({
           title="Gelişmiş Cloud teşhisi"
           description="Uyumluluk, kuyruk, son eşitleme ve çakışma ayrıntılarını göster."
           alert={hasCloudAlert}
-          badge={<span className="rounded-md border border-[var(--app-border)] px-1.5 py-0.5 text-[10px] text-[var(--app-text-secondary)]">{sync.pending} bekleyen</span>}
+          badge={<span className="rounded-md border border-[var(--app-border)] px-1.5 py-0.5 text-[10px] text-[var(--app-text-secondary)]">{aggregatePending} bekleyen</span>}
           headingLevel="h4"
         >
           <div className="space-y-3 pt-1">
@@ -174,6 +182,13 @@ export default function CloudSyncStatusCard({
           <span className="text-zinc-400">Etkin bağlantı katmanı</span>
           <span className="text-zinc-200 text-xs px-2 py-1 rounded-md bg-zinc-800/60 ring-1 ring-zinc-700/40">
             {sync.adapter === "v2" ? "Cloud V2" : "Eski sürüm"}
+          </span>
+        </div>
+
+        <div className="flex items-center justify-between gap-4">
+          <span className="text-zinc-400">Hedef Cloud kuyruğu</span>
+          <span className={sync.goal.status === "incompatible" ? "text-amber-300 text-xs" : "text-zinc-300 text-xs"}>
+            {sync.goal.status === "disabled" ? "Kapalı" : sync.goal.status === "incompatible" ? "Durduruldu" : `${sync.goal.pending} bekleyen · ${sync.goal.blocked} engelli`}
           </span>
         </div>
 
@@ -277,7 +292,7 @@ export default function CloudSyncStatusCard({
           <div className="pt-2">
             <button
               type="button"
-              onClick={() => void syncNow()}
+              onClick={() => { void syncNow(); void flushGoalCloudQueue(); }}
               disabled={!canSyncNow}
               className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-medium bg-violet-500/20 text-violet-300 ring-1 ring-violet-500/40 hover:bg-violet-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >

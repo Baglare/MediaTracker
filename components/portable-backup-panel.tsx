@@ -34,6 +34,7 @@ import type { LocalOwnerScope } from "@/lib/local-owner-scope";
 import { useSyncStatus } from "@/hooks/use-sync-status";
 import { flush } from "@/lib/sync-manager";
 import type { MediaItem, ProgressLog } from "@/lib/types";
+import { flushGoalCloudQueue } from "@/features/goals/cloud/manager";
 
 interface PortableBackupPanelProps {
   ownerScope: LocalOwnerScope | null;
@@ -47,6 +48,7 @@ const DOMAIN_LABELS: Record<PortableBackupDomain, string> = {
   identityAliases: "Kimlik eşleme kayıtları",
   recordRedirects: "Kayıt yönlendirmeleri",
   recommendationLinks: "Yerel öneri bağlantıları",
+  goals: "Hedef tanımları",
 };
 
 function ownerTypeLabel(value: string): string {
@@ -230,7 +232,7 @@ export default function PortableBackupPanel({
       {
         isOwnerActive: (activeScope) =>
           ownerKeyRef.current === activeScope.key,
-        triggerSync: () => { void flush(); },
+        triggerSync: () => { void flush(); void flushGoalCloudQueue(); },
       },
     );
     if (ownerKeyRef.current !== generationKey) return;
@@ -293,7 +295,7 @@ export default function PortableBackupPanel({
   return (
     <div className="space-y-4 rounded-xl border border-zinc-800/60 bg-zinc-950/25 p-3">
       <div>
-        <h4 className="text-sm font-semibold text-zinc-200">Taşınabilir Yedek V2</h4>
+        <h4 className="text-sm font-semibold text-zinc-200">Taşınabilir Yedek V3</h4>
         <p className="mt-1 text-[11px] leading-5 text-zinc-500">
           Sahipten bağımsız JSON dışa aktarma ve yazma yapmayan dosya incelemesi.
         </p>
@@ -526,6 +528,12 @@ export default function PortableBackupPanel({
                    Eklenecek günlük
                 </div>
                 <div className="rounded-lg bg-zinc-950/50 p-2">
+                  <strong className="block text-sm text-emerald-300">
+                    {importPlan.counts.goalAdd}
+                  </strong>
+                   Eklenecek hedef
+                </div>
+                <div className="rounded-lg bg-zinc-950/50 p-2">
                   <strong className="block text-sm text-sky-300">
                     {importPlan.counts.relationshipRemaps}
                   </strong>
@@ -545,6 +553,7 @@ export default function PortableBackupPanel({
                 <p>Kimlik eşlemesi eklenecek: {importPlan.counts.aliasesAdd}</p>
                 <p>Kayıt yönlendirmesi eklenecek: {importPlan.counts.redirectsAdd}</p>
                 <p>Öneri bağlantısı eklenecek: {importPlan.counts.recommendationLinksAdd}</p>
+                <p>Hedef tanımı eklenecek: {importPlan.counts.goalAdd}</p>
                 <p>
                    Cloud: {ownerScope?.kind === "user"
                      ? `${importPlan.cloudOperationCount} kalıcı kayıt işlemi`

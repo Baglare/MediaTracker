@@ -238,7 +238,7 @@ describe("Portable Backup V2 export", () => {
 
   it("produces the stable browser download filename", () => {
     expect(portableBackupFilename(EXPORTED_AT))
-      .toBe("mediatracker-portable-v2-2026-07-30.json");
+      .toBe("mediatracker-portable-v3-2026-07-30.json");
   });
 
   it("cannot enter the existing legacy import write path", async () => {

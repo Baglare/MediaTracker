@@ -21,6 +21,7 @@ import {
   resolveLocalOwnerScope,
 } from "@/lib/local-owner-scope";
 import type { MediaItem } from "@/lib/types";
+import { setGoalCloudOwnerScope } from "@/features/goals/cloud/manager";
 
 export function useGoals(userId: string | null | undefined, mediaItems: readonly MediaItem[]) {
   const ownerScope = useMemo(() => resolveLocalOwnerScope(userId), [userId]);
@@ -53,6 +54,11 @@ export function useGoals(userId: string | null | undefined, mediaItems: readonly
     refresh();
     return subscribeGoalStore(ownerScope, refresh);
   }, [ownerScope, refresh]);
+
+  useEffect(() => {
+    setGoalCloudOwnerScope(ownerScope);
+    return () => setGoalCloudOwnerScope(null);
+  }, [ownerScope]);
 
   const repositoryOptions = useMemo(() => ({ mediaItems }), [mediaItems]);
   const requireOwner = useCallback(() => {

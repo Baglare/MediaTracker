@@ -1,5 +1,7 @@
 # Goal System D5-3 — Evaluation ve Öneri Sözleşmesi
 
+D5-4 immutable-after-dispatch ve Cloud CAS sözleşmesi: [Goal System Cloud Sync](./GOAL_SYSTEM_CLOUD_SYNC.md).
+
 Bu belge [Goal domain modelini](./GOAL_SYSTEM_DOMAIN.md) ve [owner-scoped yerel Goal store'unu](./GOAL_SYSTEM_LOCAL_PERSISTENCE.md) tamamlayan, yalnız okuma amaçlı evaluation katmanını tanımlar. `GoalEvaluation` localStorage, portable backup, Cloud queue veya Supabase'e yazılmaz; her medya/log snapshot'ından yeniden türetilir.
 
 ## Trusted ProgressLog politikası
@@ -70,12 +72,14 @@ Onay mevcut `approveGoalSuggestion` domain sınırı ve local Goal repository ü
 
 ## D5-4 Cloud gereksinimleri
 
-Mevcut local bir-saatlik mutation merge'i aynı log ID payload'ını dispatch öncesinde değiştirebilir; Cloud V2 ise gönderilmiş bir ID için immutable payload conflict'i üretebilir. D5-4:
+Guest local bir-saatlik mutation merge'i tek kütüphane snapshot'ında kalır. Authenticated owner için local kütüphane ve Cloud queue iki ayrı safe-write anahtarı olduğundan D5-4 aynı ID coalescing'i kapatır ve her yeni transition için yeni ID üretir. Cloud V2 gönderilmiş veya replay edilen bir ID için immutable payload sözleşmesini uygular:
 
 - Server'da aynı owner + log ID için payload immutability sağlamalı.
 - Aynı payload retry'ını idempotent kabul etmeli, farklı payload'ı `immutable_log_conflict` olarak bloklamalı.
-- Dispatch sonrası local log payload mutation'ını engelleyen veya yeni log ID üreten açık sözleşme kurmalı.
+- Authenticated pending/dispatch/ack durumlarının tamamında local düzeltme yeni log ID üretir.
 - Goal aggregate için ayrı owner-scoped tablo/RPC, revision/CAS, stable operation ID ve delete tombstone eklemeli.
 - Goal conflict payload'ında türetilmiş evaluation alanları taşımamalı.
 
 Portable backup/import ve Cloud Goal queue formatları D5-3'te değiştirilmemiştir.
+
+D5-4 uygulaması için [Goal Cloud Sync](./GOAL_SYSTEM_CLOUD_SYNC.md) belgesine bakın. Evaluation hâlâ hiçbir persistence/Cloud payload'ına yazılmaz.

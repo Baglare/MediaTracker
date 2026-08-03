@@ -30,10 +30,13 @@ import {
   performCloudUpload,
 } from "@/lib/supabase/cloud-actions";
 import { reportManualCloudTransfer } from "@/lib/sync-manager";
+import type { LocalOwnerScope } from "@/lib/local-owner-scope";
+import { GoalCloudManualTransferPanel } from "@/features/goals/components/goal-cloud-manual-transfer-panel";
 
 interface CloudDataStatusCardProps {
   user: User | null;
   configured: boolean;
+  ownerScope: LocalOwnerScope | null;
   mediaItems: MediaItem[];
   progressLogs: ProgressLog[];
   onReplaceData: (items: MediaItem[], logs: ProgressLog[]) => boolean;
@@ -67,6 +70,7 @@ function formatTime(iso: string): string {
 export default function CloudDataStatusCard({
   user,
   configured,
+  ownerScope,
   mediaItems,
   progressLogs,
   onReplaceData,
@@ -402,6 +406,8 @@ export default function CloudDataStatusCard({
           {banner.text}
         </p>
       )}
+
+      <GoalCloudManualTransferPanel ownerScope={ownerScope} mediaItems={mediaItems} onConfirm={onConfirm} />
 
       <p className="text-[11px] text-zinc-600 leading-relaxed mt-3 flex items-start gap-1.5">
         <Cloud className="w-3 h-3 mt-0.5 flex-shrink-0" />

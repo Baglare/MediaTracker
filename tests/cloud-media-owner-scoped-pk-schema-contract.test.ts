@@ -37,7 +37,10 @@ describe("D2C.1 owner-scoped PK SQL contract (static, not live PostgreSQL/RLS)",
     const names = readdirSync(new URL("../supabase/migrations/", import.meta.url))
       .filter((name) => /^\d{14}_.+\.sql$/.test(name))
       .sort();
-    expect(names.at(-1)).toBe(migrationName);
+    expect(names).toContain(migrationName);
+    expect(names.indexOf(migrationName)).toBeLessThan(
+      names.indexOf("20260803120000_goal_cloud_v1_additive.sql"),
+    );
     expect(new Set(names.map((name) => name.slice(0, 14))).size)
       .toBe(names.length);
     expect(migration.trimStart().startsWith("begin;")).toBe(true);

@@ -6,6 +6,7 @@ import type { LocalOwnerScope } from "@/lib/local-owner-scope";
 import type { PersonalStorageLike } from "@/lib/personal-data-storage";
 import type { MediaItem } from "@/lib/types";
 import { publishGoalStoreChange, readGoalStore, writeGoalStore } from "./goal-store";
+import { queueGoalCloudMutation } from "@/features/goals/cloud/manager";
 
 export interface CreateGoalInput {
   title: string;
@@ -27,6 +28,7 @@ export interface GoalRepositoryOptions {
   now?: () => Date;
   idFactory?: () => string;
   eventTarget?: EventTarget | null;
+  cloudMutation?: false | ((input: { operation: "upsert"; goal: Goal } | { operation: "tombstone"; goalId: string; goal: Goal }) => void);
 }
 
 export class GoalRepositoryError extends Error {
@@ -90,6 +92,16 @@ function persist(scope: LocalOwnerScope, goals: readonly Goal[], recoveryQuarant
   publishGoalStoreChange(scope, options.eventTarget);
 }
 
+function enqueueCloud(scope: LocalOwnerScope, input: { operation: "upsert"; goal: Goal } | { operation: "tombstone"; goalId: string; goal: Goal }, options: GoalRepositoryOptions) {
+  if (options.cloudMutation === false) return;
+  try {
+    if (options.cloudMutation) options.cloudMutation(input);
+    else queueGoalCloudMutation(scope, input, { storage: options.storage, now: options.now });
+  } catch {
+    // Local-first: Cloud queue failure never rolls back a verified local mutation.
+  }
+}
+
 function stableId(options: GoalRepositoryOptions): string {
   const id = options.idFactory?.() ?? globalThis.crypto?.randomUUID?.();
   if (!id) throw new GoalRepositoryError("uuid_unavailable", "Stabil Goal UUID üretilemedi.");
@@ -123,6 +135,7 @@ export function createGoal(scope: LocalOwnerScope, input: CreateGoalInput, optio
     updatedAt: createdAt,
   }, options.mediaItems ?? [], true);
   persist(scope, [...state.data.goals, goal], state.quarantineKey, options);
+  enqueueCloud(scope, { operation: "upsert", goal }, options);
   return goal;
 }
 
@@ -140,6 +153,7 @@ export function createGoalFromApprovedSuggestion(
   if (!approved.ok) throw new GoalRepositoryError(approved.issues[0]?.code ?? "goal_invalid", approved.issues[0]?.message ?? "Öneri onaylanamadı.");
   const goal = validateGoal(approved.value, options.mediaItems ?? [], true);
   persist(scope, [...state.data.goals, goal], state.quarantineKey, options);
+  enqueueCloud(scope, { operation: "upsert", goal }, options);
   return goal;
 }
 
@@ -174,6 +188,7 @@ export function updateGoal(
   const goals = [...state.data.goals];
   goals[index] = goal;
   persist(scope, goals, state.quarantineKey, options);
+  enqueueCloud(scope, { operation: "upsert", goal }, options);
   return goal;
 }
 
@@ -191,6 +206,7 @@ function changeLifecycle(
   const goals = [...state.data.goals];
   goals[index] = goal;
   persist(scope, goals, state.quarantineKey, options);
+  enqueueCloud(scope, { operation: "upsert", goal }, options);
   return goal;
 }
 
@@ -214,7 +230,9 @@ export function deleteGoal(
 ): void {
   if (confirmation.confirmed !== true) throw new GoalRepositoryError("confirmation_required", "Fiziksel silme açık onay gerektirir.");
   const state = load(scope, options);
+  const deleted = state.data.goals.find((goal) => goal.id === id);
   const goals = state.data.goals.filter((goal) => goal.id !== id);
-  if (goals.length === state.data.goals.length) throw new GoalRepositoryError("goal_not_found", "Goal bulunamadı.");
+  if (!deleted || goals.length === state.data.goals.length) throw new GoalRepositoryError("goal_not_found", "Goal bulunamadı.");
   persist(scope, goals, state.quarantineKey, options);
+  enqueueCloud(scope, { operation: "tombstone", goalId: id, goal: deleted }, options);
 }

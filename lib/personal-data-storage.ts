@@ -19,6 +19,8 @@ export type PersonalDataDomain =
   | "integrityRepairJournal"
   | "portableImportJournal"
   | "cloudMediaV2State"
+  | "goalCloudState"
+  | "goalCloudQueue"
   | "releaseCalendarCache"
   | "goals";
 

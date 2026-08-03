@@ -58,6 +58,7 @@ import {
 import { DEFAULT_ACTIVITY_PREFERENCES, type SocialPreferences } from "@/lib/social/interactions";
 import { flushXpOutbox, queueXpMediaState, sendXpOutboxBatch } from "@/lib/xp/outbox";
 import { ensureMediaIdentity } from "@/lib/media-identity";
+import { canCoalescePendingProgressLog } from "@/lib/progress-log-immutability";
 
 type ProgressAction = "increment" | "complete" | "manual_adjust" | "added";
 
@@ -75,6 +76,7 @@ interface ProgressLogInput {
 function appendProgressLog(
   progressLogs: ProgressLog[],
   args: ProgressLogInput,
+  scope: LocalOwnerScope | null,
 ): { logs: ProgressLog[]; persistedLog: ProgressLog } {
   const nowIso = new Date().toISOString();
   const nextLog: ProgressLog = {
@@ -98,6 +100,7 @@ function appendProgressLog(
       last
       && last.action === args.action
       && last.newProgress === args.previousProgress
+      && canCoalescePendingProgressLog(scope)
       && Date.now() - new Date(last.createdAt).getTime() < 60 * 60 * 1000;
     if (canMerge && last) {
       const merged: ProgressLog = {
@@ -381,7 +384,7 @@ export function useMediaLibrary(userId: string | null | undefined) {
       amount,
       previousProgress: item.currentProgress,
       newProgress,
-    });
+    }, scopeRef.current);
     if (!applyPersistedSnapshot(nextMedia, logChange.logs).ok) return;
     enqueueMediaUpsert(updated);
     enqueueProgressLog(logChange.persistedLog);
@@ -406,7 +409,7 @@ export function useMediaLibrary(userId: string | null | undefined) {
           amount: newProgress - item.currentProgress,
           previousProgress: item.currentProgress,
           newProgress,
-        })
+        }, scopeRef.current)
       : null;
     if (!applyPersistedSnapshot(nextMedia, logChange?.logs ?? logsRef.current).ok) return;
     enqueueMediaUpsert(updated);
@@ -437,7 +440,7 @@ export function useMediaLibrary(userId: string | null | undefined) {
         amount: Math.abs(classified.currentProgress - existing.currentProgress),
         previousProgress: existing.currentProgress,
         newProgress: classified.currentProgress,
-      });
+      }, scopeRef.current);
     } else if (!existing) {
       logChange = appendProgressLog(logsRef.current, {
         mediaId: classified.id,
@@ -448,7 +451,7 @@ export function useMediaLibrary(userId: string | null | undefined) {
         previousProgress: 0,
         newProgress: classified.currentProgress,
         detail: buildAddedLogDetail(classified),
-      });
+      }, scopeRef.current);
     }
 
     if (!applyPersistedSnapshot(nextMedia, logChange?.logs ?? logsRef.current).ok) return false;

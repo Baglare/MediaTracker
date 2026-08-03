@@ -55,6 +55,12 @@ import {
   type SyncQueueStorageLike,
 } from "./sync-queue";
 import type { MediaItem, ProgressLog, SyncQueueItem } from "./types";
+import type { Goal } from "@/features/goals/domain/types";
+import { decodeGoal } from "@/features/goals/domain/codec";
+import { createGoalStoreCodec, publishGoalStoreChange, writeGoalStore } from "@/features/goals/data/goal-store";
+import { createGoalCloudQueueCodec, writeGoalCloudQueue } from "@/features/goals/cloud/queue";
+import { getGoalCloudRolloutContract } from "@/features/goals/cloud/rollout";
+import type { GoalCloudQueueItem } from "@/features/goals/cloud/types";
 
 export const PORTABLE_IMPORT_PLAN_VERSION = 1 as const;
 export const PORTABLE_IMPORT_JOURNAL_VERSION = 1 as const;
@@ -84,10 +90,19 @@ export interface PortableImportLogDecision {
   reason: string;
 }
 
+export interface PortableImportGoalDecision {
+  sourceGoalId: string;
+  targetMediaId?: string;
+  status: "add" | "skip-same" | "excluded" | "conflict";
+  remapped: boolean;
+  reason: string;
+}
+
 export interface PortableImportBlocker {
   code:
     | "record_id_conflict"
     | "log_id_conflict"
+    | "goal_id_conflict"
     | "alias_collision"
     | "alias_cycle"
     | "redirect_collision"
@@ -117,6 +132,7 @@ export interface PortableImportPlan {
   exactDuplicateCopyRecordIds: string[];
   mediaDecisions: PortableImportMediaDecision[];
   logDecisions: PortableImportLogDecision[];
+  goalDecisions: PortableImportGoalDecision[];
   counts: {
     mediaAdd: number;
     mediaSkip: number;
@@ -125,6 +141,9 @@ export interface PortableImportPlan {
     logAdd: number;
     logSkip: number;
     logConflict: number;
+    goalAdd: number;
+    goalSkip: number;
+    goalConflict: number;
     aliasesAdd: number;
     redirectsAdd: number;
     recommendationLinksAdd: number;
@@ -142,6 +161,7 @@ export interface PortableImportReceipt {
   ownerScope: string;
   mediaAdded: number;
   logsAdded: number;
+  goalsAdded: number;
   aliasesAdded: number;
   redirectsAdded: number;
   recommendationLinksAdded: number;
@@ -165,10 +185,12 @@ interface PortableImportSnapshot {
   datasetOrigin: LocalDatasetOrigin;
   mediaItems: MediaItem[];
   progressLogs: ProgressLog[];
+  goals?: Goal[];
   aliases: MediaIdentityAliasRegistry;
   redirects: MediaRecordRedirectRegistry;
   recommendationLinks: RecommendationLocalLink[];
   syncQueue: SyncQueueItem[];
+  goalQueue?: GoalCloudQueueItem[];
 }
 
 export interface PortableImportJournal {
@@ -316,6 +338,10 @@ function sameLog(left: ProgressLog, right: ProgressLog): boolean {
   return stableValue(left) === stableValue(right);
 }
 
+function sameGoal(left: Goal, right: Goal): boolean {
+  return stableValue(left) === stableValue(right);
+}
+
 function sameRecommendationLink(
   left: RecommendationLocalLink,
   right: RecommendationLocalLink,
@@ -369,11 +395,15 @@ function captureSnapshot(
   );
   const links = inspectRecommendationLinksForScope(scope, storage);
   const queue = inspectSyncQueue(scope, storage);
+  const goals = inspectPersonalData(scope, "goals", createGoalStoreCodec(scope), storage);
+  const goalQueue = inspectPersonalData(scope, "goalCloudQueue", createGoalCloudQueueCodec(scope), storage);
   if (
     !["valid", "missing"].includes(aliases.status)
     || !["valid", "missing"].includes(redirects.status)
     || !["valid", "missing"].includes(links.status)
     || !["valid", "missing"].includes(queue.status)
+    || !["valid", "missing"].includes(goals.status)
+    || !["valid", "missing"].includes(goalQueue.status)
     || links.issues.length > 0
     || queue.issues.length > 0
   ) {
@@ -385,6 +415,7 @@ function captureSnapshot(
       datasetOrigin: media.datasetOrigin ?? "user",
       mediaItems: media.data,
       progressLogs: logs.data,
+      goals: goals.status === "valid" ? goals.data.goals : [],
       aliases: aliases.status === "valid"
         ? aliases.data
         : emptyMediaIdentityAliasRegistry(),
@@ -393,6 +424,7 @@ function captureSnapshot(
         : emptyMediaRecordRedirectRegistry(),
       recommendationLinks: links.links,
       syncQueue: queue.items,
+      goalQueue: goalQueue.status === "valid" ? goalQueue.data.items : [],
     },
   };
 }
@@ -451,6 +483,37 @@ function appendQueueOperations(
   return queue;
 }
 
+function deterministicUuid(value: string): string {
+  const hex = `${stableHash(value)}${stableHash(`${value}:goal`)}`.padEnd(32, "0").slice(0, 32);
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+}
+
+function appendGoalQueueOperations(
+  scope: LocalOwnerScope,
+  current: readonly GoalCloudQueueItem[],
+  operationId: string,
+  goals: readonly Goal[],
+): GoalCloudQueueItem[] {
+  if (scope.kind !== "user" || getGoalCloudRolloutContract().enabled === false) return [...current];
+  let queue = [...current];
+  goals.forEach((goal, index) => {
+    queue = queue.filter((item) => item.goalId !== goal.id || item.dispatchStartedAt !== undefined);
+    queue.push({
+      schemaVersion: 1,
+      operationId: deterministicUuid(`${operationId}:${index}:${goal.id}`),
+      ownerScope: scope.key,
+      userId: scope.userId,
+      goalId: goal.id,
+      operation: "upsert",
+      expectedRevision: 0,
+      definition: goal,
+      enqueuedAt: new Date(0).toISOString(),
+      retryCount: 0,
+    });
+  });
+  return queue;
+}
+
 function buildPlan(
   scope: LocalOwnerScope,
   before: PortableImportSnapshot,
@@ -468,6 +531,7 @@ function buildPlan(
   const blockers: PortableImportBlocker[] = [];
   const mediaDecisions: PortableImportMediaDecision[] = [];
   const logDecisions: PortableImportLogDecision[] = [];
+  const goalDecisions: PortableImportGoalDecision[] = [];
   const currentById = new Map(before.mediaItems.map((item) => [item.id, item]));
   const currentByIdentity = new Map<string, MediaItem[]>();
   before.mediaItems.forEach((item) => {
@@ -872,9 +936,45 @@ function buildPlan(
     }
   }
 
+  const currentGoals = new Map((before.goals ?? []).map((goal) => [goal.id, goal]));
+  const addedGoals: Goal[] = [];
+  if (selectedDomains.includes("goals")) {
+    for (const incoming of backup.data.goals ?? []) {
+      const remappedMediaId = incoming.scope.kind === "media"
+        ? recordIdMap.get(incoming.scope.mediaRecordId)
+        : undefined;
+      const remapped: Goal = incoming.scope.kind === "media" && remappedMediaId
+        ? { ...incoming, scope: { ...incoming.scope, mediaRecordId: remappedMediaId } }
+        : incoming;
+      const decoded = decodeGoal(remapped);
+      if (!decoded.ok) continue;
+      const existing = currentGoals.get(decoded.value.id);
+      if (existing) {
+        if (sameGoal(existing, decoded.value)) {
+          goalDecisions.push({ sourceGoalId: incoming.id, status: "skip-same", remapped: remapped !== incoming, reason: "Aynı Goal ID ve payload mevcut." });
+        } else {
+          goalDecisions.push({ sourceGoalId: incoming.id, status: "conflict", remapped: remapped !== incoming, reason: "Aynı Goal ID farklı payload taşıyor." });
+          blockers.push({ code: "goal_id_conflict", domain: "goals", recordId: incoming.id, message: `${incoming.id} Goal conflict sessizce overwrite edilemez.` });
+        }
+      } else {
+        addedGoals.push(decoded.value);
+        currentGoals.set(decoded.value.id, decoded.value);
+        goalDecisions.push({
+          sourceGoalId: incoming.id,
+          ...(decoded.value.scope.kind === "media" ? { targetMediaId: decoded.value.scope.mediaRecordId } : {}),
+          status: "add",
+          remapped: remapped !== incoming,
+          reason: decoded.value.scope.kind === "media" && !afterMediaIds.has(decoded.value.scope.mediaRecordId)
+            ? "Goal korunacak; exact media hedefi bulunamadığı için media_missing olarak değerlendirilebilir."
+            : "Çakışmasız Goal tanımı.",
+        });
+      }
+    }
+  }
+
   const sourceFingerprint = snapshotFingerprint(before);
   const backupFingerprint =
-    `portable-v2:${backup.manifest.checksum.value}`;
+    `portable-v${backup.manifest.version}:${backup.manifest.checksum.value}`;
   const operationId = `portable-import-${stableHash(stableValue({
     ownerScope: scope.key,
     backupFingerprint,
@@ -882,8 +982,9 @@ function buildPlan(
     selectedDomains,
     exactDuplicateCopyRecordIds: sortedUnique([...exactCopies]),
   }))}`;
+  const goalCloudEnabled = getGoalCloudRolloutContract().enabled;
   const cloudOperationCount = scope.kind === "user"
-    ? addedMedia.length + addedLogs.length
+    ? addedMedia.length + addedLogs.length + (goalCloudEnabled ? addedGoals.length : 0)
     : 0;
   const nextQueue = appendQueueOperations(
     scope,
@@ -892,14 +993,17 @@ function buildPlan(
     addedMedia,
     addedLogs,
   );
+  const nextGoalQueue = appendGoalQueueOperations(scope, before.goalQueue ?? [], operationId, addedGoals);
   const after: PortableImportSnapshot = {
     datasetOrigin: addedMedia.length > 0 ? "user" : before.datasetOrigin,
     mediaItems: nextMedia,
     progressLogs: [...before.progressLogs, ...addedLogs],
+    goals: [...(before.goals ?? []), ...addedGoals],
     aliases: nextAliases,
     redirects: nextRedirects,
     recommendationLinks: nextLinks,
     syncQueue: nextQueue,
+    goalQueue: nextGoalQueue,
   };
   const counts = {
     mediaAdd: mediaDecisions.filter((entry) =>
@@ -912,6 +1016,9 @@ function buildPlan(
     logAdd: logDecisions.filter((entry) => entry.status === "add").length,
     logSkip: logDecisions.filter((entry) => entry.status === "skip-same").length,
     logConflict: logDecisions.filter((entry) => entry.status === "conflict").length,
+    goalAdd: goalDecisions.filter((entry) => entry.status === "add").length,
+    goalSkip: goalDecisions.filter((entry) => entry.status === "skip-same").length,
+    goalConflict: goalDecisions.filter((entry) => entry.status === "conflict").length,
     aliasesAdd: Math.max(0, nextAliases.records.length - before.aliases.records.length),
     redirectsAdd: Math.max(0, nextRedirects.records.length - before.redirects.records.length),
     recommendationLinksAdd: recommendationLinksAdded,
@@ -932,6 +1039,7 @@ function buildPlan(
       exactDuplicateCopyRecordIds: sortedUnique([...exactCopies]),
       mediaDecisions,
       logDecisions,
+      goalDecisions,
       counts,
       blockers: blockers.filter((entry, index, all) =>
         all.findIndex((candidate) =>
@@ -1026,6 +1134,22 @@ function decodeSnapshot(
   const redirects = mediaRecordRedirectRegistryCodec(value.redirects);
   const decodedMedia = decodeMediaItems(value.mediaItems);
   const decodedLogs = decodeProgressLogs(value.progressLogs);
+  const hasGoals = value.goals !== undefined;
+  const rawGoals = Array.isArray(value.goals) ? value.goals : [];
+  if (hasGoals && !Array.isArray(value.goals)) return null;
+  const decodedGoals: Goal[] = [];
+  for (const rawGoal of rawGoals) {
+    const decoded = decodeGoal(rawGoal);
+    if (!decoded.ok || decodedGoals.some((goal) => goal.id === decoded.value.id)) return null;
+    decodedGoals.push(decoded.value);
+  }
+  const hasGoalQueue = value.goalQueue !== undefined;
+  const rawGoalQueue = Array.isArray(value.goalQueue) ? value.goalQueue : [];
+  if (hasGoalQueue && !Array.isArray(value.goalQueue)) return null;
+  const queueScope = ownerScope === "guest"
+    ? ({ kind: "guest", key: "guest", storageKey: "guest" } as LocalOwnerScope)
+    : ({ kind: "user", key: ownerScope, storageKey: `user-${ownerScope.slice("user:".length)}`, userId: ownerScope.slice("user:".length) } as LocalOwnerScope);
+  const decodedGoalQueue = createGoalCloudQueueCodec(queueScope)({ version: 1, owner: ownerScope, items: rawGoalQueue });
   const linksValid = ownerScope === "guest"
     ? value.recommendationLinks.length === 0
     : value.recommendationLinks.every((entry) =>
@@ -1037,15 +1161,18 @@ function decodeSnapshot(
     || !redirects.ok
     || !linksValid
     || !value.syncQueue.every((entry) => isQueueItem(entry, ownerScope))
+    || !decodedGoalQueue.ok
   ) return null;
   return {
     datasetOrigin: value.datasetOrigin as LocalDatasetOrigin,
     mediaItems: decodedMedia.records,
     progressLogs: decodedLogs.records,
+    ...(hasGoals ? { goals: decodedGoals } : {}),
     aliases: media.value,
     redirects: redirects.value,
     recommendationLinks: value.recommendationLinks as RecommendationLocalLink[],
     syncQueue: value.syncQueue as SyncQueueItem[],
+    ...(hasGoalQueue ? { goalQueue: decodedGoalQueue.value.items } : {}),
   };
 }
 
@@ -1061,6 +1188,7 @@ function validPlan(value: unknown, ownerScope: string): value is PortableImportP
     && Array.isArray(value.exactDuplicateCopyRecordIds)
     && Array.isArray(value.mediaDecisions)
     && Array.isArray(value.logDecisions)
+    && (value.goalDecisions === undefined || Array.isArray(value.goalDecisions))
     && Array.isArray(value.blockers)
     && typeof value.hasChanges === "boolean"
     && typeof value.personalNotesPresent === "boolean"
@@ -1181,6 +1309,13 @@ function applySnapshot(
   if (!replaceSyncQueueDurably(scope, snapshot.syncQueue, storage)) {
     return { ok: false, message: "Cloud queue durable write başarısız." };
   }
+  if (snapshot.goals) {
+    const goalStore = writeGoalStore(scope, snapshot.goals, { storage });
+    if (!goalStore.ok) return { ok: false, message: "Goal store durable write başarısız." };
+  }
+  if (snapshot.goalQueue && !writeGoalCloudQueue(scope, snapshot.goalQueue, storage)) {
+    return { ok: false, message: "Goal Cloud queue durable write başarısız." };
+  }
   const verified = captureSnapshot(scope, storage);
   return verified.ok
     && snapshotFingerprint(verified.snapshot) === snapshotFingerprint(snapshot)
@@ -1194,6 +1329,10 @@ function notifyLibraryChanged() {
   }
 }
 
+function notifyGoalChanges(scope: LocalOwnerScope) {
+  publishGoalStoreChange(scope);
+}
+
 function receiptFor(plan: PortableImportPlan): PortableImportReceipt {
   return {
     version: 1,
@@ -1201,6 +1340,7 @@ function receiptFor(plan: PortableImportPlan): PortableImportReceipt {
     ownerScope: plan.ownerScope,
     mediaAdded: plan.counts.mediaAdd,
     logsAdded: plan.counts.logAdd,
+    goalsAdded: plan.counts.goalAdd ?? 0,
     aliasesAdded: plan.counts.aliasesAdd,
     redirectsAdded: plan.counts.redirectsAdd,
     recommendationLinksAdded: plan.counts.recommendationLinksAdd,
@@ -1438,6 +1578,7 @@ export async function executePortableAdditiveImport(
     };
   }
   notifyLibraryChanged();
+  notifyGoalChanges(scope);
   if (finalState === "sync-pending") {
     try {
       options.triggerSync?.();
@@ -1474,6 +1615,7 @@ export function recoverPendingPortableImport(
   writePortableImportJournal(scope, journal, storage);
   if (rollback.ok && journal.receipt) {
     notifyLibraryChanged();
+    notifyGoalChanges(scope);
     return { ok: true, state: "rolled-back", receipt: journal.receipt };
   }
   return rollback.ok
@@ -1547,30 +1689,37 @@ export function inspectPortableImportUndo(
   const importQueue = journal.after.syncQueue.filter((item) =>
     !beforeQueueIds.has(item.id)
     && item.id.startsWith(`${journal.operationId}:cloud:`));
+  const beforeGoalQueueIds = new Set((journal.before.goalQueue ?? []).map((item) => item.operationId));
+  const importGoalQueue = (journal.after.goalQueue ?? []).filter((item) => !beforeGoalQueueIds.has(item.operationId));
   if (scope.kind === "user" && journal.plan.cloudOperationCount > 0) {
     const currentQueue = new Map(
       current.snapshot.syncQueue.map((item) => [item.id, item]),
     );
+    const currentGoalQueue = new Map(
+      (current.snapshot.goalQueue ?? []).map((item) => [item.operationId, item]),
+    );
     if (
-      importQueue.length !== journal.plan.cloudOperationCount
+      importQueue.length + importGoalQueue.length !== journal.plan.cloudOperationCount
       || importQueue.some((item) => !currentQueue.has(item.id))
+      || importGoalQueue.some((item) => !currentGoalQueue.has(item.operationId))
     ) {
       return {
         available: false,
         code: "cloud_outcome_unknown",
         message:
           "Import cloud queue işlemlerinden biri dispatch edilmiş, tamamlanmış veya sonucu belirsiz. Local undo uygulanamaz.",
-        pendingQueueCount: importQueue.length,
+        pendingQueueCount: importQueue.length + importGoalQueue.length,
       };
     }
     if (importQueue.some((item) =>
-      Boolean(currentQueue.get(item.id)?.dispatchStartedAt))) {
+      Boolean(currentQueue.get(item.id)?.dispatchStartedAt))
+      || importGoalQueue.some((item) => Boolean(currentGoalQueue.get(item.operationId)?.dispatchStartedAt))) {
       return {
         available: false,
         code: "cloud_dispatch_started",
         message:
           "Import upsert işlemlerinden en az biri cloud'a gönderilmeye başladı. Local undo uygulanamaz.",
-        pendingQueueCount: importQueue.length,
+        pendingQueueCount: importQueue.length + importGoalQueue.length,
       };
     }
   }
@@ -1579,7 +1728,7 @@ export function inspectPortableImportUndo(
       available: false,
       code: "state_stale",
       message: "Import sonrası local state değişti; mevcut veriyi korumak için undo bloke edildi.",
-      pendingQueueCount: importQueue.length,
+      pendingQueueCount: importQueue.length + importGoalQueue.length,
     };
   }
   return {
@@ -1588,7 +1737,7 @@ export function inspectPortableImportUndo(
     message: scope.kind === "guest"
       ? "Guest import local snapshot üzerinden güvenle geri alınabilir."
       : "Import queue işlemleri henüz dispatch edilmedi; undo bunları iptal edebilir.",
-    pendingQueueCount: importQueue.length,
+    pendingQueueCount: importQueue.length + importGoalQueue.length,
   };
 }
 
@@ -1715,5 +1864,6 @@ export function undoLastPortableImport(
     };
   }
   notifyLibraryChanged();
+  notifyGoalChanges(scope);
   return { ok: true, state: "rolled-back", receipt };
 }

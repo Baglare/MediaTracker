@@ -1,5 +1,7 @@
 # Goal System D5-1 — Audit ve Domain Kararları
 
+D5-4 backup/Cloud uygulaması: [Goal System Cloud Sync](./GOAL_SYSTEM_CLOUD_SYNC.md).
+
 ## Kapsam ve sonuç
 
 D5-1 read-only audit'i domain çekirdeğini engelleyen bir hard blocker bulmadı. Bu aşama yalnız `features/goals/domain` altında saf model, codec, tarih/policy helper'ları ve read-model sözleşmesini tanımlar. UI, localStorage kaydı, portable backup formatı, Cloud queue entity'si, Supabase schema/RPC ve öneri motoru eklenmez.
@@ -22,7 +24,7 @@ Ek bulgular:
 - `manual_adjust` yeni değeri codec/UI yollarında sıfırın altına inmez; fakat `newProgress < previousProgress` ile negatif yönlü bir düzeltmeyi temsil edebilir. Bu nedenle evaluator `amount` toplamak yerine geçiş yönünü okumalıdır.
 - Normal komut yolunda `complete.amount` yalnız kalan farktır; önceki increment amount'larını tekrar içermez. Son increment total'e ulaştığında status otomatik `completed` olur ve ayrıca `complete` logu oluşmaz. Buna rağmen import/replay/merge nedeniyle action amount'larını körlemesine toplamak güvenli değildir.
 - Standart film formu `totalProgress=1` kullanır. Tamamla komutu çoğunlukla `complete: 0 → 1` üretir. Film doğrudan completed eklenirse `added`, edit ile completed yapılırsa `manual_adjust` oluşabilir; import/cloud state'i hiç tamamlanma logu taşımayabilir. Anime film de film-benzeri komut davranışına sahiptir.
-- Aynı log ID replay edilebilir. Bir saat içindeki aynı action merge'i mevcut log ID'sini yeni payload ile günceller. Local codec duplicate ID'yi koleksiyon seviyesinde reddetmez; display dedupe payload alanlarıyla, legacy XP ise ID ile dedupe eder. Portable V2 aynı backup içindeki duplicate ID'yi reddeder; additive import aynı ID+aynı payload'ı skip, aynı ID+farklı payload'ı conflict yapar. Cloud V2 immutable progress log sözleşmesi merge edilmiş payload için conflict üretebilir.
+- Aynı log ID replay edilebilir. Guest store'daki bir saatlik aynı-action merge'i tek snapshot içinde mevcut ID'yi güncelleyebilir. D5-4, authenticated owner'da local kütüphane ile Cloud kuyruğu arasında gerçek cross-key atomiklik olmadığı için aynı-ID merge'ini kapatır; yeni transition yeni ID alır. Local codec duplicate ID'yi koleksiyon seviyesinde reddetmez; additive import aynı ID+aynı payload'ı skip, aynı ID+farklı payload'ı conflict yapar. Cloud V2 aynı payload'ı idempotent, farklı payload'ı immutable conflict kabul eder.
 - Ayrı bir kullanıcı-facing progress-log silme komutu bulunmadı. Replace import/cloud conflict çözümü log listesini azaltabilir; portable additive import silmez. Media silme local logları silmez ve onları detached bırakır. Duplicate merge exact record-ID remap tablosuyla logları yeni media ID'ye taşır.
 - Hedef ilerlemesi her okumada mevcut, benzersiz log kümesi ve MediaItem state'inden yeniden hesaplanmalıdır. Log silme/import sonrası azaltılacak ayrı bir Goal sayacı yoktur.
 - Detached log hiçbir Goal'a katkı vermemelidir. Exact media ilişkisi çözülemeyen kayıtlar yok sayılır ve `detached_logs_ignored` eklenir. `media` scope kesinlikle title/canonical/fuzzy fallback kullanmaz; `media_type` ve library hesapları da orphan snapshot'a güvenmemelidir.

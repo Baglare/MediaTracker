@@ -1,5 +1,7 @@
 # Goal System D5-2 — Yerel Kalıcılık ve Manuel Yönetim
 
+D5-4 owner-scoped Cloud sidecar/queue ve Portable V3: [Goal System Cloud Sync](./GOAL_SYSTEM_CLOUD_SYNC.md).
+
 Bu belge D5-1 [Goal domain sözleşmesinin](./GOAL_SYSTEM_DOMAIN.md) owner-scoped yerel uygulamasını tanımlar. Goal tanımı kalıcıdır; ilerleme sonucu değildir.
 
 ## Owner-scoped key ve envelope
@@ -66,3 +68,7 @@ D5-3 aşağıdaki kararları [GOAL_SYSTEM_EVALUATION.md](./GOAL_SYSTEM_EVALUATIO
 4. Evaluation ve suggestion state'i bu local store'a yazılmaz.
 
 D5-4 portable backup/import ile ayrı Cloud Goal aggregate'ını eklerken bu store envelope'ına türetilmiş sayaç koymamalıdır; immutable Cloud log/CAS ve fiziksel delete tombstone kararı da D5-4'e aittir.
+
+## D5-4 uygulama notu
+
+D5-4 bu ertelenen kapsamı [Portable V3 ve Goal Cloud V1](./GOAL_SYSTEM_CLOUD_SYNC.md) sözleşmesiyle ekledi. Goal envelope v1 değişmedi; revision/queue ayrı owner-scoped sidecar'dadır ve portable değildir.

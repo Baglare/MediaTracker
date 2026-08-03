@@ -114,6 +114,7 @@ export default function SettingsFeature({
             <CloudDataStatusCard
               user={user}
               configured={configured}
+              ownerScope={ownerScope}
               mediaItems={mediaList}
               progressLogs={progressLogs}
               onReplaceData={onReplaceData}

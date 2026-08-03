@@ -3,6 +3,9 @@ import {
   decodeMediaItems,
   decodeProgressLogs,
 } from "./local-data-codec";
+import { decodeGoal } from "@/features/goals/domain/codec";
+import type { Goal } from "@/features/goals/domain/types";
+import { createGoalStoreCodec } from "@/features/goals/data/goal-store";
 import { LOCAL_DATA_SCHEMA_VERSION } from "./local-data-storage";
 import type { LocalOwnerScope } from "./local-owner-scope";
 import {
@@ -24,7 +27,8 @@ import type { MediaItem, ProgressLog } from "./types";
 import { decodeMediaReleaseCalendarData } from "../features/calendar/domain/manual-release-calendar";
 
 export const PORTABLE_BACKUP_FORMAT = "mediatracker-portable-backup" as const;
-export const PORTABLE_BACKUP_VERSION = 2 as const;
+export const PORTABLE_BACKUP_VERSION = 3 as const;
+export const PORTABLE_BACKUP_SUPPORTED_VERSIONS = [2, 3] as const;
 export const MAX_PORTABLE_BACKUP_BYTES = 10 * 1024 * 1024;
 
 export const PORTABLE_BACKUP_DOMAINS = [
@@ -33,6 +37,7 @@ export const PORTABLE_BACKUP_DOMAINS = [
   "identityAliases",
   "recordRedirects",
   "recommendationLinks",
+  "goals",
 ] as const;
 
 export type PortableBackupDomain = (typeof PORTABLE_BACKUP_DOMAINS)[number];
@@ -52,11 +57,12 @@ export interface PortableBackupData {
   identityAliases?: MediaIdentityAliasRegistry;
   recordRedirects?: MediaRecordRedirectRegistry;
   recommendationLinks?: PortableRecommendationLink[];
+  goals?: Goal[];
 }
 
 export interface PortableBackupManifest {
   format: typeof PORTABLE_BACKUP_FORMAT;
-  version: typeof PORTABLE_BACKUP_VERSION;
+  version: (typeof PORTABLE_BACKUP_SUPPORTED_VERSIONS)[number];
   exportedAt: string;
   application: {
     name: "MediaTracker";
@@ -69,6 +75,7 @@ export interface PortableBackupManifest {
     identityAliasRegistry: 1;
     recordRedirectRegistry: 1;
     recommendationLink: 1;
+    goal?: 1;
   };
   domains: PortableBackupDomain[];
   counts: Record<PortableBackupDomain, number>;
@@ -88,6 +95,8 @@ export interface PortableBackupV2 {
   data: PortableBackupData;
 }
 
+export type PortableBackupV3 = PortableBackupV2;
+
 export interface PortableBackupSource {
   ownerType: PortableBackupOwnerType;
   mediaItems: MediaItem[];
@@ -95,6 +104,7 @@ export interface PortableBackupSource {
   identityAliases: MediaIdentityAliasRegistry;
   recordRedirects: MediaRecordRedirectRegistry;
   recommendationLinks: PortableRecommendationLink[];
+  goals?: Goal[];
 }
 
 export type PortableBackupSourceResult =
@@ -122,7 +132,7 @@ export interface PortableBackupInspectionIssue {
 }
 
 export interface PortableBackupInspectionSummary {
-  kind: "portable-v2" | "legacy";
+  kind: "portable-v2" | "portable-v3" | "legacy";
   compatible: boolean;
   format: string;
   version?: number;
@@ -166,6 +176,7 @@ export type DecodedPortableBackupResult =
     };
 
 const DOMAIN_SET = new Set<string>(PORTABLE_BACKUP_DOMAINS);
+const V2_DOMAINS = PORTABLE_BACKUP_DOMAINS.filter((domain) => domain !== "goals");
 const TOP_LEVEL_FIELDS = new Set(["manifest", "data"]);
 const MANIFEST_FIELDS = new Set([
   "format",
@@ -228,6 +239,10 @@ const REDIRECT_RECORD_FIELDS = new Set([
 ]);
 const RECOMMENDATION_LINK_FIELDS = new Set([
   "recommendationId", "localMediaId", "canonicalMediaKey", "linkedAt",
+]);
+const GOAL_FIELDS = new Set([
+  "id", "title", "origin", "scope", "metric", "schedule", "lifecycle",
+  "createdAt", "updatedAt",
 ]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -327,6 +342,14 @@ function sanitizeProgressLogs(logs: readonly ProgressLog[]): ProgressLog[] {
   return decoded.records.sort((left, right) => left.id.localeCompare(right.id, "en"));
 }
 
+function sanitizeGoals(goals: readonly Goal[]): Goal[] {
+  return goals.map((goal) => {
+    const decoded = decodeGoal(goal);
+    if (!decoded.ok) throw new Error("portable_backup_goal_invalid");
+    return decoded.value;
+  }).sort((left, right) => left.id.localeCompare(right.id, "en"));
+}
+
 function normalizedAliases(
   registry: MediaIdentityAliasRegistry,
 ): MediaIdentityAliasRegistry {
@@ -372,6 +395,7 @@ export function collectPortableBackupSource(
     storage,
   );
   const recommendationLinks = inspectRecommendationLinksForScope(scope, storage);
+  const goals = inspectPersonalData(scope, "goals", createGoalStoreCodec(scope), storage);
   if (aliases.status !== "valid" && aliases.status !== "missing") {
     return { ok: false, error: "Identity alias registry export için doğrulanamadı." };
   }
@@ -383,6 +407,9 @@ export function collectPortableBackupSource(
     && recommendationLinks.status !== "missing"
   ) {
     return { ok: false, error: "Recommendation link kayıtları doğrulanamadı." };
+  }
+  if (goals.status !== "valid" && goals.status !== "missing") {
+    return { ok: false, error: "Goal kayıtları export için doğrulanamadı." };
   }
   if (recommendationLinks.issues.length > 0) {
     return { ok: false, error: "Recommendation link owner/codec uyuşmazlığı bulundu." };
@@ -403,6 +430,7 @@ export function collectPortableBackupSource(
         .map(portableLink)
         .sort((left, right) =>
           left.recommendationId.localeCompare(right.recommendationId, "en")),
+      goals: goals.status === "valid" ? goals.data.goals : [],
     },
   };
 }
@@ -414,6 +442,7 @@ function emptyCounts(): Record<PortableBackupDomain, number> {
     identityAliases: 0,
     recordRedirects: 0,
     recommendationLinks: 0,
+    goals: 0,
   };
 }
 
@@ -454,6 +483,10 @@ export async function createPortableBackup(
         left.recommendationId.localeCompare(right.recommendationId, "en"));
     counts.recommendationLinks = data.recommendationLinks.length;
   }
+  if (domains.includes("goals")) {
+    data.goals = sanitizeGoals(source.goals ?? []);
+    counts.goals = data.goals.length;
+  }
 
   const manifest: PortableBackupManifest = {
     format: PORTABLE_BACKUP_FORMAT,
@@ -470,6 +503,7 @@ export async function createPortableBackup(
       identityAliasRegistry: 1,
       recordRedirectRegistry: 1,
       recommendationLink: 1,
+      goal: 1,
     },
     domains,
     counts,
@@ -644,6 +678,7 @@ function inspectDomainUnknownFields(
     "recommendationLinks",
     "Recommendation link",
   );
+  inspectRecordUnknownFields(data.goals, GOAL_FIELDS, issues, "goals", "Goal");
   if (isRecord(data.identityAliases)) {
     for (const key of Object.keys(data.identityAliases)) {
       if (!ALIAS_REGISTRY_FIELDS.has(key)) {
@@ -685,6 +720,45 @@ function duplicateCount(values: readonly string[]): number {
   const counts = new Map<string, number>();
   values.forEach((value) => counts.set(value, (counts.get(value) ?? 0) + 1));
   return [...counts.values()].filter((count) => count > 1).length;
+}
+
+function decodePortableGoals(values: unknown): {
+  goals: Goal[];
+  malformed: number;
+  duplicateSame: number;
+  duplicateConflict: number;
+} {
+  if (!Array.isArray(values)) {
+    return { goals: [], malformed: 1, duplicateSame: 0, duplicateConflict: 0 };
+  }
+  const byId = new Map<string, { goal: Goal; payload: string; conflict: boolean }>();
+  let malformed = 0;
+  let duplicateSame = 0;
+  let duplicateConflict = 0;
+  for (const value of values) {
+    const decoded = decodeGoal(value);
+    if (!decoded.ok) {
+      malformed += 1;
+      continue;
+    }
+    const payload = JSON.stringify(canonicalize(decoded.value));
+    const prior = byId.get(decoded.value.id);
+    if (!prior) {
+      byId.set(decoded.value.id, { goal: decoded.value, payload, conflict: false });
+    } else if (prior.payload === payload) {
+      duplicateSame += 1;
+    } else {
+      duplicateConflict += 1;
+      prior.conflict = true;
+    }
+  }
+  return {
+    goals: [...byId.values()].filter((entry) => !entry.conflict).map((entry) => entry.goal)
+      .sort((left, right) => left.id.localeCompare(right.id, "en")),
+    malformed,
+    duplicateSame,
+    duplicateConflict,
+  };
 }
 
 function legacyInspection(parsed: Record<string, unknown>): PortableBackupInspectionResult | null {
@@ -748,12 +822,14 @@ export async function inspectPortableBackupText(
   if (manifest.format !== PORTABLE_BACKUP_FORMAT) {
     issue(issues, "error", "INVALID_FORMAT", "Dosya Portable MediaTracker backup formatında değil.", "manifest");
   }
-  if (manifest.version !== PORTABLE_BACKUP_VERSION) {
+  if (manifest.version !== 2 && manifest.version !== PORTABLE_BACKUP_VERSION) {
     issue(issues, "error", "UNSUPPORTED_VERSION", "Portable backup sürümü desteklenmiyor.", "manifest");
     summary.version = typeof manifest.version === "number" ? manifest.version : undefined;
     return result("unsupported-version", issues, summary);
   }
-  summary.version = PORTABLE_BACKUP_VERSION;
+  const portableVersion = manifest.version as 2 | 3;
+  summary.kind = portableVersion === 3 ? "portable-v3" : "portable-v2";
+  summary.version = portableVersion;
 
   if (
     typeof manifest.exportedAt !== "string"
@@ -774,6 +850,7 @@ export async function inspectPortableBackupText(
     || manifest.schemas.identityAliasRegistry !== 1
     || manifest.schemas.recordRedirectRegistry !== 1
     || manifest.schemas.recommendationLink !== 1
+    || (portableVersion === 3 && manifest.schemas.goal !== 1)
     || !Array.isArray(manifest.domains)
     || (manifest.ownerType !== "guest" && manifest.ownerType !== "authenticated")
   ) {
@@ -781,9 +858,14 @@ export async function inspectPortableBackupText(
     return result("invalid", issues, summary);
   }
 
+  const allowedDomains = portableVersion === 3 ? PORTABLE_BACKUP_DOMAINS : V2_DOMAINS;
+  if (portableVersion === 2 && data.goals !== undefined) {
+    issue(issues, "error", "UNDECLARED_DOMAIN", "Portable V2 goals domain'i taşıyamaz.", "goals");
+  }
+  const allowedDomainSet = new Set<string>(allowedDomains);
   const domains = manifest.domains.filter(
     (entry): entry is PortableBackupDomain =>
-      typeof entry === "string" && DOMAIN_SET.has(entry),
+      typeof entry === "string" && allowedDomainSet.has(entry),
   );
   if (
     domains.length !== manifest.domains.length
@@ -795,7 +877,7 @@ export async function inspectPortableBackupText(
   summary.domains = domains;
   summary.ownerType = manifest.ownerType;
   summary.personalNotesIncluded = manifest.privacy.personalNotesIncluded === true;
-  for (const domain of PORTABLE_BACKUP_DOMAINS) {
+  for (const domain of allowedDomains) {
     if (!domains.includes(domain) && data[domain] !== undefined) {
       issue(issues, "error", "UNDECLARED_DOMAIN", `Data içinde manifestte seçilmemiş domain var: ${domain}.`, domain);
     }
@@ -827,6 +909,7 @@ export async function inspectPortableBackupText(
   let aliases: MediaIdentityAliasRegistry | null = null;
   let redirects: MediaRecordRedirectRegistry | null = null;
   let links: PortableRecommendationLink[] = [];
+  let goals: Goal[] = [];
 
   for (const domain of domains) {
     const domainValue = data[domain];
@@ -897,6 +980,20 @@ export async function inspectPortableBackupText(
       summary.counts.recommendationLinks = links.length;
     }
   }
+  if (domains.includes("goals")) {
+    const decoded = decodePortableGoals(data.goals);
+    goals = decoded.goals;
+    summary.counts.goals = Array.isArray(data.goals) ? data.goals.length : 0;
+    if (decoded.malformed > 0) {
+      issue(issues, "warning", "GOAL_CODEC_INVALID", `${decoded.malformed} bozuk Goal kaydı import dışında bırakılacak.`, "goals");
+    }
+    if (decoded.duplicateSame > 0) {
+      issue(issues, "warning", "DUPLICATE_GOAL_ID_SAME", "Aynı payload taşıyan yinelenen Goal kayıtları bir kez değerlendirilecek.", "goals");
+    }
+    if (decoded.duplicateConflict > 0) {
+      issue(issues, "warning", "DUPLICATE_GOAL_ID_CONFLICT", "Aynı ID ve farklı payload taşıyan Goal kayıtları import dışında bırakılacak.", "goals");
+    }
+  }
 
   for (const domain of domains) {
     const expected = manifest.counts[domain];
@@ -942,6 +1039,8 @@ export async function inspectPortableBackupText(
     !mediaIds.has(entry.toRecordId)).length ?? 0;
   summary.relationships.missingRecommendationTargets = links.filter((entry) =>
     !mediaIds.has(entry.localMediaId)).length;
+  const missingGoalTargets = goals.filter((goal) =>
+    goal.scope.kind === "media" && !mediaIds.has(goal.scope.mediaRecordId)).length;
 
   if (summary.relationships.orphanProgressLogs > 0) {
     issue(issues, "warning", "ORPHAN_PROGRESS_LOG", "Backup orphan progress log içeriyor.", "progressLogs");
@@ -954,6 +1053,9 @@ export async function inspectPortableBackupText(
   }
   if (summary.relationships.missingRecommendationTargets > 0) {
     issue(issues, "warning", "MISSING_RECOMMENDATION_TARGET", "Recommendation link hedeflerinden bazıları backup media listesinde yok.", "recommendationLinks");
+  }
+  if (missingGoalTargets > 0) {
+    issue(issues, "warning", "GOAL_MEDIA_MISSING", "Bazı Goal kayıtlarının exact mediaRecordId hedefi backup içinde bulunmuyor; kayıt korunacak.", "goals");
   }
 
   summary.compatible = issues.every((entry) => entry.severity !== "error");
@@ -1010,6 +1112,9 @@ export async function decodePortableBackupForImport(
     }
     data.recommendationLinks = links;
   }
+  if (parsed.manifest.domains.includes("goals")) {
+    data.goals = decodePortableGoals(parsed.data.goals).goals;
+  }
   return {
     ok: true,
     manifest: parsed.manifest,
@@ -1022,5 +1127,5 @@ export function portableBackupFilename(exportedAt: string): string {
   const date = Number.isFinite(Date.parse(exportedAt))
     ? new Date(exportedAt).toISOString().slice(0, 10)
     : "unknown-date";
-  return `mediatracker-portable-v2-${date}.json`;
+  return `mediatracker-portable-v3-${date}.json`;
 }
