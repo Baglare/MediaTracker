@@ -76,6 +76,7 @@ let lastSyncAt: string | null = null;
 let online = typeof navigator !== "undefined" ? navigator.onLine : true;
 let onlineListenersAttached = false;
 let runtimeRolloutOverride: CloudRolloutContract | null = null;
+const activeDispatchIds = new Set<string>();
 
 const listeners = new Set<Listener>();
 let cachedSnapshot: SyncSnapshot = computeSnapshot();
@@ -128,7 +129,7 @@ function computeSnapshot(): SyncSnapshot {
       if (it.blockedConflict) {
         blocked++;
       } else {
-        if (it.dispatchStartedAt) inFlight++;
+        if (activeDispatchIds.has(it.id)) inFlight++;
         if (it.retryCount > 0) retryable++;
       }
     } else {
@@ -205,9 +206,21 @@ export function setOwnerScope(scope: LocalOwnerScope | null): void {
   if (ownerScope?.key === scope?.key) return;
   ownerScope = scope;
   ownerGeneration += 1;
+  activeDispatchIds.clear();
   quarantineLegacyOwnerlessQueue();
   notify();
   if (ownerScope?.kind === "user" && online) void flush();
+}
+
+/** Manual cloud transfers feed the same reactive read-model as queue flushes. */
+export function reportManualCloudTransfer(result: { ok: boolean; error?: string }): void {
+  if (result.ok) {
+    lastError = null;
+    lastSyncAt = new Date().toISOString();
+  } else {
+    lastError = result.error ? shortenError(result.error) : "Cloud aktarımı tamamlanamadı; yerel veriler korundu.";
+  }
+  notify();
 }
 
 export function setCloudRolloutRuntimeContract(
@@ -654,6 +667,7 @@ export async function flush(): Promise<void> {
   notify();
 
   const eligibleIds = new Set(eligible.map((item) => item.id));
+  eligibleIds.forEach((id) => activeDispatchIds.add(id));
   const dispatchStartedAt = new Date().toISOString();
   const queueBeforeDispatch = loadSyncQueue(flushScope);
   const markedQueue = queueBeforeDispatch.map((item) =>
@@ -669,6 +683,7 @@ export async function flush(): Promise<void> {
       throw new Error("dispatch_marker_verification_failed");
     }
   } catch {
+    eligibleIds.forEach((id) => activeDispatchIds.delete(id));
     syncing = false;
     lastError = "Cloud gönderim işareti kaydedilemedi.";
     notify();
@@ -710,6 +725,7 @@ export async function flush(): Promise<void> {
   }
 
   if (staleResponse) {
+    eligibleIds.forEach((id) => activeDispatchIds.delete(id));
     syncing = false;
     notify();
     if (ownerScope?.kind === "user" && online) void flush();
@@ -739,6 +755,7 @@ export async function flush(): Promise<void> {
   }
 
   syncing = false;
+  eligibleIds.forEach((id) => activeDispatchIds.delete(id));
   if (flushGeneration !== ownerGeneration) {
     notify();
     if (ownerScope?.kind === "user" && online) void flush();
@@ -752,6 +769,20 @@ export async function flush(): Promise<void> {
   }
   lastSyncAt = new Date().toISOString();
   notify();
+
+  // A mutation may be enqueued while this batch is in flight. Drain only those
+  // newly queued operations; failed items remain retryable and are not looped.
+  const hasNewEligible = next.some((item) =>
+    !eligibleIds.has(item.id)
+    && !item.blockedConflict
+    && item.ownerScope === flushScope.key
+    && item.userId === flushScope.userId
+    && (
+      (rollout.adapter === "v2" && item.transport === "cloud-v2")
+      || (rollout.adapter === "legacy" && item.transport === "legacy")
+    )
+  );
+  if (hasNewEligible && ownerScope?.key === flushScope.key && online) void flush();
 }
 
 /** Scoped queue modeli foreign kayıt silmez; legacy ownerless veri quarantine'de korunur. */

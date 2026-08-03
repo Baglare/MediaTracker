@@ -67,7 +67,7 @@ function queueItem(overrides: Partial<SyncQueueItem> = {}): SyncQueueItem {
 beforeEach(() => {
   vi.resetModules();
   vi.clearAllMocks();
-  vi.stubGlobal("window", {});
+  vi.stubGlobal("window", { addEventListener: vi.fn() });
   vi.stubGlobal("navigator", { onLine: true });
   vi.stubGlobal("localStorage", new MemoryStorage());
 });
@@ -234,6 +234,39 @@ describe("sync queue and manager", () => {
         dispatchStartedAt: expect.any(String),
       },
     ]);
+  });
+
+  it("reactively drains an operation enqueued while a flush is in flight", async () => {
+    const manager = await import("@/lib/sync-manager");
+    const queue = await import("@/lib/sync-queue");
+    const scope = createUserOwnerScope("user-a");
+    let resolveFirst!: (value: { ok: true }) => void;
+    cloudMocks.uploadMediaItems
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveFirst = resolve; }))
+      .mockResolvedValue({ ok: true });
+    manager.setUserId("user-a");
+
+    manager.enqueueMediaUpsert(mediaItem("m1"));
+    await vi.waitFor(() => expect(manager.getSnapshot().inFlight).toBe(1));
+    manager.enqueueMediaUpsert(mediaItem("m2"));
+    resolveFirst({ ok: true });
+
+    await vi.waitFor(() => expect(queue.loadSyncQueue(scope)).toEqual([]));
+    expect(cloudMocks.uploadMediaItems).toHaveBeenCalledTimes(2);
+    expect(manager.getSnapshot()).toMatchObject({ pending: 0, inFlight: 0, synced: true });
+  });
+
+  it("publishes manual transfer success through the shared snapshot", async () => {
+    const manager = await import("@/lib/sync-manager");
+    const listener = vi.fn();
+    const unsubscribe = manager.subscribe(listener);
+
+    manager.reportManualCloudTransfer({ ok: true });
+
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(manager.getSnapshot().lastSyncAt).toBeTruthy();
+    expect(manager.getSnapshot().lastError).toBeNull();
+    unsubscribe();
   });
 
   it("does not flush an item owned by another user", async () => {

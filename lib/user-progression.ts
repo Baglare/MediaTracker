@@ -15,6 +15,7 @@ export interface UserProgression {
   nextLevelXp: number;
   progressPercent: number;
   worldCounts: Record<UserProgressionWorld, number>;
+  worldMetric?: "media_count" | "xp";
 }
 
 type LegacyNoteItem = MediaItem & { notes?: unknown };
@@ -87,7 +88,9 @@ export function calculateUserProgression(
   mediaList: MediaItem[],
   progressLogs: ProgressLog[]
 ): UserProgression {
-  let totalXp = mediaList.length * 10 + progressLogs.length * 5;
+  // Aynı persisted log ID'sinin replay edilmesi local fallback XP'yi şişirmemeli.
+  const uniqueProgressLogCount = new Set(progressLogs.map((log) => log.id)).size;
+  let totalXp = mediaList.length * 10 + uniqueProgressLogCount * 5;
   const worldCounts: Record<UserProgressionWorld, number> = {
     east: 0,
     screen: 0,
@@ -128,5 +131,6 @@ export function calculateUserProgression(
     nextLevelXp,
     progressPercent: Math.min(1, Math.max(0, progressPercent)),
     worldCounts,
+    worldMetric: "media_count",
   };
 }

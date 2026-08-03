@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import type { SocialProfileEditorData } from "@/lib/social/types";
+import { loadOwnProfileCache, readOwnProfileCache, updateOwnProfileCache } from "@/lib/social/own-profile-cache";
+import type { OwnProfileSummary } from "@/lib/social/profile-summary";
 
 interface SocialAvatarSnapshot {
   userId: string;
@@ -18,13 +19,19 @@ const EMPTY: SocialAvatarSnapshot = {
 };
 
 async function fetchSocialAvatarSnapshot(userId: string): Promise<SocialAvatarSnapshot> {
-  const response = await fetch("/api/social/profile", { cache: "no-store" });
-  if (!response.ok) throw new Error("social_profile_unavailable");
-  const data = await response.json() as SocialProfileEditorData;
+  const summary = await loadOwnProfileCache<OwnProfileSummary>({
+    ownerId: userId,
+    resource: "summary",
+    fetcher: async () => {
+      const response = await fetch("/api/social/profile/summary", { cache: "no-store" });
+      if (!response.ok) throw new Error("social_profile_unavailable");
+      return response.json() as Promise<OwnProfileSummary>;
+    },
+  });
   return {
     userId,
-    hasSocialProfile: Boolean(data.profile),
-    socialAvatarUrl: data.profile?.avatarUrl,
+    hasSocialProfile: Object.keys(summary).length > 0,
+    socialAvatarUrl: summary.avatarUrl,
     loading: false,
   };
 }
@@ -48,6 +55,8 @@ export function useSocialAvatar(configured: boolean, userId: string | null) {
   useEffect(() => {
     if (!configured || !userId) return;
     let active = true;
+    const cached = readOwnProfileCache<OwnProfileSummary>(userId, "summary");
+    if (cached) queueMicrotask(() => setSnapshot({ userId, hasSocialProfile: true, socialAvatarUrl: cached.avatarUrl, loading: false }));
     fetchSocialAvatarSnapshot(userId)
       .then((next) => { if (active) setSnapshot(next); })
       .catch(() => { /* Keep the last in-memory/local fallback when offline. */ });
@@ -62,6 +71,7 @@ export function useSocialAvatar(configured: boolean, userId: string | null) {
 
   const updateSocialAvatar = useCallback((socialAvatarUrl: string | undefined) => {
     if (!userId) return;
+    updateOwnProfileCache(userId, { avatarUrl: socialAvatarUrl });
     setSnapshot((previous) => ({
       userId,
       hasSocialProfile: true,

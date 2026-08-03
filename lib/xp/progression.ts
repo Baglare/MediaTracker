@@ -133,6 +133,7 @@ export function summaryToLegacyProgression(summary: XpDashboardSummary): UserPro
     nextLevelXp,
     progressPercent: nextLevelXp > 0 ? Math.min(1, Math.max(0, currentLevelXp / nextLevelXp)) : 0,
     worldCounts,
+    worldMetric: "xp",
   };
 }
 

@@ -29,6 +29,7 @@ import {
   performCloudMerge,
   performCloudUpload,
 } from "@/lib/supabase/cloud-actions";
+import { reportManualCloudTransfer } from "@/lib/sync-manager";
 
 interface CloudDataStatusCardProps {
   user: User | null;
@@ -189,6 +190,7 @@ export default function CloudDataStatusCard({
         setBusy("upload");
         showBanner(null);
         const res = await performCloudUpload(user.id, mediaItems, progressLogs);
+        reportManualCloudTransfer({ ok: res.ok, error: res.ok ? undefined : res.message });
         setBusy(null);
         showBanner({ kind: res.ok ? "success" : "error", text: res.message });
         if (res.ok) void refresh();
@@ -206,13 +208,16 @@ export default function CloudDataStatusCard({
         const res = await performCloudDownload(user.id);
         setBusy(null);
         if (!res.ok) {
+          reportManualCloudTransfer({ ok: false, error: res.message });
           showBanner({ kind: "error", text: res.message });
           return;
         }
         if (!onReplaceData(res.mediaItems, res.progressLogs)) {
+          reportManualCloudTransfer({ ok: false, error: "Cloud verisi indirildi ancak güvenli local write tamamlanamadı." });
           showBanner({ kind: "error", text: "Cloud verisi indirildi ancak güvenli local write tamamlanamadı." });
           return;
         }
+        reportManualCloudTransfer({ ok: true });
         showBanner({ kind: "success", text: res.message });
         void refresh();
       }
@@ -229,13 +234,16 @@ export default function CloudDataStatusCard({
         const res = await performCloudMerge(user.id, mediaItems, progressLogs);
         setBusy(null);
         if (!res.ok) {
+          reportManualCloudTransfer({ ok: false, error: res.message });
           showBanner({ kind: "error", text: res.message });
           return;
         }
         if (!onReplaceData(res.mediaItems, res.progressLogs)) {
+          reportManualCloudTransfer({ ok: false, error: "Cloud birleştirmesi hazırlandı ancak güvenli local write tamamlanamadı." });
           showBanner({ kind: "error", text: "Cloud birleştirmesi hazırlandı ancak güvenli local write tamamlanamadı." });
           return;
         }
+        reportManualCloudTransfer({ ok: true });
         showBanner({ kind: "success", text: res.message });
         void refresh();
       }

@@ -6,6 +6,7 @@ import { UnifiedProfileEditor } from "@/components/profile/unified-profile-edito
 import { useMediaLibrary } from "@/hooks/use-media-library";
 import type { ProfilePreferences } from "@/lib/profile-preferences";
 import { publishOwnProfileSummary } from "@/lib/social/profile-summary";
+import { updateOwnProfileCache } from "@/lib/social/own-profile-cache";
 import type { SocialProfileEditorData } from "@/lib/social/types";
 import { calculateUserProgression, type UserProgression } from "@/lib/user-progression";
 
@@ -33,14 +34,18 @@ export function ProfileEditorPanel({ authConfigured, authenticated, userId, loca
       if (!response.ok) throw new Error("profile_unavailable");
       const next = await response.json() as SocialProfileEditorData;
       setCloud(next);
-      if (next.profile) publishOwnProfileSummary({ ...next.profile, avatarTransform: next.profile.presentation.avatarTransform });
+      if (next.profile && userId) {
+        const summary = { ...next.profile, avatarTransform: next.profile.presentation.avatarTransform };
+        updateOwnProfileCache(userId, summary);
+        publishOwnProfileSummary(summary);
+      }
       setState("ready");
       return next;
     } catch {
       setState("offline");
       return undefined;
     }
-  }, [authConfigured, authenticated]);
+  }, [authConfigured, authenticated, userId]);
 
   // eslint-disable-next-line react-hooks/set-state-in-effect -- loadCloud owns the explicit remote editor state.
   useEffect(() => { void loadCloud(); }, [loadCloud]);

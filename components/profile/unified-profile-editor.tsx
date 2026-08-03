@@ -27,6 +27,8 @@ import { CONNECTION_COLORS, PROFILE_VISIBILITIES, type ProfileModuleLayout, type
 import { validateSocialProfileInput } from "@/lib/social/validation";
 import type { MediaItem } from "@/lib/types";
 import type { UserProgression } from "@/lib/user-progression";
+import { updateOwnProfileCache } from "@/lib/social/own-profile-cache";
+import { publishOwnProfileSummary } from "@/lib/social/profile-summary";
 
 const EMPTY: SocialProfileEditorData = { configured: false, authenticated: false, modules: [], favorites: [], current: [], sharedNotes: [], blockedAccounts: [] };
 const INPUT_CLASS = "app-input mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-focus)]";
@@ -112,6 +114,7 @@ export function UnifiedProfileEditor({ initialData, authConfigured, authenticate
       if (!response.ok) throw new Error(result.message ?? "Banner yüklenemedi.");
       if (!result.url) throw new Error("Banner kaydedildi ancak güvenli önizleme bağlantısı üretilemedi.");
       setData((current) => current.profile ? { ...current, profile: { ...current.profile, bannerUrl: result.url } } : current);
+      if (userId) updateOwnProfileCache(userId, { bannerUrl: result.url });
       setForm((current) => updatePresentation(
         updatePresentation(current, "bannerMode", "image"),
         "bannerTransform",
@@ -143,6 +146,8 @@ export function UnifiedProfileEditor({ initialData, authConfigured, authenticate
       </section>
 
       <ProfileSettingsCard preferences={localPreferences} profileName={form.displayName || profileName} automaticTitle={selectedTitle} onChange={onLocalPreferencesChange} authenticated={authenticated} userId={userId} hasSocialProfile={cloudReady} socialAvatarUrl={data.profile?.avatarUrl ?? socialAvatarUrl} avatarTransform={form.presentation.avatarTransform} onSocialAvatarChanged={(avatarUrl) => {
+        if (userId) updateOwnProfileCache(userId, { avatarUrl });
+        publishOwnProfileSummary({ avatarUrl });
         setData((current) => current.profile ? { ...current, profile: { ...current.profile, avatarUrl } } : current);
         setForm((current) => ({ ...current, presentation: { ...current.presentation, avatarTransform: defaultImageTransform() } }));
       }} showIdentityFields={false} />

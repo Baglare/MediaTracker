@@ -41,7 +41,9 @@ export default function CloudSyncStatusCard({
   const sync = useSyncStatus();
 
   const isCloudReady = configured && !!user;
-  const headerLabel = isCloudReady ? "Cloud Hazır" : "Yerel Mod";
+  const headerLabel = isCloudReady
+    ? sync.synced && sync.rolloutStatus === "ready" ? "Cloud Hazır" : "Cloud Bağlı"
+    : "Yerel Mod";
 
   let description: string;
   if (!configured) {
@@ -56,6 +58,10 @@ export default function CloudSyncStatusCard({
       "Bazı Cloud V2 işlemleri kullanıcı kararı bekliyor. Blocked işlemler otomatik retry edilmez.";
   } else if (sync.pending > 0 && !sync.online) {
     description = "Çevrimdışısın. Bekleyen cloud işlemleri internet geldiğinde otomatik gönderilecek.";
+  } else if (sync.inFlight > 0) {
+    description = "Yerel kayıt korundu; cloud kuyruğundaki işlemler şu anda gönderiliyor.";
+  } else if (sync.retryable > 0) {
+    description = "Yerel kayıt korundu. Cloud işlemi ağ yeniden uygun olduğunda tekrar denenecek.";
   } else if (sync.pending > 0) {
     description =
       "Bekleyen cloud işlemleri arka planda gönderiliyor. " +
@@ -91,7 +97,7 @@ export default function CloudSyncStatusCard({
     };
   } else if (sync.pending > 0) {
     statusBadge = {
-      text: "Bekliyor",
+      text: "Cloud kuyruğunda",
       cls: "text-amber-300 bg-amber-500/10 ring-1 ring-amber-500/30",
     };
   } else if (isCloudReady) {

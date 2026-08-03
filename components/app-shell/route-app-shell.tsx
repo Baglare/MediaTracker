@@ -18,6 +18,7 @@ import { useOwnedProfilePreferences } from "@/hooks/use-owned-profile-preference
 import { useXpProgression } from "@/hooks/use-xp-progression";
 import { resolveProfileIdentity } from "@/lib/personalization/profile-identity";
 import { PROFILE_SUMMARY_EVENT, type OwnProfileSummary } from "@/lib/social/profile-summary";
+import { loadOwnProfileCache, readOwnProfileCache, updateOwnProfileCache } from "@/lib/social/own-profile-cache";
 import { calculateUserProgression } from "@/lib/user-progression";
 
 const EMPTY_PROGRESSION = calculateUserProgression([], []);
@@ -54,6 +55,7 @@ export function RouteAppShell({ children }: { children: ReactNode }) {
     const onSummary = (event: Event) => {
       if (!auth.user) return;
       const summary = (event as CustomEvent<OwnProfileSummary>).detail;
+      updateOwnProfileCache(auth.user.id, summary);
       setCloudIdentity((current) => ({ ...current, ...summary }));
       setCloudOwnerId(auth.user.id);
       summaryUserId.current = auth.user?.id ?? null;
@@ -74,16 +76,21 @@ export function RouteAppShell({ children }: { children: ReactNode }) {
     if (pathname === "/profile" || summaryUserId.current === auth.user.id) return;
     summaryUserId.current = auth.user.id;
     const ownerId = auth.user.id;
+    const cached = readOwnProfileCache<OwnProfileSummary>(ownerId, "summary");
     queueMicrotask(() => {
       setCloudOwnerId(ownerId);
-      setCloudIdentity(undefined);
+      setCloudIdentity(cached);
     });
     let active = true;
-    fetch("/api/social/profile/summary", { cache: "no-store" })
-      .then((response) => {
+    loadOwnProfileCache({
+      ownerId,
+      resource: "summary",
+      fetcher: async () => {
+        const response = await fetch("/api/social/profile/summary", { cache: "no-store" });
         if (!response.ok) throw new Error("profile_summary_unavailable");
         return response.json() as Promise<OwnProfileSummary>;
-      })
+      },
+    })
       .then((summary) => { if (active) setCloudIdentity(summary); })
       .catch(() => { if (active) summaryUserId.current = null; });
     return () => { active = false; };

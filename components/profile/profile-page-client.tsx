@@ -13,6 +13,7 @@ import { defaultProfilePresentationPreferences } from "@/lib/personalization/def
 import { resolveProfileIdentity } from "@/lib/personalization/profile-identity";
 import { resolveProfileDisplayName, resolveSelectedTitle } from "@/lib/profile-preferences";
 import { publishOwnProfileSummary, type OwnProfileHeroData } from "@/lib/social/profile-summary";
+import { loadOwnProfileCache, readOwnProfileCache, updateOwnProfileCache } from "@/lib/social/own-profile-cache";
 import { calculateUserProgression, type UserProgression } from "@/lib/user-progression";
 
 const EMPTY_PROGRESSION = calculateUserProgression([], []);
@@ -49,18 +50,25 @@ export function ProfilePageClient({ initialMode = "view" }: { initialMode?: "vie
     }
     const ownerId = auth.user.id;
     const controller = new AbortController();
+    const cached = readOwnProfileCache<OwnProfileHeroData>(ownerId, "hero");
     queueMicrotask(() => {
       setHeroOwnerId(ownerId);
-      setHeroData(undefined);
-      setCloudState("loading");
+      setHeroData(cached);
+      setCloudState(cached ? "ready" : "loading");
     });
-    fetch("/api/social/profile/hero", { cache: "no-store", signal: controller.signal })
-      .then(async (response) => {
+    loadOwnProfileCache({
+      ownerId,
+      resource: "hero",
+      fetcher: async () => {
+        const response = await fetch("/api/social/profile/hero", { cache: "no-store", signal: controller.signal });
         if (!response.ok) throw new Error("profile_hero_unavailable");
         return response.json() as Promise<OwnProfileHeroData>;
-      })
+      },
+    })
       .then((next) => {
+        if (controller.signal.aborted) return;
         setHeroData(next);
+        updateOwnProfileCache(ownerId, next);
         publishOwnProfileSummary(next);
         setCloudState("ready");
       })
