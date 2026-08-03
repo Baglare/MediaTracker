@@ -88,12 +88,12 @@ Codec strict allowlist kullanır; bilinmeyen Goal alanları reddedilir. Goal ID 
 
 ## Owner-scoped local persistence kararı
 
-D5-2/D5-4 için önerilen yol mevcut personal-data safe-write desenidir:
+D5-2 bu kararı [GOAL_SYSTEM_LOCAL_PERSISTENCE.md](./GOAL_SYSTEM_LOCAL_PERSISTENCE.md) sözleşmesiyle uyguladı:
 
-- Registry domain'i: `goals` (D5-1'de `PersonalDataDomain` union'ına eklenmedi).
+- Registry domain'i: `goals`.
 - Önerilen current key: `mediaTracker:personal:v1:<guest|user-{id}>:goals`.
 - Envelope mevcut `mediatracker-personal-data` owner scope, `current/temp/backup`, temp read-back ve rollback davranışını kullanır.
-- Envelope `value`, versioned `GoalDocument` taşır; domain codec doğrudan localStorage'a bağlı değildir.
+- Envelope `value`, owner ve `savedAt` taşıyan versioned Goal store document'ını taşır; her kayıt D5-1 domain codec'iyle doğrulanır ve domain codec doğrudan localStorage'a bağlı değildir.
 - Malformed current overwrite edilmez. Raw kayıt `mediaTracker:quarantine:personal:goals:<timestamp>` altında karantinaya alınır; guest ve account owner verileri birbirine yeniden etiketlenmez.
 - Account switch sırasında eski owner verisi hydration tamamlanmadan görünmez. Guest Goal'ları login ile otomatik kullanıcı Goal'ına dönüşmez; mevcut explicit ownership kararı uygulanır.
 

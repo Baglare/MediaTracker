@@ -58,13 +58,30 @@ describe("D4-2 card title and badge taxonomy", () => {
 describe("D4-2 light theme identity and contrast", () => {
   const ids = ["porcelain", "dusty_rose", "lavender", "polar", "sepia"] as const;
 
-  it("keeps each light preset's real surfaces distinct", () => {
+  it("keeps each light preset distinct while using closely related internal surfaces", () => {
     const backgrounds = ids.map((id) => getBaseThemeDefinition(id).tokens.background);
     expect(new Set(backgrounds).size).toBe(ids.length);
+    const accents = ids.map((id) => getBaseThemeDefinition(id).tokens.accent);
+    expect(new Set(accents).size).toBe(ids.length);
     for (const id of ids) {
       const tokens = getBaseThemeDefinition(id).tokens;
-      expect(new Set([tokens.background, tokens.surface1, tokens.surface2, tokens.surface3]).size).toBe(4);
-      expect(Math.abs(relativeLuminance(tokens.surface1) - relativeLuminance(tokens.surface2))).toBeGreaterThan(0.04);
+      const surfaces = [tokens.background, tokens.surface1, tokens.surface2, tokens.surface3, tokens.elevated];
+      expect(new Set(surfaces).size).toBe(surfaces.length);
+      const luminances = surfaces.map(relativeLuminance);
+      expect(Math.max(...luminances) - Math.min(...luminances), id).toBeLessThan(0.24);
+    }
+  });
+
+  it("keeps Porcelain near neutral white without the old yellow cast", () => {
+    const tokens = getBaseThemeDefinition("porcelain").tokens;
+    expect(tokens.background).toBe("#f2f3f5");
+    expect(tokens.surface1).toBe("#fcfcfb");
+    expect(tokens.elevated).toBe("#ffffff");
+    expect(tokens.accent).toBe("#245fa8");
+    for (const color of [tokens.background, tokens.surface1, tokens.surface2, tokens.elevated]) {
+      const [red, green, blue] = color.match(/[0-9a-f]{2}/gi)!.map((part) => Number.parseInt(part, 16));
+      expect(Math.abs(red - green)).toBeLessThanOrEqual(2);
+      expect(green - blue).toBeLessThanOrEqual(2);
     }
   });
 
@@ -83,9 +100,19 @@ describe("D4-2 light theme identity and contrast", () => {
   });
 
   it("copies updated preset inputs without migrating existing custom themes", () => {
-    expect(PRESET_THEME_INPUTS.porcelain).toMatchObject({ background: "#E8E1D4", surface: "#F8F4EA", accent: "#245FA8" });
+    expect(PRESET_THEME_INPUTS.porcelain).toMatchObject({ background: "#F2F3F5", surface: "#FCFCFB", accent: "#245FA8" });
     expect(read("components/personalization/theme-studio.tsx")).toContain("inputs: { ...PRESET_THEME_INPUTS[resolvedId] }");
     expect(read("lib/personalization/custom-themes.ts")).not.toContain("PRESET_THEME_INPUTS");
+    const preview = read("components/personalization/theme-studio.tsx");
+    for (const token of ["background", "surface2", "accent", "secondaryAccent"]) {
+      expect(preview).toContain(`preview.tokens.${token}`);
+    }
+  });
+
+  it("does not change dark preset token contracts", () => {
+    expect(getBaseThemeDefinition("obsidian").tokens).toMatchObject({ background: "#09090b", surface1: "#18181b", accent: "#8b5cf6" });
+    expect(getBaseThemeDefinition("ocean").tokens).toMatchObject({ background: "#06111f", surface1: "#0b1b2d", accent: "#0ea5e9" });
+    expect(PRESET_THEME_INPUTS.forest).toEqual({ colorScheme: "dark", background: "#10231C", surface: "#183128", accent: "#7FA56F", secondaryAccent: "#B1845A" });
   });
 });
 

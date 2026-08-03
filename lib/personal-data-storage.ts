@@ -19,7 +19,8 @@ export type PersonalDataDomain =
   | "integrityRepairJournal"
   | "portableImportJournal"
   | "cloudMediaV2State"
-  | "releaseCalendarCache";
+  | "releaseCalendarCache"
+  | "goals";
 
 export interface PersonalStorageLike {
   getItem(key: string): string | null;
@@ -196,6 +197,40 @@ export function inspectPersonalData<T>(
   };
 }
 
+/** Read-only recovery-slot inspection; it never quarantines or promotes data. */
+export function inspectPersonalDataSlot<T>(
+  scope: LocalOwnerScope,
+  domain: PersonalDataDomain,
+  codec: PersonalDataCodec<T>,
+  slot: "temp" | "backup",
+  storage: Pick<PersonalStorageLike, "getItem"> | null = browserStorage(),
+): PersonalDataReadResult<T> {
+  const key = buildPersonalDataKeys(domain, scope)[slot];
+  if (!storage) {
+    return { status: "storage_unavailable", sourceKey: key, message: "Tarayici local storage kullanilamiyor." };
+  }
+  let raw: string | null;
+  try {
+    raw = storage.getItem(key);
+  } catch {
+    return { status: "storage_unavailable", sourceKey: key, message: "Kisisel veri recovery slotu okunamadi." };
+  }
+  if (raw === null) return { status: "missing", sourceKey: key };
+  const decoded = decodeEnvelope(raw, domain, scope, codec);
+  if (decoded.ok) {
+    return { status: "valid", sourceKey: key, data: decoded.value, writtenAt: decoded.writtenAt };
+  }
+  return decoded.ownerMismatch
+    ? { status: "owner_mismatch", sourceKey: key, message: decoded.message }
+    : {
+        status: "corrupt",
+        sourceKey: key,
+        message: decoded.message,
+        diagnosticCode: decoded.code,
+        repairData: decoded.repairData,
+      };
+}
+
 function quarantineRaw(
   storage: PersonalStorageLike,
   domain: PersonalDataDomain,
@@ -301,6 +336,7 @@ function writePersonalDataInternal<T>(
   codec: PersonalDataCodec<T>,
   previousCodec: PersonalDataCodec<T>,
   storage: PersonalStorageLike | null = browserStorage(),
+  allowCorruptPrevious = false,
 ): StorageWriteResult {
   if (!storage || !isLocalOwnerScope(scope)) {
     return {
@@ -370,7 +406,8 @@ function writePersonalDataInternal<T>(
   }
   let backupCreated = false;
   if (previous !== null) {
-    if (!decodeEnvelope(previous, domain, scope, previousCodec).ok) {
+    const previousDecoded = decodeEnvelope(previous, domain, scope, previousCodec);
+    if (!previousDecoded.ok && !allowCorruptPrevious) {
       removeQuietly(storage, keys.temp);
       return {
         ok: false,
@@ -379,24 +416,26 @@ function writePersonalDataInternal<T>(
         recoverable: true,
       };
     }
-    try {
-      storage.setItem(keys.backup, previous);
-      if (
-        storage.getItem(keys.backup) !== previous
-        || !decodeEnvelope(previous, domain, scope, previousCodec).ok
-      ) {
+    if (previousDecoded.ok) {
+      try {
+        storage.setItem(keys.backup, previous);
+        if (
+          storage.getItem(keys.backup) !== previous
+          || !decodeEnvelope(previous, domain, scope, previousCodec).ok
+        ) {
+          removeQuietly(storage, keys.temp);
+          return {
+            ok: false,
+            code: "verification_failed",
+            message: "Kisisel veri backup slotu dogrulanamadi.",
+            recoverable: true,
+          };
+        }
+        backupCreated = true;
+      } catch (error) {
         removeQuietly(storage, keys.temp);
-        return {
-          ok: false,
-          code: "verification_failed",
-          message: "Kisisel veri backup slotu dogrulanamadi.",
-          recoverable: true,
-        };
+        return writeFailure(error, "Kisisel veri backup slotu olusturulamadi.");
       }
-      backupCreated = true;
-    } catch (error) {
-      removeQuietly(storage, keys.temp);
-      return writeFailure(error, "Kisisel veri backup slotu olusturulamadi.");
     }
   }
 
@@ -467,4 +506,43 @@ export function writeRepairedPersonalData<T>(
     recoveryCodec,
     storage,
   );
+}
+
+/**
+ * Explicit post-quarantine recovery path. A corrupt current slot may be
+ * replaced only after the caller has read/quarantined it and selected a
+ * verified repaired or recovery-slot value. Invalid raw data is never copied
+ * into backup; quarantine remains the evidence trail.
+ */
+export function writeRecoveredPersonalData<T>(
+  scope: LocalOwnerScope,
+  domain: PersonalDataDomain,
+  value: T,
+  codec: PersonalDataCodec<T>,
+  quarantineKey: string | undefined,
+  storage: PersonalStorageLike | null = browserStorage(),
+): StorageWriteResult {
+  const expectedPrefix = `mediaTracker:quarantine:personal:${domain}:`;
+  let evidence: unknown;
+  try {
+    evidence = storage && quarantineKey?.startsWith(expectedPrefix)
+      ? JSON.parse(storage.getItem(quarantineKey) ?? "null")
+      : null;
+  } catch {
+    evidence = null;
+  }
+  const keys = buildPersonalDataKeys(domain, scope);
+  if (!isRecord(evidence)
+    || evidence.format !== "mediatracker-personal-quarantine"
+    || evidence.version !== 1
+    || evidence.domain !== domain
+    || evidence.sourceKey !== keys.current) {
+    return {
+      ok: false,
+      code: "verification_failed",
+      message: "Karantina kanıtı doğrulanmadan corrupt current değiştirilemez.",
+      recoverable: true,
+    };
+  }
+  return writePersonalDataInternal(scope, domain, value, codec, codec, storage, true);
 }

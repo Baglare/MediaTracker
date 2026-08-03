@@ -13,6 +13,7 @@ import {
   Settings,
   Sparkles,
   Star,
+  Target,
   TrendingUp,
   UserRound,
   Users,
@@ -42,7 +43,8 @@ export type AppNavigationId =
   | "recommendations"
   | "notifications"
   | "people"
-  | "progression";
+  | "progression"
+  | "goals";
 
 export type AppNavigationSection = "general" | "social" | "personal" | "assistants";
 
@@ -99,6 +101,7 @@ export const APP_NAVIGATION_ITEMS: readonly AppNavigationItem[] = [
   { id: "notifications", label: "Bildirimler", icon: Bell, section: "social", authRequired: true, unread: true, destination: { kind: "route", href: "/notifications", activeMatch: "prefix" } },
   { id: "people", label: "Kullanıcı Ara", icon: Users, section: "social", authRequired: false, destination: { kind: "route", href: "/people", activeMatch: "prefix" } },
   { id: "progression", label: "İlerleme", icon: TrendingUp, section: "personal", authRequired: true, destination: { kind: "route", href: "/progression", activeMatch: "prefix" } },
+  { id: "goals", label: "Hedefler", icon: Target, section: "personal", authRequired: false, destination: { kind: "route", href: "/goals", activeMatch: "prefix" } },
   dashboardItem("watchlist", "İzleme Listem", ListChecks, "personal"),
   dashboardItem("favorites", "Favorilerim", Heart, "personal"),
   dashboardItem("ratings", "Puanlamalarım", Star, "personal"),

@@ -34,15 +34,17 @@ describe("D4-3 card stabilization", () => {
 describe("D4-3 light theme identity", () => {
   it("keeps preset backgrounds and surfaces visibly distinct", () => {
     expect(PRESET_THEME_INPUTS).toMatchObject({
-      porcelain: { background: "#E8E1D4", surface: "#F8F4EA" },
-      dusty_rose: { background: "#DFC5CD", surface: "#F1DDE3" },
-      lavender: { background: "#D4C9E7", surface: "#EDE6F5" },
-      polar: { background: "#CDE1E9", surface: "#E7F2F5" },
-      sepia: { background: "#E8D5B6", surface: "#F6E8D0" },
+      porcelain: { background: "#F2F3F5", surface: "#FCFCFB" },
+      dusty_rose: { background: "#EAD9DE", surface: "#F4E8EB" },
+      lavender: { background: "#E4DDEF", surface: "#F1EDF7" },
+      polar: { background: "#DCEBEF", surface: "#EEF6F7" },
+      sepia: { background: "#EADFCF", surface: "#F5ECDF" },
     });
     for (const id of LIGHT_IDS) {
       const tokens = getBaseThemeDefinition(id).tokens;
-      expect(Math.abs(relativeLuminance(tokens.surface1) - relativeLuminance(tokens.surface2)), id).toBeGreaterThan(0.08);
+      const surfaceDifference = Math.abs(relativeLuminance(tokens.surface1) - relativeLuminance(tokens.surface2));
+      expect(surfaceDifference, id).toBeGreaterThan(0.005);
+      expect(surfaceDifference, id).toBeLessThan(0.12);
       expect(tokens.panelBackground).not.toBe(tokens.cardBackground);
     }
   });

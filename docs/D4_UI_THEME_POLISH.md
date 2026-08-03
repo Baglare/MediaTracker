@@ -16,13 +16,13 @@ Her medya ana tür rozeti taşır. Alt tür yalnız yapılandırılmış `subTyp
 
 ## Açık tema kimlikleri
 
-- Porselen: sıcak fildişi zemin, kırık beyaz yüzey, çini mavisi ve kontrollü turkuaz.
-- Tozpembe: toz pembe zemin, pembe-krem kart, koyu gül kurusu vurgu.
+- Porselen: sarı/fildişi kayması azaltılmış nötr, gerçek beyaza yakın porselen yüzeyler; çini mavisi ve kontrollü turkuaz kimliği korunur.
+- Tozpembe: toz pembe zemin, yakın akraba pudra kart katmanları, koyu gül kurusu vurgu.
 - Lavanta: soğuk lavanta zemin, açık lila yüzey, koyu erik vurgu.
 - Kutup: buz mavisi zemin, sisli mavi-beyaz yüzey, petrol/turkuaz vurgu.
 - Sepya: korunan parşömen kimliği, ayrıştırılmış kart/input katmanları ve güçlü terracotta-mürekkep kontrastı.
 
-Preset kimliği merkezi tema kayıt defterindeki background, surface, elevated, border, input, hover, selected, focus ve durum tokenlarından gelir. D4-3 yüzey farklarını güçlendirdi; Dashboard özetleri ile Yolculuk kartı anlamsal panel/card ve durum tokenlarını tüketir. Hazır temayı özel temaya kopyalama güncel temel girdileri kullanır; mevcut özel tema kayıtları değiştirilmez. Önizleme şeridi gerçek background, surface2, accent ve secondaryAccent değerlerini gösterir.
+Preset kimliği merkezi tema kayıt defterindeki background, surface, elevated, border, input, hover, selected, focus ve durum tokenlarından gelir. D5-2 açık tema rötuşu Tozpembe, Lavanta, Kutup ve Sepya'nın kendi içindeki yüzey luminance farklarını azalttı; katman ayrımı border, shadow ve semantic panel/card tokenlarıyla sürer. Koyu presetler ve mevcut custom theme kayıtları değiştirilmedi. Hazır temayı özel temaya kopyalama güncel temel girdileri kullanır; önizleme şeridi gerçek background, surface2, accent ve secondaryAccent değerlerini gösterir.
 
 ## Logo, yayın özeti ve metrikler
 
