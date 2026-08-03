@@ -1,6 +1,8 @@
 # Cloud Media Schema V2 Planı
 
-Bu belge D2A salt-okunur denetiminin sonucudur. Kanıtlar yalnız repository içindeki `supabase/schema.sql`, `supabase/migrations/`, `lib/supabase/`, local sync queue ve ilgili XP/social/recommendation kodundan gelir. Canlı Supabase projesine bağlanılmadı; production şeması, policy'leri, veri dağılımı ve uygulanmış migration listesi **doğrulanamadı**.
+> **Güncel durum:** Bu belgenin D2A risk analizi tarihsel başlangıç fotoğrafıdır. Proje kilometre taşı kaydına göre D2B.0 ilişki onarımı ve D2B.1 additive Cloud Media V2 migration'ı production veritabanına uygulanmıştır. D2C.1 owner-scoped primary key enforcement ve production cutover uygulanmamıştır; [ROADMAP.md](./ROADMAP.md) uyarınca D8 aşamasındadır. Bu dokümantasyon turunda canlı veritabanına bağlanılmamıştır.
+
+Bu belge D2A salt-okunur denetiminin sonucudur. Aşağıdaki “mevcut” ifadeleri D2A anındaki legacy başlangıç durumunu anlatır; güncel rollout durumu için [Cloud Media Schema V2 Migration Runbook](./CLOUD_MEDIA_SCHEMA_V2_MIGRATION_RUNBOOK.md) esas alınır. D2A kanıtları yalnız repository içindeki `supabase/schema.sql`, `supabase/migrations/`, `lib/supabase/`, local sync queue ve ilgili XP/social/recommendation kodundan gelmiştir.
 
 ## 1. Mevcut tablo ve sync haritası
 

@@ -1,8 +1,8 @@
 # Cloud Media Schema V2 Migration Runbook
 
-Bu belge D2B.1 additive migration paketinin rollback/roll-forward sınırını tanımlar. Paket boş test projesinde doğrulanmıştır; production'a uygulanmamıştır.
+Bu belge D2B.1 additive migration paketinin rollback/roll-forward sınırını ve D8'de yapılacak D2C.1 production cutover hazırlığını tanımlar. Proje kilometre taşı kaydına göre D2B.0 ve D2B.1 production veritabanına uygulanmıştır; tekrar uygulanmamalıdır. D2C.1 production'a uygulanmamıştır ve D8 release aşamasına bırakılmıştır. Bu dokümantasyon turunda canlı DB doğrulaması yapılmamıştır.
 
-## Uygulama sırası
+## D2B.1 tarihsel uygulama/doğrulama sırası
 
 1. Staging/production üzerinde `supabase/d2b1_cloud_media_v2_preflight.sql` read-only çalıştırılır.
 2. Preflight row count, owner-record fingerprint, orphan/cross-owner ilişki ve RLS çıktıları saklanır.
@@ -89,14 +89,14 @@ Migration direct `INSERT/UPDATE/DELETE` yetkilerini `anon` ve `authenticated` ro
 - Production flag migration sonrasında legacy'ye çevrilmez. Uygulama rollback'i gerekiyorsa V2 RPC sözleşmesini koruyan önceki istemci sürümü kullanılmalıdır.
 - Canlı DB uygulaması, backup/PITR kanıtı ve iki kullanıcı smoke sonucu bu repository paketinin dışında operasyonel onay gerektirir.
 
-## D2C.2 production cutover
+## D8 production cutover — D2C.1 enforcement
 
 Production geçişi aşağıdaki sıradan sapmadan yapılır:
 
-1. Production migration geçmişi doğrulanır; D2B.1 ve D2C.1 read-only preflight sonuçları proje referansı ile arşivlenir.
+1. Production migration geçmişi doğrulanır; uygulanmış D2B.0/D2B.1 kayıtları ve D2C.1 read-only preflight sonuçları proje referansı ile arşivlenir.
 2. PITR/backup geri yükleme noktası oluşturulur ve erişilebilirliği doğrulanır.
-3. D2B.1 additive migration uygulanır; post-verification tamamlanır.
-4. D2C.2 guard içeren uygulama `NEXT_PUBLIC_CLOUD_MEDIA_SCHEMA_STAGE=d2b1` ve V2 flag kapalı olarak deploy edilir.
+3. D2B.1 additive şema yeniden uygulanmadan post-verification ile doğrulanır.
+4. Rollout guard içeren uygulama `NEXT_PUBLIC_CLOUD_MEDIA_SCHEMA_STAGE=d2b1` sözleşmesiyle kontrollü release adayı olarak doğrulanır.
 5. `NEXT_PUBLIC_CLOUD_MEDIA_V2_ENABLED=true` kontrollü rollout ile açılır; production varsayılanı repository içinde değiştirilmez.
 6. İki kullanıcıyla media/progress, RLS, CAS conflict, tombstone ve restore smoke'u çalıştırılır.
 7. Legacy direct DML trafiğinin kalmadığı gözlem/DB audit kanıtıyla doğrulanır.
@@ -106,7 +106,7 @@ Production geçişi aşağıdaki sıradan sapmadan yapılır:
 
 Runtime uyumluluk matrisi `legacy+legacy`, `d2b1+legacy`, `d2b1+v2` ve `d2c1+v2` kombinasyonlarını kabul eder. `legacy+v2`, bilinmeyen stage ve özellikle `d2c1+legacy` fail-closed davranır. D2C.1 şemasında flag yanlışlıkla kapalı olsa bile yeni mutation legacy transport olarak oluşturulmaz; V2 queue item olarak korunur ve uygulama yenilenene kadar dispatch edilmez.
 
-`/api/cloud/rollout` yalnız public stage, maintenance, deployment epoch ve minimum client sürümünü `no-store` olarak döndürür. Açık sekmeler bunu periyodik doğrular. Bakım veya epoch/client değişiminde sync durur; kullanıcı kontrollü yenileme mesajı görür. D2C.2'den daha eski sekmeler bu guard'a sahip olmadığından D2C.1 öncesi hosting/edge bakım sayfası, zorunlu reload ve legacy trafik drain kontrolü ayrıca zorunludur.
+`/api/cloud/rollout` yalnız public stage, maintenance, deployment epoch ve minimum client sürümünü `no-store` olarak döndürür. Açık sekmeler bunu periyodik doğrular. Bakım veya epoch/client değişiminde sync durur; kullanıcı kontrollü yenileme mesajı görür. Rollout guard'dan eski sekmeler D2C.1 öncesi ayrıca bakım/reload ve legacy trafik drain kontrolü gerektirir.
 
 Canlı test komutları yalnız açık `SUPABASE_TEST_*` değişkenleriyle çalışır ve `SUPABASE_TEST_URL`, `NEXT_PUBLIC_SUPABASE_URL` veya `SUPABASE_PRODUCTION_URL` ile aynı origin ise reddedilir. Operatör ayrıca dashboard project ref'ini preflight çıktısındaki beklenen ref ile elle eşleştirmelidir. Anon key dışında secret/service-role client bundle'a veya test çıktısına konmaz.
 

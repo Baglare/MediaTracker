@@ -1,5 +1,7 @@
 # Frontend Architecture
 
+> P4 bu belgenin refactor başlangıç aşamasıdır. D4 sonrası güncel UI/performance kabulü [D4_OVERVIEW.md](./D4_OVERVIEW.md) ve [D4_STABILIZATION_AND_ACCEPTANCE.md](./D4_STABILIZATION_AND_ACCEPTANCE.md) içinde tutulur.
+
 ## Amaç ve feature sınırları
 
 P4, `app/page.tsx` dosyasını uygulamanın bütün işlerini yapan bir client component olmaktan çıkarıp composition root hâline getirir. URL tab çözümleme, ortak local library controller'ı, feature seçimi, modal host ve Right Rail bağlantısı bu kökte kalır. Görsel tasarım, local-first veri davranışı ve `/?tab=` URL sözleşmesi değişmez.
@@ -133,7 +135,9 @@ Statik import testleri bundle benchmark veya ölçülmüş hız iddiası değild
 
 Feature component'leri tema kimliği switch'i taşımaz; `--app-*` ve `--w-*` semantic tokenlarını tüketir. Base theme ve world registry source of truth olmaya devam eder. Bu nedenle yeni hazır tema veya doğrulanmış custom token seti eklemek feature component değişikliği gerektirmemelidir.
 
-P4, RGB/HEX seçici, custom theme UI, Tozpembe veya Orman teması eklemez. P6 kontrast denetimi registry/token katmanına eklenebilir.
+P4 bunları eklememiştir; sonraki P6/D4 aşamaları RGB/HEX kontrollü custom tema UI'ını, yeni presetleri, kontrast denetimini ve semantic surface/token kullanımını registry katmanında tamamlamıştır. Feature component'leri preset adına özel renk dallanması yapmaz.
+
+D4 ile kart başlıkları varsayılan iki satır ve fine-pointer hover/focus sırasında genişleyen gerçek alan kullanır. Ayarlar ikincil alanları ortak `CollapsibleSection` üzerinden erişilebilir/session-scoped biçimde açılır. Marka, tek SVG asset'i CSS mask ile tema tokenına boyar. Dashboard/right rail “Yakında” özeti `app/page.tsx` içindeki tek `useReleaseCalendar` sonucunu tüketir; ikinci fetch/cache katmanı oluşturmaz.
 
 ## P5A widget composition ve görünürlük
 
@@ -156,8 +160,8 @@ Statik mimari kontroller runtime performans ölçümü veya tarayıcı görsel r
 
 - Internal tab URL'leri route'a çevrilmemiştir.
 - `useMediaLibrary` mevcut local-first domain controller'ı olarak korunmuştur; yeni repository/command bus/factory sistemi kurulmamıştır.
-- Dashboard ve MediaCard görsel olarak yeniden tasarlanmamıştır.
-- Chart palette, density/effects ve custom theme UI kapsam dışıdır; widget görünürlük ve sırası P5A ile eklenmiştir.
+- Dashboard ve MediaCard büyük layout redesign geçirmemiştir; D4 yalnız responsive başlık, semantic yüzey ve kontrast düzeltmeleri yapmıştır.
+- P4 sırasında kapsam dışı olan chart palette, density/effects ve custom theme UI sonraki P5/P6/D4 aşamalarında eklenmiştir.
 - Bu tur DB migration, dependency, remote işlem veya cloud veri modeli değişikliği içermez.
 
 İlgili belgeler: [PAGE_DESIGN_SYSTEM.md](./PAGE_DESIGN_SYSTEM.md) ve [PERSONALIZATION_ARCHITECTURE.md](./PERSONALIZATION_ARCHITECTURE.md).

@@ -1,6 +1,6 @@
 # Production Cloud V2 Cutover
 
-Bu belge D2C.3A salt-okunur audit, backup ve production cutover sırasını tanımlar. Production bağlantısı, migration uygulaması veya backup alma işlemi bu paketin parçası değildir.
+Bu belge D8 kapsamında yapılacak D2C.1 salt-okunur audit, backup ve production cutover sırasını tanımlar. Proje kilometre taşı kaydına göre D2B.0 ve D2B.1 production veritabanına uygulanmıştır; D2C.1 uygulanmamıştır. Production bağlantısı, migration uygulaması veya backup alma işlemi bu dokümantasyon paketinin parçası değildir.
 
 ## Salt-okunur audit
 
@@ -72,15 +72,15 @@ Docker bulunmadığı varsayımıyla ilk tercih doğrulanmış platform backup/P
 2. Platform backup/PITR ve seçilen bağımsız dump artefact'ını oluştur.
 3. Checksum, dump listesi ve izole restore testiyle backup'ı doğrula.
 4. Migration history/schema farklarını tek tek değerlendir; otomatik `migration repair` kullanma.
-5. Yalnız legacy core doğrulandıysa D2B.1 additive migration'ı uygula ve post-verification çalıştır.
-6. D2C.2 runtime guard içeren V2 destekli uygulamayı deploy et.
+5. Uygulanmış D2B.0/D2B.1 şemasını post-verification ile doğrula; migration'ları yeniden çalıştırma.
+6. Runtime rollout guard içeren V2 destekli release adayını kontrollü ortamda doğrula.
 7. Kontrollü cohort'ta V2 feature flag'i aç; adapter/schema kartını ve conflict sonuçlarını izle.
 8. Legacy direct DML trafiğinin sıfırlandığını kanıtla; eski sekmeler için bakım/reload gate aç.
-9. D2C.1 preflight'i tekrar çalıştır, ardından enforcement migration ve post-verification uygula.
+9. D2C.1 preflight'i tekrar çalıştır; yalnız D8 go/no-go onayından sonra enforcement migration ve post-verification uygula.
 10. İki kullanıcıyla media/progress, RLS, CAS, idempotency, tombstone/restore ve owner-switch smoke'u tamamla.
 
 ## Incident ve roll-forward
 
 D2B.1 additive fazında, V2 trafik başlamadıysa flag kontrollü biçimde kapatılabilir; schema nesneleri silinmez. D2C.1 commit edildikten sonra legacy client'a dönülmez. Mutation dispatch durdurulur, durable queue ve operation ledger korunur, audit/post-verification yeniden alınır ve düzeltici roll-forward hazırlanır. Cross-owner aynı record ID oluştuktan sonra global `id` PK'ye destructive rollback yapılmaz.
 
-Bu plan [Cloud Media Schema V2 Migration Runbook](./CLOUD_MEDIA_SCHEMA_V2_MIGRATION_RUNBOOK.md) ile birlikte uygulanır.
+Bu plan [Cloud Media Schema V2 Migration Runbook](./CLOUD_MEDIA_SCHEMA_V2_MIGRATION_RUNBOOK.md) ve [Roadmap](./ROADMAP.md) ile birlikte değerlendirilir.

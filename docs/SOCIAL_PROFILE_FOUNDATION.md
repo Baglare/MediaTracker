@@ -64,6 +64,12 @@ Yerel `personalNotes` hiçbir sosyal sorguya açılmaz. Kullanıcı önce notu s
 
 Migration private `profile-assets` bucket’ını oluşturur. Yol düzeni `{user_id}/avatar/{uuid}.{ext}` ve `{user_id}/banner/{uuid}.{ext}` şeklindedir. JPG/PNG/WebP kabul edilir; route avatar için 5 MB, banner için 10 MB sınırı uygular. Kullanıcı yalnızca kendi klasörüne yazabilir. Public/protected asset erişimi kısa ömürlü signed URL ile, personal ve block durumlarıyla tutarlı security-definer görünürlük kontrolü üzerinden sağlanır. Profil fotoğrafı için uygulamada tek upload kontrolü mevcut `/api/social/assets` endpoint’ini kullanır. Yeni upload veya profil update başarısızsa eski görsel korunur; başarıdan sonra eski object temizlenir. Service role kullanılmaz.
 
+## Kendi profil cache sözleşmesi
+
+D4 performans katmanı yalnız authenticated kullanıcının kendi `summary` ve `hero` response'larını process belleğinde cache'ler. Anahtar `ownerId + summary|hero`, TTL 5 dakikadır; aynı anahtarın eşzamanlı istekleri request coalescing ile tek promise paylaşır. Viewer-specific public profil response'ları bu cache'e katılmaz.
+
+Cache değeri blob/base64 görsel içermez ve localStorage'a yazılmaz. Profil save veya avatar/banner upload başarısı ilgili owner/resource kaydını günceller ya da geçersizleştirir. Logout/account switch önceki owner değerini yeni kullanıcıya göstermez. Bu optimizasyon API'lerin `private, no-store` güvenlik sınırını public/shared HTTP cache'e dönüştürmez.
+
 ## Supabase kurulumu
 
 1. Yeni kurulumda 14 haneli migration’ları sırayla uygula. Social Phase 1 daha önce kurulmuş uzak projede önce `supabase/migrations/20260721121000_social_profile_protected_visibility_fix_v2.sql`, ardından Faz 2 için `supabase/migrations/20260721130000_social_interactions_recommendations.sql` dosyasını uygula.

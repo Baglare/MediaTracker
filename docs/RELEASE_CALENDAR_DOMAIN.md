@@ -1,28 +1,26 @@
-# Release Calendar Domain (D3-1)
+# Release Calendar Domain
 
-## Mevcut audit özeti
+Bu belge D3-1'de belirlenen domain invariant'larını ve tamamlanmış D3 uygulamasının sınırlarını açıklar. Provider/cache/UI kabulünün canonical özeti [RELEASE_CALENDAR_ARCHITECTURE.md](./RELEASE_CALENDAR_ARCHITECTURE.md), manuel doğrulama [RELEASE_CALENDAR_MANUAL_TESTS.md](./RELEASE_CALENDAR_MANUAL_TESTS.md) içindedir.
 
-- `features/calendar/components/calendar-feature.tsx` bugün progress log, planlanan
-  kayıt ve aktif kayıt özetini gösteriyor. Gerçek yayın akışı için yalnız bir
-  placeholder var; bu aşamada UI davranışı değiştirilmedi.
-- `features/calendar/domain/selectors.ts` yalnız mevcut activity read-model'ini
-  üretir. Yeni release selector'ları bu sözleşmeden bağımsız ve saf tutuldu.
+## Güncel uygulama özeti
+
+- Ajanda ve Pazartesi başlangıçlı aylık görünüm aynı normalize `ReleaseEvent`
+  read-model'ini kullanır.
+- Tek provider politikası `tv → TVMaze`, `anime → AniList`, `movie → TMDB`
+  eşlemesidir; başlık veya fuzzy text üzerinden provider/sezon çözülmez.
 - `MediaItem` içinde `seasonNumber`, `seriesGroupId`, Canonical Identity V2 ve
   provider `externalSource/externalId` alanları bulunuyor. Bunlar güvenli sezon
-  çözümü için yeterli; hard blocker yok.
+  çözümü için kullanılır.
 - `lib/series-group.ts` içindeki genel legacy inference, TVMaze sezon başlığını
   regex ile okuyabiliyor. Release Calendar resolver'ı bu fonksiyonu çağırmaz;
   title ve `originalTitle` sezon veya medya eşleştirmesinde kullanılmaz.
-- TVMaze details route'u episode listesini sunucuda çekse de istemciye yalnız
-  aggregate alanlar (`seasonBreakdown`, `nextAirDate`) döndürüyor. AniList yalnız
-  `nextAiringEpisode`, TMDB mevcut detay yolu film, Open Library/OMDb ise takvim
-  için yetersiz veya kısmi tarih verisi sağlıyor.
-- Owner-scoped local storage bugün media/progress envelope'ları, codec,
-  quarantine ve safe-write sağlar. Portable backup/import aynı core domain'leri
-  taşır. Release event için persistence domain'i henüz yoktur.
-- Supabase mapping ve durable Cloud V2 queue media/progress sözleşmeleridir.
-  Release event kolonu, RPC'si veya queue entity'si yoktur ve D3-1 bunları
-  değiştirmez.
+- Otomatik provider olayları owner-scoped, 12 saat TTL'li ve
+  stale-while-revalidate davranan yeniden üretilebilir cache'tir.
+- Manuel olaylar ile provider olaylarını gizleme kararları
+  `MediaItem.releaseCalendar` altında kalıcı kullanıcı verisidir. Portable backup
+  bunları taşır; otomatik provider cache'ini taşımaz.
+- Sağ panel ve dar Dashboard'daki “Yakında” özeti aynı D3 hook/read-model'ini
+  kullanır; ikinci provider fetch veya cache sistemi kurmaz.
 
 ## Domain kararları
 
@@ -37,8 +35,6 @@
   `seriesGroupId` veya yapılandırılmış TVMaze season external ID kullanır.
 - Provider kaynaklı olaylar `reproducible_cache`, manuel olaylar
   `persistent_user_data` olarak açıkça ayrılır.
-- D3-1 provider implementasyonu, API çağrısı, cache persistence, manuel CRUD ve
-  yeni takvim UI'ı içermez.
 
 ## Tarih ve selector invariant'ları
 
@@ -57,50 +53,48 @@
   canonical key, origin veya sezon kimliğini geçersiz sayar; issue üretmeden
   sessiz kabul etmez.
 
-## D3-2 provider veri gereksinimleri
+## Provider veri gereksinimleri
 
 - TVMaze: stable show/season/episode ID, season number, episode number, airdate,
   varsa timezone içeren airtime ve iptal/erteleme durumu.
 - AniList: stable media ID, episode number ve `airingAt`; her AniList kaydı kendi
   canonical entity'si olarak ele alınmalı, başlıkla sezon bridge yapılmamalı.
-- TMDB: movie release region/type bilgisi; TV desteği eklenecekse show ID ile
-  explicit season number birlikte taşınmalı.
+- TMDB: film release region/type bilgisi.
 - Open Library: work/edition ayrımı korunarak güvenilir publication precision.
 - OMDb: IMDb ID ve ham tarih metninin güvenilir precision'a dönüştürülebildiğine
   dair açık provider kuralı.
 - Provider normalize çıktısı her zaman `decodeReleaseEvent` doğrulamasından
   geçmeli; raw provider payload persisted event'e kopyalanmamalı.
 
-## Açık riskler ve sonraki sınır
+## Bilinen sınırlar
 
-- Exact datetime değerinin kullanıcı timezone'unda hangi takvim gününde
-  gösterileceği D3-2'de açık ürün politikası gerektirir. D3-1 deterministik olarak
-  provider ISO değerindeki takvim bölümünü kullanır.
-- Mevcut provider route'ları tam release stream sağlamaz. D3-2, cache TTL,
-  rate-limit, retry ve stale veri politikasını tasarlamalıdır.
-- Otomatik cache ile kalıcı manuel event aynı storage envelope'a konmamalıdır.
-  Manuel event persistence, owner scope, safe-write, quarantine ve portable
-  backup/import sözleşmeleri D3-2 veya sonraki kalıcı veri aşamasında ayrıca
-  eklenmelidir.
-- Release event'ler Cloud V2 media/progress queue'ya eklenmemeli; cloud sahipliği
-  için ayrı karar verilene kadar local-only kalmalıdır.
+- Otomatik provider ufku 90 gündür; geçmiş yayın arşivi değildir.
+- Exact datetime kullanıcının IANA timezone'undaki güne çevrilir; date-only
+  literal takvim günü olarak kalır.
+- TMDB takvimi server-side token olmadan çalışmaz. AniList ve TVMaze public API
+  kullanır; provider hatasında geçerli stale cache korunabilir.
+- Provider cache Cloud/backup kapsamı dışındadır. Manuel/gizli olay verisi medya
+  metadata'sı olarak mevcut Cloud V2 revision/conflict akışını kullanabilir.
 - Başlık tabanlı legacy series inference'ın takvim dışında kullanılmaya devam
   etmesi mevcut davranıştır; takvim domain'ine sızmasını engelleyen regresyon
   testi vardır.
+- Push/e-posta, ICS/Google Calendar, streaming availability ve AI tarih tahmini
+  D3 kabul kapsamı değildir; opsiyonel backlog'dur.
 
 ## Manuel smoke
 
-1. Mevcut Takvim ekranında activity, planlanan ve aktif kayıt bölümlerinin aynı
-   kaldığını doğrula.
+1. Ajanda ve ay görünümünün aynı filtrelenmiş event kümesini kullandığını doğrula.
 2. `completed` ve `dropped` kayıtların release selector sonucunda bulunmadığını
    kontrol et.
 3. Aynı TVMaze show'un iki sezon kaydına farklı structured season identity verip
    olayların sezonlar arasında sızmadığını doğrula.
 4. Date-only olayı farklı sistem timezone'larında aynı takvim gününde göster.
-5. Bu aşamada network isteği, yeni localStorage key'i veya Cloud V2 queue işlemi
-   oluşmadığını doğrula.
+5. Manuel event/gizleme kararının backup'a girdiğini, otomatik provider cache'inin
+   girmediğini doğrula.
 
-## D3-2 otomatik provider ve cache uygulaması
+Tam akış [RELEASE_CALENDAR_MANUAL_TESTS.md](./RELEASE_CALENDAR_MANUAL_TESTS.md) içindedir.
+
+## Otomatik provider ve cache uygulaması
 
 - Provider eşlemesi tekildir: `tv → TVMaze`, `anime → AniList`,
   `movie → TMDB`. Cross-provider veya başlık tabanlı eşleştirme yapılmaz.

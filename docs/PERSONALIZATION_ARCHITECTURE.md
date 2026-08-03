@@ -2,6 +2,8 @@
 
 > P3.1 ortak sayfa primitive'leri, surface hiyerarşisi ve dünya motif kuralları için [PAGE_DESIGN_SYSTEM.md](./PAGE_DESIGN_SYSTEM.md) belgesine bakın.
 
+> **Güncel durum:** P1–P6 tarihsel aşamalarının üzerine D4 tema/UX stabilizasyonu tamamlandı. Güncel açık tema, logo, collapsible ve grafik kararları [D4_UI_THEME_POLISH.md](./D4_UI_THEME_POLISH.md) içinde; D4 kabul özeti [D4_STABILIZATION_AND_ACCEPTANCE.md](./D4_STABILIZATION_AND_ACCEPTANCE.md) içindedir.
+
 ## Amaç
 
 Bu belge MediaTracker'ın temel uygulama görünümünü, dünya vurgusunu, cihaz tercihlerini ve public profil sunumunu birbirinden ayıran P0 sınırlarını; P1 tema motorunu ve P2 birleşik uygulama kabuğu/profil kimliği katmanını tanımlar. Bu aşamalar sayfa redesign'i değildir; mevcut özellikleri ortak, test edilebilir sınırlar altında toplar.
@@ -19,7 +21,7 @@ Bu belge MediaTracker'ın temel uygulama görünümünü, dünya vurgusunu, ciha
 
 ### Base theme
 
-Uygulama arka planı, yüzeyleri, metinleri, border, gölge, overlay, focus ve temel accent tokenlarını sağlar. Registry kimlikleri `system`, `obsidian`, `porcelain` ve `ocean`dır. P1'de dört seçenek de Ayarlar içinden seçilebilir. Sistem, `prefers-color-scheme` sonucuna göre Obsidyen veya Porselen tabanına çözülür ve sistem tercihi çalışma sırasında değişirse güncellenir.
+Uygulama arka planı, yüzeyleri, metinleri, border, gölge, overlay, focus ve temel accent tokenlarını sağlar. Preset registry kimlikleri `system`, `obsidian`, `porcelain`, `ocean`, `dusty_rose`, `forest`, `lavender`, `polar` ve `sepia`dır. Sistem, `prefers-color-scheme` sonucuna göre Obsidyen veya Porselen tabanına çözülür ve sistem tercihi çalışma sırasında değişirse güncellenir.
 
 ### Accent mode ve world theme
 
@@ -69,6 +71,11 @@ Chart palette tamamlanan, devam eden, planlanan, duraklatılan ve bırakılan du
 | Obsidyen | Koyu zinc | Aktif; mevcut görünümün temel eşlemesi |
 | Porselen | Kırık beyaz / stone | Aktif; açık yüzey ve koyu metin eşlemesi |
 | Okyanus | Lacivert / mavi / turkuaz | Aktif; navy yüzey ve kontrollü cyan accent |
+| Tozpembe | Gül kurusu / pembe-krem | Aktif; belirgin pudramsı yüzeyler |
+| Orman | Çam / yosun / toprak | Aktif; koyu tema |
+| Lavanta | Lila / erik | Aktif; soğuk açık tema |
+| Kutup | Buz mavisi / arduvaz | Aktif; soğuk açık tema |
+| Sepya | Parşömen / terracotta / mürekkep | Aktif; sıcak açık tema |
 
 ## Dünya matrisi
 
@@ -91,7 +98,7 @@ Chart palette tamamlanan, devam eden, planlanan, duraklatılan ve bırakılan du
 
 ### Root attribute modeli
 
-Root layout ilk HTML'de `data-theme`, `data-base-theme`, `data-accent-mode`, `data-resolved-accent`, `data-effects` ve `data-density` attribute'larını yazar. `data-theme` her zaman çözülmüş `obsidian`, `porcelain` veya `ocean` değeridir. Client runtime yalnız doğrulanmış preference değerleriyle bu attribute'ları günceller ve `color-scheme` değerini temayla eşler.
+Root layout ilk HTML'de `data-theme`, `data-base-theme`, `data-accent-mode`, `data-resolved-accent`, `data-effects` ve `data-density` attribute'larını yazar. `data-theme` doğrulanmış preset kimliği veya `custom` değeridir. Client runtime yalnız doğrulanmış preference değerleriyle bu attribute'ları günceller ve `color-scheme` değerini temayla eşler.
 
 ### Persistence ve cookie mirror
 
@@ -107,11 +114,11 @@ Base theme `--app-*` tokenlarını sağlar. Kullanıcı accent tercihi `--app-ac
 
 ### Semantic token migration stratejisi
 
-Gerçek tema renklerinin source of truth'u `app/globals.css` içindeki `[data-theme]` scope'larıdır. TypeScript registry kullanıcıya gösterilen metadata ve güvenli preview değerlerini taşır; testler temel değerlerin CSS ile aynı kaldığını kontrol eder. Shared kabuklarda `app-page`, `app-panel`, `app-card`, `app-input` ve az sayıdaki semantik action utility'si kullanılır. Kalan yaygın nötr zinc utility'leri Porselen/Okyanus scope'larında Tailwind renk değişkenleri üzerinden role göre eşlenir; domain/status renkleri topluca tema rengine çevrilmez.
+Preset token registry tema kimliğinin canonical modelidir; background, surface, elevated, text, border, input, hover, selected, focus ve durum rollerini birlikte tanımlar. `app/globals.css` preset scope'ları ilk paint/fallback ve Tailwind uyumluluğu için aynı semantic sözleşmeyi yansıtır; testler registry ile CSS contract'ının ayrışmasını engeller. Shared kabuklarda `app-page`, `app-panel`, `app-card`, `app-input` ve sınırlı semantik action utility'leri kullanılır. Domain/status renkleri topluca tema rengine çevrilmez.
 
 ### Tema ayar UI
 
-Ayarlar içindeki Görünüm kartı Sistem, Obsidyen, Porselen ve Okyanus için ad, açıklama, token preview ve seçili durum gösterir. Dünya vurgusu Otomatik, Tema rengi, Doğu, Kadraj, Arşiv ve Nötr seçeneklerini ayrı sunar. P5B aynı anında-kaydet modeline grafik palette'i, dünya rengini izleme, Rahat/Kompakt yoğunluk ve Kapalı/Hafif/Tam efekt kontrollerini ekler. Varsayılana dön görünüm modelinin bütün alanlarını güvenli P5B default'una döndürür; profile presentation ayrı kalır.
+Ayarlar içindeki Görünüm kartı bütün presetler için ad, açıklama, gerçek token preview ve seçili durum gösterir. Dünya vurgusu Otomatik, Tema rengi, Doğu, Kadraj, Arşiv ve Nötr seçeneklerini ayrı sunar. Grafik paleti, dünya rengini izleme, Rahat/Kompakt yoğunluk ve Kapalı/Hafif/Tam efekt kontrolleri aynı modelin ayrı alanlarıdır. Varsayılana dön görünüm modelinin bütün alanlarını güvenli varsayılana döndürür; profil sunumu ayrı kalır.
 
 ### Erişilebilirlik
 
@@ -162,6 +169,8 @@ Uygulama çalıştırıldığında Dashboard, Feed, Öneriler, Bildirimler, Kull
 ### Hero-first yükleme ve editör sınırı
 
 `/profile` ilk görünümünde local kimlikten üretilen ortak `ProfileHero` hemen render edilir. Cloud tarafında yalnız kimlik, banner/avatar referansları, presentation ve kısa hero alanlarını taşıyan `/api/social/profile/hero` yüklenir. Favoriler, aktivite ve yerel kütüphane kendi client sınırında hazırlanır. Tam profil editor payload'ı, `SocialLayoutEditor`, `SocialSharingEditor`, `SocialPreferencesPanel` ve görsel konumlandırma UI'ı yalnız `mode=edit` olduğunda dynamic import ile yüklenir. Shell ve hero bu yüklemeyi beklemez. Eşzamanlı XP özet istekleri kullanıcı kimliği bazında tek in-flight promise üzerinden birleştirilir.
+
+D4 ile kendi profil `summary` ve `hero` okumaları process belleğinde owner-scoped cache'e bağlandı. Anahtar `ownerId + resource(summary|hero)`, TTL 5 dakikadır; aynı anahtarın eşzamanlı istekleri tek promise paylaşır. Cache yalnız güvenli parse edilmiş response değerini tutar, localStorage'a veya cache değerine blob/base64 görsel yazmaz. Profil save ve avatar/banner upload başarısı ilgili owner kaydını günceller veya geçersizleştirir; account switch yalnız aktif owner anahtarını okuyabilir.
 
 ### Non-destructive görsel transform modeli
 
@@ -222,7 +231,7 @@ Yeni hazır temalar registry metadata'sı ve CSS semantic scope'ları üzerinden
 - **Tozpembe:** kırık beyaz/gül kurusu, sakin bordo vurgu.
 - **Orman:** katmanlı çam ve yosun yüzeyleri, toprak ikincil vurgu.
 - **Lavanta:** soluk lavanta, gri-mavi yüzey ve koyu erik vurgu.
-- **Kutup:** buz mavisi/slate yüzey ve kontrollü cyan.
+- **Kutup:** buz mavisi/arduvaz yüzey ve kontrollü turkuaz.
 - **Sepya:** parşömen, mürekkep kahvesi ve terracotta; Arşiv dünya kimliği değildir.
 
 ### Custom theme girdileri ve token üretimi
@@ -243,7 +252,7 @@ Root runtime custom temada `data-theme-source="custom"`, `data-theme="custom"` v
 
 Tema Stüdyosu preset listesini registry'den üretir; custom tema oluşturma, düzenleme/yeniden adlandırma, kopyalama, confirmation ile silme, yalnız kaydetme ve kaydet-uygula akışlarını sunar. Ortak `ColorField` native picker, HEX, RGB ve 36 renkli merkezi katalog arasında senkronizasyon sağlar. Mini preview gerçek semantic tokenları kullanır. “Uygulamada geçici önizle” root tokenlarını kalıcı preference/cookie yazmadan değiştirir; vazgeçme önceki seçimi geri getirir.
 
-Tema değişimi network, route reload, AppShell remount, local library parse veya auth/profile/XP fetch üretmez. Custom state Tema Stüdyosu ve tek root runtime sınırında kalır. Cloud tema sync, tema marketi, import/export, raw CSS, custom font/background image, world/chart/profile palette editörleri kapsam dışıdır.
+Tema değişimi network, route reload, AppShell remount, local library parse veya auth/profile/XP fetch üretmez. Custom state Tema Stüdyosu ve tek root runtime sınırında kalır. P6 çekirdeğinde cloud tema sync/import-export yoktur; bunlar aşağıdaki P6.1 katmanında eklenmiştir. Tema marketi, raw CSS, custom font/background image ve world/chart/profile palette editörleri kapsam dışıdır.
 
 Chart palette, public `profilePaletteId`, banner/avatar sunumu ve Yin/Yang `connectionColor` ayrı sahipliklerini korur; custom app theme bu alanlara yazmaz.
 
@@ -273,6 +282,8 @@ Tema mutasyonu önce localStorage ve root runtime'a uygulanır. Cloud save başa
 
 ## Gelecek aşamalar
 
+- **D4 Product Polish / Performance / UX Reliability:** Tamamlandı; açık tema yüzey kimlikleri, theme-aware SVG mask logo, responsive başlık/rozetler, ayar collapsible'ları, monokrom grafik erişilebilirliği ve browser smoke kabulü tamamlandı.
+
 - **P1 Tema motoru:** Tamamlandı; root runtime, cookie mirror, aktif tema/accent UI ve shared semantic uyumluluk eklendi.
 - **P2 Birleşik profil ve ProfileHero:** Tamamlandı; canonical shell, `/profile`, ortak hero, cloud presentation ve local fallback/cache bağlandı.
 - **P3.1 Ortak sayfa tasarım sistemi:** Tamamlandı; sosyal feature sayfaları, progression ve profil alt modülleri ortak hero/section/stat/filter/state diline geçirildi.
@@ -287,4 +298,4 @@ Tema mutasyonu önce localStorage ve root runtime'a uygulanır. Cloud save başa
 - P2 migration uygulanmış kabul edilir; P3.0 transform migration'ı için remote Supabase işlemi veya migration apply yapılmamıştır.
 - Dashboard internal sekmeleri route'a taşınmamıştır; P4 yalnız mevcut `/?tab=` sözleşmesini koruyarak feature sınırlarını ayırmıştır.
 - Public profil modüllerinin veri/visibility davranışı yeniden tasarlanmamış; P3.1 yalnız ortak surface ve state dilini uygular.
-- Tema marketi ve public tema paylaşımı yoktur. P6.1 import/export ile private, opsiyonel cloud sync ekler; cloud sync kullanılabilmesi için yeni migration ayrıca uygulanmalıdır.
+- Tema marketi ve public tema paylaşımı yoktur. P6.1 import/export ile private, opsiyonel cloud sync sağlar; remote kullanılabilirlik ilgili server migration/RPC sözleşmesinin hedef ortamda bulunmasına bağlıdır.

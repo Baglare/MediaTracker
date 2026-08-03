@@ -1,4 +1,4 @@
-# MediaTracker Supabase + Offline-first Sync Notes
+# MediaTracker Supabase + Local-first Sync Sözleşmesi
 
 Bu doküman güncel Supabase ve offline-first davranışını özetler. MediaTracker'ın ana veri kaynağı hâlâ tarayıcıdaki `localStorage` alanıdır; Supabase opsiyonel cloud aktarım ve senkronizasyon katmanı olarak çalışır.
 
@@ -15,12 +15,14 @@ Bu doküman güncel Supabase ve offline-first davranışını özetler. MediaTra
 - Yerel mutasyonlar `media-tracker-sync-queue` kuyruğuna eklenir.
 - Kullanıcı giriş yapmış ve ağ online ise uygun kuyruk item'ları Supabase'e flush edilir.
 - Bekleyen işlemler Ayarlar ekranındaki cloud sync kartından görülebilir ve "Şimdi Senkronize Et" ile manuel tetiklenebilir.
+- UI pending, canlı in-flight, retryable/blocked, adapter/rollout ve son sonuç değerlerini tek reaktif `SyncSnapshot` kaynağından okur.
+- D2B.0 ve D2B.1 production veritabanına uygulanmıştır. D2C.1 enforcement/cutover D8'e bırakılmıştır.
 
 ## Nasıl Çalışıyor?
 
 ### Local-first state
 
-Uygulama ilk olarak `localStorage` anahtarlarını kullanır:
+Uygulama ilk olarak owner-scoped personal storage adapter'larını kullanır. Aşağıdaki eski düz anahtarlar legacy/import uyumluluğu için görülebilir; güncel kayıtlar owner scope ve versioned envelope kullanır:
 
 - `media-tracker-list`: medya listesi
 - `media-tracker-logs`: aktivite/progress logları
@@ -45,13 +47,9 @@ Bu işlemler otomatik başlamaz; kullanıcı onayı ister.
 - `media_item` için `upsert` ve `delete`
 - `progress_log` için `upsert`
 
-Kuyruk `localStorage` içinde saklanır. Aynı entity ve aynı payload id için bekleyen kayıtlar coalescing ile sadeleştirilir.
+Kuyruk owner-scoped ve durable biçimde yerel depolamada saklanır. Aynı entity ve aynı payload id için bekleyen kayıtlar coalescing ile sadeleştirilir.
 
-Queue item'ları `userId` taşıyabilir:
-
-- `null` / `undefined`: login öncesi anonim item; giriş sonrası mevcut kullanıcıya uygulanabilir.
-- mevcut kullanıcı id'si: flush edilebilir.
-- başka kullanıcı id'si: orphan sayılır ve mevcut kullanıcıyla otomatik gönderilmez.
+Guest ve authenticated owner kuyrukları ayrı scope'larda tutulur. Guest queue uzak servise gönderilmez; hesap değişiminde önceki owner snapshot'ı veya sonucu yeni owner'a uygulanmaz.
 
 ### Flush davranışı
 
@@ -61,7 +59,9 @@ Flush şu koşullarda çalışır:
 - tarayıcı online ise,
 - mevcut kullanıcıya uygun bekleyen item varsa.
 
-Başarılı item kuyruktan çıkarılır. Başarısız item `retryCount` ve `lastError` ile kuyrukta kalır. Ağ geri geldiğinde veya kullanıcı "Şimdi Senkronize Et" dediğinde tekrar denenebilir.
+Başarılı item kuyruktan çıkarılır. Canlı dispatch ID'leri process belleğinde in-flight olarak izlenir; durable `dispatchStartedAt` crash/retry işaretidir. Başarısız item retryable veya controlled conflict ise blocked olarak kuyrukta kalır. Aynı flush sırasında eklenen yeni uygun item bounded sonraki batch'te tüketilir; başarısız item agresif döngüye sokulmaz.
+
+Cloud Media V2 adapter'ı stabil operation ID, expected revision, CAS, tombstone ve server idempotency sonucunu kullanır. Rollout sözleşmesi bilinmiyor, bakımda veya reload gerektiriyorsa mutation dispatch fail-closed durur; yerel state çalışmaya devam eder.
 
 ## Neden Böyle Tasarlandı?
 
@@ -74,14 +74,15 @@ Başarılı item kuyruktan çıkarılır. Başarısız item `retryCount` ve `las
 ## Sınırlamalar
 
 - Cloud'dan otomatik real-time pull yoktur; download ve merge manuel aksiyonlardır.
-- Conflict resolution UI yoktur.
+- Revision/tombstone/parent/record conflict'leri için kontrollü UI vardır; otomatik alan bazlı merge yoktur.
 - `progress_logs.detail` cloud'a yazılmaz; yerel-only alandır.
 - Başka kullanıcıya ait orphan queue item'ları otomatik flush edilmez.
 - Sync queue yalnızca desteklenen medya ve progress log operasyonlarını kapsar.
 
 ## Sonraki İyileştirme Alanları
 
-- Daha ayrıntılı conflict resolution ekranı.
 - Cloud -> local değişiklikleri için kontrollü refresh/pull akışı.
 - Queue hata detayları için daha kapsamlı kullanıcı geri bildirimi.
-- Hesap değişimlerinde orphan queue yönetimini daha görünür hâle getirme.
+- D8'de D2C.1 owner-scoped fiziksel primary key enforcement ve production cutover.
+
+Production durumunun ve cutover sınırının canonical kaydı [CLOUD_MEDIA_SCHEMA_V2_MIGRATION_RUNBOOK.md](./CLOUD_MEDIA_SCHEMA_V2_MIGRATION_RUNBOOK.md) ile [PRODUCTION_CLOUD_V2_CUTOVER.md](./PRODUCTION_CLOUD_V2_CUTOVER.md) belgeleridir.

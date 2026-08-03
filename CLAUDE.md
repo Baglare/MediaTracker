@@ -15,35 +15,38 @@ npm run dev      # Geliştirme sunucusu
 npm run build    # Production build (TypeScript dahil tip kontrolü yapar)
 npm run lint     # ESLint
 npm run start    # Build sonrası prod sunucu
+npm run test     # Vitest watch
+npm run test:run # Vitest tek seferlik paket
 npx tsc --noEmit # Build'siz salt tip kontrolü
 ```
 
-Test runner kurulu değil — manuel test yolu `npm run dev` veya `npm run build` üzerinden ilerler. Lint+TS+build geçmesi pratikte gerekli minimum. `eslint.config.mjs` `design_references/**` yolunu kapsam dışı bırakır (R19); o klasördeki JSX prototype snapshot'larını düzenlemeye gerek yok.
+Vitest test runner kuruludur. D4 sonrası temel doğrulama `npm run lint`, `npm run test:run`, `npm run build` ve `git diff --check` sırasıdır; browser smoke ile contract testleri ayrı kanıttır. `eslint.config.mjs` `design_references/**` yolunu kapsam dışı bırakır (R19); o klasördeki JSX prototype snapshot'larını düzenlemeye gerek yok.
 
 ## Mimari
 
-Next.js 16 App Router + React 19 + Tailwind 4 üzerine kurulu, **offline-first**, tek-sayfalık (sekmeli) bir medya takip uygulaması. Tek route var: `app/page.tsx`. Tüm UI sekmeleri (Dashboard / Kütüphanem / Keşfet / Aktivite / AI Danışman / Ayarlar) burada koşullu render ile yönetiliyor.
+Next.js 16 App Router + React 19 + Tailwind 4 üzerine kurulu, **local-first** bir medya takip uygulaması. `app/page.tsx` sekmeli ana composition root'tur; sosyal profil, akış, öneriler, bildirimler, kişiler ve progression için ayrı App Router sayfaları da vardır. Feature sınırları `features/dashboard`, `features/library`, `features/discovery`, `features/calendar` ve `features/settings` altında ayrılmıştır.
 
 ### Veri akışı: localStorage öncelikli, Supabase opsiyonel
 
 İki kaynak var, ama **localStorage tek "source of truth"**. Supabase aktifken bile UI hâlâ `mediaList`/`progressLogs` React state'inden render olur; Supabase yalnızca arka planda kuyruktan flush edilir.
 
-- **localStorage anahtarları** ([lib/storage.ts](lib/storage.ts), [lib/sync-queue.ts](lib/sync-queue.ts)):
-  - `media-tracker-list` — `MediaItem[]`
-  - `media-tracker-logs` — `ProgressLog[]`
-  - `media-tracker-sync-queue` — `SyncQueueItem[]`
+- **Yerel veri adapter'ları** ([lib/storage.ts](lib/storage.ts), [lib/personal-data-storage.ts](lib/personal-data-storage.ts), [lib/sync-queue.ts](lib/sync-queue.ts)) owner-scoped/versioned envelope kullanır. Aşağıdaki düz anahtarlar legacy import/uyumluluk kaynağıdır:
+  - `media-tracker-list` — legacy `MediaItem[]`
+  - `media-tracker-logs` — legacy `ProgressLog[]`
+  - `media-tracker-sync-queue` — legacy queue kaynağı; güncel queue owner-scoped'dur
   - `mediaTracker:uiPreferences` — R18 UI tercihleri (aşağıya bak)
-- Mount'ta `app/page.tsx` storage'tan okur. Sonraki tüm değişikliklerde otomatik yazma için bir `useEffect`.
+- Hydration ve yazma `useMediaLibrary` ile domain storage adapter'larında koordine edilir; component'ler raw storage formatını yeniden yorumlamaz.
 - Supabase env yoksa veya kullanıcı giriş yapmadıysa hiçbir cloud çağrısı tetiklenmez.
 
 ### Sync mimarisi
 
-[lib/sync-manager.ts](lib/sync-manager.ts) singleton bir orchestrator'dır. Mutasyon noktaları (`app/page.tsx` içindeki `handleIncrement`, `handleComplete`, `handleSaveMedia`, `handleDeleteRequest`, `handleToggleFavorite`, `handleUpdateRating`, `addProgressLog`, `handleCommitGroupAction`, `handleAddFromAniList` relation patch'leri) lokal state'i güncellerken **aynı zamanda** kuyruğa item düşürür:
+[lib/sync-manager.ts](lib/sync-manager.ts) singleton orchestrator'dır. Domain mutation noktaları local state doğrulandıktan sonra owner-scoped kuyruğa item düşürür:
 
 - `enqueueMediaUpsert(item)` / `enqueueMediaDelete(id)` / `enqueueProgressLog(log)`
 - Coalescing: aynı `entity` + aynı `payload.id` için bekleyen kayıt yenisiyle değiştirilir.
 - Online + login varsa anında `flush()`. Aksi halde queue bekler.
-- `flush()`: snapshot alır, item başına `processItem` çağırır → `lib/supabase/cloud-repository.ts`'in `uploadMediaItems`/`uploadProgressLogs`/`deleteMediaItem` fonksiyonlarını kullanır. Başarılı id'ler kuyruktan silinir; başarısızlarda `retryCount++` ve `lastError` set edilir.
+- `flush()`: rollout contract hazırsa aktif `legacy | v2` adapter ile işler. V2 yolu stabil operation ID, expected revision, CAS, tombstone ve controlled conflict sonucunu korur. Başarılı id'ler kuyruktan silinir; retryable/blocked sonuçlar durable kalır.
+- `SyncSnapshot` pending, process-memory in-flight, retryable, blocked, adapter, rollout ve son sonuç alanlarını tek reaktif kaynakta toplar. Aynı flush sırasında eklenen uygun item bounded sonraki batch'te tüketilir.
 - `window`'un `online`/`offline` event'leri otomatik flush tetikler.
 - UI subscribe için `useSyncStatus()` hook'u (`useSyncExternalStore` üzerine kurulu).
 
@@ -71,7 +74,7 @@ for (const m of touched) enqueueMediaUpsert(m);
 
 ### Supabase katmanı
 
-[lib/supabase/](lib/supabase/) altında dört dosya:
+`lib/supabase/` altındaki başlıca sınırlar:
 - `client.ts` — `createBrowserClient`, env yoksa `null` (cache'li).
 - `server.ts` — `createServerClient` async helper (şu an UI'dan tüketilmiyor; auth eklendiğinde devreye girer).
 - `status.ts` — `isSupabaseConfigured()` env kontrolü.
@@ -83,7 +86,7 @@ for (const m of touched) enqueueMediaUpsert(m);
 
 ### Şema (Supabase)
 
-[supabase/schema.sql](supabase/schema.sql). **Önemli:** `media_items.id` ve `progress_logs.id` `text` (yerel `tvmaze-123`, `anilist-456`, `log-...` gibi string id'leri korumak için), `user_id` `uuid`. RLS her tablo için `auth.uid() = user_id` üzerinden. `progress_logs.detail` kolonu **yoktur** — yerel-only alan; upload'a gönderilmez. `media_items.metadata jsonb` kaynak-spesifik alanları (TVmaze/AniList/OpenLibrary/OMDb) tutar.
+[supabase/schema.sql](supabase/schema.sql) legacy/core başlangıç şemasıdır; migration zinciri güncel sözleşmenin parçasıdır. Proje durumuna göre D2B.0 ve D2B.1 production'a uygulanmıştır; D2C.1 owner-scoped fiziksel PK enforcement D8'e bırakılmıştır. `progress_logs.detail` cloud'a yazılmaz; `media_items.metadata jsonb` allowlist ile kaynak-spesifik ve Release Calendar kullanıcı metadata'sını taşır.
 
 ### Auth
 
@@ -505,9 +508,9 @@ design_references/ — sadece görsel/layout referans; runtime'da kullanılmaz; 
 
 ## Bilinçli olarak yapılmayanlar
 
-- Test runner yok.
+- Vitest test runner vardır; güncel scriptler `package.json` içindedir.
 - `progress_logs.detail` cloud'a yazılmaz; yerel-only.
-- Sync queue cross-user temizlenmez (giriş değişiminde queue'da bekleyen item olursa yeni user'a yazılır — RLS yine korur ama dikkat edilmeli).
+- Sync queue owner-scoped'dur; guest veya başka owner item'ı aktif kullanıcıya otomatik gönderilmez. Generation guard stale async sonucu yeni owner state'ine uygulamaz.
 - Cloud realtime/auto-pull yok — sadece yerel→cloud push otomatik. Cloud→local yalnızca `CloudTransferPanel` butonlarıyla manuel.
 - AniList için **title benzerliği** ile otomatik gruplama yok — sadece persist edilmiş `anilistRelations` id eşleşmesi kullanılır. "Frieren Season 2" gibi kayıtlar relation verisi olmadan gruplanmaz.
 - AniList relation tipleri için whitelist dar tutulmuştur: `PREQUEL`, `SEQUEL`, `PARENT`, `SIDE_STORY`. `ADAPTATION` (manga↔anime), `ALTERNATIVE`, `SPIN_OFF`, `CHARACTER`, `SUMMARY`, `COMPILATION`, `SOURCE`, `OTHER`, `CONTAINS` **yanlış pozitif riski** nedeniyle dışarıda. Genişletmeden önce iyi düşün.
@@ -517,6 +520,6 @@ design_references/ — sadece görsel/layout referans; runtime'da kullanılmaz; 
 - WorldTransition macro overlay **sadece `handleThemeFilterChange` token bumpı ile** oynar; başka tetikleyici eklenmez. Sayfa açılışında hidrasyon setter'ları doğrudan kullanılır, handler üzerinden değil.
 - Title benzerliği ile favorit/rating türetme yok — kullanıcı eylemiyle değişir.
 - AI Danışman'da gerçek web search yok (R37 `web` modu UI-only, sadece `useWebResearch` flag'i provider'a iletilir).
-- AI feedback **kalıcı değil** (R39) — sadece session-level suppression; "Konuyu kapat" veya sayfa yenilenip "Konuyu kapat" sonrası temizlenir. Supabase tarafı dokunulmadı.
+- AI feedback yerel, owner-scoped recommendation state'inde korunur; Cloud/social veriyle otomatik paylaşılmaz.
 - AI sekme değişiminde **otomatik reset yok** (R40). Aktif oturum localStorage'a (`media-tracker-ai-active-session`) yazılır; yalnızca "Konuyu kapat" / `handleNewTopic` temizler. Yeni bir sekme ekleyip AI state'i reset etmek isterseniz açıkça `handleNewTopic()` çağırın — eski `aiResetSignal` mekanizması yok.
 - AI source-apis modunda **library fallback'e düşülmez** (R37.2) — 0 aday → kullanıcıya net mesaj + `r37_source_candidates_empty` debug satırı; library-based intent ise zaten erken çıkış yapar (farklı kod yolu).

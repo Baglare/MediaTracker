@@ -100,10 +100,9 @@ ve `aria-invalid` ile bağlanır. Motion sınıfları reduced-motion tercihini k
 - Otomatik provider ufku 90 gündür; geçmiş yayın arşivi değildir.
 - TMDB release takvimi token olmadan kullanılamaz.
 - Browser locale yalnız geçerli region alt etiketi taşıyorsa bölge seçimine girer.
-- Manual event conflict'i bağımsız field merge değildir; media kaydının mevcut
+- Manual event conflict'i bağımsız alan birleştirmesi değildir; media kaydının mevcut
   Cloud V2 conflict akışını kullanır.
 - Push/e-posta bildirimi, ICS/Google Calendar ve streaming platform availability
   bu kapsamda yoktur.
 
-Manuel kabul akışı için `RELEASE_CALENDAR_MANUAL_TESTS.md`, kısa portfolyo anlatımı
-için `RELEASE_CALENDAR_DEMO_SCRIPT.md` kullanılır.
+Manuel kabul akışı için [RELEASE_CALENDAR_MANUAL_TESTS.md](./RELEASE_CALENDAR_MANUAL_TESTS.md), kısa demo akışı için [RELEASE_CALENDAR_DEMO_SCRIPT.md](./RELEASE_CALENDAR_DEMO_SCRIPT.md) kullanılır. D4 “Yakında” tüketicisi ve kabul sınırı [D4_OVERVIEW.md](./D4_OVERVIEW.md) içinde özetlenir.

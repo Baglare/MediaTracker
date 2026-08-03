@@ -1,5 +1,7 @@
 # D4 Performans ve State Denetimi
 
+Bu belge D4-1'in ölçüm ve state kararlarını açıklar. D4 geneli için [D4_OVERVIEW.md](./D4_OVERVIEW.md), tek kabul özeti için [D4_STABILIZATION_AND_ACCEPTANCE.md](./D4_STABILIZATION_AND_ACCEPTANCE.md) kullanılır.
+
 ## Kanıtlanan sorunlar
 
 - Cloud queue enqueue ve flush adımları subscription yayınlıyordu; ancak aktif flush sırasında eklenen yeni bir işlem batch sonunda otomatik olarak yeniden drain edilmiyordu. Bu kayıt gerçekte kuyrukta kalıyor ve sonraki mutation, manuel sync veya owner hydration bekliyordu.
@@ -28,5 +30,6 @@
 
 - Cache process/session belleğindedir; tam reload sonrası browser HTTP cache'i `no-store` nedeniyle yeniden istek gerekir. Signed URL süresi server tarafından 5 dakika olduğu için TTL bununla sınırlıdır.
 - Profil editörünün tam veri endpoint'i yalnız edit modunda ayrı yüklenmeye devam eder; summary cache'e hassas editor payload'ı konmaz.
-- Browser profiler ve gerçek iki hesap/Supabase smoke bu statik ve unit doğrulama turunda koşulmadı.
-- Seri kartı, akordeon, logo/taxonomy rozeti, yaklaşan yayın widget'ı ve grafik paleti D4-2 kapsamında kalır.
+- Browser profiler ve canlı iki hesap/Supabase smoke, D4'ün yerel statik/unit/browser kabulünden ayrıdır; production kanıtı olarak sunulmaz.
+
+D4-2 UI/tema kapsamı tamamlanmıştır; kararlar [D4_UI_THEME_POLISH.md](./D4_UI_THEME_POLISH.md) belgesindedir.

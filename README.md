@@ -1,22 +1,35 @@
 # MediaTracker
 
-MediaTracker; film, dizi, anime, manga, manhwa, manhua, novel ve kitap takibi için geliştirilmiş offline-first bir medya takip uygulamasıdır. Proje Next.js 16 App Router, React 19, TypeScript ve Tailwind CSS 4 üzerine kuruludur.
+MediaTracker; film, dizi, anime, manga, manhwa, manhua, novel ve kitap takibi için geliştirilmiş local-first bir medya takip uygulamasıdır. Proje Next.js 16 App Router, React 19, TypeScript ve Tailwind CSS 4 üzerine kuruludur.
 
-Uygulamanın ana veri kaynağı tarayıcıdaki `localStorage` alanıdır. Supabase yapılandırılırsa hesap, cloud aktarım ve senkron hazırlıkları devreye girer; yapılandırılmazsa uygulama yerel modda çalışmaya devam eder.
+Uygulamanın ana veri kaynağı tarayıcıdaki owner-scoped yerel depolamadır. Supabase yapılandırılırsa hesap, kontrollü Cloud aktarımı ve kuyruk tabanlı senkronizasyon devreye girer; yapılandırılmazsa uygulama yerel modda çalışmaya devam eder. Proje henüz public frontend olarak yayınlanmamıştır.
 
 ## Mevcut Durum
 
-- Tek sayfalık, sekmeli Next.js uygulaması.
-- Varsayılan kullanım yerel moddur; veri tarayıcıda saklanır.
-- Supabase opsiyoneldir: auth, manuel cloud upload/download/merge ve sync queue altyapısı vardır.
+- App Router sayfaları ile sekmeli ana uygulamayı birleştiren Next.js uygulaması.
+- Varsayılan kullanım yerel moddur; medya ve ilerleme verisi owner-scoped biçimde tarayıcıda saklanır.
+- Supabase opsiyoneldir: auth, manuel Cloud upload/download/merge, owner-scoped sync queue, revision/idempotency ve conflict akışları vardır.
 - AI Danışman opsiyoneldir: varsayılan mock provider ile çalışır, API anahtarları verilirse gerçek provider kullanılabilir.
 - Python tabanlı ML servisi opsiyoneldir: embedding skoru için kullanılabilir; yoksa yerel mock embedding fallback'i çalışır.
+
+### Geliştirme aşamaları
+
+| Aşama | Durum |
+| --- | --- |
+| D1 — Veri bütünlüğü ve portable backup | Tamamlandı |
+| D2 — Cloud Sync geliştirme ve testleri | Tamamlandı |
+| D2B.0 / D2B.1 production veritabanı | Uygulandı |
+| D2C.1 production cutover | D8 release aşamasına bırakıldı |
+| D3 — Release Calendar | Tamamlandı |
+| D4 — Product Polish / Performance / UX Reliability | Tamamlandı |
+
+Ayrıntılı sıra ve sonraki aşamalar: [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Teknik Kazanımlar
 
 - Offline-first veri mimarisi ve `localStorage` tabanlı persistence.
-- JSON import/export, merge/replace veri yönetimi ve tarayıcı içi yedekleme akışı.
-- Supabase auth, manuel cloud aktarım ve sync queue hazırlığı.
+- Versioned JSON import/export, kontrollü additive import, checksum, rollback/undo ve portable backup akışı.
+- Supabase auth, manuel Cloud aktarım, owner-scoped sync queue, V2 revision/idempotency/tombstone ve conflict akışı.
 - Local-first kütüphaneden ayrılmış cloud sosyal profil, kullanıcı arama ve takip/engel temeli.
 - TMDB, OMDb, TVmaze, AniList ve Open Library entegrasyonları için normalize edilmiş medya modeli.
 - AI destekli öneri pipeline'ı, embedding tabanlı benzerlik skoru, provider fallback sistemi ve feedback-aware recommendation flow.
@@ -61,19 +74,29 @@ Uygulamanın ana veri kaynağı tarayıcıdaki `localStorage` alanıdır. Supaba
   - Anime/manga/manhwa/manhua/novel için AniList
   - Kitap için Open Library
 - Veri yönetimi:
-  - JSON dışa aktarma
-  - JSON içe aktarma
-  - Merge veya replace modu
-  - Mock verilere sıfırlama
+  - Versioned portable JSON yedeği ve SHA-256 bütünlük kontrolü
+  - Salt-okunur dosya inceleme ve kullanıcı onaylı additive import
+  - Journal, read-back, rollback ve sınırlı undo
+  - Duplicate inceleme/birleştirme ve yerel veri bütünlüğü taraması
+  - Basit JSON içe/dışa aktarma ve yerel örnek verileri yönetme
+  - Format ayrıntıları: [`docs/PORTABLE_BACKUP_FORMAT.md`](docs/PORTABLE_BACKUP_FORMAT.md)
 - Cloud:
   - Supabase email/password auth
   - Yerel -> Cloud aktarım
   - Cloud -> Yerel indirme
   - Cloud verisini yerel veriyle birleştirme
-  - Mutasyonlar için sync queue ve online durumda flush altyapısı
+  - Mutasyonlar için owner-scoped sync queue, online flush ve reaktif `queue → in-flight → ready` durum özeti
+  - Cloud Media V2 için revision, operation idempotency, tombstone ve kontrollü conflict çözümü
+  - Uyuşmayan veya doğrulanamayan rollout sözleşmesinde local kullanımı koruyup Cloud mutation'ı fail-closed durdurma
   - Özel temalar için güvenli JSON import/export ve kullanıcı onaylı, revision kontrollü opsiyonel cloud senkronizasyonu
-  - Birbirinden ayrışan Porselen, Tozpembe, Lavanta, Kutup ve Sepya açık tema yüzeyleri ile açık/koyu temaya uyumlu logo
   - Tema aktarım/senkronizasyon ayrıntıları: [`docs/THEME_IMPORT_EXPORT_AND_SYNC.md`](docs/THEME_IMPORT_EXPORT_AND_SYNC.md)
+- Kişiselleştirme:
+  - Merkezi preset/custom tema token registry'si; cihaz teması, dünya vurgusu, grafik paleti ve profil sunumunu ayrı modellerde tutma
+  - Birbirinden ayrışan Porselen, Tozpembe, Lavanta, Kutup ve Sepya açık tema yüzeyleri
+  - Tek SVG mask varlığından üretilen açık/koyu temaya uyumlu logo
+  - Dashboard/sağ panel düzeni, yoğunluk, efekt ve başlangıç görünümü tercihleri
+  - Erişilebilir collapsible ayarlar ve ayırt edilebilir monokrom grafik paleti
+  - Mimari ayrıntılar: [`docs/PERSONALIZATION_ARCHITECTURE.md`](docs/PERSONALIZATION_ARCHITECTURE.md)
 - Sosyal profil:
   - `/u/[username]` public/protected/personal profil route’u ve `/people` kullanıcı araması
   - Asimetrik takip/istek, karşılıklı Yin/Yang durumu ve engelleme RPC’leri
@@ -202,8 +225,13 @@ Temel kullanım için hiçbir değişken zorunlu değildir. Aşağıdaki değiş
 | --- | --- | --- |
 | `NEXT_PUBLIC_SUPABASE_URL` | Hayır | Supabase auth, cloud aktarım ve persistent embedding cache bağlantısı için |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Hayır | Supabase client bağlantısı için |
+| `NEXT_PUBLIC_CLOUD_MEDIA_SCHEMA_STAGE` | Hayır | Cloud şema fazı: local varsayılan `legacy`; D2B.1 ortamı için kontrollü `d2b1` |
+| `NEXT_PUBLIC_CLOUD_MEDIA_V2_ENABLED` | Hayır | Cloud Media V2 adapter'ını açıkça etkinleştirir; varsayılan `false` |
+| `NEXT_PUBLIC_CLOUD_MEDIA_MAINTENANCE` | Hayır | Bakım sırasında Cloud mutation dispatch'ini durdurur |
+| `NEXT_PUBLIC_CLOUD_MEDIA_DEPLOYMENT_EPOCH` | Hayır | Açık istemcilerde deployment değişimini ve kontrollü reload gereksinimini tanımlar |
+| `NEXT_PUBLIC_CLOUD_MEDIA_MINIMUM_CLIENT_VERSION` | Hayır | Minimum uyumlu istemci sözleşmesini tanımlar |
 | `SUPABASE_SERVICE_ROLE_KEY` | Hayır | Yalnızca server-side persistent embedding cache erişimi için |
-| `TMDB_READ_ACCESS_TOKEN` | Hayır | Film aramasında TMDB birincil kaynak |
+| `TMDB_READ_ACCESS_TOKEN` | Hayır | Film araması ve TMDB Release Calendar için server-side token |
 | `OMDB_API_KEY` | Hayır | Film aramasında OMDb fallback ve detay kaynağı |
 | `AI_PROVIDER` | Hayır | `mock`, `auto`, `openai`, `gemini`, `openrouter`, `groq` |
 | `OPENAI_API_KEY` | Hayır | OpenAI uyumlu provider |
@@ -227,7 +255,7 @@ Güvenlik notu: `SUPABASE_SERVICE_ROLE_KEY` yalnızca server-side kullanılmalı
 Cloud özelliklerini kullanmak istiyorsan:
 
 1. Supabase projesi oluştur.
-2. Yeni kurulumda `supabase/schema.sql` dosyasındaki SQL'i Supabase SQL Editor içinde çalıştır. Mevcut projede 14 haneli migration’ları sırayla uygula; opsiyonel tema senkronizasyonu için `supabase/migrations/20260722130000_theme_cloud_sync.sql` dosyası da uygulanmalıdır. Bu tur migration’ı uzak projeye otomatik uygulamaz.
+2. Yeni yerel/disposable kurulumda repository migration zincirini kendi izole ortamında doğrula. Production veritabanında D2B.0 ve D2B.1 uygulanmıştır; D2C.1 enforcement/cutover yapılmamıştır ve D8'e bırakılmıştır. Production işlemleri README kapsamı değildir; operasyonel sıra için [`docs/PRODUCTION_CLOUD_V2_CUTOVER.md`](docs/PRODUCTION_CLOUD_V2_CUTOVER.md) kullanılır.
 3. Supabase Project Settings -> API bölümünden URL ve anon key değerlerini al.
 4. `.env.local` içine şunları ekle:
 
@@ -248,7 +276,11 @@ Cloud davranışı:
 - Yerel veri yine arayüzün ana kaynağıdır.
 - Cloud upload, download ve merge işlemleri kullanıcı onayıyla yapılır.
 - Giriş yapılmış ve online durumdaysan yerel mutasyonlar sync queue üzerinden cloud'a gönderilir; ağ veya oturum yoksa bekleyen işlemler kuyrukta kalır.
+- Sync kartı pending, canlı in-flight, retryable/blocked, adapter/rollout ve son sonuç durumlarını aynı reaktif snapshot'tan gösterir.
+- Rollout sözleşmesi bakım, sürüm veya bilinmeyen şema nedeniyle hazır değilse Cloud mutation gönderimi durur; yerel veri ve yerel kullanım etkilenmez.
 - Cloud'dan otomatik real-time pull yoktur; indirme ve birleştirme manuel aksiyonlarla yapılır.
+
+Local D2B.1 geliştirme örneği `.env.example` içindedir. D2C.1'i uygulanmış gibi gösterecek environment değeri veya production komutu bu README'de verilmez.
 
 ## Veri Saklama
 
@@ -345,6 +377,32 @@ Next.js tarafı `MEDIA_TRACKER_ML_SERVICE_URL` doluysa bu servisi kullanır. Ser
 - Yeni medya kaynağı eklenirse normalizer, global search, AI candidate source union'ları ve UI label'ları birlikte güncellenmelidir.
 - AniList otomatik gruplama title benzerliğiyle yapılmaz; güvenli relation verisi kullanılır.
 - Bilinmeyen total progress için sahte `1` fallback'i yerine kaynağın semantiğine uygun değer korunmalıdır.
+
+## Mimari Belgeler
+
+- [Frontend mimarisi](docs/FRONTEND_ARCHITECTURE.md)
+- [Yerel veri formatı ve recovery](docs/LOCAL_DATA_FORMAT_AND_RECOVERY.md)
+- [Yerel veri bütünlüğü scanner/repair](docs/LOCAL_DATA_INTEGRITY_SCANNER.md)
+- [Portable Backup V2](docs/PORTABLE_BACKUP_FORMAT.md)
+- [Cloud Media V2 planı](docs/CLOUD_MEDIA_SCHEMA_V2_PLAN.md)
+- [Cloud migration/cutover runbook](docs/CLOUD_MEDIA_SCHEMA_V2_MIGRATION_RUNBOOK.md)
+- [Release Calendar mimarisi](docs/RELEASE_CALENDAR_ARCHITECTURE.md)
+- [Kişiselleştirme mimarisi](docs/PERSONALIZATION_ARCHITECTURE.md)
+- [D4 genel bakış ve kabul](docs/D4_OVERVIEW.md)
+- [Roadmap](docs/ROADMAP.md)
+
+## Bilinen Sınırlamalar
+
+- Public frontend deployment henüz yapılmamıştır; repository bir production URL iddia etmez.
+- D2C.1 owner-scoped fiziksel primary key enforcement ve production cutover D8 aşamasındadır.
+- Cloud'dan otomatik realtime pull yoktur; download/merge kullanıcı aksiyonudur.
+- Release Calendar otomatik provider ufku 90 gündür. Push/e-posta, ICS/Google Calendar ve streaming availability zorunlu kapsamda değildir.
+- TMDB takvim/film verisi token olmadan kullanılamaz; provider erişilemezse geçerli stale Release Calendar cache'i korunabilir.
+- Contract/unit testleri canlı Supabase, RLS veya production deployment kanıtı değildir.
+
+## Roadmap Özeti
+
+D1–D4 tamamlandı. Sıradaki ürün aşamaları D5 hedef sistemi, D6 AI Recommendation V2, D7 ML/değerlendirme ve D8 release/deployment + D2C.1 production cutover'dır. Opsiyonel fikirler D8 kabulünün zorunlu maddesi değildir; güncel ayrıntı [`docs/ROADMAP.md`](docs/ROADMAP.md) içindedir.
 
 ## Sorun Giderme
 
