@@ -241,6 +241,7 @@ export interface AiRecommendation {
 }
 
 export type AiEngineProvider =
+  | "deterministic_v2"
   | "mock"
   | "openai"
   | "gemini"

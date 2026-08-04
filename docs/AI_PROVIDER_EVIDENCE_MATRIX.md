@@ -1,6 +1,6 @@
 # AI Provider Evidence Matrix
 
-> Durum: D6-0 karar sözleşmesi. “Hedef” sütunları V2 yeteneğini, “mevcut boşluk” notları bugünkü adaptörleri anlatır. Bu belge canlı provider doğrulaması değildir.
+> Durum: D6-0 karar sözleşmesi; D6-2 adapter'ları raw claim üretir, D6-3 aggregator bu claim'leri bounded provider-support policy ile tüketir. Bu belge canlı provider doğrulaması değildir.
 
 ## Kaynak sahipliği
 
@@ -109,6 +109,8 @@ Mevcut kod boşluğu: arama route'u work key, author, subject, edition count, IS
 Aspect eşlemelerinin tek doğruluk kaynağı [AI Aspect Taxonomy](AI_ASPECT_TAXONOMY.md), aggregation ve ranking sözleşmesi [AI Recommendation V2 Architecture](AI_RECOMMENDATION_V2_ARCHITECTURE.md) belgesidir.
 
 ## D6-1/D6-2 kod karşılığı
+
+D6-3'te reliability, provider support ve source-kind ayrı tutulur; hiçbir genre/tag/keyword doğrudan `primary` ilan edilmez. `unsupported` alan absent değil unknown üretir. Birleşim ve confidence kuralları [AI Recommendation V2 Ranking](AI_RECOMMENDATION_V2_RANKING.md) belgesindedir.
 
 - Provider capability/ownership matrisi [`features/recommendations/domain/providers.ts`](../features/recommendations/domain/providers.ts) içindedir; hiçbir provider çağrısı yapmaz.
 - TVMaze raw `type` alanı [`lib/tvmaze-types.ts`](../lib/tvmaze-types.ts) içine optional olarak eklendi. Saf classifier [`tvmaze-anime-classifier.ts`](../features/recommendations/providers/tvmaze-anime-classifier.ts) içinde confirmed/likely/non-anime/unknown sonucu üretir.

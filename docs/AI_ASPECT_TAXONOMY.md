@@ -1,6 +1,6 @@
 # AI Aspect Taxonomy
 
-> Durum: D6-0 karar sözleşmesi. Bu belge üretim kodu veya çalışan bir registry değildir.
+> Durum: D6-0 taxonomy kaynağı; D6-1'de çalışan TypeScript registry'ye, D6-3'te raw evidence aggregation ve constraint extraction'a bağlanmıştır. Eşik kalibrasyonu D7'ye aittir.
 
 ## Amaç ve kapsam
 
@@ -165,4 +165,6 @@ Eşikler D6 sözleşme başlangıcıdır; D7 gold-label ölçümü olmadan provi
 
 ## D6-1 kod karşılığı
 
-Registry [`features/recommendations/domain/aspect-registry.ts`](../features/recommendations/domain/aspect-registry.ts), merkezi eşikler [`aspect-strength.ts`](../features/recommendations/domain/aspect-strength.ts), runtime invariant'lar [`codec.ts`](../features/recommendations/domain/codec.ts) içindedir. Kod 43 kaydı ve beş explicit provider mapping'ini taşır; V1 intent regex'leri veya production scorer bu registry'ye henüz bağlanmamıştır. Ayrıntı için [AI Recommendation V2 Domain](AI_RECOMMENDATION_V2_DOMAIN.md) belgesine bakın.
+D6-3 kod karşılığı: registry alias'ları [`constraint-extractor.ts`](../features/recommendations/intent/constraint-extractor.ts) ve provider raw claim mapping/aggregation tarafından tek aspect doğruluk kaynağı olarak tüketilir. Ayrıntılı katkı, confidence ve unknown semantiği [V2 Ranking](AI_RECOMMENDATION_V2_RANKING.md) belgesindedir. V1 regex'leri compatibility kodunda bulunabilir fakat V2 final eligibility için kanıt değildir.
+
+Registry [`features/recommendations/domain/aspect-registry.ts`](../features/recommendations/domain/aspect-registry.ts), merkezi eşikler [`aspect-strength.ts`](../features/recommendations/domain/aspect-strength.ts), runtime invariant'lar [`codec.ts`](../features/recommendations/domain/codec.ts) içindedir. Kod 43 kaydı ve beş explicit provider mapping'ini taşır; D6-3 V2 constraint/evidence/ranking yolu registry'yi kullanır. Legacy V1 regex'leri yalnız compatibility/migration karşılaştırmasıdır. Ayrıntı için [AI Recommendation V2 Domain](AI_RECOMMENDATION_V2_DOMAIN.md) belgesine bakın.

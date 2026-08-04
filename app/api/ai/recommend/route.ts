@@ -51,7 +51,11 @@ import {
   AiCandidate,
 } from "@/lib/ai/types";
 import { MediaType } from "@/lib/types";
-import { prepareProviderEvidencePipeline } from "@/features/recommendations/providers/pipeline";
+import { prepareProviderEvidencePipeline, type ProviderEvidencePipelineResult } from "@/features/recommendations/providers/pipeline";
+import {
+  DETERMINISTIC_RECOMMENDATION_V2_ENABLED,
+  runDeterministicRecommendationV2,
+} from "@/features/recommendations/orchestration";
 
 export const runtime = "nodejs";
 
@@ -238,32 +242,7 @@ function isCloseSourceTitleMatch(value: string, sourceTitle: string): boolean {
 }
 
 function buildExcludedSourceTitles(sourceTitles: string[]): string[] {
-  const expanded: string[] = [];
-  for (const title of sourceTitles) {
-    expanded.push(title);
-    const normalized = normalizeTitleForMatch(title);
-    if (normalized.includes("game of thrones") || normalized.includes("song of ice and fire")) {
-      expanded.push(
-        "Game of Thrones",
-        "A Game of Thrones",
-        "Song of Ice and Fire",
-        "A Song of Ice and Fire",
-        "A Clash of Kings",
-        "A Storm of Swords",
-        "A Feast for Crows",
-        "A Dance with Dragons",
-        "The Winds of Winter",
-        "A Dream of Spring",
-        "Fire & Blood",
-        "The World of Ice & Fire",
-        "A Knight of the Seven Kingdoms"
-      );
-    }
-    if (normalized.includes("solo leveling")) {
-      expanded.push("Solo Leveling");
-    }
-  }
-  return dedupeText(expanded);
+  return dedupeText(sourceTitles);
 }
 
 function extractDeterministicTaste(
@@ -309,23 +288,6 @@ function extractDeterministicTaste(
   }
 
   const referenceText = `${sourceTitles.join(" ")} ${message}`.toLowerCase();
-  if (/game\s+of\s+thrones|song\s+of\s+ice\s+and\s+fire|\bthrone\b/i.test(referenceText)) {
-    addSignal(signals, "fantasy");
-    addSignal(signals, "drama");
-    addSignal(signals, "political");
-    addSignal(signals, "power struggle");
-    addSignal(signals, "dark");
-    addSignal(signals, "court intrigue");
-    addSignal(signals, "morally gray");
-  }
-  if (/solo\s+leveling|\bleveling\b|dungeon|gate|hunter|rank|system/i.test(referenceText)) {
-    addSignal(signals, "action");
-    addSignal(signals, "fantasy");
-    addSignal(signals, "adventure");
-    addSignal(signals, "power progression");
-    addSignal(signals, "dungeon");
-    addSignal(signals, "game system");
-  }
   if (/romantik|romance|romantic/i.test(referenceText)) addSignal(signals, "romance");
   if (/action|aksiyon/i.test(referenceText)) addSignal(signals, "action");
   if (/fantasy|fantastik/i.test(referenceText)) addSignal(signals, "fantasy");
@@ -1016,29 +978,22 @@ function filterDismissedCandidates(
   candidates: AiCandidate[],
   dismissedRaw: unknown[]
 ): { candidates: AiCandidate[]; suppressed: number; keyCount: number; titleTypeCount: number } {
-  const normalizeTitle = (s: string) =>
-    s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
   const dismissedKeys = new Set<string>();
-  const dismissedTitleTypes = new Set<string>();
   for (const d of dismissedRaw) {
     if (d && typeof d === "object") {
-      const item = d as { externalSource?: unknown; externalId?: unknown; title?: unknown; mediaType?: unknown };
+      const item = d as { externalSource?: unknown; externalId?: unknown };
       if (item.externalSource && item.externalId) {
         dismissedKeys.add(`${String(item.externalSource)}:${String(item.externalId)}`);
       }
-      if (item.title && item.mediaType) {
-        dismissedTitleTypes.add(`${normalizeTitle(String(item.title))}:${String(item.mediaType)}`);
-      }
     }
   }
-  if (dismissedKeys.size === 0 && dismissedTitleTypes.size === 0) {
+  if (dismissedKeys.size === 0) {
     return { candidates, suppressed: 0, keyCount: 0, titleTypeCount: 0 };
   }
   let suppressed = 0;
   const filtered = candidates.filter((c) => {
     const keyHit = dismissedKeys.has(`${c.source}:${c.externalId}`);
-    const titleHit = dismissedTitleTypes.has(`${normalizeTitle(c.title)}:${c.type}`);
-    if (keyHit || titleHit) {
+    if (keyHit) {
       suppressed++;
       return false;
     }
@@ -1048,7 +1003,7 @@ function filterDismissedCandidates(
     candidates: filtered,
     suppressed,
     keyCount: dismissedKeys.size,
-    titleTypeCount: dismissedTitleTypes.size,
+    titleTypeCount: 0,
   };
 }
 
@@ -1537,9 +1492,10 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // D6-2 — Recommendation-only provider hygiene/evidence sidecar. Snapshotlar
-  // scorer veya kullanıcı response'una verilmez; D6-3 aggregation'a hazırlıktır.
+  // D6-2/D6-3 — Recommendation-only provider hygiene/evidence sidecar.
+  // Snapshot kullanıcı response'una sızmaz; authoritative V2 engine'e verilir.
   let providerEvidenceTelemetry: AiRetrievalDebug["providerEvidence"];
+  let providerPipelineResult: ProviderEvidencePipelineResult | undefined;
   let d6ProviderRejected: { title: string; reason: string }[] = [];
   try {
     const providerPipeline = await prepareProviderEvidencePipeline({
@@ -1547,6 +1503,7 @@ export async function POST(req: NextRequest) {
       baseUrl: req.nextUrl.origin,
     });
     candidates = providerPipeline.candidates;
+    providerPipelineResult = providerPipeline;
     providerEvidenceTelemetry = providerPipeline.telemetry;
     d6ProviderRejected = [...providerPipeline.rejectedCandidates];
     debugNotes.push(
@@ -1631,6 +1588,42 @@ export async function POST(req: NextRequest) {
   }
   if ((researchMode === "source-apis" || researchMode === "web") && candidates.length === 0) {
     debugNotes.push(researchMode === "web" ? "web_research_candidates_empty" : "source_api_candidates_empty");
+  }
+
+  if (DETERMINISTIC_RECOMMENDATION_V2_ENABLED) {
+    const response = await runDeterministicRecommendationV2({
+      message: providerMessage,
+      intent,
+      retrievalPlan,
+      settings,
+      candidates,
+      mediaItems,
+      feedback: recommendationFeedback,
+      dismissed: body.dismissed,
+      baseUrl: req.nextUrl.origin,
+      providerPipeline: providerPipelineResult,
+    });
+    const existing = new Set((response.rejectedCandidates ?? []).map((item) => `${item.title}:${item.reason}`));
+    const mergedRejected = [...(response.rejectedCandidates ?? [])];
+    for (const item of policyRejected) {
+      const key = `${item.title}:${item.reason}`;
+      if (!existing.has(key)) { existing.add(key); mergedRejected.push(item); }
+    }
+    response.rejectedCandidates = mergedRejected.length > 0 ? mergedRejected : undefined;
+    response.debug = {
+      ...(response.debug ?? { provider: "deterministic_v2" }),
+      provider: "deterministic_v2",
+      ...providerDebugFields(providerState),
+      selectedProvider: "deterministic_v2",
+      retrieval: response.debug?.retrieval ? {
+        ...response.debug.retrieval,
+        executedQueries: searchResult.debug.executedQueries,
+        sourceCandidateCounts: searchResult.debug.sourceCandidateCounts,
+        providerEvidence: providerEvidenceTelemetry,
+        notes: [...(response.debug.retrieval.notes ?? []), ...debugNotes, "d6_3_deterministic_final_ranking"],
+      } : undefined,
+    };
+    return NextResponse.json(response satisfies AiRecommendResponse);
   }
 
   const libIndex = new Map<string, true>();

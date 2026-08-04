@@ -6,6 +6,7 @@ import type {
 } from "@/lib/ai/types";
 
 const KNOWN_PROVIDERS = new Set<AiEngineProvider>([
+  "deterministic_v2",
   "mock",
   "openai",
   "gemini",

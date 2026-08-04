@@ -1,6 +1,6 @@
 # AI Recommendation V2 Provider Enrichment
 
-> Durum: D6-2 tamamlandı. Bu katman provider kimliği, ham yapılandırılmış evidence, recommendation-only TVMaze anime filtresi, exact-ID linking ve bounded public metadata cache sağlar. Aspect aggregation ve final ranking D6-3'e aittir.
+> Durum: D6-2 tamamlandı. Bu katman provider kimliği, ham yapılandırılmış evidence, recommendation-only TVMaze anime filtresi, exact-ID linking ve bounded public metadata cache sağlar. D6-3 consumer/aggregation ve final ranking de uygulanmıştır.
 
 ## Klasör ve sınır
 
@@ -86,14 +86,17 @@ Search normalizer work ID ile ilk exact edition ID'yi ayrı alanlarda korur. Aut
 
 ## Fail-soft ve V1 compatibility
 
-Enrichment hatası mevcut doğrulanmış V1 adayını düşürmez; identity üretilemeyen external aday ise recommendation havuzuna alınmaz. Provider/raw hata ve token kullanıcıya açılmaz. Recommendation response shape, scorer ağırlıkları ve LLM ranking davranışı değişmemiştir. D6-2'nin üretim etkisi yalnız recommendation candidate hijyeni, TVMaze anime exclusion, TMDB TV discovery ve exact-ID dedupe'dur.
+Enrichment hatası mevcut doğrulanmış adayı düşürmez; identity üretilemeyen external aday ise recommendation havuzuna alınmaz. Provider/raw hata ve token kullanıcıya açılmaz. D6-2'nin kendi üretim etkisi recommendation candidate hijyeni, TVMaze anime exclusion, TMDB TV discovery ve exact-ID dedupe'dur; D6-3 sonrasında snapshot'lar deterministik scorer tarafından tüketilir.
 
 Conditional live smoke `D6_PROVIDER_LIVE_SMOKE=1` olmadan tamamen skip edilir. TMDB ve OMDb kontrolleri ayrıca ilgili env anahtarını gerektirir; DB veya mutation yapmaz.
 
-## D6-3'e kalanlar
+## D6-3 consumer sözleşmesi
 
-- Raw claim'lerden `AspectEvidence` strength/level/confidence aggregation.
-- Must/avoid ve objektif hard filtreler.
-- Deterministik score breakdown, sort key, diversity ve grounded explanation.
-- V1 LLM reranking'in kaldırılması ve V2 scorer'ın authoritative olması.
+Raw snapshot'lar [`aggregation.ts`](../features/recommendations/evidence/aggregation.ts) tarafından `AspectEvidence` read-model'ine çevrilir; D6-2 reliability değerleri strength değildir. Authoritative pipeline, aynı snapshot/cache sonucunu [`runDeterministicRecommendationV2`](../features/recommendations/orchestration/deterministic-engine.ts) içine sidecar olarak verir ve duplicate enrichment çağrısı yapmaz. Ayrıntı [V2 Ranking](AI_RECOMMENDATION_V2_RANKING.md) belgesindedir.
 
+## D6-4'e kalanlar
+
+- Editable constraint ve strictness UI.
+- Reason/aspect-level feedback contract'ının kullanıcı etkileşimine bağlanması.
+- Exploratory near-match read-model'inin primary listeden ayrı gösterimi.
+- Evidence confidence ve warning'ler için sade kullanıcı transparency görünümü.

@@ -1,0 +1,152 @@
+# AI Recommendation V2 — Evidence, Eligibility ve Deterministik Ranking
+
+> Durum: D6-3 tamamlandı. Bu belge `features/recommendations/{intent,evidence,ranking,explanation,orchestration}` altındaki çalışan baseline sözleşmesini açıklar. D6-4 UI/read-model genişletmeleri ve D7 kalibrasyonu başlamamıştır.
+
+## 1. Çalışan akış
+
+External recommendation akışı şu sırayı kullanır:
+
+1. V1 intent ve retrieval plan, version 2 yapılandırılmış request'e çevrilir.
+2. Doğrulanmış provider identity ve D6-2 evidence snapshot alınır.
+3. Raw claim'ler merkezi registry desteğine göre `AspectEvidence` olur.
+4. Objective ve aspect must/avoid koşulları soft scoring'den önce uygulanır.
+5. Uygun adaylar ayrı skor boyutları ve deterministik tuple ile sıralanır.
+6. Exact franchise/provider bilgisi varsa diversity rerank uygulanır.
+7. Açıklama yalnız taşınan provider/evidence alanlarından Türkçe üretilir.
+
+Authoritative çağrı [`runDeterministicRecommendationV2`](../features/recommendations/orchestration/deterministic-engine.ts) fonksiyonudur. [`route.ts`](../app/api/ai/recommend/route.ts) retrieval sonrasında bu use-case'e delege eder ve response/Quick Add şekli korunur. Provider LLM'leri retrieval planning için kullanılabilir; final aday seçimi, sıra ve fit kararı LLM'ye verilmez.
+
+## 2. Structured request adapter
+
+[`constraint-extractor.ts`](../features/recommendations/intent/constraint-extractor.ts) aspect eşlemesini yalnız 43 kayıtlı aspect'in label/alias alanlarından yapar. Ayrı romance/action regex listesi taşımaz. Yerel context, constraint'i `must`, `prefer` veya `avoid` olarak sınıflandırır.
+
+- Explicit must bütün strictness modlarında must kalır.
+- Provider desteği `unsupported/experimental` veya registry `mustSafety=unsafe` ise otomatik hard karar uydurulmaz; constraint `prefer` olur ve warning taşır.
+- Retrieval planning sinyalleri yalnız `inferred` kaynaktır ve explicit constraint'i ezmez.
+- Reference yalnız exact provider + external ID ile `verified` olur. Title-only/fuzzy eşleşme `unresolved` kalır.
+- Medya türü, length, release status/year, format, language ve country objective constraint'tir; aspect registry'ye gömülmez.
+
+D6-3 adapter mevcut V1 request'i kabul eder. Editable parse, strictness seçimi ve unresolved reference çözümü D6-4'tedir.
+
+## 3. Evidence aggregation
+
+Raw provider claim reliability değeri aspect strength değildir. [`claim-normalizer.ts`](../features/recommendations/evidence/claim-normalizer.ts) şu merkezi katkı tablosunu uygular:
+
+| Kaynak | Başlangıç katkısı | Not |
+|---|---:|---|
+| provider genre | 0.55 | Genre merkezilik garantisi değildir. |
+| AniList tag rank | 0.62 | 0–100 rank ayrıca `0.50–1.00` faktörüne çevrilir. |
+| provider keyword | 0.46 | Exact registry alias eşleşmesi gerekir. |
+| provider metadata | 0.32 | Çoğunlukla objective kanıttır. |
+| local semantic verifier | claim reliability | Tek başına provider kanıtını ezmez; contribution 0.65 ile sınırlıdır. |
+| remote LLM verifier | claim reliability | Yalnız candidate metadata; aynı sınırlar. |
+| user feedback | 0 | Provider evidence değildir; personal-fit katmanına gider. |
+
+Katkı `source base × claim reliability × provider support × tag-rank factor` ile hesaplanır. Aynı provider/source/field/normalized value/aspect claim'i bir kez sayılır. En güçlü dört bağımsız katkı bounded noisy-or ile birleşir; sonuç `0.95` ile, provider support da `strong=0.90`, `partial=0.74`, `experimental=0.49`, `unsupported=0` ile sınırlıdır.
+
+Bu sayılar D6 baseline sabitleridir; D7 gold label olmadan aspect/provider bazında değiştirilmez.
+
+### Unknown ve absent
+
+- Hiç supporting claim yoksa veya provider/aspect `unsupported` ise `strength=null`, `level=unknown`, `confidence=unknown` üretilir.
+- `absent` ancak sayısal, doğrulanmış düşük strength (`0.00–0.199…`) olduğunda anlamlıdır.
+- Unknown otomatik sıfır veya absent değildir.
+- Malformed reliability/tag rank claim'i atılır ve warning taşınır.
+
+### Confidence
+
+- İki bağımsız evidence ailesi ve en az `0.72` reliability: `high`.
+- Tek güçlü (`>=0.55`) veya iki bağımsız claim: `medium`.
+- Daha zayıf supporting evidence: `low`.
+- Supporting evidence yok: `unknown`.
+- Contradictory semantic evidence supporting claim'leri silmez; confidence bir kademe düşer.
+
+## 4. Hard eligibility
+
+Objective evaluator [`objective-filters.ts`](../features/recommendations/ranking/objective-filters.ts), aspect evaluator ise D6-1 [`policies.ts`](../features/recommendations/domain/policies.ts) sözleşmesini kullanır.
+
+- Must seviye/confidence koşulu karşılanmıyorsa aday scored listeye girmez.
+- Must evidence `unknown` ise aday elenir; popularity veya personal fit bunu telafi edemez.
+- Güvenilir `avoid` eşiği tetiklenirse aday elenir.
+- Düşük güvenli avoid, primary sonucu otomatik elemez; warning/risk taşır.
+- Prefer eligibility değiştirmez, yalnız request-fit boyutuna katkı verir.
+- Objective must'ta metadata yoksa sonuç `unknown` ve hard fail'dir.
+- Exploratory near-match domain contract'ı korunur; D6-3 public response'ta primary listeyle karıştırılmaz. Near-match UI D6-4'tedir.
+
+## 5. Personal fit
+
+[`personal-profile.ts`](../features/recommendations/ranking/personal-profile.ts) iki sinyali ayırır:
+
+- `consumed`: genre/subject/tag görülme sıklığı; küçük ağırlık.
+- `loved`: favorite ve 8+ rating; güçlü pozitif ağırlık.
+- `avoided`: dropped veya 4 ve altı rating; negatif ağırlık.
+
+Aspect eşlemesi registry alias'larıyla yapılır. Feedback yalnız exact `externalSource + externalId` item'a uygulanır. Tek dismissal bütün source/type ailesini cezalandırmaz. Reason/aspect-level feedback D6-4'e bırakılmıştır.
+
+## 6. Ranking boyutları ve sort key
+
+Her eligible aday ayrı boyutlar taşır:
+
+| Boyut | Aralık | Kullanım |
+|---|---:|---|
+| `requestFit` | 0–1 | Must/prefer/avoid ve objective karar sonucu. |
+| `personalFit` | -1–1 | Explicit beğeni/tüketim/avoid ve exact feedback. |
+| `evidenceConfidence` | 0–1 | İstekle ilgili aspect confidence. |
+| `qualitySignal` | 0–1 | Community score ağırlıklı; popularity sınırlı katkı. |
+| `novelty` | 0–1 | Exact library identity dışlamasından sonra 1. |
+| `diversityContribution` | 0–1 | Rerank sırasında ayrı read-model alanı. |
+
+Authoritative additive “score çorbası” yoktur. İlk deterministik sıra anahtarı:
+
+```text
+requestFit desc
+personalFit desc
+evidenceConfidence desc
+qualitySignal desc
+novelty desc
+canonicalProviderIdentity asc
+```
+
+Bu tuple hard-filter sonrasında uygulanır. Quality/popularity yalnız daha güçlü istek ve personal/evidence boyutlarını geçemez. Eşitlik exact canonical identity ile deterministik çözülür.
+
+## 7. Diversity
+
+[`diversity.ts`](../features/recommendations/ranking/diversity.ts) yalnız exact `seriesGroupId` varsa franchise tekrarına ceza uygular; title benzerliği franchise kimliği sayılmaz. Aynı provider tekrarına küçük bir dağılım cezası vardır. Sistem uygun aday sayısı kadar sonuç döndürür; listeyi beşe tamamlamak için hard koşul veya identity politikasını gevşetmez.
+
+## 8. Grounded explanation
+
+[`grounded-explanation.ts`](../features/recommendations/explanation/grounded-explanation.ts):
+
+- Aspect label/level/confidence yalnız `AspectEvidence` içinden gelir.
+- Length/community/popularity yalnız snapshot'ta gerçekten varsa söylenir.
+- Supporting claim'de provider varsa kaynak adı gösterilir.
+- Kanıt yoksa kesin olumlu/olumsuz aspect iddiası üretilmez.
+- Spoiler raw tag açıklama metnine taşınmaz.
+
+Baseline tamamen template-driven'dır. Opsiyonel LLM wording daha sonra eklenirse aynı evidence payload'a bağlı kalmalı; yeni fact, title, aspect veya sıra üretemez.
+
+## 9. Semantic verifier modları
+
+| Mod | Durum | Bütçe/fallback |
+|---|---|---|
+| `structured_only` | Varsayılan ve her zaman çalışır | Network/model çağrısı yok. |
+| `local_enhanced` | `AI_LOCAL_SEMANTIC_VERIFIER_URL` varsa | Top-N 8, concurrency 2, timeout 1800 ms; hata structured-only confidence ile devam eder. |
+| `remote_enhanced` | `AI_REMOTE_SEMANTIC_VERIFIER_URL` varsa | Aynı bütçe; yalnız public candidate metadata gönderilir. |
+
+Verifier payload kişisel not, rating, progress veya profile içermez. Response versioned JSON claim contract'ına göre aspect ID, `0..1` score, confidence ve polarity doğrular. Hash/mock embedding evidence source değildir. Model yokluğu request hatası değil `unavailable` engine status/fallback bilgisidir.
+
+## 10. Telemetry ve compatibility
+
+Internal debug notları constraint source sayıları, evidence snapshot sayısı, hard-filter rejection sayısı, eligible count ve effective verifier mode taşır. D6-2 cache/TVMaze/identity sayaçları korunur.
+
+- V1 request ve `AiRecommendResponse` şekli korunur.
+- `AiRecommendation.candidate` Quick Add için korunur.
+- Engine provider `deterministic_v2`, embedding mode `disabled` olarak görünür.
+- Global Search, Release Calendar ve provider details/add akışları değişmez.
+- Legacy scorer/embedding/LLM ranking sembolleri migration karşılaştırması için kaynakta kalabilir fakat authoritative production branch tarafından çağrılmaz.
+
+## 11. D6-4 ve D7 sınırı
+
+D6-4: editable constraints, strict/balanced/exploratory seçimi, reason-level feedback, near-match UI ve kullanıcıya dönük ayrıntılı transparency.
+
+D7: gold labels, aspect threshold/confidence kalibrasyonu, Precision@K/NDCG@K, hard-violation/unsupported-explanation ölçümü ve deterministik baseline'a karşı kontrollü verifier/LLM deneyleri. D7 hiçbir ölçüm sonucu olmadan D6 sabitlerini sessizce değiştirmez.

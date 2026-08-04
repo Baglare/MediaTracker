@@ -1,6 +1,6 @@
 # AI Recommendation V2 Architecture
 
-> Durum: D6-0 karar/audit kaynağı. D6-1 domain ve D6-2 provider evidence katmanı uygulanmıştır; V1 scoring ve LLM ranking davranışı değişmemiştir.
+> Durum: D6-0 karar/audit kaynağı. D6-1 domain, D6-2 provider evidence ve D6-3 deterministik ranking baseline uygulanmıştır. D6-4 UI/feedback geliştirmesi başlamamıştır.
 
 ## 1. Amaç ve değişmez kararlar
 
@@ -46,7 +46,7 @@ Aspect registry sözleşmesi [AI_ASPECT_TAXONOMY.md](AI_ASPECT_TAXONOMY.md), pro
 | Embedding similarity | [`embedding-provider.ts:embedManyWithFallback`](../lib/ai/embedding-provider.ts), [`embedding-similarity-scorer.ts`](../lib/ai/embedding-similarity-scorer.ts) | Candidate/profile metni | Gerçek Python vektörü varsa embedding score | Memory/persistent embedding cache; local service çağrısı | Hash tabanlı local mock | Karma: scorer yalnız gerçek 384-boyut Python vektörünü kabul eder; mock skor üretmez | Korunacak ilke; mock test-only olacak, gerçek model yoksa skor 0 |
 | Text similarity | [`text-similarity-scorer.ts:applyTextSimilarityScoring`](../lib/ai/text-similarity-scorer.ts) | Tokenize candidate/profile metni | Jaccard tabanlı -3..3 | Yok | Profil yoksa 0 | Orta-düşük; lexical sinyaldir, semantik kanıt değildir | Soft personal-fit sinyali olarak değişecek; aspect evidence sayılmayacak |
 | Hybrid scoring | [`hybrid-feature-builder.ts`](../lib/ai/hybrid-feature-builder.ts), [`hybrid-scorer.ts`](../lib/ai/hybrid-scorer.ts) | Rule, feedback, content, behavior, popularity, text, embedding | Tek additive `finalScore` | Yok | Eksik boyut 0 | Düşük-orta; hard/soft ayrımı yok | Kaldırılacak; breakdown + deterministik sort key gelecek |
-| LLM ranking | Provider `generate`; `route.ts:runRankingWithProviders` | Ön sıralı adaylar, profil, prompt | Havuzdan 3-5 seçim ve açıklama | Remote LLM çağrısı | Mock ilk 3 adayı seçer | Kimlikte orta, sıralamada düşük; LLM ön sırayı serbestçe değiştirebilir | D6 baseline'ında kaldırılacak; LLM sadece grounded wording |
+| Final ranking | `runDeterministicRecommendationV2`; legacy `runRankingWithProviders` production branch değildir | Doğrulanmış aday, structured request, evidence sidecar | Hard-filter sonucu, score breakdown, deterministik sıra ve grounded açıklama | Opsiyonel verifier dışında yok | Structured-only ile devam | Deterministik; confidence/coverage provider metadata'ya bağlı | D6-3'te uygulandı; LLM final seçim/sıra vermez |
 | Safe fallback | `route.ts` deterministic plan/empty response; [`mock-provider.ts`](../lib/ai/providers/mock-provider.ts); client local fallback | Provider/retrieval/ranking hatası | Mevcut havuzdan deterministik öneri veya boş sonuç | Yok | Katmanlı fallback | Orta; dış kaynak modunda library fallback yapılmaması doğru | Korunacak, fakat engine mode ve confidence açık olacak |
 | Response mapping | Provider mapper'ları, `retainVerifiedRecommendations`, `buildAiEngineStatus`, client `runApi` | Aday/LLM çıktısı | `AiRecommendResponse` ve UI model | Yok | Geçersiz shape client'ta null/fallback | Orta; public response ile geniş debug tipi iç içe | Değişecek: public read-model, internal trace ve ops telemetry ayrılacak |
 | Feedback persistence | [`ai-advisor.tsx:recordRecommendationFeedback`](../components/ai-advisor.tsx), [`recommendation-feedback.ts`](../lib/ai/recommendation-feedback.ts), [`local-state.ts`](../lib/ai/local-state.ts) | shown/dismissed/added/similar/open events | Owner-scoped local state, en çok 1000 event | Yerel personal-data storage yazımı | Yazma hatası UI uyarısı | Orta-yüksek; owner scope var, reason-level veri yok | Korunacak; schema version ve reason/aspect alanları eklenecek |
@@ -361,12 +361,13 @@ Public response yalnız kullanıcı için gerekli alanları taşır:
 
 Internal trace; query listeleri, provider hata kodları, filtre sayaçları, cache istatistikleri ve model teknik ayrıntılarını kapsar. Development-only gated telemetry'dir; public API'nin zorunlu contract'ı değildir ve kişisel not/prompt/raw provider body içermez.
 
-## 11. D6-1/D6-2 uygulama durumu ve D6-3 sınırı
+## 11. D6-1/D6-2/D6-3 uygulama durumu ve D6-4 sınırı
 
 D6-1 tamamlandı; domain ayrıntıları [AI Recommendation V2 Domain](AI_RECOMMENDATION_V2_DOMAIN.md) belgesindedir.
 
 - Ortak tipler, 43-aspect registry, strength/evidence/constraint/request codec'leri ve strictness/near-match policy'leri `features/recommendations/domain/` altında izoledir.
 - D6-2 provider adapter'ları, exact identity policy, raw evidence sidecar ve bounded cache `features/recommendations/providers/` altındadır; ayrıntı [Provider Enrichment](AI_RECOMMENDATION_V2_PROVIDER_ENRICHMENT.md) belgesindedir.
 - TVMaze classifier yalnız recommendation candidate pipeline'ına bağlandı. Global search route'u, details/Quick Add ve release calendar filtrelenmez.
-- V1 scorer ağırlıkları ve LLM final ranking yolu sidecar evidence'i tüketmez. Aspect aggregation, hard filter ve deterministik ranking D6-3 acceptance kapsamıdır.
-- D6-3 için bilinen hard blocker yoktur; provider/live drift fixture'ları conditional smoke ile ayrıca izlenmelidir.
+- D6-3 raw claim normalization, `AspectEvidence` aggregation, objective/aspect hard filter, ayrı score breakdown, deterministik sort key, diversity rerank ve grounded açıklamayı `features/recommendations/` içinde uygulamıştır. Ayrıntı [AI Recommendation V2 Ranking](AI_RECOMMENDATION_V2_RANKING.md) belgesindedir.
+- External recommendation final seçimi artık `runDeterministicRecommendationV2` tarafından yapılır; LLM retrieval planning için kalabilir fakat final aday/sıra kararı vermez. V1 scorer/embedding yolu authoritative production branch değildir.
+- D6-4 için bilinen hard blocker yoktur. Editable constraint/strictness, reason-level feedback ve near-match UI henüz yoktur.
