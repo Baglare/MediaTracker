@@ -131,6 +131,20 @@ export interface AiRetrievalDebug {
   tasteSignalQueries?: string[];
   directTitleQueryUsed?: boolean;
   notes?: string[];
+  providerEvidence?: {
+    snapshots: number;
+    enrichedCandidates: number;
+    cacheHits: number;
+    cacheMisses: number;
+    enrichmentFailures: number;
+    tvmaze_anime_excluded: number;
+    tvmaze_anime_likely_excluded: number;
+    tvmaze_anime_unknown: number;
+    tvmaze_non_anime_kept: number;
+    same_provider_deduped: number;
+    exact_bridge_deduped: number;
+    identity_conflicts: number;
+  };
 }
 
 export interface AiCandidate {

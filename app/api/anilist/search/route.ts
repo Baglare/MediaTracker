@@ -44,6 +44,7 @@ const MEDIA_FIELDS = `
   chapters
   volumes
   genres
+  tags { id name rank category isGeneralSpoiler isMediaSpoiler isAdult }
   countryOfOrigin
   averageScore
   popularity

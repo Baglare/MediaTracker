@@ -1,11 +1,11 @@
 // ============================================
 // TMDB Arama API Route'u (Server-Side)
 // ============================================
-// R21.2: Film aramalarında birincil kaynak. Şu değişikliklerle:
+// R21.2/D6-2: Varsayılan film aramasını korur; recommendation için opsiyonel
+// `mediaType=tv` desteği sunar. Şu değişikliklerle:
 //   - `search/multi` yerine `search/movie` kullanılıyor → sadece film sonuçları
 //     döner. Dizi sonuçları TVmaze tarafında zaten zengin (sezon kırılımı vs.),
-//     TMDB sonuçlarının TVmaze ile karışıp duplicate yaratmasını engellemek
-//     için TMDB **film-only**.
+//     Varsayılan çağrı film-only kalır; TV sonucu yalnız explicit parametreyle döner.
 //   - Token yapılandırılmamış (env eksik) durumda 503 + `{ results: [] }` döner.
 //     Eskiden 500 dönüyordu; client tarafı bunu hata olarak görüp OMDb
 //     fallback'ine düşemiyordu.
@@ -23,7 +23,7 @@ const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/w500";
  * `search/movie` yalnızca film döndürdüğü için media_type alanı yoktur;
  * dönüşümü film için sabitliyoruz.
  */
-function normalizeMovieResult(raw: TmdbRawResult): TmdbNormalizedResult | null {
+export function normalizeMovieResult(raw: TmdbRawResult): TmdbNormalizedResult | null {
   const title = raw.title;
   if (!title) return null;
 
@@ -46,6 +46,27 @@ function normalizeMovieResult(raw: TmdbRawResult): TmdbNormalizedResult | null {
     releaseYear,
     coverUrl,
     totalProgress: 1,
+    originalTitle: raw.original_title && raw.original_title !== title ? raw.original_title : undefined,
+    originalLanguage: raw.original_language,
+    popularity: raw.popularity,
+    averageScore: typeof raw.vote_average === "number" ? Math.round(raw.vote_average * 10) : undefined,
+  };
+}
+
+export function normalizeTvResult(raw: TmdbRawResult): TmdbNormalizedResult | null {
+  const title = raw.name;
+  if (!title) return null;
+  const releaseYear = raw.first_air_date?.length && raw.first_air_date.length >= 4
+    ? Number.parseInt(raw.first_air_date.slice(0, 4), 10) : undefined;
+  return {
+    externalSource: "tmdb", externalId: String(raw.id), type: "tv", title,
+    originalTitle: raw.original_name && raw.original_name !== title ? raw.original_name : undefined,
+    overview: raw.overview || undefined,
+    releaseYear: Number.isFinite(releaseYear) ? releaseYear : undefined,
+    coverUrl: raw.poster_path ? `${TMDB_IMAGE_BASE}${raw.poster_path}` : undefined,
+    totalProgress: 1, originalLanguage: raw.original_language,
+    countries: raw.origin_country, popularity: raw.popularity,
+    averageScore: typeof raw.vote_average === "number" ? Math.round(raw.vote_average * 10) : undefined,
   };
 }
 
@@ -62,6 +83,7 @@ interface TmdbSearchMovieResponse {
  */
 export async function GET(request: NextRequest) {
   const query = request.nextUrl.searchParams.get("q");
+  const requestedMediaType = request.nextUrl.searchParams.get("mediaType") === "tv" ? "tv" : "movie";
   if (!query || query.trim().length === 0) {
     return NextResponse.json({ error: "Arama metni (q) gerekli." }, { status: 400 });
   }
@@ -76,7 +98,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const url = new URL("https://api.themoviedb.org/3/search/movie");
+    const url = new URL(`https://api.themoviedb.org/3/search/${requestedMediaType}`);
     url.searchParams.set("query", query.trim());
     url.searchParams.set("include_adult", "false");
     url.searchParams.set("language", "tr-TR");
@@ -100,7 +122,7 @@ export async function GET(request: NextRequest) {
 
     const data = (await tmdbResponse.json()) as TmdbSearchMovieResponse;
     const normalized: TmdbNormalizedResult[] = (data.results || [])
-      .map(normalizeMovieResult)
+      .map(requestedMediaType === "tv" ? normalizeTvResult : normalizeMovieResult)
       .filter((item): item is TmdbNormalizedResult => item !== null);
 
     return NextResponse.json({ results: normalized });

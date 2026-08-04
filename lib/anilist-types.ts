@@ -54,6 +54,16 @@ export interface AniListRawRelations {
   edges?: AniListRawRelationEdge[];
 }
 
+export interface AniListRawTag {
+  id?: number;
+  name: string;
+  rank?: number;
+  category?: string;
+  isGeneralSpoiler?: boolean;
+  isMediaSpoiler?: boolean;
+  isAdult?: boolean;
+}
+
 /** AniList media (GraphQL sorgudan dönen tek bir medya) */
 export interface AniListRawMedia {
   id: number;
@@ -70,6 +80,7 @@ export interface AniListRawMedia {
   chapters?: number;        // Manga chapter sayısı
   volumes?: number;         // Manga cilt sayısı
   genres?: string[];
+  tags?: AniListRawTag[];
   countryOfOrigin?: string; // JP, KR, CN, TW vb.
   averageScore?: number;    // 0-100 arası puan
   popularity?: number;
@@ -117,6 +128,7 @@ export interface AniListNormalizedResult {
   chapters?: number;           // Manga chapter sayısı
   volumes?: number;            // Manga cilt sayısı
   genres?: string[];
+  tags?: AniListRawTag[];
   countryOfOrigin?: string;    // JP, KR, CN, TW
   anilistStatus?: string;      // FINISHED, RELEASING vb.
   format?: string;             // TV, OVA, MANGA, ONE_SHOT vb.

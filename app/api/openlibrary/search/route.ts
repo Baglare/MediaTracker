@@ -17,7 +17,7 @@ import {
 /**
  * Tek bir Open Library doc'unu normalize eder.
  */
-function normalizeDoc(doc: OpenLibraryRawDoc): OpenLibraryNormalizedResult {
+export function normalizeDoc(doc: OpenLibraryRawDoc): OpenLibraryNormalizedResult {
   // Kapak URL'si oluştur: cover_i değeri varsa resim URL'si yap
   // ?default=false → kapak yoksa 404 döndürür (kırık resim yerine)
   const coverUrl = doc.cover_i
@@ -52,6 +52,8 @@ function normalizeDoc(doc: OpenLibraryRawDoc): OpenLibraryNormalizedResult {
     languages: doc.language || undefined,
     subjects,
     isbn,
+    workId: doc.key,
+    editionId: doc.edition_key?.[0] ? `/books/${doc.edition_key[0]}` : undefined,
   };
 }
 
@@ -76,7 +78,7 @@ export async function GET(request: NextRequest) {
       q: query.trim(),
       limit: "12",
       fields:
-        "key,title,author_name,first_publish_year,cover_i,edition_count,isbn,language,number_of_pages_median,subject",
+        "key,title,author_name,first_publish_year,cover_i,edition_count,edition_key,isbn,language,number_of_pages_median,subject",
     });
 
     const url = `https://openlibrary.org/search.json?${params.toString()}`;

@@ -10,14 +10,16 @@
  */
 export interface TmdbRawResult {
   id: number;
-  media_type: "movie" | "tv" | "person";
+  media_type?: "movie" | "tv" | "person";
 
   // Film alanları
   title?: string;           // Film başlığı
+  original_title?: string;
   release_date?: string;    // Çıkış tarihi "2010-07-16" formatında
 
   // Dizi alanları
   name?: string;            // Dizi adı
+  original_name?: string;
   first_air_date?: string;  // İlk yayın tarihi
 
   // Ortak alanlar
@@ -25,7 +27,11 @@ export interface TmdbRawResult {
   poster_path?: string | null;     // Poster yolu ("/abc123.jpg")
   vote_average?: number;
   popularity?: number;
+  original_language?: string;
+  origin_country?: string[];
 }
+
+export interface TmdbKeyword { id?: number; name: string }
 
 /**
  * TMDB API yanıtının üst yapısı.
@@ -51,6 +57,17 @@ export interface TmdbNormalizedResult {
   releaseYear?: number;
   coverUrl?: string;
   totalProgress: number;     // movie: 1, tv: 1 (ileride detail ile güncellenecek)
+  originalLanguage?: string;
+  countries?: string[];
+  popularity?: number;
+  averageScore?: number;
+  genres?: string[];
+  keywords?: TmdbKeyword[];
+  runtime?: number;
+  numberOfEpisodes?: number;
+  numberOfSeasons?: number;
+  imdbId?: string;
+  theTvdbId?: string;
 }
 
 /**
@@ -69,6 +86,29 @@ export interface TmdbMovieDetailResponse {
   genres?: { id: number; name: string }[];
   external_ids?: { imdb_id?: string | null };
   homepage?: string | null;
+  original_language?: string;
+  production_countries?: { iso_3166_1: string }[];
+  popularity?: number;
+  keywords?: { keywords?: TmdbKeyword[] };
+}
+
+export interface TmdbTvDetailResponse {
+  id: number;
+  name: string;
+  original_name?: string;
+  overview?: string;
+  first_air_date?: string;
+  poster_path?: string | null;
+  number_of_episodes?: number;
+  number_of_seasons?: number;
+  vote_average?: number;
+  popularity?: number;
+  genres?: { id: number; name: string }[];
+  original_language?: string;
+  origin_country?: string[];
+  external_ids?: { imdb_id?: string | null; tvdb_id?: number | null };
+  keywords?: { results?: TmdbKeyword[] };
+  homepage?: string | null;
 }
 
 /**
@@ -79,7 +119,7 @@ export interface TmdbMovieDetailResponse {
 export interface TmdbNormalizedDetail {
   externalSource: "tmdb";
   externalId: string;
-  type: "movie";
+  type: "movie" | "tv";
   title: string;
   originalTitle?: string;
   overview?: string;
@@ -90,5 +130,12 @@ export interface TmdbNormalizedDetail {
   genres?: string[];
   averageScore?: number;  // 0-100 (TMDB vote_average 0-10 → ×10)
   imdbId?: string;
+  theTvdbId?: string;
+  keywords?: TmdbKeyword[];
+  originalLanguage?: string;
+  countries?: string[];
+  popularity?: number;
+  numberOfEpisodes?: number;
+  numberOfSeasons?: number;
   siteUrl?: string;        // homepage veya TMDB sayfa linki
 }

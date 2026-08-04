@@ -18,6 +18,7 @@ export interface OpenLibraryRawDoc {
   language?: string[];                // Diller (ISO 639-2 kodları: "eng", "tur" vb.)
   isbn?: string[];                    // ISBN numaraları
   subject?: string[];                 // Konular/Türler
+  edition_key?: string[];             // Örn: OL7353617M
 }
 
 /** Open Library search response yapısı */
@@ -44,4 +45,6 @@ export interface OpenLibraryNormalizedResult {
   languages?: string[];             // Diller
   subjects?: string[];              // Konular (en fazla 5 tane)
   isbn?: string[];                  // ISBN numaraları (en fazla 3 tane)
+  workId?: string;                 // Exact work kimliği
+  editionId?: string;              // Search doc içindeki exact edition ilişkisi
 }

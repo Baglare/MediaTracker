@@ -1,6 +1,6 @@
 # AI Recommendation V2 Architecture
 
-> Durum: D6-0 karar/audit kaynağı. D6-1 domain contract'ları uygulanmıştır; V1 üretim orchestration ve scoring davranışı değişmemiştir.
+> Durum: D6-0 karar/audit kaynağı. D6-1 domain ve D6-2 provider evidence katmanı uygulanmıştır; V1 scoring ve LLM ranking davranışı değişmemiştir.
 
 ## 1. Amaç ve değişmez kararlar
 
@@ -361,11 +361,12 @@ Public response yalnız kullanıcı için gerekli alanları taşır:
 
 Internal trace; query listeleri, provider hata kodları, filtre sayaçları, cache istatistikleri ve model teknik ayrıntılarını kapsar. Development-only gated telemetry'dir; public API'nin zorunlu contract'ı değildir ve kişisel not/prompt/raw provider body içermez.
 
-## 11. D6-1 uygulama durumu ve D6-2 sınırı
+## 11. D6-1/D6-2 uygulama durumu ve D6-3 sınırı
 
 D6-1 tamamlandı; domain ayrıntıları [AI Recommendation V2 Domain](AI_RECOMMENDATION_V2_DOMAIN.md) belgesindedir.
 
 - Ortak tipler, 43-aspect registry, strength/evidence/constraint/request codec'leri ve strictness/near-match policy'leri `features/recommendations/domain/` altında izoledir.
-- TVMaze raw tipe yalnız `type?: string | null` eklendi; saf classifier `features/recommendations/providers/tvmaze-anime-classifier.ts` içindedir.
-- V1 route, candidate retrieval ve scorer'lar yeni registry/policy'yi kullanmaz. Global search, TVMaze normalize route'u ve release calendar filtresiz kalır.
-- D6-2 için hard blocker yoktur. Enrichment, classifier entegrasyonu, evidence read-model/cache ve cross-provider identity link'leri D6-2 acceptance kapsamıdır.
+- D6-2 provider adapter'ları, exact identity policy, raw evidence sidecar ve bounded cache `features/recommendations/providers/` altındadır; ayrıntı [Provider Enrichment](AI_RECOMMENDATION_V2_PROVIDER_ENRICHMENT.md) belgesindedir.
+- TVMaze classifier yalnız recommendation candidate pipeline'ına bağlandı. Global search route'u, details/Quick Add ve release calendar filtrelenmez.
+- V1 scorer ağırlıkları ve LLM final ranking yolu sidecar evidence'i tüketmez. Aspect aggregation, hard filter ve deterministik ranking D6-3 acceptance kapsamıdır.
+- D6-3 için bilinen hard blocker yoktur; provider/live drift fixture'ları conditional smoke ile ayrıca izlenmelidir.

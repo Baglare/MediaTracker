@@ -1,6 +1,6 @@
 # AI Recommendation V2 Domain
 
-> Durum: D6-1 tamamlandı. Bu domain henüz V1 orchestration, retrieval veya scoring akışına bağlı değildir.
+> Durum: D6-1 tamamlandı; D6-2 provider adapter/sidecar katmanı domain'i bozmadan eklendi. Domain constraint/strength policy'leri henüz V1 scoring'e bağlı değildir.
 
 ## Klasör yapısı
 
@@ -17,6 +17,9 @@ features/recommendations/
     policies.ts          # strictness, eligibility, near-match ve length policy'leri
     index.ts              # domain public export yüzeyi
   providers/
+    types.ts, candidate-identity.ts, evidence-mappers.ts, evidence-cache.ts
+    anilist-adapter.ts, tvmaze-adapter.ts, tmdb-adapter.ts
+    omdb-adapter.ts, openlibrary-adapter.ts, pipeline.ts
     tvmaze-anime-classifier.ts
 ```
 
@@ -116,7 +119,7 @@ Verified reference için `provider + externalId + mediaType + titleSnapshot` zor
 - `Animation + English + US` gibi açık Batı sinyali → `non_anime`, tutulur.
 - Yalnız `Animation` veya yetersiz metadata → `unknown`, sırf belirsizlikten elenmez.
 
-`tvmaze_anime_excluded`, `tvmaze_anime_likely_excluded`, `tvmaze_anime_unknown` yalnız telemetry type contract'ıdır. Sayaç ve recommendation filtresi D6-2'de bağlanacaktır. Global search, TVMaze route'u ve release calendar davranışı değişmedi.
+`tvmaze_anime_excluded`, `tvmaze_anime_likely_excluded`, `tvmaze_anime_unknown`, `tvmaze_non_anime_kept` recommendation debug telemetry'sine D6-2'de bağlandı. Filtre yalnız `prepareProviderEvidencePipeline` içindedir; global search route'u, details akışı ve release calendar davranışı değişmedi.
 
 ## V1 compatibility sınırı
 
@@ -125,9 +128,9 @@ Verified reference için `provider + externalId + mediaType + titleSnapshot` zor
 - [`components/ai-advisor.tsx`](../components/ai-advisor.tsx) yalnız birebir aynı `AiSettings` ve `AiRecommendation` tiplerini type-only import eder. Runtime shape, prop veya response mapping değişmedi.
 - UI'ya V2 constraint/strictness/near-match tipleri bağlanmadı. Daha gevşek yerel debug/session tiplerinin taşınması D6-4'e bırakıldı.
 
-## D6-2'ye kalan entegrasyonlar
+## D6-2 provider katmanı ve D6-3 sınırı
 
-- AniList tag rank, TMDB TV/keyword ve Open Library evidence enrichment.
-- TVMaze classifier'ı yalnız recommendation TV candidate pool'a bağlama ve gerçek debug sayaçları.
-- Provider evidence read-model/cache ve cross-provider identity link'leri.
-- V2 domain'i V1 orchestration/scoring'e authoritative olarak bağlamak D6-2/D6-3 acceptance gate'lerine tabidir.
+- AniList tag rank, TMDB movie/TV keyword/external ID, OMDb secondary evidence ve Open Library work/edition metadata adapter'ları eklendi.
+- `CandidateProviderEvidenceSnapshot` aggregation öncesi raw claim sidecar'ıdır; public response ve V1 scorer'a sızmaz.
+- Exact identity link'leri ve bounded public metadata cache [Provider Enrichment](AI_RECOMMENDATION_V2_PROVIDER_ENRICHMENT.md) belgesinde tanımlıdır.
+- Aspect aggregation, hard filters ve authoritative deterministic ranking D6-3'e kalır.

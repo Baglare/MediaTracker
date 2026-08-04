@@ -993,7 +993,7 @@ function sourceMatchesMediaType(plan: AiSearchPlan): boolean {
     case "omdb":
       return plan.mediaType === "movie";
     case "tmdb":
-      return plan.mediaType === "movie";
+      return plan.mediaType === "movie" || plan.mediaType === "tv";
     case "library":
       return true;
     case "web":
@@ -1040,11 +1040,13 @@ async function runRetrievalPlan(
 
   for (const p of plan.searchPlans) {
     if (p.source === "library") continue;
+    if (p.source === "tvmaze" && plan.targetMediaTypes.includes("anime") && !plan.targetMediaTypes.includes("tv")) continue;
     for (const q of p.queries.slice(0, MAX_PLAN_QUERIES)) {
       if (p.source === "anilist") tasks.push(searchAniList(ctx, q, p.mediaType));
       else if (p.source === "tvmaze") tasks.push(searchTvmaze(ctx, q));
       else if (p.source === "openlibrary") tasks.push(searchOpenLibrary(ctx, q));
-      else if (p.source === "omdb" || p.source === "tmdb") tasks.push(searchOmdb(ctx, q));
+      else if (p.source === "omdb") tasks.push(searchOmdb(ctx, q));
+      else if (p.source === "tmdb") tasks.push(searchTmdb(ctx, q, p.mediaType === "tv" ? "tv" : "movie"));
     }
   }
 
@@ -1077,28 +1079,29 @@ async function searchForIdea(ctx: SearchContext, idea: AiCandidateIdea): Promise
   }
 }
 
-// R37 — TMDB film araması (source-apis modunun birincil film kaynağı).
-// TMDB route'u key eksikse 503 + boş results döndürdüğü için bu fonksiyon
+// R37/D6-2 — TMDB movie/TV araması. Movie source-apis modunun birincil film
+// kaynağıdır; TV ise TVMaze yanında discovery/enrichment kaynağıdır.
+// TMDB route'u token eksikse 503 + boş results döndürdüğü için bu fonksiyon
 // boş sonuç durumunda OMDb fallback'in çağrıldığını söyleyen bir sinyal
 // üretmez — orchestrator (searchSourceApiCandidates) zaten ardından OMDb'yi
 // çalıştırır.
-async function searchTmdb(ctx: SearchContext, q: string): Promise<AiCandidate[]> {
+async function searchTmdb(ctx: SearchContext, q: string, mediaType: "movie" | "tv" = "movie"): Promise<AiCandidate[]> {
   if (!q.trim()) return [];
   try {
-    const url = `${ctx.baseUrl}/api/tmdb/search?q=${encodeURIComponent(q)}`;
+    const url = `${ctx.baseUrl}/api/tmdb/search?q=${encodeURIComponent(q)}&mediaType=${mediaType}`;
     const res = await fetch(url, { cache: "no-store" });
     if (!res.ok) {
-      recordQuery(ctx.debug, "tmdb", "movie", q, 0);
+      recordQuery(ctx.debug, "tmdb", mediaType, q, 0);
       return [];
     }
     const data = (await res.json()) as { results?: TmdbNormalizedResult[] };
-    const results = (data.results || []).filter((r) => r.type === "movie").slice(0, PER_SOURCE_LIMIT);
-    recordQuery(ctx.debug, "tmdb", "movie", q, results.length);
+    const results = (data.results || []).filter((r) => r.type === mediaType).slice(0, PER_SOURCE_LIMIT);
+    recordQuery(ctx.debug, "tmdb", mediaType, q, results.length);
     return results.map<AiCandidate>((r) => {
       const gs: GlobalSearchResult = {
         source: "tmdb",
         externalId: r.externalId,
-        type: "movie",
+        type: r.type,
         title: r.title,
         overview: r.overview,
         releaseYear: r.releaseYear,
@@ -1109,7 +1112,7 @@ async function searchTmdb(ctx: SearchContext, q: string): Promise<AiCandidate[]>
       return {
         source: "tmdb",
         externalId: r.externalId,
-        type: "movie",
+        type: r.type,
         title: r.title,
         overview: r.overview,
         releaseYear: r.releaseYear,
@@ -1373,6 +1376,7 @@ function planForScope(scope: AdvisorScopeMode): ScopePlan {
   const screen: ScopePlan["pairs"] = [
     { source: "tmdb", mediaType: "movie" },
     { source: "tvmaze", mediaType: "tv" },
+    { source: "tmdb", mediaType: "tv" },
   ];
   const arch: ScopePlan["pairs"] = [{ source: "openlibrary", mediaType: "book" }];
 
@@ -1408,7 +1412,7 @@ function dispatchSearch(
     case "openlibrary":
       return searchOpenLibrary(ctx, query);
     case "tmdb":
-      return searchTmdb(ctx, query);
+      return mediaType === "movie" || mediaType === "tv" ? searchTmdb(ctx, query, mediaType) : Promise.resolve([]);
     case "omdb":
       return searchOmdb(ctx, query);
     case "web":

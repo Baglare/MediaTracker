@@ -11,7 +11,7 @@
 | Film önerisi | TMDB | OMDb IMDb kimliği ve ikincil doğrulama sağlar. |
 | Kitap önerisi | Open Library | Work/edition ve bibliyografik metadata birlikte tutulur. |
 
-Provider kimliği doğrulanmamış eser normal öneri havuzuna alınmaz. Web sonucu veya LLM başlığı tek başına kimlik değildir. Provider'lar arası eşleşme; normalize başlık, yıl, medya türü ve varsa IMDb/ilişki kimlikleriyle açıkça kaydedilir, sessiz birleştirme yapılmaz.
+Provider kimliği doğrulanmamış eser normal öneri havuzuna alınmaz. Web sonucu veya LLM başlığı tek başına kimlik değildir. Provider'lar arası merge yalnız aynı provider external ID, IMDb, TheTVDB veya exact Open Library work ilişkisiyle yapılır; normalize başlık/yıl/yazar benzerliği identity sayılmaz.
 
 Gösterim: `Evet` doğrudan kullanım, `Koşullu` başka alan/kanıt gerektirir, `Hayır` bu amaçla kullanılmaz. Hard constraint kararı medium/high confidence ve alanın anlamına uygun olmalıdır. Eksik alan `unknown` üretir; `absent` üretmez.
 
@@ -30,7 +30,7 @@ Gösterim: `Evet` doğrudan kullanım, `Koşullu` başka alan/kanıt gerektirir,
 | Relations | Koşullu | Evet: franchise/season hijyeni | Hayır | Koşullu: diversity | High/medium | Dedupe franchise düzeyine çıkamaz; uyarı kaydedilir. |
 | Synopsis | Evet | Tek başına hayır | Koşullu, classifier/verifier ile | Evet | Tek başına low | Eksikse synopsis tabanlı evidence unknown. |
 
-Mevcut kod boşluğu: arama sorgusu genre/format/status/length/score/popularity taşırken tag ve tag rank istemiyor; candidate adaptörü popularity, synonym, country ve relations bilgisini kaybediyor. D6-2, tag rank'i ve gerekli ham kanıt referanslarını kayıpsız taşır.
+D6-2 kod karşılığı: search/details tag adı, rank, category ve spoiler bayraklarını opsiyonel normalize eder. Tag rank raw claim'dir; aspect strength değildir.
 
 ## TVMaze
 
@@ -53,7 +53,7 @@ Mevcut kod boşluğu: `TvmazeRawShow` tipi `show.type` alanını modellemiyor; c
 - **Kesin anime:** `genres` içinde case-insensitive `Anime` varsa recommendation TV havuzundan elenir.
 - **Yüksek olasılıklı anime:** `show.type === "Animation"` ve ayrıca `language === "Japanese"` veya `network.country.code === "JP"` veya `webChannel.country.code === "JP"` ise elenir.
 - **Batı animasyonu:** yalnız `Animation` olması elenme nedeni değildir.
-- Her eleme `tvmaze_anime_excluded` debug sayacını artırır; kullanıcı contract'ında ham provider payload'ı açığa çıkarılmaz.
+- Confirmed/likely/unknown/non-anime kararları sırasıyla `tvmaze_anime_excluded`, `tvmaze_anime_likely_excluded`, `tvmaze_anime_unknown`, `tvmaze_non_anime_kept` sayaçlarında ayrılır; ham provider payload kullanıcı contract'ında açılmaz.
 - False positive riski: Japon yapımı anime olmayan animasyon veya ortak yapım. False negative riski: genre/type/dil/ülke alanlarının eksik ya da hatalı olması. Bu nedenle kesin ve olasılıklı sınıflar trace'te ayrılır.
 - TVMaze sonuçları AniList anime havuzuna taşınmaz; identity ve taxonomy kaynağı AniList olarak kalır.
 - Bu filtre yalnız recommendation TV candidate pool policy'sidir. Global manuel arama ve release calendar kullanıcıya provider kataloğunu gösterdiği için bağımsız kalır; D6 değişikliği ortak normalizer'a görünmez bir eleme eklememelidir.
@@ -70,7 +70,7 @@ Mevcut kod boşluğu: `TvmazeRawShow` tipi `show.type` alanını modellemiyor; c
 | Popularity/vote | Evet | Hayır | Hayır | Evet | Evidence confidence artırmaz | Eksikse quality contribution sıfır. |
 | Runtime/episode metadata | Evet | Evet, exact alan olduğunda | Hayır | Hayır | High | Explicit süre/bölüm must karşılanmış sayılmaz. |
 
-Mevcut kod boşluğu: route yalnız `/search/movie` kullanıyor; TV discovery yok. Normalize edilen sonuç genre, keyword, vote/popularity ve runtime taşımıyor. Hedefte film ve TV discovery açıkça ayrılır; TVMaze metadata'sı ile cross-provider eşleşme kanıtı saklanır.
+D6-2 kod karşılığı: default movie route davranışı korunurken recommendation `mediaType=tv` kullanabilir; details `external_ids,keywords` ile bounded top-N zenginleştirilir. Exact IMDb/TheTVDB bridge yoksa TMDB ve TVMaze ayrı kalır.
 
 ## OMDb
 
@@ -108,8 +108,9 @@ Mevcut kod boşluğu: arama route'u work key, author, subject, edition count, IS
 
 Aspect eşlemelerinin tek doğruluk kaynağı [AI Aspect Taxonomy](AI_ASPECT_TAXONOMY.md), aggregation ve ranking sözleşmesi [AI Recommendation V2 Architecture](AI_RECOMMENDATION_V2_ARCHITECTURE.md) belgesidir.
 
-## D6-1 kod karşılığı
+## D6-1/D6-2 kod karşılığı
 
 - Provider capability/ownership matrisi [`features/recommendations/domain/providers.ts`](../features/recommendations/domain/providers.ts) içindedir; hiçbir provider çağrısı yapmaz.
 - TVMaze raw `type` alanı [`lib/tvmaze-types.ts`](../lib/tvmaze-types.ts) içine optional olarak eklendi. Saf classifier [`tvmaze-anime-classifier.ts`](../features/recommendations/providers/tvmaze-anime-classifier.ts) içinde confirmed/likely/non-anime/unknown sonucu üretir.
-- Classifier henüz `app/api/tvmaze/search/route.ts`, Global Search, Release Calendar veya recommendation candidate retrieval'a bağlı değildir. Gerçek filtre ve telemetry sayaçları D6-2'ye aittir.
+- Classifier yalnız [`features/recommendations/providers/pipeline.ts`](../features/recommendations/providers/pipeline.ts) recommendation hattında uygulanır. Global Search route'u ve Release Calendar filtresizdir.
+- Adapter/snapshot/cache ve exact identity ayrıntıları [Provider Enrichment](AI_RECOMMENDATION_V2_PROVIDER_ENRICHMENT.md) belgesindedir.

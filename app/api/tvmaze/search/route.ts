@@ -32,7 +32,7 @@ function stripHtml(html: string): string {
 /**
  * Tek bir TVmaze arama sonucunu normalize eder.
  */
-function normalizeSearchResult(
+export function normalizeSearchResult(
   item: TvmazeSearchItem
 ): TvmazeNormalizedResult {
   const show = item.show;
@@ -66,6 +66,13 @@ function normalizeSearchResult(
     tvmazeStatus: show.status || undefined,
     networkName,
     language: show.language || undefined,
+    showType: show.type || undefined,
+    networkCountryCode: show.network?.country?.code || undefined,
+    webChannelCountryCode: show.webChannel?.country?.code || undefined,
+    imdbId: show.externals?.imdb || undefined,
+    theTvdbId: typeof show.externals?.thetvdb === "number" ? String(show.externals.thetvdb) : undefined,
+    premiered: show.premiered || undefined,
+    ended: show.ended || undefined,
   };
 }
 

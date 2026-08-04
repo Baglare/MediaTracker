@@ -1,6 +1,6 @@
 # AI Recommendation V2 Migration Plan
 
-> Durum: D6-0 audit tamamlandı; D6-1 domain/codec temeli tamamlandı. D6-2 geliştirmesi başlamamıştır.
+> Durum: D6-0 audit, D6-1 domain/codec ve D6-2 provider evidence/enrichment tamamlandı. D6-3 geliştirmesi başlamamıştır.
 
 ## Dönüşüm ilkeleri
 
@@ -17,7 +17,7 @@
 |---|---|---|
 | D6-0 | Audit, taxonomy, evidence, mimari ve ölçüm sözleşmeleri | Değişmez; tamamlandı. |
 | D6-1 | **Tamamlandı:** ortak domain/codec/registry ve compatibility contract'ları | Mevcut sonuç sırası ve V1 runtime korunur. |
-| D6-2 | Provider enrichment, TV anime exclusion, evidence read-model/cache | Yalnız açık policy ve provider adaptörü acceptance'ı sonrası. |
+| D6-2 | **Tamamlandı:** provider enrichment, TV anime exclusion, evidence sidecar/cache | Recommendation-only identity/hijyen davranışı aktif; V1 scoring değişmez. |
 | D6-3 | Aggregation, hard filter, deterministik ranking ve grounded explanation | V2 ranking baseline devreye alınır. |
 | D6-4 | Düzenlenebilir constraints, strictness, reason feedback, near-match UI | Kullanıcı kontrolü ve şeffaflık açılır. |
 | D6-5 | Regresyon, live smoke, performans, docs ve D7 fixture hazırlığı | D6 stabilizasyonu. |
@@ -55,6 +55,8 @@
 - Provider çağrısı/enrichment, gerçek filtreleme, yeni scorer, UI, cache persistence, model entegrasyonu.
 
 ## D6-2 — Provider enrichment ve evidence read-model
+
+**Durum: tamamlandı.** Uygulama ve limitler [AI Recommendation V2 Provider Enrichment](AI_RECOMMENDATION_V2_PROVIDER_ENRICHMENT.md) belgesindedir.
 
 **Giriş koşulları**
 
@@ -241,6 +243,6 @@ Gold label'lar en az iki değerlendirici veya uyuşmazlık çözümü, provider 
 
 - **D6:** domain, provider evidence, hard-filter/ranking baseline, UI şeffaflığı, telemetry ve değerlendirme fixture contract'ını uygular.
 - **D7:** gold dataset'i oluşturur, metrikleri hesaplar, threshold kalibrasyonu ve model/verifier karşılaştırması yapar. LLM reranking yalnız deterministik baseline'a karşı kontrollü deneydir; varsayılan D6 davranışı değildir.
-- D6-2'ye başlamak için model veya D7 label seti gerekmez. D6-1 registry/codec/classifier testleri ve V1 compatibility gate'i tamamlanmıştır.
+- D6-3'e başlamak için model veya D7 label seti gerekmez. D6-1 registry/codec ve D6-2 identity/evidence/cache testleri tamamlanmıştır; aggregation/ranking gate'i D6-3'te kalır.
 
 Mimari kararların ayrıntısı [AI Recommendation V2 Architecture](AI_RECOMMENDATION_V2_ARCHITECTURE.md), aspect kayıtları [AI Aspect Taxonomy](AI_ASPECT_TAXONOMY.md), provider alan kuralları [AI Provider Evidence Matrix](AI_PROVIDER_EVIDENCE_MATRIX.md) belgesindedir.

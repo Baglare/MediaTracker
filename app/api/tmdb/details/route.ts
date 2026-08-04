@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type {
   TmdbMovieDetailResponse,
   TmdbNormalizedDetail,
+  TmdbTvDetailResponse,
 } from "@/lib/tmdb-types";
 
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/w500";
@@ -57,11 +58,38 @@ function normalizeDetail(detail: TmdbMovieDetailResponse): TmdbNormalizedDetail 
         : undefined,
     imdbId,
     siteUrl,
+    originalLanguage: detail.original_language,
+    countries: detail.production_countries?.map((country) => country.iso_3166_1).filter(Boolean),
+    popularity: detail.popularity,
+    keywords: detail.keywords?.keywords,
+  };
+}
+
+function normalizeTvDetail(detail: TmdbTvDetailResponse): TmdbNormalizedDetail | null {
+  if (!detail.id || !detail.name) return null;
+  const releaseYear = detail.first_air_date?.length && detail.first_air_date.length >= 4
+    ? Number.parseInt(detail.first_air_date.slice(0, 4), 10) : undefined;
+  const imdbId = detail.external_ids?.imdb_id || undefined;
+  return {
+    externalSource: "tmdb", externalId: String(detail.id), type: "tv", title: detail.name,
+    originalTitle: detail.original_name && detail.original_name !== detail.name ? detail.original_name : undefined,
+    overview: detail.overview || undefined,
+    releaseYear: Number.isFinite(releaseYear) ? releaseYear : undefined,
+    coverUrl: detail.poster_path ? `${TMDB_IMAGE_BASE}${detail.poster_path}` : undefined,
+    totalProgress: 1,
+    genres: detail.genres?.map((genre) => genre.name).filter(Boolean),
+    averageScore: typeof detail.vote_average === "number" ? Math.round(detail.vote_average * 10) : undefined,
+    imdbId, theTvdbId: detail.external_ids?.tvdb_id ? String(detail.external_ids.tvdb_id) : undefined,
+    keywords: detail.keywords?.results, originalLanguage: detail.original_language,
+    countries: detail.origin_country, popularity: detail.popularity,
+    numberOfEpisodes: detail.number_of_episodes, numberOfSeasons: detail.number_of_seasons,
+    siteUrl: detail.homepage || (imdbId ? `https://www.imdb.com/title/${imdbId}/` : `https://www.themoviedb.org/tv/${detail.id}`),
   };
 }
 
 export async function GET(request: NextRequest) {
   const id = request.nextUrl.searchParams.get("id");
+  const requestedMediaType = request.nextUrl.searchParams.get("mediaType") === "tv" ? "tv" : "movie";
   if (!id || id.trim().length === 0) {
     return NextResponse.json({ error: "id gerekli." }, { status: 400 });
   }
@@ -75,9 +103,9 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const url = new URL(`https://api.themoviedb.org/3/movie/${encodeURIComponent(id)}`);
+    const url = new URL(`https://api.themoviedb.org/3/${requestedMediaType}/${encodeURIComponent(id)}`);
     url.searchParams.set("language", "tr-TR");
-    url.searchParams.set("append_to_response", "external_ids");
+    url.searchParams.set("append_to_response", "external_ids,keywords");
 
     const res = await fetch(url.toString(), {
       headers: {
@@ -94,8 +122,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const detail = (await res.json()) as TmdbMovieDetailResponse;
-    const normalized = normalizeDetail(detail);
+    const detail = (await res.json()) as TmdbMovieDetailResponse | TmdbTvDetailResponse;
+    const normalized = requestedMediaType === "tv"
+      ? normalizeTvDetail(detail as TmdbTvDetailResponse)
+      : normalizeDetail(detail as TmdbMovieDetailResponse);
     if (!normalized) {
       return NextResponse.json(
         { result: null, error: "TMDB detayı geçersiz." },

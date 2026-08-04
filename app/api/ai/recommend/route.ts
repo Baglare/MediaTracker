@@ -51,6 +51,7 @@ import {
   AiCandidate,
 } from "@/lib/ai/types";
 import { MediaType } from "@/lib/types";
+import { prepareProviderEvidencePipeline } from "@/features/recommendations/providers/pipeline";
 
 export const runtime = "nodejs";
 
@@ -1536,6 +1537,32 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // D6-2 — Recommendation-only provider hygiene/evidence sidecar. Snapshotlar
+  // scorer veya kullanıcı response'una verilmez; D6-3 aggregation'a hazırlıktır.
+  let providerEvidenceTelemetry: AiRetrievalDebug["providerEvidence"];
+  let d6ProviderRejected: { title: string; reason: string }[] = [];
+  try {
+    const providerPipeline = await prepareProviderEvidencePipeline({
+      candidates,
+      baseUrl: req.nextUrl.origin,
+    });
+    candidates = providerPipeline.candidates;
+    providerEvidenceTelemetry = providerPipeline.telemetry;
+    d6ProviderRejected = [...providerPipeline.rejectedCandidates];
+    debugNotes.push(
+      `d6_provider_evidence:snapshots=${providerPipeline.telemetry.snapshots} enriched=${providerPipeline.telemetry.enrichedCandidates} cacheHits=${providerPipeline.telemetry.cacheHits} cacheMisses=${providerPipeline.telemetry.cacheMisses}`
+    );
+    debugNotes.push(
+      `d6_tvmaze_anime:confirmed=${providerPipeline.telemetry.tvmaze_anime_excluded} likely=${providerPipeline.telemetry.tvmaze_anime_likely_excluded} unknown=${providerPipeline.telemetry.tvmaze_anime_unknown} kept=${providerPipeline.telemetry.tvmaze_non_anime_kept}`
+    );
+    debugNotes.push(
+      `d6_identity_dedupe:sameProvider=${providerPipeline.telemetry.same_provider_deduped} exactBridge=${providerPipeline.telemetry.exact_bridge_deduped} conflicts=${providerPipeline.telemetry.identity_conflicts}`
+    );
+  } catch {
+    // Evidence zenginleştirmesi fail-soft'tur; mevcut V1 aday havuzu korunur.
+    debugNotes.push("d6_provider_evidence_error:fail_soft");
+  }
+
   // R39/R42 — persistent feedback suppression.
   const dismissedFiltered = filterDismissedCandidates(candidates, dismissedRaw);
   if (dismissedFiltered.suppressed > 0 || dismissedFiltered.keyCount > 0 || dismissedFiltered.titleTypeCount > 0) {
@@ -1549,7 +1576,7 @@ export async function POST(req: NextRequest) {
   // R37.2 — Aday havuzu politikası: source-apis modunda library kaynağını
   // havuza sokma; intent.targetTypes ve scope filtresini final aday havuzuna
   // uygula. Elenenler rejectedCandidates'a gerekçeyle yazılır.
-  const policyRejected: { title: string; reason: string }[] = [];
+  const policyRejected: { title: string; reason: string }[] = [...d6ProviderRejected];
   const eastTypes = new Set(["anime", "manga", "manhwa", "manhua", "light_novel", "web_novel", "visual_novel"]);
   const screenTypes = new Set(["tv", "movie"]);
   const archTypes = new Set(["book"]);
@@ -1740,6 +1767,7 @@ export async function POST(req: NextRequest) {
   retrievalDebug.ideationFailedReason = ideationFailedReason;
   retrievalDebug.safeFallbackUsed = false;
   retrievalDebug.parseRepairUsed = false;
+  if (providerEvidenceTelemetry) retrievalDebug.providerEvidence = providerEvidenceTelemetry;
 
   if (candidates.length === 0) {
     providerState.selectedProvider = "safe_fallback";

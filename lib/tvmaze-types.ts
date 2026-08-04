@@ -33,6 +33,11 @@ export interface TvmazeRawShow {
   summary?: string | null;    // HTML içerebilir: "<p>A show about...</p>"
   network?: TvmazeNetwork | null;
   webChannel?: TvmazeNetwork | null;
+  externals?: {
+    tvrage?: number | null;
+    thetvdb?: number | null;
+    imdb?: string | null;
+  } | null;
 }
 
 /** TVmaze search/shows endpoint'inden dönen her bir sonuç */
@@ -66,6 +71,13 @@ export interface TvmazeNormalizedResult {
   tvmazeStatus?: string;
   networkName?: string;
   language?: string;
+  showType?: string;
+  networkCountryCode?: string;
+  webChannelCountryCode?: string;
+  imdbId?: string;
+  theTvdbId?: string;
+  premiered?: string;
+  ended?: string;
 }
 
 /** Normalize edilmiş TVmaze detay sonucu (listeye eklerken kullanılır) */
