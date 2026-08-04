@@ -2,6 +2,7 @@ import type { RecommendationFeedbackEvent } from "@/lib/ai/types";
 import type { MediaItem } from "@/lib/types";
 import { ASPECT_IDS, findAspectByAlias, normalizeAspectAlias, type AspectId } from "../domain/aspect-registry";
 import type { CandidateProviderEvidenceSnapshot } from "../providers/types";
+import type { RecommendationFeedbackEventV2 } from "../feedback";
 
 export interface PersonalPreferenceProfile {
   loved: ReadonlyMap<AspectId, number>;
@@ -57,6 +58,7 @@ export function calculatePersonalFit(input: {
   snapshot: CandidateProviderEvidenceSnapshot;
   aspectEvidence: ReadonlyMap<AspectId, import("../domain/evidence").AspectEvidence>;
   feedback: readonly RecommendationFeedbackEvent[];
+  feedbackV2?: readonly RecommendationFeedbackEventV2[];
 }): number {
   let total = 0;
   let weight = 0;
@@ -72,7 +74,17 @@ export function calculatePersonalFit(input: {
   }
   const aspectFit = weight > 0 ? total / weight : 0;
   const exact = exactFeedbackAdjustment(input.snapshot.candidateIdentity.canonicalKey, input.feedback);
-  return Math.max(-1, Math.min(1, aspectFit + exact));
+  let reasonAdjustment = 0;
+  for (const event of input.feedbackV2 ?? []) {
+    if (event.reasonCode === "not_interested_now" || event.reasonCode === "already_known") continue;
+    for (const id of event.aspectIds) {
+      const evidence = input.aspectEvidence.get(id);
+      if (!evidence || evidence.strength === null) continue;
+      const negative = ["weak_requested_aspect", "too_much_aspect", "wrong_tone", "love_triangle", "fanservice", "violence_gore"].includes(event.reasonCode ?? "");
+      reasonAdjustment += evidence.strength * (negative ? -0.12 : event.action === "similar_requested" ? 0.08 : 0);
+    }
+  }
+  return Math.max(-1, Math.min(1, aspectFit + exact + Math.max(-0.35, Math.min(0.25, reasonAdjustment))));
 }
 
 export function hasExactLibraryIdentity(snapshot: CandidateProviderEvidenceSnapshot, items: readonly MediaItem[]): boolean {

@@ -71,4 +71,3 @@ export function adaptV1RequestToV2(input: {
     },
   };
 }
-

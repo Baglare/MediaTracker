@@ -56,6 +56,8 @@ import {
   DETERMINISTIC_RECOMMENDATION_V2_ENABLED,
   runDeterministicRecommendationV2,
 } from "@/features/recommendations/orchestration";
+import { decodeRecommendationRequestV2 } from "@/features/recommendations/domain/codec";
+import { decodeRecommendationFeedbackEventV2 } from "@/features/recommendations/feedback";
 
 export const runtime = "nodejs";
 
@@ -1103,11 +1105,31 @@ export async function POST(req: NextRequest) {
   const recommendationFeedback = Array.isArray(body.recommendationFeedback)
     ? body.recommendationFeedback
     : [];
+  const structuredRequest = body.structuredRequestV2 === undefined
+    ? null
+    : decodeRecommendationRequestV2(body.structuredRequestV2);
+  if (structuredRequest && !structuredRequest.ok) {
+    return NextResponse.json({ code: "structured_request_invalid", issues: structuredRequest.issues }, { status: 400 });
+  }
+  const recommendationFeedbackV2 = Array.isArray(body.recommendationFeedbackV2)
+    ? body.recommendationFeedbackV2.flatMap((event) => {
+        const decoded = decodeRecommendationFeedbackEventV2(event);
+        return decoded.ok ? [decoded.value] : [];
+      }).slice(-1000)
+    : [];
 
   const settings = body.settings;
   const mediaItems = Array.isArray(body.mediaItems) ? body.mediaItems : [];
   const progressLogs = Array.isArray(body.progressLogs) ? body.progressLogs : [];
-  const intent = analyzeIntent(message);
+  let intent = analyzeIntent(message);
+  if (structuredRequest?.ok) {
+    intent = {
+      ...intent,
+      targetTypes: [...structuredRequest.value.targetMediaTypes],
+      references: structuredRequest.value.references.map((reference) => reference.state === "verified" ? reference.titleSnapshot : reference.titleText),
+      avoid: structuredRequest.value.aspectConstraints.filter((constraint) => constraint.role === "avoid").map((constraint) => constraint.aspectId),
+    };
+  }
   const researchMode = (body as { researchMode?: string }).researchMode || "library-only";
   const scopeMode = (body as { scopeMode?: string }).scopeMode as
     | "mixed"
@@ -1157,10 +1179,15 @@ export async function POST(req: NextRequest) {
     });
     const dismissedLib = filterDismissedCandidates(libSearch.candidates, dismissedRaw);
     const libRecs = buildLibraryDeterministicRecs(dismissedLib.candidates);
+    const structuredLibraryHardConstraint = structuredRequest?.ok
+      ? structuredRequest.value.aspectConstraints.some((constraint) => constraint.role === "must")
+        || structuredRequest.value.objectiveConstraints.some((constraint) => constraint.role === "must")
+      : false;
+    const safeLibraryRecs = structuredLibraryHardConstraint ? [] : libRecs;
     const libDebug = buildRetrievalDebug({
       intent: libraryIntent,
       plan: null,
-      searchDebug: { ...libSearch.debug, finalCandidateCount: libRecs.length },
+      searchDebug: { ...libSearch.debug, finalCandidateCount: safeLibraryRecs.length },
       refinedPassUsed: false,
       providerFallback: false,
       notes: [
@@ -1177,14 +1204,27 @@ export async function POST(req: NextRequest) {
     });
     libDebug.ideationFailedReason = "skipped_library_based";
     libDebug.safeFallbackUsed = false;
-    const assistantMessage = libRecs.length > 0
-      ? `Kütüphanenden devam etmeye uygun ${libRecs.length} öneri seçtim.`
-      : "Kütüphanende bu isteğe uygun aday bulamadım.";
+    const assistantMessage = structuredLibraryHardConstraint
+      ? "Kütüphane adaylarında zorunlu koşulları doğrulayacak provider kanıtı yok; koşullar otomatik gevşetilmedi. Kaynak API kapsamını seçebilirsin."
+      : safeLibraryRecs.length > 0
+        ? `Kütüphanenden devam etmeye uygun ${safeLibraryRecs.length} öneri seçtim.`
+        : "Kütüphanende bu isteğe uygun aday bulamadım.";
     return NextResponse.json({
       assistantMessage,
-      recommendations: libRecs,
+      recommendations: safeLibraryRecs,
+      nearMatches: [],
       transparencySummary: buildTransparencySummary(settings),
       intent: libraryIntent,
+      ...(structuredRequest?.ok ? { engineStatus: {
+        provider: "deterministic_v2" as const,
+        embeddingMode: "disabled" as const,
+        providerFallbackUsed: false,
+        evaluatedCandidateCount: libSearch.candidates.length,
+        sources: ["library" as const],
+        feedbackApplied: false,
+        feedbackEventCount: recommendationFeedbackV2.length,
+        persistentCache: "not_used" as const,
+      } } : {}),
       debug: {
         provider: "library_local",
         selectedProvider: "library_local",
@@ -1599,7 +1639,9 @@ export async function POST(req: NextRequest) {
       candidates,
       mediaItems,
       feedback: recommendationFeedback,
+      feedbackV2: recommendationFeedbackV2,
       dismissed: body.dismissed,
+      structuredRequest: structuredRequest?.ok ? structuredRequest.value : undefined,
       baseUrl: req.nextUrl.origin,
       providerPipeline: providerPipelineResult,
     });

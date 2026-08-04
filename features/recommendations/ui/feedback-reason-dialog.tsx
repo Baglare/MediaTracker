@@ -1,0 +1,15 @@
+"use client";
+import { useEffect, useRef } from "react";
+import type { RecommendationFeedbackReasonCode } from "../feedback";
+
+const REASONS: { code: RecommendationFeedbackReasonCode; label: string }[] = [
+  { code: "weak_requested_aspect", label: "İstenen yön yeterince güçlü değil" },
+  { code: "too_much_aspect", label: "Bu yön fazla baskın" },
+  { code: "wrong_tone", label: "Tonu yanlış" }, { code: "too_long", label: "Fazla uzun" },
+  { code: "ongoing_not_wanted", label: "Devam eden seri istemiyorum" },
+  { code: "love_triangle", label: "Aşk üçgeni istemiyorum" }, { code: "fanservice", label: "Fanservice fazla" },
+  { code: "violence_gore", label: "Şiddet/kan fazla" }, { code: "already_known", label: "Zaten biliyorum" },
+  { code: "reference_mismatch", label: "Referansa benzemiyor" }, { code: "not_interested_now", label: "Şu an ilgimi çekmedi" },
+];
+
+export function FeedbackReasonDialog({ open, title, onSelect, onClose }: { open: boolean; title: string; onSelect: (reason: RecommendationFeedbackReasonCode) => void; onClose: () => void }) { const panel = useRef<HTMLDivElement>(null); const previous = useRef<HTMLElement | null>(null); useEffect(() => { if (!open) return; previous.current = document.activeElement as HTMLElement; panel.current?.querySelector<HTMLButtonElement>("button")?.focus(); const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); if (event.key === "Tab" && panel.current) { const controls = [...panel.current.querySelectorAll<HTMLElement>("button")]; if (!controls.length) return; const index = controls.indexOf(document.activeElement as HTMLElement); if (event.shiftKey && index <= 0) { event.preventDefault(); controls.at(-1)?.focus(); } else if (!event.shiftKey && index === controls.length - 1) { event.preventDefault(); controls[0].focus(); } } }; document.addEventListener("keydown", onKey); return () => { document.removeEventListener("keydown", onKey); previous.current?.focus(); }; }, [open, onClose]); if (!open) return null; return <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-4 sm:items-center" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><div ref={panel} role="dialog" aria-modal="true" aria-labelledby="feedback-reason-title" className="w-full max-w-md rounded-2xl border border-zinc-700 bg-zinc-950 p-4 shadow-2xl"><h3 id="feedback-reason-title" className="text-sm font-semibold text-zinc-100">Neden ilgilenmiyorsun?</h3><p className="mt-1 text-xs text-zinc-500">{title} zaten gizlendi; neden seçimi isteğe bağlıdır.</p><div className="mt-3 grid gap-1">{REASONS.map((reason) => <button type="button" key={reason.code} onClick={() => onSelect(reason.code)} className="rounded-lg px-3 py-2 text-left text-xs text-zinc-300 hover:bg-zinc-800">{reason.label}</button>)}</div><button type="button" onClick={onClose} className="mt-3 w-full rounded-lg border border-zinc-800 px-3 py-2 text-xs text-zinc-400">Kapat</button></div></div>; }

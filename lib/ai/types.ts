@@ -4,6 +4,8 @@
 
 import { MediaItem, ProgressLog, MediaType } from "@/lib/types";
 import { GlobalSearchResult } from "@/lib/global-search-types";
+import type { RecommendationRequestV2 } from "@/features/recommendations/domain/codec";
+import type { RecommendationFeedbackEventV2 } from "@/features/recommendations/feedback";
 
 export interface AiSettings {
   useProfile: boolean;
@@ -238,6 +240,15 @@ export interface AiRecommendation {
   communitySignal?: string;   // Eski "community"
   inLibrary?: boolean;
   candidate?: AiCandidate;    // Quick Add akışı için
+  resultKind?: "primary" | "near_match";
+  evidenceSummary?: { label: string; value: string; confidenceLabel?: string }[];
+}
+
+export interface AiNearMatchRecommendation extends AiRecommendation {
+  resultKind: "near_match";
+  violatedConstraints: string[];
+  satisfiedConstraints: string[];
+  nearMatchReason: string;
 }
 
 export type AiEngineProvider =
@@ -295,6 +306,7 @@ export interface RecommendationFeedbackEvent {
 export interface AiRecommendResponse {
   assistantMessage: string;
   recommendations: AiRecommendation[];
+  nearMatches?: AiNearMatchRecommendation[];
   rejectedCandidates?: { title: string; reason: string }[];
   transparencySummary: string;
   intent?: AiIntent;
@@ -358,6 +370,8 @@ export interface AiRecommendRequest {
     mediaType?: string;
   }[];
   recommendationFeedback?: RecommendationFeedbackEvent[];
+  recommendationFeedbackV2?: RecommendationFeedbackEventV2[];
+  structuredRequestV2?: RecommendationRequestV2;
 }
 
 export interface AiProvider {

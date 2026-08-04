@@ -126,7 +126,14 @@ Verified reference için `provider + externalId + mediaType + titleSnapshot` zor
 - [`lib/ai/types.ts`](../lib/ai/types.ts) V1 public contract olarak kaldı.
 - [`app/api/ai/recommend/route.ts`](../app/api/ai/recommend/route.ts), V1 intent, candidate search ve scorer'lar değiştirilmedi.
 - [`components/ai-advisor.tsx`](../components/ai-advisor.tsx) yalnız birebir aynı `AiSettings` ve `AiRecommendation` tiplerini type-only import eder. Runtime shape, prop veya response mapping değişmedi.
-- UI'ya V2 constraint/strictness/near-match tipleri bağlanmadı. Daha gevşek yerel debug/session tiplerinin taşınması D6-4'e bırakıldı.
+- V2 constraint/strictness/near-match tipleri `features/recommendations/ui` ve versioned owner state'e bağlandı. V1 session/response alanları additive olarak okunmaya devam eder.
+
+## D6-4 runtime bağlantıları
+
+- `POST /api/ai/interpret`: retrieval yapmadan version 2 taslak üretir veya clarification döndürür.
+- `/api/ai/recommend`: `structuredRequestV2` varsa codec ile doğrular ve message yerine domain kararlarını kaynak alır.
+- `RecommendationFeedbackEventV2`: exact identity ve reason scope zorunluluklarını codec ile korur; V1 feedback ayrı compatibility dizisinde kalır.
+- `nearMatches`: yalnız exploratory sonuç read-model'idir ve primary önerilerden ayrıdır.
 
 ## D6-2 provider katmanı ve D6-3 sınırı
 

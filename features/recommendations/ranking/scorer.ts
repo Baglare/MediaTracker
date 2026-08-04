@@ -8,6 +8,7 @@ import type { CandidateProviderEvidenceSnapshot } from "../providers/types";
 import { evaluateObjectiveConstraint, objectiveDecisionsAllowPrimary } from "./objective-filters";
 import { buildPersonalPreferenceProfile, calculatePersonalFit, hasExactLibraryIdentity } from "./personal-profile";
 import type { ScoredRecommendationCandidate } from "./types";
+import type { RecommendationFeedbackEventV2 } from "../feedback";
 
 const CONFIDENCE_VALUE = { unknown: 0, low: 0.35, medium: 0.7, high: 1 } as const;
 
@@ -41,16 +42,28 @@ export function scoreEligibleCandidates(input: {
   candidates: readonly { candidate: AiCandidate; snapshot: CandidateProviderEvidenceSnapshot; aspectEvidence: ReadonlyMap<AspectId, AspectEvidence> }[];
   mediaItems: readonly MediaItem[];
   feedback: readonly RecommendationFeedbackEvent[];
-}): { scored: ScoredRecommendationCandidate[]; rejected: { title: string; reason: string }[] } {
+  feedbackV2?: readonly RecommendationFeedbackEventV2[];
+}): { scored: ScoredRecommendationCandidate[]; nearMatches: ScoredRecommendationCandidate[]; rejected: { title: string; reason: string }[] } {
   const profile = buildPersonalPreferenceProfile(input.mediaItems);
   const scored: ScoredRecommendationCandidate[] = [];
   const rejected: { title: string; reason: string }[] = [];
+  const nearMatches: ScoredRecommendationCandidate[] = [];
   for (const item of input.candidates) {
     const aspectDecisions = input.request.aspectConstraints.map((constraint) => evaluateConstraintEligibility({ constraint, evidence: item.aspectEvidence.get(constraint.aspectId) ?? null, strictness: input.request.strictness }));
     const objectiveDecisions = input.request.objectiveConstraints.map((constraint) => evaluateObjectiveConstraint({ constraint, snapshot: item.snapshot }));
     const aspectEligibility = buildCandidateEligibility(input.request.strictness, aspectDecisions);
-    if (!aspectEligibility.eligibleForPrimary || !objectiveDecisionsAllowPrimary(objectiveDecisions)) {
+    const objectiveEligible = objectiveDecisionsAllowPrimary(objectiveDecisions);
+    if (!aspectEligibility.eligibleForPrimary || !objectiveEligible) {
       const reason = [...aspectDecisions, ...objectiveDecisions].find((decision) => !decision.passed)?.outcome ?? "constraint_failed";
+      if (aspectEligibility.eligibleForNearMatch && objectiveEligible && !hasExactLibraryIdentity(item.snapshot, input.mediaItems)) {
+        const breakdown = {
+          requestFit: requestFit(aspectDecisions, objectiveDecisions),
+          personalFit: input.request.profileSignalsEnabled ? calculatePersonalFit({ profile, snapshot: item.snapshot, aspectEvidence: item.aspectEvidence, feedback: input.feedback, feedbackV2: input.feedbackV2 ?? [] }) : 0,
+          evidenceConfidence: evidenceConfidence(input.request, item.aspectEvidence),
+          qualitySignal: quality(item.snapshot), novelty: 1, diversityContribution: 1,
+        };
+        nearMatches.push({ ...item, aspectDecisions, objectiveDecisions, scoreBreakdown: breakdown, deterministicSortKey: [breakdown.requestFit, breakdown.personalFit, breakdown.evidenceConfidence, breakdown.qualitySignal, breakdown.novelty, item.snapshot.candidateIdentity.canonicalKey], warnings: [...item.snapshot.warnings, ...aspectDecisions.flatMap((decision) => decision.warnings)] });
+      }
       rejected.push({ title: item.candidate.title, reason });
       continue;
     }
@@ -60,7 +73,7 @@ export function scoreEligibleCandidates(input: {
     }
     const breakdown = {
       requestFit: requestFit(aspectDecisions, objectiveDecisions),
-      personalFit: input.request.profileSignalsEnabled ? calculatePersonalFit({ profile, snapshot: item.snapshot, aspectEvidence: item.aspectEvidence, feedback: input.feedback }) : 0,
+      personalFit: input.request.profileSignalsEnabled ? calculatePersonalFit({ profile, snapshot: item.snapshot, aspectEvidence: item.aspectEvidence, feedback: input.feedback, feedbackV2: input.feedbackV2 ?? [] }) : 0,
       evidenceConfidence: evidenceConfidence(input.request, item.aspectEvidence),
       qualitySignal: quality(item.snapshot),
       novelty: 1,
@@ -76,7 +89,8 @@ export function scoreEligibleCandidates(input: {
     });
   }
   scored.sort(compareScoredCandidates);
-  return { scored, rejected };
+  nearMatches.sort(compareScoredCandidates);
+  return { scored, nearMatches, rejected };
 }
 
 export function compareScoredCandidates(a: ScoredRecommendationCandidate, b: ScoredRecommendationCandidate): number {

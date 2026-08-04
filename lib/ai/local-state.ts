@@ -12,6 +12,8 @@ import type {
   RecommendationFeedbackAction,
   RecommendationFeedbackEvent,
 } from "./types";
+import { decodeRecommendationFeedbackEventV2, type RecommendationFeedbackEventV2 } from "@/features/recommendations/feedback";
+import type { RecommendationStrictness } from "@/features/recommendations/domain/types";
 
 export interface AiSessionLocalState {
   version: 1;
@@ -20,13 +22,14 @@ export interface AiSessionLocalState {
 }
 
 export interface AiFeedbackLocalState {
-  version: 1;
+  version: 1 | 2;
   dismissedSignals: Record<string, Record<string, unknown>>;
   recommendationEvents: RecommendationFeedbackEvent[];
+  recommendationEventsV2?: RecommendationFeedbackEventV2[];
 }
 
 export interface AiPreferencesLocalState {
-  version: 1;
+  version: 1 | 2;
   settings: AiSettings;
   dataToggles: {
     ratings: boolean;
@@ -37,6 +40,7 @@ export interface AiPreferencesLocalState {
   };
   scopeMode: "mixed" | "east" | "screen" | "arch" | "one-per-world";
   researchMode: "library-only" | "source-apis" | "web";
+  recommendationStrictness?: RecommendationStrictness;
 }
 
 export const DEFAULT_AI_SETTINGS: AiSettings = {
@@ -49,7 +53,7 @@ export const DEFAULT_AI_SETTINGS: AiSettings = {
 };
 
 export const DEFAULT_AI_PREFERENCES: AiPreferencesLocalState = {
-  version: 1,
+  version: 2,
   settings: { ...DEFAULT_AI_SETTINGS },
   dataToggles: {
     ratings: true,
@@ -60,6 +64,7 @@ export const DEFAULT_AI_PREFERENCES: AiPreferencesLocalState = {
   },
   scopeMode: "mixed",
   researchMode: "library-only",
+  recommendationStrictness: "balanced",
 };
 
 const MEDIA_TYPES = new Set([
@@ -74,6 +79,7 @@ const EXTERNAL_SOURCES = new Set([
 ]);
 const SCOPES = new Set(["mixed", "east", "screen", "arch", "one-per-world"]);
 const RESEARCH = new Set(["library-only", "source-apis", "web"]);
+const STRICTNESS = new Set<RecommendationStrictness>(["strict", "balanced", "exploratory"]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -223,7 +229,7 @@ function normalizeFeedbackEvent(value: unknown): RecommendationFeedbackEvent | n
 }
 
 export const aiFeedbackCodec: PersonalDataCodec<AiFeedbackLocalState> = (value) => {
-  if (!isRecord(value) || value.version !== 1) {
+  if (!isRecord(value) || (value.version !== 1 && value.version !== 2)) {
     return { ok: false, message: "AI feedback state formati gecersiz." };
   }
   const dismissedSignals: Record<string, Record<string, unknown>> = {};
@@ -248,14 +254,20 @@ export const aiFeedbackCodec: PersonalDataCodec<AiFeedbackLocalState> = (value) 
         (item): item is RecommendationFeedbackEvent => item !== null,
       )
     : [];
+  const recommendationEventsV2 = Array.isArray(value.recommendationEventsV2)
+    ? value.recommendationEventsV2.slice(-1000).flatMap((event) => {
+        const decoded = decodeRecommendationFeedbackEventV2(event);
+        return decoded.ok ? [decoded.value] : [];
+      })
+    : [];
   return {
     ok: true,
-    value: { version: 1, dismissedSignals, recommendationEvents },
+    value: { version: 2, dismissedSignals, recommendationEvents, recommendationEventsV2 },
   };
 };
 
 export const aiPreferencesCodec: PersonalDataCodec<AiPreferencesLocalState> = (value) => {
-  if (!isRecord(value) || value.version !== 1) {
+  if (!isRecord(value) || (value.version !== 1 && value.version !== 2)) {
     return { ok: false, message: "AI preference state formati gecersiz." };
   }
   const settings = isRecord(value.settings) ? value.settings : {};
@@ -263,7 +275,7 @@ export const aiPreferencesCodec: PersonalDataCodec<AiPreferencesLocalState> = (v
   return {
     ok: true,
     value: {
-      version: 1,
+      version: 2,
       settings: {
         useProfile: settings.useProfile !== false,
         useRecentActivity: settings.useRecentActivity !== false,
@@ -288,6 +300,9 @@ export const aiPreferencesCodec: PersonalDataCodec<AiPreferencesLocalState> = (v
       researchMode: RESEARCH.has(String(value.researchMode))
         ? value.researchMode as AiPreferencesLocalState["researchMode"]
         : "library-only",
+      recommendationStrictness: STRICTNESS.has(value.recommendationStrictness as RecommendationStrictness)
+        ? value.recommendationStrictness as RecommendationStrictness
+        : "balanced",
     },
   };
 };

@@ -1,9 +1,11 @@
-import type { AiRecommendation } from "@/lib/ai/types";
+import type { AiNearMatchRecommendation, AiRecommendation } from "@/lib/ai/types";
 import { ASPECT_REGISTRY } from "../domain/aspect-registry";
 import type { RecommendationRequestV2 } from "../domain/codec";
 import type { ScoredRecommendationCandidate } from "../ranking/types";
 
 const SOURCE_LABELS = { anilist: "AniList", tvmaze: "TVMaze", tmdb: "TMDB", omdb: "OMDb", openlibrary: "Open Library" } as const;
+const LEVEL_LABELS = { primary: "Güçlü", significant: "Belirgin", incidental: "İkincil", absent: "Yok", unknown: "Bilinmiyor" } as const;
+const CONFIDENCE_LABELS = { high: "Yüksek kanıt güveni", medium: "Orta kanıt güveni", low: "Düşük kanıt güveni", unknown: "Kanıt güveni bilinmiyor" } as const;
 
 function evidenceSentence(item: ScoredRecommendationCandidate, request: RecommendationRequestV2): string[] {
   const sentences: string[] = [];
@@ -51,7 +53,30 @@ export function buildGroundedRecommendation(item: ScoredRecommendationCandidate,
     communitySignal: typeof score === "number" ? `Topluluk skoru: ${score}` : typeof popularity === "number" ? `Popülerlik sinyali: ${popularity}` : undefined,
     inLibrary: false,
     candidate,
+    resultKind: "primary",
+    evidenceSummary: [
+      ...request.aspectConstraints.flatMap((constraint) => {
+        const evidence = item.aspectEvidence.get(constraint.aspectId);
+        const decision = item.aspectDecisions.find((entry) => entry.constraintId === constraint.id);
+        return evidence && decision?.passed && evidence.level !== "unknown" ? [{ label: ASPECT_REGISTRY[constraint.aspectId].labelTr, value: LEVEL_LABELS[evidence.level], confidenceLabel: CONFIDENCE_LABELS[evidence.confidence] }] : [];
+      }),
+      ...(item.snapshot.objectiveMetadata.episodeCount !== undefined ? [{ label: "Uzunluk", value: `${item.snapshot.objectiveMetadata.episodeCount} bölüm` }] : []),
+      ...(item.snapshot.objectiveMetadata.pageCount !== undefined ? [{ label: "Uzunluk", value: `${item.snapshot.objectiveMetadata.pageCount} sayfa` }] : []),
+    ].slice(0, 4),
   };
+}
+
+export function buildGroundedNearMatchRecommendation(item: ScoredRecommendationCandidate, request: RecommendationRequestV2, index: number): AiNearMatchRecommendation {
+  const base = buildGroundedRecommendation(item, request, index);
+  const violated = item.aspectDecisions.filter((decision) => decision.role === "must" && !decision.passed).map((decision) => {
+    const constraint = request.aspectConstraints.find((entry) => entry.id === decision.constraintId);
+    return constraint ? `${ASPECT_REGISTRY[constraint.aspectId].labelTr}: zorunlu eşik karşılanmadı` : "Zorunlu koşul karşılanmadı";
+  });
+  const satisfied = item.aspectDecisions.filter((decision) => decision.passed).flatMap((decision) => {
+    const constraint = request.aspectConstraints.find((entry) => entry.id === decision.constraintId);
+    return constraint ? [ASPECT_REGISTRY[constraint.aspectId].labelTr] : [];
+  });
+  return { ...base, id: `near-${base.id}`, resultKind: "near_match", fitLabel: "Yakın eşleşme", violatedConstraints: violated, satisfiedConstraints: satisfied, nearMatchReason: violated.join("; ") || "Bir zorunlu koşul karşılanmadı." };
 }
 
 export function buildGroundedAssistantMessage(count: number, rejectedCount: number): string {

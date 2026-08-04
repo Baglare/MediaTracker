@@ -1,6 +1,6 @@
 # AI Recommendation V2 — Evidence, Eligibility ve Deterministik Ranking
 
-> Durum: D6-3 tamamlandı. Bu belge `features/recommendations/{intent,evidence,ranking,explanation,orchestration}` altındaki çalışan baseline sözleşmesini açıklar. D6-4 UI/read-model genişletmeleri ve D7 kalibrasyonu başlamamıştır.
+> Durum: D6-3 deterministik baseline ve D6-4 UI/read-model bağlantısı tamamlandı. D7 kalibrasyonu başlamamıştır.
 
 ## 1. Çalışan akış
 
@@ -147,6 +147,6 @@ Internal debug notları constraint source sayıları, evidence snapshot sayısı
 
 ## 11. D6-4 ve D7 sınırı
 
-D6-4: editable constraints, strict/balanced/exploratory seçimi, reason-level feedback, near-match UI ve kullanıcıya dönük ayrıntılı transparency.
+D6-4 tamamlandı: editable constraints, strict/balanced/exploratory, reason-level feedback, ayrı near-match UI ve kullanıcı şeffaflığı bağlandı. Primary deterministic sort key değiştirilmedi. D7 learned ranking, threshold kalibrasyonu ve karşılaştırmalı deney kapsamıdır.
 
 D7: gold labels, aspect threshold/confidence kalibrasyonu, Precision@K/NDCG@K, hard-violation/unsupported-explanation ölçümü ve deterministik baseline'a karşı kontrollü verifier/LLM deneyleri. D7 hiçbir ölçüm sonucu olmadan D6 sabitlerini sessizce değiştirmez.

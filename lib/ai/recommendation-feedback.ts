@@ -4,6 +4,7 @@ import {
   readAiFeedbackState,
   writeAiFeedbackState,
 } from "@/lib/ai/local-state";
+import { decodeRecommendationFeedbackEventV2, type RecommendationFeedbackEventV2 } from "@/features/recommendations/feedback";
 
 const RECOMMENDATION_FEEDBACK_KEY = "media-tracker-ai-recommendation-feedback";
 const MAX_RECOMMENDATION_FEEDBACK_EVENTS = 1000;
@@ -119,13 +120,25 @@ export function appendScopedRecommendationFeedbackEvent(
   const current = readAiFeedbackState(scope);
   const state = current.status === "valid"
     ? current.data
-    : { version: 1 as const, dismissedSignals: {}, recommendationEvents: [] };
+    : { version: 2 as const, dismissedSignals: {}, recommendationEvents: [], recommendationEventsV2: [] };
   const result = writeAiFeedbackState(scope, {
     ...state,
     recommendationEvents: [...state.recommendationEvents, event]
       .slice(-MAX_RECOMMENDATION_FEEDBACK_EVENTS),
   });
   return result.ok ? event : null;
+}
+
+export function appendScopedRecommendationFeedbackEventV2(
+  scope: LocalOwnerScope,
+  input: Omit<RecommendationFeedbackEventV2, "version" | "id" | "createdAt"> & { id?: string; createdAt?: string },
+): RecommendationFeedbackEventV2 | null {
+  const decoded = decodeRecommendationFeedbackEventV2({ ...input, version: 2, id: input.id ?? createFeedbackId(), createdAt: input.createdAt ?? new Date().toISOString() });
+  if (!decoded.ok) return null;
+  const current = readAiFeedbackState(scope);
+  const state = current.status === "valid" ? current.data : { version: 2 as const, dismissedSignals: {}, recommendationEvents: [], recommendationEventsV2: [] };
+  const result = writeAiFeedbackState(scope, { ...state, version: 2, recommendationEventsV2: [...(state.recommendationEventsV2 ?? []), decoded.value].slice(-MAX_RECOMMENDATION_FEEDBACK_EVENTS) });
+  return result.ok ? decoded.value : null;
 }
 
 export function removeScopedDismissedRecommendationFeedback(

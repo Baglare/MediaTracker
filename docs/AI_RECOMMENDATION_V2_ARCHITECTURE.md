@@ -1,6 +1,6 @@
 # AI Recommendation V2 Architecture
 
-> Durum: D6-0 karar/audit kaynağı. D6-1 domain, D6-2 provider evidence ve D6-3 deterministik ranking baseline uygulanmıştır. D6-4 UI/feedback geliştirmesi başlamamıştır.
+> Durum: D6-0–D6-4 uygulanmıştır. Editable request, strictness, ayrı near-match read-model'i ve owner-scoped Feedback V2 baseline'ı aktiftir; D6-5 stabilizasyonu başlamamıştır.
 
 ## 1. Amaç ve değişmez kararlar
 
@@ -370,4 +370,4 @@ D6-1 tamamlandı; domain ayrıntıları [AI Recommendation V2 Domain](AI_RECOMME
 - TVMaze classifier yalnız recommendation candidate pipeline'ına bağlandı. Global search route'u, details/Quick Add ve release calendar filtrelenmez.
 - D6-3 raw claim normalization, `AspectEvidence` aggregation, objective/aspect hard filter, ayrı score breakdown, deterministik sort key, diversity rerank ve grounded açıklamayı `features/recommendations/` içinde uygulamıştır. Ayrıntı [AI Recommendation V2 Ranking](AI_RECOMMENDATION_V2_RANKING.md) belgesindedir.
 - External recommendation final seçimi artık `runDeterministicRecommendationV2` tarafından yapılır; LLM retrieval planning için kalabilir fakat final aday/sıra kararı vermez. V1 scorer/embedding yolu authoritative production branch değildir.
-- D6-4 için bilinen hard blocker yoktur. Editable constraint/strictness, reason-level feedback ve near-match UI henüz yoktur.
+- D6-4 tamamlandı: `/api/ai/interpret`, onaylı structured request transport'u, editable constraint/strictness UI, ayrı near-match ve reason-level owner feedback eklendi. D6-3 deterministik sıra anahtarı korunmuştur.

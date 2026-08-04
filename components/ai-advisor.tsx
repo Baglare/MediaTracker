@@ -34,6 +34,7 @@ import { GlobalSearchResult } from "@/lib/global-search-types";
 import { expandTargetFamily } from "@/lib/ai/target-family";
 import {
   appendScopedRecommendationFeedbackEvent,
+  appendScopedRecommendationFeedbackEventV2,
   clearScopedDismissedRecommendationFeedback,
   removeScopedDismissedRecommendationFeedback,
 } from "@/lib/ai/recommendation-feedback";
@@ -41,9 +42,21 @@ import { buildAiEngineStatus } from "@/lib/ai/engine-status";
 import type {
   AiEngineStatus,
   AiRecommendation,
+  AiNearMatchRecommendation,
   AiSettings,
   RecommendationFeedbackAction,
 } from "@/lib/ai/types";
+import type { RecommendationRequestV2 } from "@/features/recommendations/domain/codec";
+import type { RecommendationStrictness } from "@/features/recommendations/domain/types";
+import type { RecommendationFeedbackEventV2, RecommendationFeedbackReasonCode } from "@/features/recommendations/feedback";
+import { ASPECT_REGISTRY } from "@/features/recommendations/domain/aspect-registry";
+import {
+  EngineTransparency,
+  FeedbackReasonDialog,
+  NearMatchSection,
+  ParsedRequestPanel,
+  RequestComposer,
+} from "@/features/recommendations/ui";
 export type { AiSettings } from "@/lib/ai/types";
 import { useAuth } from "@/hooks/use-auth";
 import {
@@ -158,6 +171,8 @@ interface AiSession {
   prompt: string;
   assistantMessage: string;
   recommendations: AiRecommendation[];
+  nearMatches?: AiNearMatchRecommendation[];
+  structuredRequestV2?: RecommendationRequestV2;
   rejectedCandidates?: RejectedCandidate[];
   settings: AiSettings;
   debug?: AiDebugInfo;
@@ -649,6 +664,11 @@ export default function AiAdvisor({
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<AiMessage[]>([]);
   const [recommendations, setRecommendations] = useState<AiRecommendation[]>([]);
+  const [nearMatches, setNearMatches] = useState<AiNearMatchRecommendation[]>([]);
+  const [structuredRequest, setStructuredRequest] = useState<RecommendationRequestV2 | null>(null);
+  const [draftWarnings, setDraftWarnings] = useState<string[]>([]);
+  const [recommendationStrictness, setRecommendationStrictness] = useState<RecommendationStrictness>("balanced");
+  const [interpretationLoading, setInterpretationLoading] = useState(false);
   const [rejected, setRejected] = useState<RejectedCandidate[]>([]);
   const [loadingStep, setLoadingStep] = useState(-1);
   const [sessions, setSessions] = useState<AiSession[]>([]);
@@ -660,6 +680,8 @@ export default function AiAdvisor({
   const [recommendationFeedbackEvents, setRecommendationFeedbackEvents] = useState<
     import("@/lib/ai/types").RecommendationFeedbackEvent[]
   >([]);
+  const [recommendationFeedbackEventsV2, setRecommendationFeedbackEventsV2] = useState<RecommendationFeedbackEventV2[]>([]);
+  const [feedbackDialogRec, setFeedbackDialogRec] = useState<AiRecommendation | null>(null);
   const [debugInfo, setDebugInfo] = useState<AiDebugInfo | null>(null);
   const [engineStatus, setEngineStatus] = useState<AiEngineStatus | null>(null);
   const [feedbackNotice, setFeedbackNotice] = useState<string | null>(null);
@@ -701,10 +723,21 @@ export default function AiAdvisor({
       setSessions([]);
       setMessages([]);
       setRecommendations([]);
+      setNearMatches([]);
+      setStructuredRequest(null);
+      setDraftWarnings([]);
+      setFeedbackDialogRec(null);
+      setNearMatches([]);
+      setStructuredRequest(null);
+      setDraftWarnings([]);
+      setRecommendationStrictness("balanced");
+      setInterpretationLoading(false);
       setRejected([]);
       setAddedIds({});
       setDismissedSignals({});
       setRecommendationFeedbackEvents([]);
+      setRecommendationFeedbackEventsV2([]);
+      setFeedbackDialogRec(null);
       setDataToggles({ ...DEFAULT_DATA_TOGGLES });
       setScopeMode("mixed");
       setResearchMode("library-only");
@@ -726,6 +759,7 @@ export default function AiAdvisor({
         setDataToggles(storedPreferences.data.dataToggles);
         setScopeMode(storedPreferences.data.scopeMode);
         setResearchMode(storedPreferences.data.researchMode);
+        setRecommendationStrictness(storedPreferences.data.recommendationStrictness ?? "balanced");
       }
       const storedSessions = readAiSessionState(ownerScope);
       if (storedSessions.status === "valid") {
@@ -734,6 +768,8 @@ export default function AiAdvisor({
           v?: number;
           messages?: AiMessage[];
           recommendations?: AiRecommendation[];
+          nearMatches?: AiNearMatchRecommendation[];
+          structuredRequestV2?: RecommendationRequestV2 | null;
           rejected?: RejectedCandidate[];
           addedIds?: Record<string, boolean>;
           pendingClarification?: { originalPrompt: string; question: string } | null;
@@ -744,6 +780,8 @@ export default function AiAdvisor({
         if (snap?.v === ACTIVE_SESSION_VERSION) {
           if (Array.isArray(snap.messages)) setMessages(snap.messages);
           if (Array.isArray(snap.recommendations)) setRecommendations(snap.recommendations);
+          if (Array.isArray(snap.nearMatches)) setNearMatches(snap.nearMatches);
+          if (snap.structuredRequestV2) setStructuredRequest(snap.structuredRequestV2);
           if (Array.isArray(snap.rejected)) setRejected(snap.rejected);
           if (snap.addedIds) setAddedIds(snap.addedIds);
           if (snap.pendingClarification) setPendingClarification(snap.pendingClarification);
@@ -756,6 +794,7 @@ export default function AiAdvisor({
       if (storedFeedback.status === "valid") {
         setDismissedSignals(parseDismissedSignals(storedFeedback.data.dismissedSignals));
         setRecommendationFeedbackEvents(storedFeedback.data.recommendationEvents);
+        setRecommendationFeedbackEventsV2(storedFeedback.data.recommendationEventsV2 ?? []);
       }
       setHydratedOwnerKey(ownerScope.key);
     } catch {
@@ -772,6 +811,8 @@ export default function AiAdvisor({
       const isEmpty =
         messages.length === 0 &&
         recommendations.length === 0 &&
+        nearMatches.length === 0 &&
+        !structuredRequest &&
         rejected.length === 0 &&
         Object.keys(addedIds).length === 0 &&
         !pendingClarification;
@@ -787,6 +828,8 @@ export default function AiAdvisor({
         v: ACTIVE_SESSION_VERSION,
         messages,
         recommendations,
+        nearMatches,
+        structuredRequestV2: structuredRequest,
         rejected,
         addedIds,
         pendingClarification,
@@ -803,7 +846,7 @@ export default function AiAdvisor({
     } catch {
       // ignore (kotanın dolması ya da JSON cycle gibi nadir durumlar)
     }
-  }, [messages, recommendations, rejected, addedIds, pendingClarification, debugInfo, engineStatus, ownerScope, ownerVisible, sessions]);
+  }, [messages, recommendations, nearMatches, structuredRequest, rejected, addedIds, pendingClarification, debugInfo, engineStatus, ownerScope, ownerVisible, sessions]);
 
   useEffect(() => {
     if (!persistenceReadyRef.current || !ownerScope || !ownerVisible) return;
@@ -814,6 +857,7 @@ export default function AiAdvisor({
           version: 1,
           dismissedSignals: {},
           recommendationEvents: recommendationFeedbackEvents,
+          recommendationEventsV2: recommendationFeedbackEventsV2,
         });
         if (!result.ok) queueMicrotask(() => setAiStorageError(result.message));
         return;
@@ -822,6 +866,7 @@ export default function AiAdvisor({
         version: 1,
         dismissedSignals: limited as unknown as Record<string, Record<string, unknown>>,
         recommendationEvents: recommendationFeedbackEvents,
+        recommendationEventsV2: recommendationFeedbackEventsV2,
       });
       if (!result.ok) queueMicrotask(() => setAiStorageError(result.message));
       if (Object.keys(limited).length !== Object.keys(dismissedSignals).length) {
@@ -833,7 +878,7 @@ export default function AiAdvisor({
     } catch {
       // bozuk veya dolu localStorage app'i düşürmesin
     }
-  }, [dismissedSignals, ownerScope, ownerVisible, recommendationFeedbackEvents]);
+  }, [dismissedSignals, ownerScope, ownerVisible, recommendationFeedbackEvents, recommendationFeedbackEventsV2]);
 
   useEffect(() => {
     if (recommendations.length === 0) return;
@@ -845,6 +890,7 @@ export default function AiAdvisor({
         canAdd: !!rec.candidate?.globalSearch,
         inLibrary: !!rec.inLibrary,
       });
+      recordExactFeedbackV2("shown", rec);
     }
     // recordRecommendationFeedback ref tabanlı bağlam okur; shown event'leri
     // yalnızca recommendation listesi değiştiğinde yazılmalı.
@@ -855,17 +901,18 @@ export default function AiAdvisor({
     if (!persistenceReadyRef.current || !ownerScope || !ownerVisible) return;
     try {
       const result = writeAiPreferencesState(ownerScope, {
-        version: 1,
+        version: 2,
         settings,
         dataToggles,
         scopeMode,
         researchMode,
+        recommendationStrictness,
       });
       if (!result.ok) queueMicrotask(() => setAiStorageError(result.message));
     } catch {
       // ignore
     }
-  }, [dataToggles, ownerScope, ownerVisible, researchMode, scopeMode, settings]);
+  }, [dataToggles, ownerScope, ownerVisible, researchMode, scopeMode, settings, recommendationStrictness]);
 
   // R34/R44 — araştırma modu route'a ayrıca gönderilir; web modu provider
   // context'inde de gerçek web araştırması olarak işaretlenir.
@@ -927,7 +974,9 @@ export default function AiAdvisor({
     rejectedList: RejectedCandidate[],
     debug?: AiDebugInfo,
     requestId?: string,
-    status?: AiEngineStatus
+    status?: AiEngineStatus,
+    nearMatchList: AiNearMatchRecommendation[] = [],
+    approvedRequest?: RecommendationRequestV2,
   ) {
     if (requestId && inFlightRequestId.current !== requestId) return;
     if (requestId) {
@@ -937,6 +986,8 @@ export default function AiAdvisor({
     const sessionId = requestId || generateId("session");
     feedbackContextRef.current = { sessionId, prompt };
     setRecommendations(recs);
+    setNearMatches(nearMatchList);
+    if (approvedRequest) setStructuredRequest(approvedRequest);
     setRejected(rejectedList);
     setDebugInfo(debug || null);
     setEngineStatus(status || null);
@@ -973,6 +1024,8 @@ export default function AiAdvisor({
       prompt,
       assistantMessage: assistantText,
       recommendations: recs,
+      nearMatches: nearMatchList,
+      structuredRequestV2: approvedRequest,
       rejectedCandidates: rejectedList,
       settings,
       debug,
@@ -990,6 +1043,7 @@ export default function AiAdvisor({
     rejected: RejectedCandidate[];
     debug?: AiDebugInfo;
     engineStatus?: AiEngineStatus;
+    nearMatches: AiNearMatchRecommendation[];
   } | null> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), AI_REQUEST_TIMEOUT_MS);
@@ -1028,6 +1082,8 @@ export default function AiAdvisor({
           // dediği önerileri backend aday havuzundan filtrelesin.
           dismissed: Object.values(dismissedSignals),
           recommendationFeedback: recommendationFeedbackEvents,
+          recommendationFeedbackV2: recommendationFeedbackEventsV2,
+          structuredRequestV2: structuredRequest,
         }),
       });
       if (!res.ok) return null;
@@ -1049,6 +1105,8 @@ export default function AiAdvisor({
           communitySignal: r.communitySignal,
           inLibrary: r.inLibrary,
           candidate: r.candidate,
+          resultKind: r.resultKind,
+          evidenceSummary: r.evidenceSummary,
         })
       );
       return {
@@ -1057,6 +1115,7 @@ export default function AiAdvisor({
         rejected: Array.isArray(data.rejectedCandidates) ? data.rejectedCandidates : [],
         debug: data.debug,
         engineStatus: data.engineStatus,
+        nearMatches: Array.isArray(data.nearMatches) ? data.nearMatches.slice(0, 3) : [],
       };
     } catch {
       return null;
@@ -1075,6 +1134,7 @@ export default function AiAdvisor({
       rejected: RejectedCandidate[];
       debug?: AiDebugInfo;
       engineStatus?: AiEngineStatus;
+      nearMatches: AiNearMatchRecommendation[];
     } | null>
   ) {
     if (inFlightRequestId.current !== requestId) return;
@@ -1086,7 +1146,7 @@ export default function AiAdvisor({
           evaluatedCandidateCount: mediaList.length,
           candidates: [],
         });
-        if (researchMode === "source-apis" || researchMode === "web") {
+        if (structuredRequest || researchMode === "source-apis" || researchMode === "web") {
           finishWith(prompt, [], buildExternalClientEmptyMessage(prompt, researchMode), [], undefined, requestId, localStatus);
           return;
         }
@@ -1099,7 +1159,7 @@ export default function AiAdvisor({
         .then((apiResult) => {
           if (inFlightRequestId.current !== requestId) return;
           if (apiResult) {
-            finishWith(prompt, apiResult.recs, apiResult.text, apiResult.rejected, apiResult.debug, requestId, apiResult.engineStatus);
+            finishWith(prompt, apiResult.recs, apiResult.text, apiResult.rejected, apiResult.debug, requestId, apiResult.engineStatus, apiResult.nearMatches, structuredRequest ?? undefined);
           } else {
             finishWithClientFallback();
           }
@@ -1247,7 +1307,7 @@ export default function AiAdvisor({
     return { prompt: rawPrompt, activeContext: null };
   }
 
-  function handleSend(text?: string) {
+  function executeRecommendation(text?: string) {
     const rawPrompt = (text ?? input).trim();
     if (!rawPrompt || isLoading || inFlightRequestId.current) return;
     const { prompt, activeContext } = buildFollowUpRequest(rawPrompt);
@@ -1269,6 +1329,51 @@ export default function AiAdvisor({
     runStep(0, prompt, requestId, apiPromise);
   }
 
+  async function handleSend(text?: string) {
+    const rawPrompt = (text ?? input).trim();
+    if (!rawPrompt || isLoading || interpretationLoading) return;
+    setInterpretationLoading(true);
+    setViewingSessionId(null);
+    try {
+      const response = await fetch("/api/ai/interpret", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: rawPrompt,
+          mediaItems: Array.isArray(mediaList) ? mediaList : [],
+          settings,
+          strictness: recommendationStrictness,
+          previousStructuredRequestV2: structuredRequest ?? undefined,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data?.request) {
+        setPendingClarification({ originalPrompt: rawPrompt, question: data?.clarificationQuestion || "İstek çözümlenemedi; hedef medya türünü ve sınırları netleştirir misin?" });
+        return;
+      }
+      const draft = data.request as RecommendationRequestV2;
+      setStructuredRequest(draft);
+      setRecommendationStrictness(draft.strictness);
+      setDraftWarnings(Array.isArray(data.warnings) ? data.warnings : []);
+      setPendingClarification(null);
+      setRecommendations([]);
+      setNearMatches([]);
+      setRejected([]);
+      setEngineStatus(null);
+      setMessages((prev) => [...prev, { id: generateId("msg"), role: "user", content: rawPrompt }]);
+      setInput("");
+    } catch {
+      setPendingClarification({ originalPrompt: rawPrompt, question: "İstek özeti hazırlanamadı. Tekrar dener misin?" });
+    } finally {
+      setInterpretationLoading(false);
+    }
+  }
+
+  function handleFindRecommendations() {
+    if (!structuredRequest || interpretationLoading) return;
+    executeRecommendation(structuredRequest.queryText);
+  }
+
   function handleModeClick(mode: AdvisorMode) {
     if (isLoading || inFlightRequestId.current) return;
     const effectiveScope: ScopeMode = mode === "one-per-world" ? "one-per-world" : scopeMode;
@@ -1282,6 +1387,10 @@ export default function AiAdvisor({
     inFlightPromptKey.current = null;
     setMessages([]);
     setRecommendations([]);
+    setNearMatches([]);
+    setStructuredRequest(null);
+    setDraftWarnings([]);
+    setFeedbackDialogRec(null);
     setRejected([]);
     setInput("");
     setViewingSessionId(null);
@@ -1293,6 +1402,7 @@ export default function AiAdvisor({
     setPendingClarification(null);
     setLoadingStep(-1);
     feedbackContextRef.current = null;
+    activeContextRef.current = null;
     shownFeedbackKeysRef.current.clear();
   }
 
@@ -1303,6 +1413,8 @@ export default function AiAdvisor({
     feedbackContextRef.current = { sessionId: id, prompt: s.prompt };
     setMessages([]);
     setRecommendations(s.recommendations);
+    setNearMatches(s.nearMatches ?? []);
+    setStructuredRequest(s.structuredRequestV2 ?? null);
     setRejected(s.rejectedCandidates || []);
     setDebugInfo(s.debug || null);
     setEngineStatus(s.engineStatus || null);
@@ -1324,6 +1436,7 @@ export default function AiAdvisor({
         canAdd: true,
         inLibrary: true,
       });
+      recordExactFeedbackV2("added", rec);
     } catch {
       // ekleme başarısız olursa state geri al
       setAddedIds((prev) => {
@@ -1350,7 +1463,6 @@ export default function AiAdvisor({
       externalSource: rec.externalSource,
       externalId: rec.externalId,
       sessionId: feedbackContextRef.current?.sessionId || viewingSessionId || undefined,
-      prompt: feedbackContextRef.current?.prompt,
       metadata: {
         fitLabel: rec.fitLabel,
         inLibrary: metadata?.inLibrary ?? !!rec.inLibrary,
@@ -1366,16 +1478,68 @@ export default function AiAdvisor({
   }
 
   function handleDismissRec(rec: AiRecommendation) {
+    if ((!rec.externalSource || !rec.externalId) && !rec.candidate?.libraryItemId) {
+      setFeedbackNotice("Bu önerinin doğrulanmış kimliği olmadığı için kalıcı feedback kaydedilmedi.");
+      return;
+    }
     const signal = feedbackSignalFromRec(rec);
     const key = feedbackKeyFromSignal(signal);
-    recordRecommendationFeedback("dismissed", rec);
     setDismissedSignals((prev) => {
       const next = { ...prev };
       delete next[key];
       next[key] = signal;
       return limitDismissedSignals(next);
     });
-    setFeedbackNotice("İlgilenmiyorum tercihin kaydedildi; sonraki önerilerde bu sinyal dikkate alınacak.");
+    setFeedbackDialogRec(rec);
+    setFeedbackNotice("Öneri exact kimliğiyle gizlendi. İstersen nedenini seçebilirsin.");
+  }
+
+  function feedbackV2Identity(rec: AiRecommendation): RecommendationFeedbackEventV2["candidateIdentity"] | null {
+    if (rec.externalSource && rec.externalSource !== "library" && rec.externalId) {
+      return { kind: "provider", provider: rec.externalSource, externalId: rec.externalId, mediaType: rec.mediaType as import("@/features/recommendations/domain/types").RecommendationMediaType };
+    }
+    if (rec.candidate?.libraryItemId) return { kind: "library", libraryItemId: rec.candidate.libraryItemId, mediaType: rec.mediaType as import("@/features/recommendations/domain/types").RecommendationMediaType };
+    return null;
+  }
+
+  function recordExactFeedbackV2(action: RecommendationFeedbackEventV2["action"], rec: AiRecommendation) {
+    if (!ownerScope || !ownerVisible) return;
+    const candidateIdentity = feedbackV2Identity(rec);
+    if (!candidateIdentity) return;
+    const event = appendScopedRecommendationFeedbackEventV2(ownerScope, {
+      action, candidateIdentity,
+      sessionId: feedbackContextRef.current?.sessionId || viewingSessionId || undefined,
+      resultKind: rec.resultKind === "near_match" ? "near_match" : "primary",
+      aspectIds: [], constraintKeys: [], metadata: { fitLabel: rec.fitLabel },
+    });
+    if (event) setRecommendationFeedbackEventsV2((current) => [...current, event].slice(-1000));
+  }
+
+  function feedbackAspectIds(reason: RecommendationFeedbackReasonCode): RecommendationFeedbackEventV2["aspectIds"] {
+    if (reason === "love_triangle" || reason === "fanservice" || reason === "violence_gore") return [reason];
+    if (reason === "weak_requested_aspect" || reason === "too_much_aspect") {
+      return structuredRequest?.aspectConstraints.slice(0, 1).map((item) => item.aspectId) ?? [];
+    }
+    if (reason === "wrong_tone") return structuredRequest?.aspectConstraints.filter((item) => ASPECT_REGISTRY[item.aspectId].group === "tone_content").map((item) => item.aspectId) ?? [];
+    return [];
+  }
+
+  function recordFeedbackReason(rec: AiRecommendation, reasonCode: RecommendationFeedbackReasonCode) {
+    if (!ownerScope || !ownerVisible) return;
+    const candidateIdentity = feedbackV2Identity(rec);
+    if (!candidateIdentity) return;
+    const event = appendScopedRecommendationFeedbackEventV2(ownerScope, {
+      action: "dismissed",
+      candidateIdentity,
+      sessionId: feedbackContextRef.current?.sessionId || viewingSessionId || undefined,
+      resultKind: rec.resultKind === "near_match" ? "near_match" : "primary",
+      reasonCode,
+      aspectIds: feedbackAspectIds(reasonCode),
+      constraintKeys: structuredRequest?.aspectConstraints.filter((constraint) => feedbackAspectIds(reasonCode).includes(constraint.aspectId)).map((constraint) => constraint.id) ?? [],
+      metadata: { fitLabel: rec.fitLabel, ...(reasonCode === "too_long" ? { objectiveField: "length" as const } : {}), ...(reasonCode === "ongoing_not_wanted" ? { objectiveField: "release_status" as const } : {}) },
+    });
+    if (event) setRecommendationFeedbackEventsV2((current) => [...current, event].slice(-1000));
+    setFeedbackDialogRec(null);
   }
   function handleUndoDismissRec(rec: AiRecommendation) {
     const key = feedbackKeyFromRec(rec);
@@ -1393,6 +1557,10 @@ export default function AiAdvisor({
           : event.mediaType !== rec.mediaType
             || event.title.trim().toLowerCase() !== rec.title.trim().toLowerCase()),
     ));
+    setRecommendationFeedbackEventsV2((current) => current.filter((event) => {
+      if (event.action !== "dismissed") return true;
+      return event.candidateIdentity.kind !== "provider" || event.candidateIdentity.provider !== rec.externalSource || event.candidateIdentity.externalId !== rec.externalId;
+    }));
     setDismissedSignals((prev) => {
       const next = { ...prev };
       delete next[key];
@@ -1402,20 +1570,24 @@ export default function AiAdvisor({
   }
   function handleClearDismissedFeedback() {
     if (!ownerScope || !ownerVisible) return;
+    if (!window.confirm("Bu owner için gizlenen AI önerilerini ve nedenlerini sıfırlamak istiyor musun?")) return;
     clearScopedDismissedRecommendationFeedback(ownerScope);
     setRecommendationFeedbackEvents((current) => current.filter(
       (event) => event.action !== "dismissed",
     ));
+    setRecommendationFeedbackEventsV2((current) => current.filter((event) => event.action !== "dismissed"));
     setDismissedSignals({});
     setFeedbackNotice("İlgilenmiyorum kayıtları temizlendi.");
   }
   function handleSimilarRec(rec: AiRecommendation) {
     if (isLoading || inFlightRequestId.current) return;
     recordRecommendationFeedback("similar_requested", rec);
+    recordExactFeedbackV2("similar_requested", rec);
     handleSend(buildSimilarPrompt(rec));
   }
   function handleOpenDiscoverFor(rec: AiRecommendation) {
     recordRecommendationFeedback("open_discover", rec);
+    recordExactFeedbackV2("open_discover", rec);
     if (onOpenDiscover) onOpenDiscover(rec);
   }
 
@@ -1638,7 +1810,21 @@ export default function AiAdvisor({
           </div>
         )}
 
-        {isLoading && (
+        {structuredRequest && (
+          <ParsedRequestPanel
+            request={structuredRequest}
+            warnings={draftWarnings}
+            onChange={(next) => {
+              setStructuredRequest(next);
+              setRecommendationStrictness(next.strictness);
+              setRecommendations([]);
+              setNearMatches([]);
+              setFeedbackNotice("İstek değişti; mevcut sonuçlar temizlendi. Yeni arama başlatabilirsin.");
+            }}
+          />
+        )}
+
+        {(isLoading || interpretationLoading) && (
           <div className="space-y-2 p-4 rounded-xl bg-zinc-900/40 border border-zinc-800/60">
             {LOADING_STEPS.map((label, i) => {
               const done = i < loadingStep;
@@ -1694,6 +1880,8 @@ export default function AiAdvisor({
             )}
           </div>
         )}
+
+        <EngineTransparency status={engineStatus} settings={{ ...settings, includeRatings: dataToggles.ratings, includeFavorites: dataToggles.favorites, includeProgress: dataToggles.progress }} profileEnabled={structuredRequest?.profileSignalsEnabled ?? settings.useProfile} />
 
         {feedbackNotice && (
           <p role="status" className="px-3 py-2 rounded-xl border border-emerald-500/20 bg-emerald-500/5 text-xs text-emerald-300/90">
@@ -1868,6 +2056,27 @@ export default function AiAdvisor({
           </div>
         )}
 
+        {engineStatus && !isLoading && recommendations.length === 0 && (
+          <section className="rounded-2xl border border-amber-500/25 bg-amber-500/5 p-4">
+            <h3 className="text-sm font-semibold text-zinc-100">Uygun eser bulamadım</h3>
+            <p className="mt-1 text-xs text-zinc-400">{engineStatus.providerFallbackUsed ? "Bazı kanıt kaynakları kullanılamadı; doğrulanmamış başlık eklenmedi." : "Zorunlu koşullar doğrulanmış aday havuzunu daralttı; liste düşük kaliteli adaylarla doldurulmadı."}</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {structuredRequest?.strictness !== "exploratory" && <button type="button" onClick={() => structuredRequest && setStructuredRequest({ ...structuredRequest, strictness: "exploratory" })} className="text-xs text-violet-300">Keşifçi moda geç</button>}
+              {structuredRequest?.aspectConstraints.some((constraint) => constraint.role === "must") && <button type="button" onClick={() => setStructuredRequest((current) => current ? { ...current, aspectConstraints: current.aspectConstraints.map((constraint, index) => index === current.aspectConstraints.findIndex((item) => item.role === "must") ? { ...constraint, role: "prefer", source: "explicit", rejectAtLevel: undefined } : constraint) as RecommendationRequestV2["aspectConstraints"] } : current)} className="text-xs text-violet-300">İlk zorunluyu tercih yap</button>}
+              {structuredRequest?.objectiveConstraints.some((constraint) => constraint.field === "length" || constraint.field === "release_status") && <button type="button" onClick={() => setStructuredRequest((current) => current ? { ...current, objectiveConstraints: current.objectiveConstraints.filter((constraint) => constraint.field !== "length" && constraint.field !== "release_status") } : current)} className="text-xs text-violet-300">Süre/yayın filtresini kaldır</button>}
+              {researchMode === "library-only" && <button type="button" onClick={() => setResearchMode("source-apis")} className="text-xs text-violet-300">Provider kapsamını genişlet</button>}
+            </div>
+          </section>
+        )}
+
+        <NearMatchSection
+          strictness={structuredRequest?.strictness ?? recommendationStrictness}
+          items={nearMatches}
+          onAdd={handleAddRec}
+          onDiscover={handleOpenDiscoverFor}
+          onDismiss={handleDismissRec}
+        />
+
         {/* Elenen adaylar */}
         {rejected.length > 0 && (
           <div className="p-3 rounded-xl bg-zinc-900/30 border border-zinc-800/50">
@@ -1882,32 +2091,14 @@ export default function AiAdvisor({
           </div>
         )}
 
-        {/* Input */}
-        <div className="sticky bottom-4 pt-2">
-          <div className="flex items-end gap-2 p-2 rounded-2xl bg-zinc-900/80 border border-zinc-800 backdrop-blur">
-            <textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSend();
-                }
-              }}
-              rows={1}
-              placeholder="AI Danışmana sor: ne izlemek/okumak istersin?"
-              className="min-w-0 flex-1 bg-transparent resize-none px-3 py-2 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none max-h-32"
-            />
-            <button
-              onClick={() => handleSend()}
-              disabled={!input.trim() || isLoading}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium bg-violet-500/20 text-violet-300 border border-violet-500/40 hover:bg-violet-500/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
-            >
-              <Send className="w-4 h-4" />
-              <span className="hidden sm:inline">Gönder</span>
-            </button>
-          </div>
-        </div>
+        <RequestComposer
+          value={input}
+          onChange={setInput}
+          onInterpret={() => void handleSend()}
+          onRecommend={handleFindRecommendations}
+          hasDraft={Boolean(structuredRequest)}
+          loading={isLoading || interpretationLoading}
+        />
       </div>
 
       <aside className="space-y-4">
@@ -2022,6 +2213,15 @@ export default function AiAdvisor({
           )}
         </div>
       </aside>
+      <FeedbackReasonDialog
+        open={Boolean(feedbackDialogRec)}
+        title={feedbackDialogRec?.title ?? "Öneri"}
+        onSelect={(reason) => feedbackDialogRec && recordFeedbackReason(feedbackDialogRec, reason)}
+        onClose={() => {
+          if (feedbackDialogRec) recordFeedbackReason(feedbackDialogRec, "not_interested_now");
+          else setFeedbackDialogRec(null);
+        }}
+      />
     </div>
   );
 }

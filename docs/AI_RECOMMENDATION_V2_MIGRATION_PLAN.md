@@ -1,6 +1,6 @@
 # AI Recommendation V2 Migration Plan
 
-> Durum: D6-0 audit, D6-1 domain/codec, D6-2 provider evidence/enrichment ve D6-3 deterministik ranking tamamlandı. D6-4 geliştirmesi başlamamıştır.
+> Durum: D6-0–D6-4 tamamlandı. D6-5 stabilizasyon/regresyon geliştirmesi başlamamıştır.
 
 ## Dönüşüm ilkeleri
 
@@ -19,7 +19,7 @@
 | D6-1 | **Tamamlandı:** ortak domain/codec/registry ve compatibility contract'ları | Mevcut sonuç sırası ve V1 runtime korunur. |
 | D6-2 | **Tamamlandı:** provider enrichment, TV anime exclusion, evidence sidecar/cache | Recommendation-only identity/hijyen davranışı aktif; V1 scoring değişmez. |
 | D6-3 | **Tamamlandı:** aggregation, hard filter, deterministik ranking ve grounded explanation | V2 ranking baseline authoritative external recommendation yolu oldu. |
-| D6-4 | Düzenlenebilir constraints, strictness, reason feedback, near-match UI | Kullanıcı kontrolü ve şeffaflık açılır. |
+| D6-4 | Tamamlandı: düzenlenebilir constraints, strictness, reason feedback, near-match UI | Kullanıcı kontrolü ve şeffaflık açıldı; V1 additive compatibility korundu. |
 | D6-5 | Regresyon, live smoke, performans, docs ve D7 fixture hazırlığı | D6 stabilizasyonu. |
 | D7 | Offline kalite değerlendirmesi, kalibrasyon ve karşılaştırmalı deneyler | D6 baseline ölçülmeden model/LLM deneyi üretime alınmaz. |
 

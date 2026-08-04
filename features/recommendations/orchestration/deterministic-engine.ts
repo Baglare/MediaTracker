@@ -1,12 +1,14 @@
 import type { AiCandidate, AiIntent, AiRecommendRequest, AiRecommendResponse, AiRetrievalPlan, AiSettings } from "@/lib/ai/types";
 import { aggregateEvidenceSnapshots, runSemanticVerifier } from "../evidence";
-import { buildGroundedAssistantMessage, buildGroundedRecommendation } from "../explanation";
+import { buildGroundedAssistantMessage, buildGroundedNearMatchRecommendation, buildGroundedRecommendation } from "../explanation";
 import { adaptV1RequestToV2 } from "../intent/v1-request-adapter";
 import { prepareProviderEvidencePipeline } from "../providers/pipeline";
 import type { ProviderEvidencePipelineResult } from "../providers/pipeline";
 import type { CandidateProviderEvidenceSnapshot } from "../providers/types";
 import { rerankForDiversity, scoreEligibleCandidates } from "../ranking";
 import type { SemanticVerifierMode } from "../domain/types";
+import type { RecommendationRequestV2 } from "../domain/codec";
+import type { RecommendationFeedbackEventV2 } from "../feedback";
 
 export const DETERMINISTIC_RECOMMENDATION_V2_ENABLED = true;
 
@@ -34,17 +36,32 @@ export async function runDeterministicRecommendationV2(input: {
   candidates: readonly AiCandidate[];
   mediaItems: AiRecommendRequest["mediaItems"];
   feedback: readonly NonNullable<AiRecommendRequest["recommendationFeedback"]>[number][];
+  feedbackV2?: readonly RecommendationFeedbackEventV2[];
   dismissed: AiRecommendRequest["dismissed"];
   baseUrl: string;
   fetchImpl?: typeof fetch;
   providerPipeline?: ProviderEvidencePipelineResult;
+  structuredRequest?: RecommendationRequestV2;
 }): Promise<AiRecommendResponse> {
   const pipeline = input.providerPipeline ?? await prepareProviderEvidencePipeline({ candidates: input.candidates, baseUrl: input.baseUrl, fetchImpl: input.fetchImpl });
   const identityVerified = input.candidates.filter((candidate) => candidate.source !== "library" && findSnapshot(candidate, pipeline.evidenceByCandidateKey));
   const dismissedRejected = identityVerified.filter((candidate) => isExactlyDismissed(candidate, input.dismissed)).map((candidate) => ({ title: candidate.title, reason: "dismissed_exact_identity" }));
   const candidates = identityVerified.filter((candidate) => !isExactlyDismissed(candidate, input.dismissed));
   const verifierMode = configuredVerifierMode();
-  const adapted = adaptV1RequestToV2({
+  const adapted = input.structuredRequest ? {
+    request: input.structuredRequest,
+    needsClarification: false,
+    issues: [] as string[],
+    warnings: [] as string[],
+    telemetry: {
+      aspectConstraints: input.structuredRequest.aspectConstraints.length,
+      objectiveConstraints: input.structuredRequest.objectiveConstraints.length,
+      explicit: input.structuredRequest.aspectConstraints.filter((item) => item.source === "explicit").length,
+      inferred: input.structuredRequest.aspectConstraints.filter((item) => item.source === "inferred").length,
+      profile: input.structuredRequest.aspectConstraints.filter((item) => item.source === "profile").length,
+      unresolvedReferences: input.structuredRequest.references.filter((item) => item.state === "unresolved").length,
+    },
+  } : adaptV1RequestToV2({
     message: input.message,
     intent: input.intent,
     retrievalPlan: input.retrievalPlan,
@@ -82,12 +99,14 @@ export async function runDeterministicRecommendationV2(input: {
     if (!snapshot) return [];
     return [{ candidate, snapshot, aspectEvidence: evidence.get(snapshot.candidateIdentity.canonicalKey) ?? new Map() }];
   });
-  const ranking = scoreEligibleCandidates({ request: adapted.request, candidates: rankable, mediaItems: input.mediaItems, feedback: input.feedback });
+  const ranking = scoreEligibleCandidates({ request: adapted.request, candidates: rankable, mediaItems: input.mediaItems, feedback: input.feedback, feedbackV2: input.feedbackV2 });
   const selected = rerankForDiversity(ranking.scored, 5);
+  const nearMatches = adapted.request.strictness === "exploratory" ? ranking.nearMatches.slice(0, 3) : [];
   const rejectedCandidates = [...pipeline.rejectedCandidates, ...dismissedRejected, ...ranking.rejected];
   return {
     assistantMessage: buildGroundedAssistantMessage(selected.length, rejectedCandidates.length),
     recommendations: selected.map((item, index) => buildGroundedRecommendation(item, adapted.request as NonNullable<typeof adapted.request>, index)),
+    nearMatches: nearMatches.map((item, index) => buildGroundedNearMatchRecommendation(item, adapted.request as NonNullable<typeof adapted.request>, index)),
     rejectedCandidates: rejectedCandidates.length > 0 ? rejectedCandidates : undefined,
     transparencySummary: `Kimlik doğrulama, yapılandırılmış kanıt, hard filter ve deterministik sıralama uygulandı. Semantic verifier: ${verifier.status}.`,
     intent: input.intent,
