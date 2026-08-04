@@ -156,9 +156,13 @@ Kısaltmalar: `AL` AniList, `TV` TVMaze, `TM` TMDB, `OM` OMDb, `OL` Open Library
 Registry değerlendirmesi [AI Recommendation V2 Architecture](AI_RECOMMENDATION_V2_ARCHITECTURE.md) içindeki `AspectEvidence` sözleşmesini üretir:
 
 - `primary`: strength `0.75–1.00`
-- `significant`: strength `0.45–0.74`
-- `incidental`: strength `0.15–0.44`
-- `absent`: strength `0–0.14`, yalnız desteklenen alanlardan yeterli negatif kanıt varsa
+- `significant`: strength `0.50–0.749…`
+- `incidental`: strength `0.20–0.499…`
+- `absent`: strength `0–0.199…`, yalnız desteklenen alanlardan yeterli negatif kanıt varsa
 - `unknown`: destek yoksa, veri eksikse veya çelişki karar vermeyi engelliyorsa
 
 Eşikler D6 sözleşme başlangıcıdır; D7 gold-label ölçümü olmadan provider veya MediaType bazında sessizce ayarlanmaz.
+
+## D6-1 kod karşılığı
+
+Registry [`features/recommendations/domain/aspect-registry.ts`](../features/recommendations/domain/aspect-registry.ts), merkezi eşikler [`aspect-strength.ts`](../features/recommendations/domain/aspect-strength.ts), runtime invariant'lar [`codec.ts`](../features/recommendations/domain/codec.ts) içindedir. Kod 43 kaydı ve beş explicit provider mapping'ini taşır; V1 intent regex'leri veya production scorer bu registry'ye henüz bağlanmamıştır. Ayrıntı için [AI Recommendation V2 Domain](AI_RECOMMENDATION_V2_DOMAIN.md) belgesine bakın.

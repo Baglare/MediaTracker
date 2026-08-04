@@ -1,6 +1,6 @@
 # AI Recommendation V2 Architecture
 
-> Durum: D6-0 karar ve read-only audit belgesi. Bu belge üretim davranışını değiştirmez. D6 geliştirmesi henüz başlamamıştır.
+> Durum: D6-0 karar/audit kaynağı. D6-1 domain contract'ları uygulanmıştır; V1 üretim orchestration ve scoring davranışı değişmemiştir.
 
 ## 1. Amaç ve değişmez kararlar
 
@@ -182,7 +182,7 @@ interface AspectEvidence {
 Aggregation kuralları:
 
 - `strength` internal 0–1 değeridir; kullanıcı contract'ı `level` ve `confidence` üzerinden okunur.
-- Başlangıç eşikleri: `primary >= 0.75`, `significant >= 0.45`, `incidental >= 0.15`, `absent < 0.15`. Bu eşikler D7 gold setiyle kalibre edilmeden kalite iddiası değildir.
+- Başlangıç eşikleri: `primary >= 0.75`, `significant >= 0.50`, `incidental >= 0.20`, `absent < 0.20`. Bu eşikler D7 gold setiyle kalibre edilmeden kalite iddiası değildir.
 - `absent` yalnız provider/verifier bu aspect'i değerlendirebiliyor ve yeterli negatif kanıt üretiyorsa kullanılabilir. Alanın eksikliği `unknown`dur.
 - Provider ve verifier kanıtları ayrı listelerde kalır; verifier provider kanıtını sessizce ezmez.
 - Bağımsız destekler confidence'ı yükseltebilir; açık çelişki confidence'ı düşürür ve warning üretir.
@@ -361,11 +361,11 @@ Public response yalnız kullanıcı için gerekli alanları taşır:
 
 Internal trace; query listeleri, provider hata kodları, filtre sayaçları, cache istatistikleri ve model teknik ayrıntılarını kapsar. Development-only gated telemetry'dir; public API'nin zorunlu contract'ı değildir ve kişisel not/prompt/raw provider body içermez.
 
-## 11. Açık kararlar ve blocker durumu
+## 11. D6-1 uygulama durumu ve D6-2 sınırı
 
-D6-0 için blocker yoktur. D6-1'e geçmeden önce uygulanacak contract kararları bu belgede kesinleşmiştir. Uygulama önkoşulları:
+D6-1 tamamlandı; domain ayrıntıları [AI Recommendation V2 Domain](AI_RECOMMENDATION_V2_DOMAIN.md) belgesindedir.
 
-- TVMaze raw tipe `show.type` eklenmesi ve country/type sinyalinin recommendation adapter'a kayıpsız taşınması.
-- Aspect registry versioning ve constraint codec'inin tek source of truth olması.
-- Public read-model/internal trace ayrımının test contract'ı olarak yazılması.
-- Existing V1 payload/response adapter'ının geriye uyumluluk kapsamının fixture ile sabitlenmesi.
+- Ortak tipler, 43-aspect registry, strength/evidence/constraint/request codec'leri ve strictness/near-match policy'leri `features/recommendations/domain/` altında izoledir.
+- TVMaze raw tipe yalnız `type?: string | null` eklendi; saf classifier `features/recommendations/providers/tvmaze-anime-classifier.ts` içindedir.
+- V1 route, candidate retrieval ve scorer'lar yeni registry/policy'yi kullanmaz. Global search, TVMaze normalize route'u ve release calendar filtresiz kalır.
+- D6-2 için hard blocker yoktur. Enrichment, classifier entegrasyonu, evidence read-model/cache ve cross-provider identity link'leri D6-2 acceptance kapsamıdır.

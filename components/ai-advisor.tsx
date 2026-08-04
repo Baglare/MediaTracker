@@ -39,10 +39,12 @@ import {
 } from "@/lib/ai/recommendation-feedback";
 import { buildAiEngineStatus } from "@/lib/ai/engine-status";
 import type {
-  AiCandidate,
   AiEngineStatus,
+  AiRecommendation,
+  AiSettings,
   RecommendationFeedbackAction,
 } from "@/lib/ai/types";
+export type { AiSettings } from "@/lib/ai/types";
 import { useAuth } from "@/hooks/use-auth";
 import {
   isHydratedOwnerVisible,
@@ -59,19 +61,6 @@ import {
 import { migrateLegacyPersonalDomainToGuest } from "@/lib/personal-data-ownership";
 
 // ---- Tipler ----
-export interface AiSettings {
-  useProfile: boolean;
-  useRecentActivity: boolean;
-  usePersonalNotes: boolean;
-  useWebResearch: boolean;
-  deepResearch: boolean;
-  useOpenAIProvider: boolean;
-  // R35 — granular data toggles (default true on server side via flag())
-  includeRatings?: boolean;
-  includeFavorites?: boolean;
-  includeProgress?: boolean;
-}
-
 interface AiRetrievalDebug {
   taskType?: string;
   targetMediaTypes?: MediaType[];
@@ -139,23 +128,6 @@ interface AiDebugInfo {
   activeContextSummary?: string;
   safeFallbackUsed?: boolean;
   retrieval?: AiRetrievalDebug;
-}
-
-interface AiRecommendation {
-  id: string;
-  title: string;
-  mediaType: MediaType;
-  source: string;
-  externalSource?: "tvmaze" | "anilist" | "openlibrary" | "omdb" | "tmdb" | "library";
-  externalId?: string;
-  coverUrl?: string;
-  overview?: string;
-  fitLabel: string;
-  reason: string;
-  risk?: string;
-  communitySignal?: string;
-  inLibrary?: boolean;
-  candidate?: AiCandidate;
 }
 
 interface RejectedCandidate {

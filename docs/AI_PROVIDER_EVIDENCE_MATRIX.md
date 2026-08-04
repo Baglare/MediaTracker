@@ -107,3 +107,9 @@ Mevcut kod boşluğu: arama route'u work key, author, subject, edition count, IS
 6. Provider metadata cache'i kişisel profil, kullanıcı notu veya feedback taşımaz. Cache anahtarı provider, external ID, schema sürümü ve metadata sürümünü içerir.
 
 Aspect eşlemelerinin tek doğruluk kaynağı [AI Aspect Taxonomy](AI_ASPECT_TAXONOMY.md), aggregation ve ranking sözleşmesi [AI Recommendation V2 Architecture](AI_RECOMMENDATION_V2_ARCHITECTURE.md) belgesidir.
+
+## D6-1 kod karşılığı
+
+- Provider capability/ownership matrisi [`features/recommendations/domain/providers.ts`](../features/recommendations/domain/providers.ts) içindedir; hiçbir provider çağrısı yapmaz.
+- TVMaze raw `type` alanı [`lib/tvmaze-types.ts`](../lib/tvmaze-types.ts) içine optional olarak eklendi. Saf classifier [`tvmaze-anime-classifier.ts`](../features/recommendations/providers/tvmaze-anime-classifier.ts) içinde confirmed/likely/non-anime/unknown sonucu üretir.
+- Classifier henüz `app/api/tvmaze/search/route.ts`, Global Search, Release Calendar veya recommendation candidate retrieval'a bağlı değildir. Gerçek filtre ve telemetry sayaçları D6-2'ye aittir.

@@ -23,6 +23,7 @@ export interface TvmazeNetwork {
 export interface TvmazeRawShow {
   id: number;
   name: string;
+  type?: string | null;
   language?: string | null;
   genres?: string[];
   status?: string;           // "Running", "Ended", "To Be Determined" vb.

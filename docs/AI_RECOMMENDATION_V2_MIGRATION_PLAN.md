@@ -1,6 +1,6 @@
 # AI Recommendation V2 Migration Plan
 
-> Durum: D6-0 audit ve karar planı. D6 geliştirmesi başlamamıştır; bu belge rollout, migration veya üretim değişikliği yapmaz.
+> Durum: D6-0 audit tamamlandı; D6-1 domain/codec temeli tamamlandı. D6-2 geliştirmesi başlamamıştır.
 
 ## Dönüşüm ilkeleri
 
@@ -16,7 +16,7 @@
 | Aşama | Ana çıktı | Üretim davranışı |
 |---|---|---|
 | D6-0 | Audit, taxonomy, evidence, mimari ve ölçüm sözleşmeleri | Değişmez; tamamlandı. |
-| D6-1 | Ortak domain/codec/registry ve compatibility contract'ları | Minimum; mevcut sonuç sırası korunur. |
+| D6-1 | **Tamamlandı:** ortak domain/codec/registry ve compatibility contract'ları | Mevcut sonuç sırası ve V1 runtime korunur. |
 | D6-2 | Provider enrichment, TV anime exclusion, evidence read-model/cache | Yalnız açık policy ve provider adaptörü acceptance'ı sonrası. |
 | D6-3 | Aggregation, hard filter, deterministik ranking ve grounded explanation | V2 ranking baseline devreye alınır. |
 | D6-4 | Düzenlenebilir constraints, strictness, reason feedback, near-match UI | Kullanıcı kontrolü ve şeffaflık açılır. |
@@ -24,6 +24,8 @@
 | D7 | Offline kalite değerlendirmesi, kalibrasyon ve karşılaştırmalı deneyler | D6 baseline ölçülmeden model/LLM deneyi üretime alınmaz. |
 
 ## D6-1 — Ortak domain ve compatibility temeli
+
+**Durum: tamamlandı.** Uygulama yolları ve invariant özeti [AI Recommendation V2 Domain](AI_RECOMMENDATION_V2_DOMAIN.md) belgesindedir. `AiSettings` ve `AiRecommendation` client tekrarları type-only import ile kaldırıldı; daha gevşek UI debug/session tipleri geriye uyumluluk için yerinde kaldı.
 
 **Giriş koşulları**
 
@@ -239,6 +241,6 @@ Gold label'lar en az iki değerlendirici veya uyuşmazlık çözümü, provider 
 
 - **D6:** domain, provider evidence, hard-filter/ranking baseline, UI şeffaflığı, telemetry ve değerlendirme fixture contract'ını uygular.
 - **D7:** gold dataset'i oluşturur, metrikleri hesaplar, threshold kalibrasyonu ve model/verifier karşılaştırması yapar. LLM reranking yalnız deterministik baseline'a karşı kontrollü deneydir; varsayılan D6 davranışı değildir.
-- D6-1'e başlamak için model, provider canlı çağrısı veya D7 label seti gerekmez. Registry ve compatibility fixture'larının onayı yeterlidir.
+- D6-2'ye başlamak için model veya D7 label seti gerekmez. D6-1 registry/codec/classifier testleri ve V1 compatibility gate'i tamamlanmıştır.
 
 Mimari kararların ayrıntısı [AI Recommendation V2 Architecture](AI_RECOMMENDATION_V2_ARCHITECTURE.md), aspect kayıtları [AI Aspect Taxonomy](AI_ASPECT_TAXONOMY.md), provider alan kuralları [AI Provider Evidence Matrix](AI_PROVIDER_EVIDENCE_MATRIX.md) belgesindedir.

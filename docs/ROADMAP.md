@@ -9,7 +9,7 @@
 | D3 — Release Calendar | Tamamlandı | TVMaze/AniList/TMDB, ajanda/ay, owner cache, manuel olaylar, provider olayı gizleme ve “Yakında” özeti |
 | D4 — Product Polish / Performance / UX Reliability | Tamamlandı | Reaktif Cloud state, profil cache, metrik doğruluğu, responsive kartlar, ayar yoğunluğu, tema/logo ve grafik erişilebilirliği |
 | D5 — Hedef sistemi | Tamamlandı (yerel/test) | Goal domain, owner-scoped CRUD, trusted-log evaluation, suggestions, Portable V3 ve Goal Cloud V1 istemci/migration paketi; production rollout D8'de |
-| D6 — AI Recommendation V2 | D6-0 tamamlandı; geliştirme başlamadı | Read-only audit ve karar sözleşmeleri tamamlandı; uygulama D6-1–D6-5 olarak planlandı ([mimari](AI_RECOMMENDATION_V2_ARCHITECTURE.md), [plan](AI_RECOMMENDATION_V2_MIGRATION_PLAN.md)) |
+| D6 — AI Recommendation V2 | D6-1 tamamlandı; D6-2 başlamadı | D6-0 audit ve D6-1 izole domain/registry/codec/classifier tamamlandı; V1 üretim davranışı korunuyor ([domain](AI_RECOMMENDATION_V2_DOMAIN.md), [plan](AI_RECOMMENDATION_V2_MIGRATION_PLAN.md)) |
 | D7 — ML ve değerlendirme | Planlandı | Offline değerlendirme, ölçüm ve model/embedding deneyleri |
 | D8 — Release ve deployment | Planlandı | Frontend yayınlama, operasyonel doğrulama, D2C.1 production cutover ve Goal Cloud V1 production migration/flag rollout |
 
