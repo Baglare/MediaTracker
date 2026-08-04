@@ -8,12 +8,11 @@
 | D2C.1 production cutover | D8'e bırakıldı | Owner-scoped fiziksel PK enforcement, legacy mutation yolunun kapatılması ve kontrollü production cutover |
 | D3 — Release Calendar | Tamamlandı | TVMaze/AniList/TMDB, ajanda/ay, owner cache, manuel olaylar, provider olayı gizleme ve “Yakında” özeti |
 | D4 — Product Polish / Performance / UX Reliability | Tamamlandı | Reaktif Cloud state, profil cache, metrik doğruluğu, responsive kartlar, ayar yoğunluğu, tema/logo ve grafik erişilebilirliği |
-| D5 — Hedef sistemi | Planlandı | Kullanıcı hedefleri ve ilerleme görünümü |
+| D5 — Hedef sistemi | Tamamlandı (yerel/test) | Goal domain, owner-scoped CRUD, trusted-log evaluation, suggestions, Portable V3 ve Goal Cloud V1 istemci/migration paketi; production rollout D8'de |
 | D6 — AI Recommendation V2 | Planlandı | Öneri kalitesi, açıklanabilirlik ve geri bildirim akışı |
 | D7 — ML ve değerlendirme | Planlandı | Offline değerlendirme, ölçüm ve model/embedding deneyleri |
-| D8 — Release ve deployment | Planlandı | Frontend yayınlama, operasyonel doğrulama ve D2C.1 production cutover |
+| D8 — Release ve deployment | Planlandı | Frontend yayınlama, operasyonel doğrulama, D2C.1 production cutover ve Goal Cloud V1 production migration/flag rollout |
 
 ## Opsiyonel backlog
 
 Push/e-posta bildirimleri, ICS veya Google Calendar aktarımı, streaming availability ve AI ile tarih tahmini fikir havuzundadır. Bunlar D8 release kabulünün zorunlu parçası değildir.
-

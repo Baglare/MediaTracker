@@ -1,6 +1,7 @@
 # Portable Backup V2 ve V3
 
 > D5-4 ile güncel export sürümü V3'tür. V2 import uyumluluğu korunur. V3 `goals` domain'inde yalnız Goal tanımlarını taşır; evaluation, yüzde, suggestion state, Cloud revision/queue/conflict/ledger ve tombstone export edilmez. Goal ID conflict ve exact media ID remap ayrıntıları [Goal Cloud Sync belgesindedir](./GOAL_SYSTEM_CLOUD_SYNC.md).
+> Birleşik Goal katmanları ve rollout bağımlılıkları [Goal System Mimarisi](./GOAL_SYSTEM_ARCHITECTURE.md) belgesinde özetlenir.
 
 ## Amaç ve sınır
 

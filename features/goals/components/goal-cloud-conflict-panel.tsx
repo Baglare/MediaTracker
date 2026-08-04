@@ -15,6 +15,11 @@ function label(item: GoalCloudQueueItem): string {
   return "Hedef sürümü çakıştı";
 }
 
+function canAcceptCloud(item: GoalCloudQueueItem): boolean {
+  return item.blockedConflict?.kind !== "malformed_server_definition"
+    && Boolean(item.blockedConflict?.serverDefinition || item.blockedConflict?.serverDeletedAt);
+}
+
 export function GoalCloudConflictPanel({ ownerScope }: { ownerScope: LocalOwnerScope | null }) {
   const [snapshot, setSnapshot] = useState<{ ownerKey: string | null; items: GoalCloudQueueItem[] }>({ ownerKey: null, items: [] });
   const [message, setMessage] = useState<string>();
@@ -46,7 +51,7 @@ export function GoalCloudConflictPanel({ ownerScope }: { ownerScope: LocalOwnerS
             <p className="text-sm font-medium text-[var(--app-text-primary)]">{item.definition?.title ?? item.blockedConflict?.serverDefinition?.title ?? item.goalId}</p>
             <p className="mt-1 text-xs text-[var(--app-text-secondary)]">{label(item)} · yerel r{item.expectedRevision} / bulut r{item.blockedConflict?.serverRevision ?? 0}</p>
             <div className="mt-3 flex flex-wrap gap-2">
-              {item.blockedConflict?.kind !== "malformed_server_definition" && (
+              {canAcceptCloud(item) && (
                 <button type="button" onClick={() => run(() => acceptCloudGoalVersion(ownerScope, item.operationId), "Cloud sürümü yerel hedef olarak kullanıldı.")} className="rounded-lg border border-[var(--app-border)] px-2.5 py-1.5 text-xs">Cloud sürümünü kullan</button>
               )}
               <button type="button" onClick={() => run(() => overwriteCloudGoalWithLocal(ownerScope, item.operationId), "Yerel hedef güncel Cloud revision üzerine kuyruğa alındı.")} className="rounded-lg border border-[var(--app-border)] px-2.5 py-1.5 text-xs">Yerel sürümü yaz</button>

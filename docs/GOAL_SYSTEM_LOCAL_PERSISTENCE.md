@@ -1,6 +1,6 @@
 # Goal System D5-2 — Yerel Kalıcılık ve Manuel Yönetim
 
-D5-4 owner-scoped Cloud sidecar/queue ve Portable V3: [Goal System Cloud Sync](./GOAL_SYSTEM_CLOUD_SYNC.md).
+D5 birleşik görünüm: [Goal System Mimarisi](./GOAL_SYSTEM_ARCHITECTURE.md). D5-4 owner-scoped Cloud sidecar/queue ve Portable V3: [Goal System Cloud Sync](./GOAL_SYSTEM_CLOUD_SYNC.md).
 
 Bu belge D5-1 [Goal domain sözleşmesinin](./GOAL_SYSTEM_DOMAIN.md) owner-scoped yerel uygulamasını tanımlar. Goal tanımı kalıcıdır; ilerleme sonucu değildir.
 

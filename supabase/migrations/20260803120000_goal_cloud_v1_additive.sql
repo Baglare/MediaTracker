@@ -1,5 +1,23 @@
 begin;
 
+do $$
+begin
+  if to_regclass('auth.users') is null then
+    raise exception 'goal_cloud_v1_prerequisite_auth_users_missing';
+  end if;
+  if to_regprocedure('public.apply_progress_log_sync_operation(text,text,text,bigint,jsonb)') is null then
+    raise exception 'goal_cloud_v1_prerequisite_d2c1_missing';
+  end if;
+  if to_regclass('public.goals') is not null
+    or to_regclass('public.goal_sync_operations') is not null
+    or to_regprocedure('public.apply_cloud_goal_v1(uuid,text,bigint,jsonb,boolean)') is not null
+    or to_regprocedure('public.cloud_goal_v1_definition_is_valid(text,jsonb)') is not null
+    or to_regprocedure('public.cloud_goal_v1_request_hash(text,bigint,jsonb,boolean)') is not null then
+    raise exception 'goal_cloud_v1_partial_or_existing_installation';
+  end if;
+end;
+$$;
+
 create table public.goals (
   row_pk uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
@@ -119,6 +137,7 @@ begin
   end if;
   v_hash:=public.cloud_goal_v1_request_hash(p_goal_id,p_expected_revision,p_definition,p_delete);
   perform pg_advisory_xact_lock(hashtextextended(v_user::text || ':' || p_operation_id::text,0));
+  perform pg_advisory_xact_lock(hashtextextended(v_user::text || ':goal:' || p_goal_id,0));
   select * into v_existing from public.goal_sync_operations
     where user_id=v_user and operation_id=p_operation_id;
   if found then

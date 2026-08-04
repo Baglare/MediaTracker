@@ -33,6 +33,7 @@ D4; MediaTracker'ın mevcut local-first ve opsiyonel Cloud mimarisini değiştir
 
 ## Kalan düşük riskler
 
+- D4 belgelerinde ayrı bir “D4-4 tamamlandı” kanıtı yoktur. D5-2 sırasında yapılan sınırlı açık-tema token rötuşu D4-4 rollout/deployment sonucu olarak yorumlanmamalıdır; güncel kontrat ve D5-5 smoke sonucu ayrı kanıttır.
+
 - Browser smoke gerçek viewport ve taşma/console kontrollerini kapsadı; otomasyon sürücüsü fine-pointer `:hover` durumunu görsel olarak etkinleştiremedi. Uzun başlıklı gerçek fixture ile kısa manuel hover kontrolü yararlıdır.
 - Statik kontrat ve unit testleri canlı Supabase/RLS, production deployment veya cihazlar arası gerçek ağ kanıtı değildir.
-

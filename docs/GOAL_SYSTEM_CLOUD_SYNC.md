@@ -1,5 +1,7 @@
 # Goal System D5-4 — Backup ve Cloud Sync
 
+D5 birleşik görünüm: [Goal System Mimarisi](./GOAL_SYSTEM_ARCHITECTURE.md). Manuel kabul: [Goal System Manuel Testleri](./GOAL_SYSTEM_MANUAL_TESTS.md).
+
 ## Kalıcı sınır
 
 Cloud ve Portable Backup yalnız `Goal` tanımını taşır. `GoalEvaluation`, `currentValue`, yüzde, attainment, öneri geçmişi, queue, revision, conflict ve tombstone portable değildir. Evaluation her Cloud/local birleşiminden sonra yerel medya ve ProgressLog snapshot'ından yeniden türetilir.

@@ -1,6 +1,6 @@
 # Goal System D5-1 — Audit ve Domain Kararları
 
-D5-4 backup/Cloud uygulaması: [Goal System Cloud Sync](./GOAL_SYSTEM_CLOUD_SYNC.md).
+D5 birleşik görünüm: [Goal System Mimarisi](./GOAL_SYSTEM_ARCHITECTURE.md). D5-4 backup/Cloud uygulaması: [Goal System Cloud Sync](./GOAL_SYSTEM_CLOUD_SYNC.md).
 
 ## Kapsam ve sonuç
 

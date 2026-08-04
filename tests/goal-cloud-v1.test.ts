@@ -6,7 +6,14 @@ import { resolveGoalCloudRolloutContract } from "@/features/goals/cloud/rollout"
 import { decodeGoalCloudRpcSnapshot } from "@/features/goals/cloud/client";
 import { enqueueGoalCloudOperation, readGoalCloudQueue, writeGoalCloudQueue } from "@/features/goals/cloud/queue";
 import { applyCloudGoalsToLocalMerge, planCloudGoalsToLocalMerge, replaceLocalGoalsFromCloud } from "@/features/goals/cloud/manual-transfer";
-import { queueGoalCloudMutation } from "@/features/goals/cloud/manager";
+import {
+  flushGoalCloudQueue,
+  getGoalCloudSyncSnapshot,
+  queueGoalCloudMutation,
+  setGoalCloudOwnerScope,
+  subscribeGoalCloudSync,
+} from "@/features/goals/cloud/manager";
+import { readGoalCloudState } from "@/features/goals/cloud/state";
 import { readGoalStore, writeGoalStore } from "@/features/goals/data/goal-store";
 import type { Goal } from "@/features/goals/domain/types";
 
@@ -29,7 +36,11 @@ const goal: Goal = {
   updatedAt: "2026-08-03T08:00:00.000Z",
 };
 
-afterEach(() => vi.unstubAllEnvs());
+afterEach(() => {
+  setGoalCloudOwnerScope(null);
+  vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
+});
 
 describe("Goal Cloud V1 mapping and rollout", () => {
   it("syncs only the strict Goal definition", () => {
@@ -85,9 +96,79 @@ describe("Goal durable owner queue", () => {
     vi.stubEnv("NEXT_PUBLIC_CLOUD_GOALS_V1_ENABLED", "false");
     expect(queueGoalCloudMutation(scope, { operation: "upsert", goal }, { storage })).toBeNull();
     vi.stubEnv("NEXT_PUBLIC_CLOUD_GOALS_V1_ENABLED", "true");
-    vi.stubEnv("NEXT_PUBLIC_CLOUD_GOALS_SCHEMA_STAGE", "absent");
+    vi.stubEnv("NEXT_PUBLIC_CLOUD_GOALS_SCHEMA_STAGE", "v1");
     expect(queueGoalCloudMutation(scope, { operation: "upsert", goal }, { storage })).not.toBeNull();
     expect(readGoalCloudQueue(scope, storage)).toHaveLength(1);
+  });
+
+  it("keeps offline failures pending and applies the bounded retry limit", async () => {
+    vi.stubEnv("NEXT_PUBLIC_CLOUD_GOALS_V1_ENABLED", "true");
+    vi.stubEnv("NEXT_PUBLIC_CLOUD_GOALS_SCHEMA_STAGE", "v1");
+    const storage = new MemoryStorage();
+    const scope = createUserOwnerScope("owner-a");
+    enqueueGoalCloudOperation(scope, "upsert", goal.id, goal, { storage, operationId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" });
+    setGoalCloudOwnerScope(scope);
+    const client = { rpc: vi.fn(async () => ({ data: null, error: { message: "network unavailable" } })) };
+    for (let attempt = 0; attempt < 5; attempt += 1) await flushGoalCloudQueue({ storage, client });
+    expect(client.rpc).toHaveBeenCalledTimes(5);
+    expect(readGoalCloudQueue(scope, storage)[0]).toMatchObject({
+      retryCount: 5,
+      permanentFailure: { code: "retry_exhausted" },
+    });
+    await flushGoalCloudQueue({ storage, client });
+    expect(client.rpc).toHaveBeenCalledTimes(5);
+  });
+
+  it("keeps revision conflicts blocked and invalid payloads permanent", async () => {
+    vi.stubEnv("NEXT_PUBLIC_CLOUD_GOALS_V1_ENABLED", "true");
+    vi.stubEnv("NEXT_PUBLIC_CLOUD_GOALS_SCHEMA_STAGE", "v1");
+    const blockedStorage = new MemoryStorage();
+    const scope = createUserOwnerScope("owner-a");
+    enqueueGoalCloudOperation(scope, "upsert", goal.id, goal, { storage: blockedStorage, operationId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" });
+    setGoalCloudOwnerScope(scope);
+    await flushGoalCloudQueue({ storage: blockedStorage, client: { rpc: async () => ({ data: { status: "revision_conflict", goalId: goal.id, revision: 3, deletedAt: null, definition: { ...goal, title: "Cloud" } }, error: null }) } });
+    expect(readGoalCloudQueue(scope, blockedStorage)[0]).toMatchObject({ blockedConflict: { kind: "local_update_vs_newer_cloud", serverRevision: 3 } });
+
+    const invalidStorage = new MemoryStorage();
+    enqueueGoalCloudOperation(scope, "upsert", goal.id, goal, { storage: invalidStorage, operationId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb" });
+    await flushGoalCloudQueue({ storage: invalidStorage, client: { rpc: async () => ({ data: { status: "invalid_payload", goalId: goal.id, revision: 0, deletedAt: null, definition: null }, error: null }) } });
+    expect(readGoalCloudQueue(scope, invalidStorage)[0]).toMatchObject({ permanentFailure: { code: "invalid_payload" } });
+  });
+
+  it("drops a stale response after owner switch", async () => {
+    vi.stubEnv("NEXT_PUBLIC_CLOUD_GOALS_V1_ENABLED", "true");
+    vi.stubEnv("NEXT_PUBLIC_CLOUD_GOALS_SCHEMA_STAGE", "v1");
+    const storage = new MemoryStorage();
+    const a = createUserOwnerScope("owner-a");
+    const b = createUserOwnerScope("owner-b");
+    enqueueGoalCloudOperation(a, "upsert", goal.id, goal, { storage, operationId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" });
+    let resolveRpc!: (value: { data: unknown; error: null }) => void;
+    const client = { rpc: () => new Promise<{ data: unknown; error: null }>((resolve) => { resolveRpc = resolve; }) };
+    setGoalCloudOwnerScope(a);
+    const flushing = flushGoalCloudQueue({ storage, client });
+    await vi.waitFor(() => expect(resolveRpc).toBeTypeOf("function"));
+    setGoalCloudOwnerScope(b);
+    resolveRpc({ data: { status: "applied", goalId: goal.id, revision: 1, deletedAt: null, definition: goal }, error: null });
+    await flushing;
+    expect(readGoalCloudQueue(a, storage)).toHaveLength(1);
+    expect(readGoalCloudState(a, storage).records).toEqual([]);
+    expect(getGoalCloudSyncSnapshot().ownerKey).toBe(b.key);
+  });
+
+  it("publishes one owner-scoped reactive status snapshot without affecting media rollout", () => {
+    vi.stubEnv("NEXT_PUBLIC_CLOUD_GOALS_V1_ENABLED", "true");
+    vi.stubEnv("NEXT_PUBLIC_CLOUD_GOALS_SCHEMA_STAGE", "absent");
+    const storage = new MemoryStorage();
+    vi.stubGlobal("window", { localStorage: storage, dispatchEvent: vi.fn() });
+    vi.stubGlobal("localStorage", storage);
+    const scope = createUserOwnerScope("owner-a");
+    const listener = vi.fn();
+    setGoalCloudOwnerScope(scope);
+    const unsubscribe = subscribeGoalCloudSync(listener);
+    expect(queueGoalCloudMutation(scope, { operation: "upsert", goal })).not.toBeNull();
+    expect(listener).toHaveBeenCalled();
+    expect(getGoalCloudSyncSnapshot()).toMatchObject({ ownerKey: scope.key, status: "incompatible", pending: 1 });
+    unsubscribe();
   });
 });
 

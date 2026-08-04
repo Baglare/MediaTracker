@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { describe, expect, it } from "vitest";
+import { assertSafeSupabaseTestTarget } from "@/lib/supabase-test-target";
 
 const env = {
   url: process.env.SUPABASE_TEST_URL,
@@ -10,16 +11,28 @@ const env = {
   bPassword: process.env.SUPABASE_TEST_USER_B_PASSWORD,
 };
 const configured = Object.values(env).every(Boolean);
-const productionCollision = Boolean(env.url && process.env.NEXT_PUBLIC_SUPABASE_URL && env.url === process.env.NEXT_PUBLIC_SUPABASE_URL)
-  || Boolean(env.url && /(?:prod|production)/i.test(env.url));
-const live = configured && !productionCollision;
+let isolatedTarget = false;
+if (configured && env.url) {
+  try {
+    assertSafeSupabaseTestTarget(env.url);
+    isolatedTarget = true;
+  } catch {
+    isolatedTarget = false;
+  }
+}
+const live = configured && isolatedTarget;
 
 describe.runIf(live)("Goal Cloud V1 disposable live runner", () => {
-  it("covers CAS, replay, owner isolation and tombstone without service role", async () => {
+  it("covers CAS, replay, owner isolation and tombstone without service role", async (context) => {
     const a = createClient(env.url!, env.anon!, { auth: { persistSession: false } });
     const b = createClient(env.url!, env.anon!, { auth: { persistSession: false } });
     expect((await a.auth.signInWithPassword({ email: env.aEmail!, password: env.aPassword! })).error).toBeNull();
     expect((await b.auth.signInWithPassword({ email: env.bEmail!, password: env.bPassword! })).error).toBeNull();
+    const schemaProbe = await a.from("goals").select("id").limit(1);
+    if (schemaProbe.error) {
+      context.skip(`Goal V1 test şeması hazır değil: ${schemaProbe.error.code ?? "schema_unavailable"}`);
+      return;
+    }
     const prefix = `d5-live-${crypto.randomUUID()}`;
     const goalId = crypto.randomUUID();
     const definition = {

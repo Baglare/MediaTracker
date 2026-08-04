@@ -20,4 +20,11 @@ describe("Supabase live-test target guard", () => {
     expect(() => assertSafeSupabaseTestTarget("not-a-url", []))
       .toThrow(/HTTP/);
   });
+
+  it("refuses an unlabelled project ref even when it differs from production", () => {
+    expect(() => assertSafeSupabaseTestTarget(
+      "https://abcdefghijklmnopqrst.supabase.co",
+      ["https://production.supabase.co"],
+    )).toThrow(/marked/i);
+  });
 });

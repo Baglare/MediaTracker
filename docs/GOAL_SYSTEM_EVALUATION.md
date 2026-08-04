@@ -1,6 +1,6 @@
 # Goal System D5-3 — Evaluation ve Öneri Sözleşmesi
 
-D5-4 immutable-after-dispatch ve Cloud CAS sözleşmesi: [Goal System Cloud Sync](./GOAL_SYSTEM_CLOUD_SYNC.md).
+D5 birleşik görünüm: [Goal System Mimarisi](./GOAL_SYSTEM_ARCHITECTURE.md). D5-4 immutable-after-dispatch ve Cloud CAS sözleşmesi: [Goal System Cloud Sync](./GOAL_SYSTEM_CLOUD_SYNC.md).
 
 Bu belge [Goal domain modelini](./GOAL_SYSTEM_DOMAIN.md) ve [owner-scoped yerel Goal store'unu](./GOAL_SYSTEM_LOCAL_PERSISTENCE.md) tamamlayan, yalnız okuma amaçlı evaluation katmanını tanımlar. `GoalEvaluation` localStorage, portable backup, Cloud queue veya Supabase'e yazılmaz; her medya/log snapshot'ından yeniden türetilir.
 

@@ -402,7 +402,7 @@ Next.js tarafı `MEDIA_TRACKER_ML_SERVICE_URL` doluysa bu servisi kullanır. Ser
 
 ## Roadmap Özeti
 
-D1–D4 tamamlandı. Sıradaki ürün aşamaları D5 hedef sistemi, D6 AI Recommendation V2, D7 ML/değerlendirme ve D8 release/deployment + D2C.1 production cutover'dır. Opsiyonel fikirler D8 kabulünün zorunlu maddesi değildir; güncel ayrıntı [`docs/ROADMAP.md`](docs/ROADMAP.md) içindedir.
+D1–D5 kod, otomatik test ve yerel kabul kapsamı tamamlandı. Sıradaki ürün aşamaları D6 AI Recommendation V2, D7 ML/değerlendirme ve D8 release/deployment'tır. D2C.1 production cutover ile Goal Cloud V1 migration/feature rollout D8'de yapılacaktır; bu repository turunda production migration veya deployment uygulanmamıştır. Opsiyonel fikirler D8 kabulünün zorunlu maddesi değildir; güncel ayrıntı [`docs/ROADMAP.md`](docs/ROADMAP.md) içindedir.
 
 ## Sorun Giderme
 

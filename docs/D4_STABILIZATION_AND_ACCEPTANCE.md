@@ -45,3 +45,4 @@ Browser smoke ile contract testleri ayrı kanıtlardır. Fine-pointer hover gör
 
 D4 kod, test ve yerel browser kabul kapsamı tamamlanmıştır. Bu karar deployment, production Supabase cutover veya canlı iki hesaplı Cloud smoke iddiası içermez. D2C.1 production cutover [ROADMAP.md](./ROADMAP.md) uyarınca D8 aşamasındadır.
 
+D4 sonrasında D5-2 kapsamında yapılan açık-tema preset rötuşları ayrı contract testleriyle korunur; bunlar doğrulanmış bir “D4-4” production veya rollout aşaması olarak sunulmaz.
