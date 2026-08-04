@@ -2,6 +2,8 @@
 
 > Durum: D6-2 tamamlandı. Bu katman provider kimliği, ham yapılandırılmış evidence, recommendation-only TVMaze anime filtresi, exact-ID linking ve bounded public metadata cache sağlar. D6-3 consumer/aggregation ve final ranking de uygulanmıştır.
 
+D6-5 regresyon sonucu için [D6 Kabul Raporu](AI_RECOMMENDATION_V2_ACCEPTANCE.md), ölçüm sınırı için [Evaluation Contract](AI_RECOMMENDATION_EVALUATION_CONTRACT.md) belgesine bakın.
+
 ## Klasör ve sınır
 
 ```text
@@ -94,9 +96,7 @@ Conditional live smoke `D6_PROVIDER_LIVE_SMOKE=1` olmadan tamamen skip edilir. T
 
 Raw snapshot'lar [`aggregation.ts`](../features/recommendations/evidence/aggregation.ts) tarafından `AspectEvidence` read-model'ine çevrilir; D6-2 reliability değerleri strength değildir. Authoritative pipeline, aynı snapshot/cache sonucunu [`runDeterministicRecommendationV2`](../features/recommendations/orchestration/deterministic-engine.ts) içine sidecar olarak verir ve duplicate enrichment çağrısı yapmaz. Ayrıntı [V2 Ranking](AI_RECOMMENDATION_V2_RANKING.md) belgesindedir.
 
-## D6-4'e kalanlar
+## D6-4/D6-5 sonucu
 
-- Editable constraint ve strictness UI.
-- Reason/aspect-level feedback contract'ının kullanıcı etkileşimine bağlanması.
-- Exploratory near-match read-model'inin primary listeden ayrı gösterimi.
-- Evidence confidence ve warning'ler için sade kullanıcı transparency görünümü.
+- Editable constraint/strictness, reason-level feedback, ayrı near-match ve sade transparency D6-4'te bağlandı.
+- Request/cache/privacy/fail-soft regresyon guardrail'leri D6-5 kabulünde doğrulandı.

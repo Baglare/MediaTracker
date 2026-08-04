@@ -4,6 +4,7 @@ export * from "./parsed-request-panel";
 export * from "./aspect-constraint-editor";
 export * from "./objective-constraint-editor";
 export * from "./strictness-selector";
+export * from "./request-payload";
 export * from "./recommendation-result-list";
 export * from "./recommendation-result-card";
 export * from "./near-match-section";

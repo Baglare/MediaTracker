@@ -1,12 +1,12 @@
 # AI Aspect Taxonomy
 
-> Durum: D6-0 taxonomy kaynağı; D6-1'de çalışan TypeScript registry'ye, D6-3'te raw evidence aggregation ve constraint extraction'a bağlanmıştır. Eşik kalibrasyonu D7'ye aittir.
+> Durum: D6-0 taxonomy kaynağı; 43 kayıt D6 boyunca donduruldu. D6 kabulü [AI_RECOMMENDATION_V2_ACCEPTANCE.md](AI_RECOMMENDATION_V2_ACCEPTANCE.md), D7 etiketleme semantiği [AI_RECOMMENDATION_EVALUATION_CONTRACT.md](AI_RECOMMENDATION_EVALUATION_CONTRACT.md) içindedir.
 
 ## Amaç ve kapsam
 
 Recommendation V2, kullanıcı isteğini yalnız genre anahtar sözcükleriyle değil, merkezi ve provider kanıtına dayalı aspect kayıtlarıyla ifade eder. Registry tek doğruluk kaynağıdır; regex, synonym ve provider eşlemeleri intent, retrieval ve scorer modüllerine ayrı ayrı kopyalanmaz.
 
-Başlangıç registry'si 5 grupta 44 aspect içerir:
+Başlangıç registry'si 5 grupta 43 aspect içerir:
 
 | Grup | Sayı |
 |---|---:|

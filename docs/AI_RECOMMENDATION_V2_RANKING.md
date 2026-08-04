@@ -1,6 +1,6 @@
 # AI Recommendation V2 — Evidence, Eligibility ve Deterministik Ranking
 
-> Durum: D6-3 deterministik baseline ve D6-4 UI/read-model bağlantısı tamamlandı. D7 kalibrasyonu başlamamıştır.
+> Durum: D6-3 deterministik baseline D6-5 regresyon kabulünden geçti. Öncelik tuple'ı değiştirilmedi; D7 kalibrasyonu başlamamıştır. [Kabul](AI_RECOMMENDATION_V2_ACCEPTANCE.md) · [Evaluation](AI_RECOMMENDATION_EVALUATION_CONTRACT.md)
 
 ## 1. Çalışan akış
 

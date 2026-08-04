@@ -1,14 +1,14 @@
 import type { AiIntent, AiSettings } from "@/lib/ai/types";
-import type { MediaItem } from "@/lib/types";
 import { decodeRecommendationRequestV2, type RecommendationRequestV2 } from "../domain/codec";
 import { adaptV1RequestToV2 } from "./v1-request-adapter";
 import { patchRecommendationRequest } from "./request-patch";
+import type { ReferenceMediaItem } from "./reference-policy";
 
 export function interpretRecommendationRequest(input: {
   message: string;
   intent: AiIntent;
   settings: AiSettings;
-  mediaItems: readonly MediaItem[];
+  mediaItems: readonly ReferenceMediaItem[];
   previousRequest?: unknown;
   strictness?: RecommendationRequestV2["strictness"];
 }) {

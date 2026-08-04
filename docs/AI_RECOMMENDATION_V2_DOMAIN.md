@@ -1,6 +1,6 @@
 # AI Recommendation V2 Domain
 
-> Durum: D6-1 tamamlandı; D6-2 provider adapter/sidecar katmanı domain'i bozmadan eklendi. Domain constraint/strength policy'leri henüz V1 scoring'e bağlı değildir.
+> Durum: D6-1 domain sözleşmesi D6-5 kabulünden geçti. Provider/evidence/ranking/UI entegrasyonları tamamlandı; threshold kalibrasyonu D7'ye aittir.
 
 ## Klasör yapısı
 
@@ -21,6 +21,8 @@ features/recommendations/
     anilist-adapter.ts, tvmaze-adapter.ts, tmdb-adapter.ts
     omdb-adapter.ts, openlibrary-adapter.ts, pipeline.ts
     tvmaze-anime-classifier.ts
+  evaluation/
+    types.ts, codec.ts, metrics.ts # D7 için üretim motorundan bağımsız sözleşme
 ```
 
 Domain React, Next.js, localStorage ve provider fetch bağımlılığı taşımaz. TVMaze classifier yalnız provider raw tipini type-only olarak kullanır; ağ çağrısı veya filtre side effect'i yoktur.
@@ -140,4 +142,6 @@ Verified reference için `provider + externalId + mediaType + titleSnapshot` zor
 - AniList tag rank, TMDB movie/TV keyword/external ID, OMDb secondary evidence ve Open Library work/edition metadata adapter'ları eklendi.
 - `CandidateProviderEvidenceSnapshot` aggregation öncesi raw claim sidecar'ıdır; public response ve V1 scorer'a sızmaz.
 - Exact identity link'leri ve bounded public metadata cache [Provider Enrichment](AI_RECOMMENDATION_V2_PROVIDER_ENRICHMENT.md) belgesinde tanımlıdır.
-- Aspect aggregation, hard filters ve authoritative deterministic ranking D6-3'e kalır.
+- Aspect aggregation, hard filters ve authoritative deterministic ranking D6-3'te; editable request/Feedback V2 D6-4'te; bounded request/session/privacy regresyonları D6-5'te tamamlandı.
+
+D6 kapanış kanıtı [AI Recommendation V2 Acceptance](AI_RECOMMENDATION_V2_ACCEPTANCE.md), D7 fixture/metric sözleşmesi [AI Recommendation Evaluation Contract](AI_RECOMMENDATION_EVALUATION_CONTRACT.md) belgesindedir.

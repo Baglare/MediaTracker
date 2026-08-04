@@ -38,6 +38,13 @@ import {
 } from "./types";
 
 export const RECOMMENDATION_REQUEST_VERSION = 2 as const;
+export const RECOMMENDATION_REQUEST_LIMITS = {
+  queryText: 4000,
+  targetMediaTypes: 7,
+  aspectConstraints: 43,
+  objectiveConstraints: 16,
+  references: 20,
+} as const;
 
 export interface VerifiedRecommendationReference {
   state: "verified";
@@ -461,7 +468,7 @@ export function decodeRecommendationRequestV2(value: unknown): RecommendationDec
     "version", "queryText", "targetMediaTypes", "aspectConstraints", "objectiveConstraints",
     "strictness", "references", "profileSignalsEnabled", "semanticVerifierMode", "locale",
   ], "$" );
-  const queryText = nonEmptyString(value.queryText, 4000);
+  const queryText = nonEmptyString(value.queryText, RECOMMENDATION_REQUEST_LIMITS.queryText);
   const strictness = asEnum(value.strictness, RECOMMENDATION_STRICTNESS_VALUES);
   const verifierMode = asEnum(value.semanticVerifierMode, SEMANTIC_VERIFIER_MODES);
   const locale = nonEmptyString(value.locale, 40);
@@ -476,7 +483,10 @@ export function decodeRecommendationRequestV2(value: unknown): RecommendationDec
   if (!Array.isArray(value.targetMediaTypes)) {
     issues.push(issue("target_media_types_invalid", "targetMediaTypes", "Target media types liste olmalıdır."));
   } else {
-    for (const [index, entry] of value.targetMediaTypes.entries()) {
+    if (value.targetMediaTypes.length > RECOMMENDATION_REQUEST_LIMITS.targetMediaTypes) {
+      issues.push(issue("target_media_types_limit_exceeded", "targetMediaTypes", "Target media type sınırı aşıldı."));
+    }
+    for (const [index, entry] of value.targetMediaTypes.slice(0, RECOMMENDATION_REQUEST_LIMITS.targetMediaTypes).entries()) {
       const mediaType = asEnum(entry, RECOMMENDATION_MEDIA_TYPES);
       if (!mediaType) issues.push(issue("target_media_type_invalid", `targetMediaTypes.${index}`, "Media type desteklenmiyor."));
       else if (!targetMediaTypes.includes(mediaType)) targetMediaTypes.push(mediaType);
@@ -487,7 +497,10 @@ export function decodeRecommendationRequestV2(value: unknown): RecommendationDec
   if (!Array.isArray(value.aspectConstraints)) {
     issues.push(issue("aspect_constraints_invalid", "aspectConstraints", "Aspect constraints liste olmalıdır."));
   } else {
-    value.aspectConstraints.forEach((entry, index) => {
+    if (value.aspectConstraints.length > RECOMMENDATION_REQUEST_LIMITS.aspectConstraints) {
+      issues.push(issue("aspect_constraints_limit_exceeded", "aspectConstraints", "Aspect constraint sınırı aşıldı."));
+    }
+    value.aspectConstraints.slice(0, RECOMMENDATION_REQUEST_LIMITS.aspectConstraints).forEach((entry, index) => {
       const decoded = decodeAspectConstraint(entry, `aspectConstraints.${index}`);
       if (decoded.ok) rawAspectConstraints.push(decoded.value);
       else issues.push(...decoded.issues);
@@ -500,7 +513,10 @@ export function decodeRecommendationRequestV2(value: unknown): RecommendationDec
   if (!Array.isArray(value.objectiveConstraints)) {
     issues.push(issue("objective_constraints_invalid", "objectiveConstraints", "Objective constraints liste olmalıdır."));
   } else {
-    value.objectiveConstraints.forEach((entry, index) => {
+    if (value.objectiveConstraints.length > RECOMMENDATION_REQUEST_LIMITS.objectiveConstraints) {
+      issues.push(issue("objective_constraints_limit_exceeded", "objectiveConstraints", "Objective constraint sınırı aşıldı."));
+    }
+    value.objectiveConstraints.slice(0, RECOMMENDATION_REQUEST_LIMITS.objectiveConstraints).forEach((entry, index) => {
       const decoded = decodeObjectiveConstraint(entry, `objectiveConstraints.${index}`);
       if (decoded.ok) rawObjectiveConstraints.push(decoded.value);
       else issues.push(...decoded.issues);
@@ -520,7 +536,10 @@ export function decodeRecommendationRequestV2(value: unknown): RecommendationDec
   if (!Array.isArray(value.references)) {
     issues.push(issue("references_invalid", "references", "References liste olmalıdır."));
   } else {
-    value.references.forEach((entry, index) => {
+    if (value.references.length > RECOMMENDATION_REQUEST_LIMITS.references) {
+      issues.push(issue("references_limit_exceeded", "references", "Reference sınırı aşıldı."));
+    }
+    value.references.slice(0, RECOMMENDATION_REQUEST_LIMITS.references).forEach((entry, index) => {
       const decoded = decodeReference(entry, `references.${index}`);
       if (decoded.ok) references.push(decoded.value);
       else issues.push(...decoded.issues);

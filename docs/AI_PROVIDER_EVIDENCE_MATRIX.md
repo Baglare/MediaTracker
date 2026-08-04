@@ -1,6 +1,6 @@
 # AI Provider Evidence Matrix
 
-> Durum: D6-0 karar sözleşmesi; D6-2 adapter'ları raw claim üretir, D6-3 aggregator bu claim'leri bounded provider-support policy ile tüketir. Bu belge canlı provider doğrulaması değildir.
+> Durum: D6-0 karar sözleşmesi; D6-2 adapter'ları raw claim üretir, D6-3 aggregator bu claim'leri bounded provider-support policy ile tüketir. D6 kabulü [AI_RECOMMENDATION_V2_ACCEPTANCE.md](AI_RECOMMENDATION_V2_ACCEPTANCE.md), D7 snapshot/label sınırı [AI_RECOMMENDATION_EVALUATION_CONTRACT.md](AI_RECOMMENDATION_EVALUATION_CONTRACT.md) içindedir. Bu belge canlı provider doğrulaması değildir.
 
 ## Kaynak sahipliği
 

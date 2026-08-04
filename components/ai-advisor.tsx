@@ -4,7 +4,6 @@ import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Sparkles,
-  Send,
   Plus,
   X,
   Loader2,
@@ -56,6 +55,8 @@ import {
   NearMatchSection,
   ParsedRequestPanel,
   RequestComposer,
+  buildInterpretReferencePayload,
+  buildRecommendationMediaPayload,
 } from "@/features/recommendations/ui";
 export type { AiSettings } from "@/lib/ai/types";
 import { useAuth } from "@/hooks/use-auth";
@@ -698,6 +699,7 @@ export default function AiAdvisor({
   const stepTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inFlightRequestId = useRef<string | null>(null);
   const inFlightPromptKey = useRef<string | null>(null);
+  const activeRequestController = useRef<AbortController | null>(null);
   const lastPersistedSessionKey = useRef<string | null>(null);
   const activeContextRef = useRef<AiActiveContext | null>(null);
   const feedbackContextRef = useRef<{ sessionId?: string; prompt?: string } | null>(null);
@@ -718,6 +720,8 @@ export default function AiAdvisor({
   useEffect(() => {
     try {
       feedbackLoadedRef.current = false;
+      activeRequestController.current?.abort();
+      activeRequestController.current = null;
       // eslint-disable-next-line react-hooks/set-state-in-effect -- owner switch must mask previous personal state
       setSettings({ ...DEFAULT_SETTINGS });
       setSessions([]);
@@ -953,6 +957,8 @@ export default function AiAdvisor({
   }
   useEffect(() => {
     if (resetSignal === 0) return;
+    activeRequestController.current?.abort();
+    activeRequestController.current = null;
     if (stepTimer.current) clearTimeout(stepTimer.current);
     inFlightRequestId.current = null;
     inFlightPromptKey.current = null;
@@ -1046,6 +1052,8 @@ export default function AiAdvisor({
     nearMatches: AiNearMatchRecommendation[];
   } | null> {
     const controller = new AbortController();
+    activeRequestController.current?.abort();
+    activeRequestController.current = controller;
     const timeoutId = setTimeout(() => controller.abort(), AI_REQUEST_TIMEOUT_MS);
     // R35 — Veri toggle'larını sunucuya iletilecek AiSettings'e yansıt.
     // Notlar/Son aktiviteler de toggle ile gerçekten kapatılır (server tarafı
@@ -1060,8 +1068,16 @@ export default function AiAdvisor({
     };
     // R35 — Boş kütüphane: güvenli payload (server zaten boş kütüphaneyi
     // tolere ediyor ama mediaItems'in array olduğundan emin oluyoruz).
-    const safeMediaItems = Array.isArray(mediaList) ? mediaList : [];
-    const safeProgressLogs = Array.isArray(progressLogs) ? progressLogs : [];
+    const safeMediaItems = buildRecommendationMediaPayload(Array.isArray(mediaList) ? mediaList : [], {
+      ratings: dataToggles.ratings,
+      favorites: dataToggles.favorites,
+      progress: dataToggles.progress,
+      notes: dataToggles.notes && settings.usePersonalNotes,
+      profile: settings.useProfile,
+    });
+    const safeProgressLogs = dataToggles.recentActivity && settings.useRecentActivity && Array.isArray(progressLogs)
+      ? progressLogs.slice(-500)
+      : [];
     try {
       const res = await fetch("/api/ai/recommend", {
         method: "POST",
@@ -1121,6 +1137,7 @@ export default function AiAdvisor({
       return null;
     } finally {
       clearTimeout(timeoutId);
+      if (activeRequestController.current === controller) activeRequestController.current = null;
     }
   }
 
@@ -1340,13 +1357,17 @@ export default function AiAdvisor({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message: rawPrompt,
-          mediaItems: Array.isArray(mediaList) ? mediaList : [],
-          settings,
+          mediaItems: buildInterpretReferencePayload(Array.isArray(mediaList) ? mediaList : []),
+          settings: { useProfile: settings.useProfile },
           strictness: recommendationStrictness,
           previousStructuredRequestV2: structuredRequest ?? undefined,
         }),
       });
       const data = await response.json();
+      if (data?.resetRequested) {
+        handleNewTopic();
+        return;
+      }
       if (!response.ok || !data?.request) {
         setPendingClarification({ originalPrompt: rawPrompt, question: data?.clarificationQuestion || "İstek çözümlenemedi; hedef medya türünü ve sınırları netleştirir misin?" });
         return;
@@ -1383,6 +1404,8 @@ export default function AiAdvisor({
 
   function handleNewTopic() {
     if (stepTimer.current) clearTimeout(stepTimer.current);
+    activeRequestController.current?.abort();
+    activeRequestController.current = null;
     inFlightRequestId.current = null;
     inFlightPromptKey.current = null;
     setMessages([]);

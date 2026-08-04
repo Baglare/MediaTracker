@@ -1,6 +1,6 @@
 # AI Recommendation V2 — UI ve Feedback V2
 
-> Durum: D6-4 uygulandı. D6-3 deterministik sıralama kararı değişmedi; stabilizasyon D6-5 kapsamındadır.
+> Durum: D6-4 uygulandı ve D6-5'te session hydration, request abort, payload minimizasyonu ve follow-up fixture'larıyla stabilize edildi. D6-3 deterministik sıralama kararı değişmedi.
 
 ## İki aşamalı istek
 
@@ -28,10 +28,7 @@ Dismissal exact identity ile hemen uygulanır; reason dialog iptal/kapatılırsa
 
 Şeffaflık alanı deterministik final sıra, kaynaklar, verifier modu, profil/toggle durumu ve must-first politikasını açıklar. Secret, raw debug, prompt, note ve vector göstermez. Strictness radio semantiği; aspect combobox ilişkileri; chip remove label'ları; collapsible `aria-expanded/controls`; dialog focus trap, Escape ve focus return sözleşmeleri uygulanır.
 
-## D6-5'e kalanlar
+## D6-5 sonucu ve D7'ye kalanlar
 
-- Fixture/mock browser matrisi ve gerçek viewport regresyonu
-- Provider-live conditional acceptance ve performans bütçeleri
-- Session/read-model geriye uyumluluk fuzz testleri
-- D7 gold-label/fixture contract'ının son hâli
-
+- D6-5 kod/test/browser sonucu [D6 Kabul Raporu](AI_RECOMMENDATION_V2_ACCEPTANCE.md) içindedir.
+- D7'ye human-labeled gold set, provider snapshot corpus'u, kalite metrik raporu ve threshold/verifier kalibrasyonu kalır.

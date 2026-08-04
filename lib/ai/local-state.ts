@@ -13,6 +13,7 @@ import type {
   RecommendationFeedbackEvent,
 } from "./types";
 import { decodeRecommendationFeedbackEventV2, type RecommendationFeedbackEventV2 } from "@/features/recommendations/feedback";
+import { decodeRecommendationRequestV2 } from "@/features/recommendations/domain/codec";
 import type { RecommendationStrictness } from "@/features/recommendations/domain/types";
 
 export interface AiSessionLocalState {
@@ -117,12 +118,21 @@ function normalizeSession(value: unknown): Record<string, unknown> | null {
         return record ? [record] : [];
       })
     : [];
+  const nearMatches = Array.isArray(value.nearMatches)
+    ? value.nearMatches.slice(0, 3).flatMap((item) => {
+        const record = boundedRecord(item, 20_000);
+        return record ? [record] : [];
+      })
+    : [];
+  const structuredRequest = decodeRecommendationRequestV2(value.structuredRequestV2);
   return {
     id,
     createdAt: value.createdAt,
     prompt,
     assistantMessage,
     recommendations,
+    nearMatches,
+    ...(structuredRequest.ok ? { structuredRequestV2: structuredRequest.value } : {}),
     ...(Array.isArray(value.rejectedCandidates)
       ? { rejectedCandidates: value.rejectedCandidates.slice(0, 50) }
       : {}),
@@ -153,10 +163,19 @@ function normalizeActiveSession(value: unknown): Record<string, unknown> | undef
         return record ? [record] : [];
       })
     : [];
+  const nearMatches = Array.isArray(value.nearMatches)
+    ? value.nearMatches.slice(0, 3).flatMap((item) => {
+        const record = boundedRecord(item, 20_000);
+        return record ? [record] : [];
+      })
+    : [];
+  const structuredRequest = decodeRecommendationRequestV2(value.structuredRequestV2);
   return {
     v: 1,
     messages,
     recommendations,
+    nearMatches,
+    ...(structuredRequest.ok ? { structuredRequestV2: structuredRequest.value } : {}),
     rejected: Array.isArray(value.rejected) ? value.rejected.slice(0, 50) : [],
     addedIds: boundedRecord(value.addedIds, 20_000) ?? {},
     pendingClarification: boundedRecord(value.pendingClarification, 10_000) ?? null,

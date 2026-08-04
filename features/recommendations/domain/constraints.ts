@@ -1,4 +1,4 @@
-import { isAspectId } from "./aspect-registry";
+import { ASPECT_REGISTRY, isAspectId } from "./aspect-registry";
 import type {
   AspectId,
   AspectStrengthLevel,
@@ -110,6 +110,13 @@ export function validateAspectConstraint(
   const issues = validConstraintBase(constraint, path);
   if (!isAspectId(constraint.aspectId)) {
     issues.push(issue("aspect_id_unknown", `${path}.aspectId`, "Aspect ID registry'de bulunmuyor."));
+  } else {
+    const safety = ASPECT_REGISTRY[constraint.aspectId] as { mustSafety: string; avoidSafety: string };
+    if (constraint.role === "must" && safety.mustSafety === "unsafe") {
+      issues.push(issue("aspect_must_unsupported", `${path}.role`, "Bu aspect güvenilir bir must constraint olarak kullanılamaz."));
+    } else if (constraint.role === "avoid" && safety.avoidSafety === "unsafe") {
+      issues.push(issue("aspect_avoid_unsupported", `${path}.role`, "Bu aspect güvenilir bir avoid constraint olarak kullanılamaz."));
+    }
   }
   if (constraint.minimumLevel !== undefined && !THRESHOLD_LEVELS.has(constraint.minimumLevel)) {
     issues.push(issue("minimum_level_invalid", `${path}.minimumLevel`, "minimumLevel geçersiz."));
@@ -253,6 +260,7 @@ export function canonicalizeObjectiveConstraints(
 ): RecommendationDecodeResult<ObjectiveConstraint[]> {
   const issues: RecommendationDomainIssue[] = [];
   const keys = new Set<string>();
+  const byField = new Map<string, ObjectiveConstraint>();
   const canonical: ObjectiveConstraint[] = [];
   constraints.forEach((constraint, index) => {
     const validated = validateObjectiveConstraint(constraint, `objectiveConstraints.${index}`);
@@ -262,7 +270,19 @@ export function canonicalizeObjectiveConstraints(
     }
     const key = objectiveConstraintKey(validated.value);
     if (keys.has(key)) return;
+    const fieldKey = validated.value.field === "length"
+      ? `${validated.value.field}:${validated.value.unit}`
+      : validated.value.field;
+    if (byField.has(fieldKey)) {
+      issues.push(issue(
+        "objective_constraint_conflict",
+        `objectiveConstraints.${index}`,
+        `${fieldKey} için çelişkili birden fazla constraint var.`,
+      ));
+      return;
+    }
     keys.add(key);
+    byField.set(fieldKey, validated.value);
     canonical.push(validated.value);
   });
   return issues.length ? { ok: false, issues } : { ok: true, value: canonical };

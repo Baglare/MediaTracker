@@ -1,6 +1,7 @@
 import { decodeRecommendationRequestV2, type RecommendationRequestV2 } from "../domain/codec";
 import type { AspectConstraint, ObjectiveConstraint } from "../domain/constraints";
 import type { RecommendationMediaType } from "../domain/types";
+import { validateLengthMediaTypeCompatibility } from "../domain/policies";
 import { extractStructuredConstraints } from "./constraint-extractor";
 
 const TARGETS: readonly [RegExp, RecommendationMediaType][] = [
@@ -26,10 +27,14 @@ function mergeObjectiveConstraints(previous: readonly ObjectiveConstraint[], nex
 }
 
 export function patchRecommendationRequest(previous: RecommendationRequestV2, followUpText: string) {
+  if (/^\s*yeni\s+konu\s*[.!?]*\s*$/i.test(followUpText)) {
+    return { request: null, resetRequested: true, needsClarification: false, warnings: [], issues: [] as string[] };
+  }
   const target = targetIn(followUpText);
   const targetMediaTypes = target ? [target] : [...previous.targetMediaTypes];
   const extracted = extractStructuredConstraints({ message: followUpText, targetMediaTypes });
   let followUpAspects = [...extracted.aspectConstraints];
+  let previousAspects = [...previous.aspectConstraints];
   if (/a[sş]k\s+[uü][cç]gen.*(çıkar|cikar|olmas[ıi]n|istemi)/i.test(followUpText)) {
     followUpAspects = followUpAspects.filter((constraint) => constraint.aspectId !== "love_triangle");
     followUpAspects.push({ id: "followup:love_triangle:avoid", kind: "aspect", aspectId: "love_triangle", role: "avoid", source: "explicit", rejectAtLevel: "significant" });
@@ -38,7 +43,28 @@ export function patchRecommendationRequest(previous: RecommendationRequestV2, fo
     && !followUpAspects.some((constraint) => constraint.aspectId === "romance")) {
     followUpAspects.push({ id: "followup:romance:must", kind: "aspect", aspectId: "romance", role: "must", source: "explicit", minimumLevel: "significant" });
   }
-  let objectiveConstraints = mergeObjectiveConstraints(previous.objectiveConstraints, extracted.objectiveConstraints);
+  if (/fantasti.*(şart\s+değil|sart\s+degil|zorunlu\s+değil|zorunlu\s+degil)/i.test(followUpText)) {
+    followUpAspects = followUpAspects.filter((constraint) => constraint.aspectId !== "fantasy");
+    previousAspects = previousAspects.filter((constraint) => constraint.aspectId !== "fantasy");
+    followUpAspects.push({ id: "followup:fantasy:prefer", kind: "aspect", aspectId: "fantasy", role: "prefer", source: "explicit", minimumLevel: "incidental" });
+  }
+  if (/a[sş]k\s+[uü][cç]gen.*(olabilir|sorun\s+değil|sorun\s+degil)/i.test(followUpText)) {
+    followUpAspects = followUpAspects.filter((constraint) => constraint.aspectId !== "love_triangle");
+    previousAspects = previousAspects.filter((constraint) => constraint.aspectId !== "love_triangle");
+  }
+
+  let previousObjectives = [...previous.objectiveConstraints];
+  if (target) {
+    previousObjectives = previousObjectives.filter((constraint) => constraint.field !== "media_type");
+    previousObjectives = previousObjectives.filter((constraint) => constraint.field !== "length"
+      || validateLengthMediaTypeCompatibility(constraint, targetMediaTypes).ok);
+  }
+  if (/devam\s+eden.*(olabilir|olsun|sorun\s+değil|sorun\s+degil)/i.test(followUpText)) {
+    previousObjectives = previousObjectives.filter((constraint) => constraint.field !== "release_status");
+  }
+  let objectiveConstraints = mergeObjectiveConstraints(previousObjectives, extracted.objectiveConstraints.filter((constraint) => (
+    !(/devam\s+eden.*(olabilir|olsun|sorun\s+değil|sorun\s+degil)/i.test(followUpText) && constraint.field === "release_status")
+  )));
   if (/daha\s+k[ıi]sa/i.test(followUpText) && !extracted.objectiveConstraints.some((constraint) => constraint.field === "length")) {
     const current = previous.objectiveConstraints.find((constraint) => constraint.field === "length" && constraint.operator !== "between");
     if (current?.field === "length" && typeof current.value === "number") {
@@ -51,8 +77,11 @@ export function patchRecommendationRequest(previous: RecommendationRequestV2, fo
     ...previous,
     queryText: `${previous.queryText} ${followUpText}`.trim().slice(0, 4000),
     targetMediaTypes,
-    aspectConstraints: mergeAspectConstraints(previous.aspectConstraints, followUpAspects),
+    aspectConstraints: mergeAspectConstraints(previousAspects, followUpAspects),
     objectiveConstraints,
+    strictness: /kat[ıi]\s+olmas[ıi]n|kat[ıi]\s+değil|strict\s+olmas[ıi]n/i.test(followUpText)
+      ? "balanced"
+      : previous.strictness,
   };
   const decoded = decodeRecommendationRequestV2(raw);
   return decoded.ok

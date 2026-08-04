@@ -1,6 +1,6 @@
 # AI Recommendation V2 Architecture
 
-> Durum: D6-0–D6-4 uygulanmıştır. Editable request, strictness, ayrı near-match read-model'i ve owner-scoped Feedback V2 baseline'ı aktiftir; D6-5 stabilizasyonu başlamamıştır.
+> Durum: D6-0–D6-5 uygulanmıştır. D6 kabul sonucu [AI_RECOMMENDATION_V2_ACCEPTANCE.md](AI_RECOMMENDATION_V2_ACCEPTANCE.md), D7 ölçüm sınırı [AI_RECOMMENDATION_EVALUATION_CONTRACT.md](AI_RECOMMENDATION_EVALUATION_CONTRACT.md) içindedir.
 
 ## 1. Amaç ve değişmez kararlar
 
@@ -22,6 +22,8 @@ Aspect registry sözleşmesi [AI_ASPECT_TAXONOMY.md](AI_ASPECT_TAXONOMY.md), pro
 ## 2. Mevcut sistem akış haritası
 
 ### 2.1 Üst seviye akış
+
+> Bu alt bölüm D6-0 read-only audit tarihindeki V1 akış kaydıdır; güncel authoritative external recommendation akışı bölüm 11'deki deterministik V2 motorudur.
 
 `components/ai-advisor.tsx:runApi` owner-scoped yerel feedback ile kütüphane verisini `POST /api/ai/recommend` isteğine koyar. `route.ts:POST` intent ve profili üretir; library-only modunu erken ve deterministik döndürür. Dış kaynak modlarında LLM provider'ından retrieval plan almayı dener, provider API route'larından aday toplar, provider kimliği ve medya türü hijyenini uygular, feedback/rule/text/embedding/hybrid skorlarını hesaplar ve mevcut durumda aday kümesini yeniden seçip sıralaması için LLM provider'ına verir. Son adım `retainVerifiedRecommendations` ile yalnız aday havuzundaki `source:id` kayıtlarını tutar. Provider başarısızsa mock provider mevcut aday sırasının ilk üçünü döndürür.
 

@@ -26,7 +26,8 @@
 ## Owner, responsive ve hata
 
 1. Owner A taslağı açıkken Owner B'ye geç; eski taslak/sonucun tek frame görünmediğini doğrula.
-2. 1280×720, 1366×768, 1536×864 ve 375×812 viewport'larında overflow kontrolü yap.
+2. 1280×720, 1366×768, 1536×864, 1920×1080 ve 375×812 viewport'larında overflow kontrolü yap.
 3. Provider unavailable ile hard-constraint empty state'ini ayır; sistemin koşulu otomatik gevşetmediğini doğrula.
 4. Abort edilen eski request'in yeni owner/state'e uygulanmadığını; hydration/request loop ve console error olmadığını doğrula.
 
+Son çalıştırma kaydı ve canlı/fixture ayrımı [AI Recommendation V2 Acceptance](AI_RECOMMENDATION_V2_ACCEPTANCE.md) belgesine yazılır. Demo akışı [AI Recommendation V2 Demo Script](AI_RECOMMENDATION_V2_DEMO_SCRIPT.md) içindedir.

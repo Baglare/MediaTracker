@@ -1,5 +1,5 @@
 import type { AiCandidate, AiIntent } from "@/lib/ai/types";
-import type { MediaItem } from "@/lib/types";
+import type { MediaType } from "@/lib/types";
 import type { RecommendationReference } from "../domain/codec";
 import type { RecommendationMediaType, RecommendationProvider } from "../domain/types";
 
@@ -17,9 +17,16 @@ export interface ReferenceResolutionResult {
   warnings: string[];
 }
 
+export interface ReferenceMediaItem {
+  title: string;
+  type: MediaType;
+  externalSource?: string;
+  externalId?: string;
+}
+
 export function resolveRecommendationReferences(input: {
   intent: AiIntent;
-  mediaItems: readonly MediaItem[];
+  mediaItems: readonly ReferenceMediaItem[];
   candidates: readonly AiCandidate[];
 }): ReferenceResolutionResult {
   const references: RecommendationReference[] = [];
@@ -53,4 +60,3 @@ export function resolveRecommendationReferences(input: {
   }
   return { references, unresolvedCount, ambiguousCount, warnings };
 }
-

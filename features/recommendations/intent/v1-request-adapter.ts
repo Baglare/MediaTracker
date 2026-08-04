@@ -1,10 +1,10 @@
 import type { AiIntent, AiRetrievalPlan, AiSettings } from "@/lib/ai/types";
-import type { MediaItem } from "@/lib/types";
 import { decodeRecommendationRequestV2, type RecommendationRequestV2 } from "../domain/codec";
 import type { RecommendationMediaType, SemanticVerifierMode } from "../domain/types";
 import { extractStructuredConstraints } from "./constraint-extractor";
 import { resolveRecommendationReferences } from "./reference-policy";
 import type { AiCandidate } from "@/lib/ai/types";
+import type { ReferenceMediaItem } from "./reference-policy";
 
 export interface V1RequestAdapterResult {
   request: RecommendationRequestV2 | null;
@@ -26,7 +26,7 @@ export function adaptV1RequestToV2(input: {
   intent: AiIntent;
   retrievalPlan: AiRetrievalPlan | null;
   settings: AiSettings;
-  mediaItems: readonly MediaItem[];
+  mediaItems: readonly ReferenceMediaItem[];
   candidates: readonly AiCandidate[];
   semanticVerifierMode?: SemanticVerifierMode;
 }): V1RequestAdapterResult {

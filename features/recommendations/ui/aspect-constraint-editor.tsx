@@ -5,9 +5,11 @@ import { ASPECT_IDS, ASPECT_REGISTRY, normalizeAspectAlias, type AspectId } from
 import type { AspectConstraint } from "../domain/constraints";
 
 const ROLE_LABEL = { must: "Zorunlu", prefer: "Tercih", avoid: "Kaçınılacak" } as const;
+const GROUP_LABEL = { core: "Tür ve anlatı", narrative: "Tema", relationship: "İlişki", tone_content: "Ton ve içerik", experience: "Deneyim" } as const;
 
 export function AspectConstraintEditor({ constraints, onChange }: { constraints: readonly AspectConstraint[]; onChange: (next: AspectConstraint[]) => void }) {
   const [search, setSearch] = useState("");
+  const [activeIndex, setActiveIndex] = useState(0);
   const results = useMemo(() => {
     const query = normalizeAspectAlias(search);
     return ASPECT_IDS.filter((id) => {
@@ -38,8 +40,8 @@ export function AspectConstraintEditor({ constraints, onChange }: { constraints:
 
   return <div className="space-y-2">
     <label className="block text-xs text-zinc-300" htmlFor="aspect-search">Aspect ekle</label>
-    <input id="aspect-search" role="combobox" aria-controls="aspect-search-results" aria-expanded={Boolean(search && results.length)} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Romantizm, karanlık ton, tempo…" className="w-full rounded-lg border border-zinc-800 bg-zinc-950/50 px-3 py-2 text-xs text-zinc-200" />
-    {search && results.length > 0 && <div id="aspect-search-results" role="listbox" className="grid gap-1 rounded-lg border border-zinc-800 bg-zinc-950 p-1">{results.map((id) => <button type="button" role="option" aria-selected="false" key={id} onClick={() => add(id)} className="rounded px-2 py-1.5 text-left text-xs text-zinc-300 hover:bg-zinc-800">{ASPECT_REGISTRY[id].labelTr}<span className="ml-2 text-zinc-600">{ASPECT_REGISTRY[id].group}</span></button>)}</div>}
+    <input id="aspect-search" role="combobox" aria-autocomplete="list" aria-controls="aspect-search-results" aria-expanded={Boolean(search && results.length)} aria-activedescendant={search && results[activeIndex] ? `aspect-option-${results[activeIndex]}` : undefined} value={search} onChange={(event) => { setSearch(event.target.value); setActiveIndex(0); }} onKeyDown={(event) => { if (!results.length) return; if (event.key === "ArrowDown") { event.preventDefault(); setActiveIndex((index) => Math.min(results.length - 1, index + 1)); } else if (event.key === "ArrowUp") { event.preventDefault(); setActiveIndex((index) => Math.max(0, index - 1)); } else if (event.key === "Enter") { event.preventDefault(); add(results[activeIndex]); } else if (event.key === "Escape") { setSearch(""); } }} placeholder="Romantizm, karanlık ton, tempo…" className="w-full rounded-lg border border-zinc-800 bg-zinc-950/50 px-3 py-2 text-xs text-zinc-200" />
+    {search && results.length > 0 && <div id="aspect-search-results" role="listbox" className="grid gap-1 rounded-lg border border-zinc-800 bg-zinc-950 p-1">{results.map((id, index) => <button id={`aspect-option-${id}`} type="button" role="option" aria-selected={index === activeIndex} key={id} onMouseEnter={() => setActiveIndex(index)} onClick={() => add(id)} className="rounded px-2 py-1.5 text-left text-xs text-zinc-300 hover:bg-zinc-800">{ASPECT_REGISTRY[id].labelTr}<span className="ml-2 text-zinc-600">{GROUP_LABEL[ASPECT_REGISTRY[id].group]}</span></button>)}</div>}
     {constraints.map((constraint, index) => {
       const entry = ASPECT_REGISTRY[constraint.aspectId];
       return <div key={constraint.id} className="flex flex-wrap items-center gap-2 rounded-lg border border-zinc-800/70 px-2 py-2">

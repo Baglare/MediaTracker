@@ -1,6 +1,6 @@
 # AI Recommendation V2 Migration Plan
 
-> Durum: D6-0–D6-4 tamamlandı. D6-5 stabilizasyon/regresyon geliştirmesi başlamamıştır.
+> Durum: D6-0–D6-5 tamamlandı. D6 kabulü [AI_RECOMMENDATION_V2_ACCEPTANCE.md](AI_RECOMMENDATION_V2_ACCEPTANCE.md) ile kapanmıştır; canlı kalite/kalibrasyon D7'dir.
 
 ## Dönüşüm ilkeleri
 
@@ -20,7 +20,7 @@
 | D6-2 | **Tamamlandı:** provider enrichment, TV anime exclusion, evidence sidecar/cache | Recommendation-only identity/hijyen davranışı aktif; V1 scoring değişmez. |
 | D6-3 | **Tamamlandı:** aggregation, hard filter, deterministik ranking ve grounded explanation | V2 ranking baseline authoritative external recommendation yolu oldu. |
 | D6-4 | Tamamlandı: düzenlenebilir constraints, strictness, reason feedback, near-match UI | Kullanıcı kontrolü ve şeffaflık açıldı; V1 additive compatibility korundu. |
-| D6-5 | Regresyon, live smoke, performans, docs ve D7 fixture hazırlığı | D6 stabilizasyonu. |
+| D6-5 | **Tamamlandı:** regresyon, privacy/performance guardrail, docs ve D7 fixture sözleşmesi | D6 stabilizasyonu; live provider flag yoksa skip açıkça raporlanır. |
 | D7 | Offline kalite değerlendirmesi, kalibrasyon ve karşılaştırmalı deneyler | D6 baseline ölçülmeden model/LLM deneyi üretime alınmaz. |
 
 ## D6-1 — Ortak domain ve compatibility temeli
@@ -147,6 +147,8 @@ Uygulama sonucu: `features/recommendations/{intent,evidence,ranking,explanation,
 - LLM reranking, otomatik kişisel must üretimi, kişisel notların remote verifier'a gönderilmesi.
 
 ## D6-5 — Stabilizasyon ve D7 hazırlığı
+
+**Durum: tamamlandı.** Runtime request sınırları, follow-up patch regresyonları, owner request abort'u, session V1/V2 hydration, feedback codec ve veri minimizasyonu sertleştirildi. Versioned 15-senaryolu sentetik evaluation contract'ı eklendi; gerçek kalite dataset'i oluşturulmadı.
 
 **Giriş koşulları**
 
