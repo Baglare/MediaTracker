@@ -63,8 +63,9 @@ describe("two-stage structured request", () => {
 
   it("keeps the interpretation endpoint free of provider, model and web retrieval", () => {
     const source = readFileSync("app/api/ai/interpret/route.ts", "utf8");
-    expect(source).not.toMatch(/candidate-search|prepareProvider|openai|gemini|webResearch|fetch\(/i);
+    expect(source).not.toMatch(/candidate-search|prepareProvider|generateRetrievalPlan|webResearch|fetch\(/i);
     expect(source).toContain("interpretRecommendationRequest");
+    expect(source).toContain("getPlanningProviderPolicy");
   });
 });
 

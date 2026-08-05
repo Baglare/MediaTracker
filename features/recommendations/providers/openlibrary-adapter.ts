@@ -1,6 +1,6 @@
 import type { OpenLibraryNormalizedResult } from "@/lib/openlibrary-types";
 import { createVerifiedCandidateIdentity } from "./candidate-identity";
-import { mapProviderGenreClaims, mapProviderMetadataClaim } from "./evidence-mappers";
+import { mapProviderMetadataClaim, mapProviderSubjectClaims } from "./evidence-mappers";
 import type { CandidateProviderEvidenceSnapshot, SecondaryIdentity } from "./types";
 import { PROVIDER_EVIDENCE_SCHEMA_VERSION } from "./types";
 
@@ -11,9 +11,9 @@ export function adaptOpenLibraryEvidence(result: OpenLibraryNormalizedResult, fe
   const identity = createVerifiedCandidateIdentity({ primaryProvider: "openlibrary", primaryExternalId: workId, mediaType: "book", secondaryIds });
   return {
     schemaVersion: PROVIDER_EVIDENCE_SCHEMA_VERSION, candidateIdentity: identity,
-    objectiveMetadata: { mediaType: "book", releaseYear: result.releaseYear, language: result.languages?.[0], pageCount: result.pageCount, genres: result.subjects },
+    objectiveMetadata: { mediaType: "book", releaseYear: result.releaseYear, language: result.languages?.[0], pageCount: result.pageCount, subjects: result.subjects },
     rawEvidenceClaims: [
-      ...mapProviderGenreClaims("openlibrary", result.subjects, 0.55),
+      ...mapProviderSubjectClaims("openlibrary", result.subjects, 0.55),
       ...(result.pageCount ? [mapProviderMetadataClaim({ provider: "openlibrary", field: "pageCount", value: result.pageCount, reliability: 0.8 })] : []),
     ],
     providerCoverage: { openlibrary: result.overview ? "available" : "partial" },

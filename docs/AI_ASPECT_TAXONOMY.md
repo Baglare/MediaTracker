@@ -143,7 +143,9 @@ Kısaltmalar: `AL` AniList, `TV` TVMaze, `TM` TMDB, `OM` OMDb, `OL` Open Library
 
 ## Provider mapping ve hard karar kuralları
 
-- `strong`, alanın var olmasını değil provider alanı ile aspect arasında kararlı ve açık bir taxonomy eşleşmesini ifade eder. AniList tag'i için rank/relevance korunmadan strong sonuç üretilemez.
+- `strong`, alanın var olmasını değil provider alanı ile aspect arasında kararlı ve açık bir taxonomy eşleşmesini ifade eder. D6-5.3'te exact provider genre yalnız registry `group=core` ve ilgili provider `strong` olduğunda `significant/medium` tabanı alabilir; genre tek başına `primary` üretmez.
+- Core genre tabanı yalnız `romance`, `action`, `adventure`, `comedy`, `drama`, `mystery`, `horror`, `fantasy`, `sci_fi`, `slice_of_life`, `supernatural`, `psychological`, `historical` kayıtlarına uygulanır. Narrative, relationship, tone/content ve experience aspect'leri genre claim'inden otomatik güçlenmez.
+- Open Library subject, registry support'u strong görünse bile exact provider genre değildir; keyword/subject claim'i olarak mevcut partial katkı yolunda kalır.
 - `partial`, soft sinyal veya başka kanıtlarla birleşen medium confidence kaynağıdır.
 - `experimental`, tek başına hard filtre uygulayamaz; yalnız verifier girdisi veya açıklanmış risk sinyali olabilir.
 - `unsupported`, `absent` değildir. Sonuç `unknown` kalır.

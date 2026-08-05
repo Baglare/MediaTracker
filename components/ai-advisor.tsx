@@ -39,6 +39,7 @@ import {
 import { buildAiEngineStatus } from "@/lib/ai/engine-status";
 import type {
   AiEngineStatus,
+  AiPlanningProviderPolicyStatus,
   AiRecommendation,
   AiNearMatchRecommendation,
   AiSettings,
@@ -690,6 +691,7 @@ export default function AiAdvisor({
   const [feedbackDialogRec, setFeedbackDialogRec] = useState<AiRecommendation | null>(null);
   const [debugInfo, setDebugInfo] = useState<AiDebugInfo | null>(null);
   const [engineStatus, setEngineStatus] = useState<AiEngineStatus | null>(null);
+  const [planningPolicy, setPlanningPolicy] = useState<AiPlanningProviderPolicyStatus | null>(null);
   const [feedbackNotice, setFeedbackNotice] = useState<string | null>(null);
   const [aiStorageError, setAiStorageError] = useState<string | null>(null);
   const [showDebug, setShowDebug] = useState(false);
@@ -753,6 +755,7 @@ export default function AiAdvisor({
       setPendingClarification(null);
       setDebugInfo(null);
       setEngineStatus(null);
+      setPlanningPolicy(null);
       setAiStorageError(null);
       activeContextRef.current = null;
       inFlightRequestId.current = null;
@@ -784,6 +787,7 @@ export default function AiAdvisor({
           pendingClarification?: { originalPrompt: string; question: string } | null;
           debugInfo?: AiDebugInfo | null;
           engineStatus?: AiEngineStatus | null;
+          planningPolicy?: AiPlanningProviderPolicyStatus | null;
           activeContext?: AiActiveContext | null;
         } | undefined;
         if (snap?.v === ACTIVE_SESSION_VERSION) {
@@ -796,6 +800,7 @@ export default function AiAdvisor({
           if (snap.pendingClarification) setPendingClarification(snap.pendingClarification);
           if (snap.debugInfo) setDebugInfo(snap.debugInfo);
           if (snap.engineStatus) setEngineStatus(snap.engineStatus);
+          if (snap.planningPolicy) setPlanningPolicy(snap.planningPolicy);
           if (snap.activeContext) activeContextRef.current = snap.activeContext;
         }
       }
@@ -844,6 +849,7 @@ export default function AiAdvisor({
         pendingClarification,
         debugInfo,
         engineStatus,
+        planningPolicy,
         activeContext: activeContextRef.current,
       };
       const result = writeAiSessionState(ownerScope, {
@@ -855,7 +861,7 @@ export default function AiAdvisor({
     } catch {
       // ignore (kotanın dolması ya da JSON cycle gibi nadir durumlar)
     }
-  }, [messages, recommendations, nearMatches, structuredRequest, rejected, addedIds, pendingClarification, debugInfo, engineStatus, ownerScope, ownerVisible, sessions]);
+  }, [messages, recommendations, nearMatches, structuredRequest, rejected, addedIds, pendingClarification, debugInfo, engineStatus, planningPolicy, ownerScope, ownerVisible, sessions]);
 
   useEffect(() => {
     if (!persistenceReadyRef.current || !ownerScope || !ownerVisible) return;
@@ -954,6 +960,7 @@ export default function AiAdvisor({
       setAddedIds({});
       setDebugInfo(null);
       setEngineStatus(null);
+      setPlanningPolicy(null);
       setFeedbackNotice(null);
       setShowDebug(false);
       setPendingClarification(null);
@@ -1363,7 +1370,10 @@ export default function AiAdvisor({
         body: JSON.stringify({
           message: rawPrompt,
           mediaItems: buildInterpretReferencePayload(Array.isArray(mediaList) ? mediaList : []),
-          settings: { useProfile: settings.useProfile },
+          settings: {
+            useProfile: settings.useProfile,
+            useOpenAIProvider: settings.useOpenAIProvider,
+          },
           strictness: recommendationStrictness,
           previousStructuredRequestV2: structuredRequest ?? undefined,
         }),
@@ -1378,6 +1388,7 @@ export default function AiAdvisor({
         return;
       }
       const draft = data.request as RecommendationRequestV2;
+      setPlanningPolicy(data.planningPolicy as AiPlanningProviderPolicyStatus ?? null);
       setStructuredRequest(draft);
       setRecommendationStrictness(draft.strictness);
       setDraftWarnings(Array.isArray(data.warnings) ? data.warnings : []);
@@ -1425,6 +1436,7 @@ export default function AiAdvisor({
     setAddedIds({});
     setDebugInfo(null);
     setEngineStatus(null);
+    setPlanningPolicy(null);
     setFeedbackNotice(null);
     setShowDebug(false);
     setPendingClarification(null);
@@ -1643,6 +1655,11 @@ export default function AiAdvisor({
 
   const viewingSession = viewingSessionId ? sessions.find((s) => s.id === viewingSessionId) : null;
   const dismissedFeedbackCount = Object.keys(dismissedSignals).length;
+  const visibleProviderPolicyMode = engineStatus?.providerPolicyMode ?? planningPolicy?.providerPolicyMode;
+  const configuredPlanningProvider = engineStatus?.configuredPlanningProvider
+    ?? planningPolicy?.configuredPlanningProvider;
+  const openAiPreferenceLocked = visibleProviderPolicyMode !== undefined
+    && visibleProviderPolicyMode !== "auto";
 
   if (!ownerVisible) {
     return (
@@ -2143,17 +2160,22 @@ export default function AiAdvisor({
                   {label}
                   {key === "useOpenAIProvider" ? (
                     <span className="block text-[10px] text-zinc-500 mt-0.5">
-                      Açıksa OpenAI API öncelikli kullanılır; ücretli olabilir.
+                      {visibleProviderPolicyMode === "fixed"
+                        ? `Sağlayıcı modu sabit: ${configuredPlanningProvider ? providerLabel(configuredPlanningProvider) : "yapılandırılmış provider"}. OpenAI tercihi uygulanmaz.`
+                        : visibleProviderPolicyMode === "mock"
+                          ? "Sağlayıcı modu mock. OpenAI tercihi uygulanmaz."
+                          : "Otomatik modda OpenAI arama planında ilk denenir; final sıralama değişmez."}
                     </span>
                   ) : null}
                 </span>
                 <input
                   type="checkbox"
                   checked={settings[key]}
+                  disabled={key === "useOpenAIProvider" && openAiPreferenceLocked}
                   onChange={(e) =>
                     setSettings((prev) => ({ ...prev, [key]: e.target.checked }))
                   }
-                  className="accent-violet-500 cursor-pointer"
+                  className="accent-violet-500 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                 />
               </label>
             ))}

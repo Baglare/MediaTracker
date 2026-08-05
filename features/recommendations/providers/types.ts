@@ -57,6 +57,7 @@ export interface CandidateObjectiveMetadata {
   pageCount?: number;
   runtimeMinutes?: number;
   genres?: readonly string[];
+  subjects?: readonly string[];
   keywords?: readonly string[];
   tags?: readonly ProviderTagMetadata[];
   popularity?: number;

@@ -1,6 +1,6 @@
 # AI Recommendation V2 — D6 Kabul Raporu
 
-> Durum: D6-0–D6-5.2 kod ve sentetik sözleşme kapsamı tamamlandı; final yeniden doğrulama kapısı açıktır. Bu ifade canlı provider/verifier kalite garantisi veya production-ready iddiası değildir.
+> Durum: D6-0–D6-5.3 kod ve sentetik sözleşme kapsamı tamamlandı; final yeniden doğrulama kapısı açıktır. Bu ifade canlı provider/verifier kalite garantisi veya production-ready iddiası değildir.
 
 ## Kabul özeti
 
@@ -52,5 +52,17 @@ Sentetik seed'ler sözleşme ve metric matematiğini doğrular; öneri kalitesin
 - Primary/near-match ortak header kullanır; near-match fixture'ı ihlal ve confidence read-model'ini raw code/score göstermeden taşır.
 - Lint, build ve `git diff --check` temiz; 1646 testin 1612'si geçti, 34 koşullu test skip. Beş viewport'ta overflow ve console error görülmedi.
 - `D6_PROVIDER_LIVE_SMOKE` kapalıydı; live provider trace ve live near-match kalite kabulü skip edildi. Bu durum D7 kalite kalibrasyonunu ikame etmez.
+
+## D6-5.3 ek kabul — 5 Ağustos 2026
+
+- Romance'a özel structured genre tabanı registry-driven `core + strong provider support + exact genre` policy'sine genelleştirildi; 13 core aspect sentetik fixture'larla aynı contract altında doğrulanır.
+- Fantasy genre-only `significant/medium`; genre + orta tag `significant/high`; genre + güçlü tag `primary/high`; düşük tag-only `incidental`; claim yoksa `unknown` üretir.
+- Niche aspect koruması Fantasy/Romance/Drama/Action genre claim'lerinin `political_intrigue`, `love_triangle`, `fanservice` veya `character_driven` için significant taban üretmesini engeller.
+- Open Library subject evidence artık `provider_keyword` / `field=subjects` taşır; subject exact provider genre veya otomatik strong baseline değildir. OMDb partial genre primary üretmez.
+- Engine status planning provider/policy/fallback bilgisini deterministic final engine'den ayrı taşır. Fixed provider ortamında OpenAI tercihi uygulanmaz ve UI bunu açıkça gösterir; final ranking her durumda Deterministik V2'dir.
+- Lint ve production build geçti. Tam pakette 132 test dosyasının 127'si geçti, 5'i koşullu skip; 1.673 testin 1.639'u geçti, 34'ü skip edildi.
+- Yerel browser smoke `AI_PROVIDER=auto` ile Fantasy taslağı, editable must/significant, OpenAI kontrolü ve 1366×768, 1536×864, 375×812 overflow/console kontrolünü geçti. Candidate retrieval çalıştırılmadı; fixed-provider browser senaryosu ortam sabit olmadığı için unit/contract kanıtıyla sınırlıdır.
+- `D6_PROVIDER_LIVE_SMOKE` kapalı olduğundan live provider trace skip edildi; bu sentetik kabul canlı recommendation kalite kabulü değildir.
+- Ayrıntılı kanıt ve smoke kaydı [D6-5.3 Core Genre Kalibrasyonu](AI_RECOMMENDATION_V2_D653_CORE_GENRE_CALIBRATION.md) belgesindedir.
 
 İlgili belgeler: [Mimari](AI_RECOMMENDATION_V2_ARCHITECTURE.md), [Domain](AI_RECOMMENDATION_V2_DOMAIN.md), [Provider](AI_RECOMMENDATION_V2_PROVIDER_ENRICHMENT.md), [Ranking](AI_RECOMMENDATION_V2_RANKING.md), [UI ve Feedback](AI_RECOMMENDATION_V2_UI_AND_FEEDBACK.md), [Evaluation](AI_RECOMMENDATION_EVALUATION_CONTRACT.md), [Manuel testler](AI_RECOMMENDATION_V2_MANUAL_TESTS.md).

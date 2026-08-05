@@ -6,7 +6,7 @@
 // mock fallback yalnizca dogrulanmis aday havuzunu kullanir.
 
 import { NextRequest, NextResponse } from "next/server";
-import { getProviderSequence, mockProvider } from "@/lib/ai/provider";
+import { getPlanningProviderPolicy, getProviderSequence, mockProvider } from "@/lib/ai/provider";
 import { buildLibraryProfile } from "@/lib/ai/profile-builder";
 import { analyzeIntent } from "@/lib/ai/intent-analyzer";
 import { scoreCandidates } from "@/lib/ai/candidate-scorer";
@@ -49,6 +49,8 @@ import {
   LibraryProfile,
   AiProvider,
   AiCandidate,
+  AiEngineProvider,
+  AiProviderPolicyMode,
 } from "@/lib/ai/types";
 import { MediaType } from "@/lib/types";
 import { prepareProviderEvidencePipeline, type ProviderEvidencePipelineResult } from "@/features/recommendations/providers/pipeline";
@@ -79,7 +81,13 @@ type ProviderErrorCode =
 
 interface ProviderRunState {
   attemptedProviders: string[];
+  attemptedPlanningProviders: AiEngineProvider[];
   selectedProvider?: string;
+  planningProvider?: AiEngineProvider;
+  providerPolicyMode: AiProviderPolicyMode;
+  configuredPlanningProvider?: AiEngineProvider;
+  openAiPreferenceApplied: boolean;
+  planningFallbackUsed: boolean;
   failedProviders: { provider: string; stage: "planning" | "ranking"; error: string }[];
   providerErrors: Record<string, string>;
   providerError?: ProviderErrorCode;
@@ -599,6 +607,24 @@ function providerDebugFields(state: ProviderRunState): Omit<NonNullable<AiRecomm
   };
 }
 
+function enginePlanningFields(state: ProviderRunState): Pick<NonNullable<AiRecommendResponse["engineStatus"]>,
+  | "planningProvider"
+  | "attemptedPlanningProviders"
+  | "providerPolicyMode"
+  | "configuredPlanningProvider"
+  | "openAiPreferenceApplied"
+  | "planningFallbackUsed"
+> {
+  return {
+    planningProvider: state.planningProvider,
+    attemptedPlanningProviders: [...state.attemptedPlanningProviders],
+    providerPolicyMode: state.providerPolicyMode,
+    configuredPlanningProvider: state.configuredPlanningProvider,
+    openAiPreferenceApplied: state.openAiPreferenceApplied,
+    planningFallbackUsed: state.planningFallbackUsed,
+  };
+}
+
 function recordProviderAttempt(state: ProviderRunState, providerName: string) {
   if (!state.attemptedProviders.includes(providerName)) {
     state.attemptedProviders.push(providerName);
@@ -701,6 +727,9 @@ async function runPlanningWithProviders(args: {
 
     try {
       recordProviderAttempt(args.state, provider.name);
+      if (!args.state.attemptedPlanningProviders.includes(provider.name as AiEngineProvider)) {
+        args.state.attemptedPlanningProviders.push(provider.name as AiEngineProvider);
+      }
       const plan = await withProviderTimeout(provider.name, provider.generateRetrievalPlan({
           message: args.message,
           profile: args.profile,
@@ -708,8 +737,13 @@ async function runPlanningWithProviders(args: {
           settings: args.settings,
         })
       );
+      args.state.planningProvider = provider.name as AiEngineProvider;
+      if (provider.name === "mock" && args.state.providerPolicyMode === "auto") {
+        args.state.planningFallbackUsed = true;
+      }
       return plan;
     } catch (error) {
+      args.state.planningFallbackUsed = true;
       applyProviderError(args.state, error, provider.name, "planning");
     }
   }
@@ -1143,12 +1177,18 @@ export async function POST(req: NextRequest) {
     ? buildLibraryProfile(mediaItems, progressLogs, settings)
     : null;
   const providers = getProviderSequence(settings);
+  const planningPolicy = getPlanningProviderPolicy(settings);
   const providerState: ProviderRunState = {
     attemptedProviders: [],
+    attemptedPlanningProviders: [],
     failedProviders: [],
     providerErrors: {},
     rateLimitHit: false,
     useOpenAIProvider: Boolean(settings?.useOpenAIProvider),
+    providerPolicyMode: planningPolicy.providerPolicyMode,
+    configuredPlanningProvider: planningPolicy.configuredPlanningProvider,
+    openAiPreferenceApplied: planningPolicy.openAiPreferenceApplied,
+    planningFallbackUsed: false,
     openaiCallCount: 0,
     geminiCallCount: 0,
     openrouterCallCount: 0,
@@ -1253,6 +1293,7 @@ export async function POST(req: NextRequest) {
     });
     providerPlanSucceeded = !!retrievalPlan;
     if (!retrievalPlan) {
+      providerState.planningFallbackUsed = true;
       const codes = Object.values(providerState.providerErrors);
       if (codes.length === 0) ideationFailedReason = "empty_ideas";
       else if (codes.every((c) => c === "rate_limit")) ideationFailedReason = "rate_limit";
@@ -1658,6 +1699,9 @@ export async function POST(req: NextRequest) {
       baseUrl: req.nextUrl.origin,
       providerPipeline: providerPipelineResult,
     });
+    if (response.engineStatus) {
+      response.engineStatus = { ...response.engineStatus, ...enginePlanningFields(providerState) };
+    }
     const existing = new Set((response.rejectedCandidates ?? []).map((item) => `${item.title}:${item.reason}`));
     const mergedRejected = [...(response.rejectedCandidates ?? [])];
     for (const item of policyRejected) {

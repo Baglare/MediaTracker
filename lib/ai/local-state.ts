@@ -9,6 +9,7 @@ import {
 } from "../personal-data-storage";
 import type {
   AiSettings,
+  AiPlanningProviderPolicyStatus,
   RecommendationFeedbackAction,
   RecommendationFeedbackEvent,
 } from "./types";
@@ -106,6 +107,19 @@ function boundedRecord(value: unknown, maxBytes = 100_000): Record<string, unkno
   }
 }
 
+function normalizePlanningPolicy(value: unknown): AiPlanningProviderPolicyStatus | null {
+  if (!isRecord(value)) return null;
+  if (value.providerPolicyMode !== "auto" && value.providerPolicyMode !== "fixed" && value.providerPolicyMode !== "mock") return null;
+  const configured = value.configuredPlanningProvider;
+  const validProvider = configured === undefined || ["openai", "gemini", "openrouter", "groq", "mock"].includes(String(configured));
+  if (!validProvider || typeof value.openAiPreferenceApplied !== "boolean") return null;
+  return {
+    providerPolicyMode: value.providerPolicyMode,
+    ...(configured ? { configuredPlanningProvider: configured as AiPlanningProviderPolicyStatus["configuredPlanningProvider"] } : {}),
+    openAiPreferenceApplied: value.openAiPreferenceApplied,
+  };
+}
+
 function normalizeSession(value: unknown): Record<string, unknown> | null {
   if (!isRecord(value)) return null;
   const id = text(value.id, 128);
@@ -181,6 +195,7 @@ function normalizeActiveSession(value: unknown): Record<string, unknown> | undef
     pendingClarification: boundedRecord(value.pendingClarification, 10_000) ?? null,
     debugInfo: boundedRecord(value.debugInfo) ?? null,
     engineStatus: boundedRecord(value.engineStatus, 20_000) ?? null,
+    planningPolicy: normalizePlanningPolicy(value.planningPolicy),
     activeContext: boundedRecord(value.activeContext, 30_000) ?? null,
   };
 }

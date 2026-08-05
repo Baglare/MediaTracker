@@ -1,6 +1,6 @@
 # AI Recommendation V2 — Evidence, Eligibility ve Deterministik Ranking
 
-> Durum: D6-3 deterministik baseline D6-5.1 relevance ve D6-5.2 Romance evidence düzeltmeleriyle korunur. Öncelik tuple'ı değiştirilmedi; D7 kalibrasyonu başlamamıştır. [D6-5.2 Romance evidence](AI_RECOMMENDATION_V2_D65_ROMANCE_EVIDENCE.md) · [Evaluation](AI_RECOMMENDATION_EVALUATION_CONTRACT.md)
+> Durum: D6-3 deterministik baseline D6-5.1 relevance, D6-5.2 Romance ve D6-5.3 core genre evidence düzeltmeleriyle korunur. Öncelik tuple'ı değiştirilmedi; D7 kalibrasyonu başlamamıştır. [D6-5.3 core genre](AI_RECOMMENDATION_V2_D653_CORE_GENRE_CALIBRATION.md) · [Evaluation](AI_RECOMMENDATION_EVALUATION_CONTRACT.md)
 
 ## 1. Çalışan akış
 
@@ -47,7 +47,7 @@ Katkı `source base × claim reliability × provider support × tag-rank factor`
 
 Bu sayılar D6 baseline sabitleridir; D7 gold label olmadan aspect/provider bazında değiştirilmez.
 
-AniList Romance için registry-driven structured policy bu genel eşikleri değiştirmeden ek bir yorum uygular: genre-only `significant/medium` tabanı; genre + orta tag `significant`, genre + yüksek tag `primary` tabanı. Exact başlangıç sabitleri tek aggregation modülündedir. Balanced, registry `strong` ve güvenilir structured genre baseline'ını kabul eder; Strict high-confidence varsayımını korur. Ayrıntı: [D6-5.2 Romance Evidence](AI_RECOMMENDATION_V2_D65_ROMANCE_EVIDENCE.md).
+Registry-driven structured policy bu genel eşikleri bütün aspect'ler için düşürmez. Yalnız `group=core`, claim provider'ı için `support=strong` ve exact `provider_genre` koşulunda genre-only `significant/medium` tabanı uygulanır; aynı aspect'e ait orta tag ile `significant/high`, güçlü tag ile `primary/high` tabanı oluşabilir. Bu politika 13 core aspect'i kapsar; narrative/relationship/tone/experience aspect'leri genre tabanından güç kazanmaz. Exact başlangıç sabitleri tek aggregation modülündedir. Balanced bu strong structured baseline'ı kabul eder; Strict high-confidence varsayımını korur. Ayrıntı: [D6-5.3 Core Genre Kalibrasyonu](AI_RECOMMENDATION_V2_D653_CORE_GENRE_CALIBRATION.md).
 
 ### Unknown ve absent
 
@@ -149,6 +149,7 @@ Internal debug notları constraint source sayıları, evidence snapshot sayısı
 - V1 request ve `AiRecommendResponse` şekli korunur.
 - `AiRecommendation.candidate` Quick Add için korunur.
 - Engine provider `deterministic_v2`, embedding mode `disabled` olarak görünür.
+- Retrieval planning provider'ı final engine'den ayrı raporlanır: actual/attempted planning provider, `auto|fixed|mock` policy, OpenAI preference uygulanma durumu ve planning fallback. Bu alanlar LLM'nin final sıralama yaptığı anlamına gelmez.
 - Global Search, Release Calendar ve provider details/add akışları değişmez.
 - Legacy scorer/embedding/LLM ranking sembolleri migration karşılaştırması için kaynakta kalabilir fakat authoritative production branch tarafından çağrılmaz.
 

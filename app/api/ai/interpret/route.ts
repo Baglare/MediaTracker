@@ -5,6 +5,7 @@ import type { AiSettings } from "@/lib/ai/types";
 import { interpretRecommendationRequest } from "@/features/recommendations/intent/interpret-request";
 import type { ReferenceMediaItem } from "@/features/recommendations/intent/reference-policy";
 import { RECOMMENDATION_REQUEST_LIMITS } from "@/features/recommendations/domain/codec";
+import { getPlanningProviderPolicy } from "@/lib/ai/provider";
 
 const ALLOWED_FIELDS = new Set(["message", "mediaItems", "settings", "previousStructuredRequestV2", "strictness"]);
 const REFERENCE_MEDIA_LIMIT = 500;
@@ -40,11 +41,18 @@ export async function POST(request: Request) {
   if (!message || message.length > RECOMMENDATION_REQUEST_LIMITS.queryText) return NextResponse.json({ code: "interpret_message_invalid" }, { status: 400 });
   const mediaItems = sanitizeReferenceItems(body.mediaItems);
   const rawSettings = isRecord(body.settings) ? body.settings : {};
-  const settings: AiSettings = { ...DEFAULT_AI_SETTINGS, useProfile: rawSettings.useProfile !== false };
+  const settings: AiSettings = {
+    ...DEFAULT_AI_SETTINGS,
+    useProfile: rawSettings.useProfile !== false,
+    useOpenAIProvider: rawSettings.useOpenAIProvider === true,
+  };
   const strictness = body.strictness === undefined ? "balanced" : body.strictness;
   if (strictness !== "strict" && strictness !== "balanced" && strictness !== "exploratory") {
     return NextResponse.json({ code: "interpret_strictness_invalid" }, { status: 400 });
   }
   const result = interpretRecommendationRequest({ message, intent: analyzeIntent(message), settings, mediaItems, previousRequest: body.previousStructuredRequestV2, strictness });
-  return NextResponse.json(result, { status: result.request || result.needsClarification || "resetRequested" in result ? 200 : 422 });
+  return NextResponse.json({
+    ...result,
+    planningPolicy: getPlanningProviderPolicy(settings),
+  }, { status: result.request || result.needsClarification || "resetRequested" in result ? 200 : 422 });
 }

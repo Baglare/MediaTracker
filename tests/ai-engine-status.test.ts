@@ -107,4 +107,27 @@ describe("AI engine status metadata", () => {
     expect(status.embeddingMode).toBe("local_mock");
     expect(status.providerFallbackUsed).toBe(false);
   });
+
+  it("reports planning provider policy separately from deterministic final ranking", () => {
+    const status = buildAiEngineStatus({
+      provider: "deterministic_v2",
+      evaluatedCandidateCount: 1,
+      candidates: [verifiedCandidate],
+      planning: {
+        planningProvider: "gemini",
+        attemptedPlanningProviders: ["openai", "gemini"],
+        providerPolicyMode: "auto",
+        openAiPreferenceApplied: true,
+        planningFallbackUsed: true,
+      },
+    });
+    expect(status).toMatchObject({
+      provider: "deterministic_v2",
+      planningProvider: "gemini",
+      attemptedPlanningProviders: ["openai", "gemini"],
+      providerPolicyMode: "auto",
+      openAiPreferenceApplied: true,
+      planningFallbackUsed: true,
+    });
+  });
 });

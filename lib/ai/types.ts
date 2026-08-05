@@ -264,6 +264,13 @@ export type AiEngineProvider =
 
 export type AiEmbeddingMode = "python_service" | "local_mock" | "disabled";
 export type AiPersistentCacheStatus = "active" | "disabled" | "not_used";
+export type AiProviderPolicyMode = "auto" | "fixed" | "mock";
+
+export interface AiPlanningProviderPolicyStatus {
+  providerPolicyMode: AiProviderPolicyMode;
+  configuredPlanningProvider?: AiEngineProvider;
+  openAiPreferenceApplied: boolean;
+}
 
 /** Kullanıcıya gösterilebilen, secret ve ham hata içermeyen sınırlı motor özeti. */
 export interface AiEngineStatus {
@@ -277,6 +284,12 @@ export interface AiEngineStatus {
   feedbackEventCount: number;
   persistentCache: AiPersistentCacheStatus;
   semanticVerifierMode?: SemanticVerifierMode;
+  planningProvider?: AiEngineProvider;
+  attemptedPlanningProviders?: AiEngineProvider[];
+  providerPolicyMode?: AiProviderPolicyMode;
+  configuredPlanningProvider?: AiEngineProvider;
+  openAiPreferenceApplied?: boolean;
+  planningFallbackUsed?: boolean;
 }
 
 export type RecommendationFeedbackAction =

@@ -39,6 +39,15 @@
 4. Parse → Önerileri bul → retry → reload akışında kullanıcı iletisinin bir kez göründüğünü doğrula. Aynı cümleyi yeni bir gönderim olarak tekrar yazmanın ayrı mesaj olduğunu kontrol et.
 5. Near-match kartında kapak, okunabilir başlık, medya/provider, confidence, Quick Add/Discover ve İlgilenmiyorum aksiyonlarını; ham tag rank/score/reason code olmadığını kontrol et.
 
+## D6-5.3 Core genre ve planning provider regresyonu
+
+1. “Epik fantastik bir anime arıyorum. Romantizm olmasın.” isteğini çözümle; anime, Fantasy **Zorunlu / Belirgin veya ana unsur**, Romance **Kaçınılacak** ve Keşifçi değerlerini doğrula.
+2. Balanced fixture'da Fantasy genre-only `significant/medium` adayın primary olabildiğini; Strict'te aynı medium-confidence adayın elendiğini; genre+tag high-confidence adayın geçebildiğini doğrula.
+3. Exploratory fixture'da incidental Fantasy adayın yalnız near-match'e gittiğini; Fantasy claim'i unknown olan yüksek community-score adayın görünmediğini doğrula.
+4. `political_intrigue`, `love_triangle`, `fanservice` ve `character_driven` aspect'lerinin yalnız Fantasy/Romance/Action/Drama genre nedeniyle significant olmadığını doğrula.
+5. `AI_PROVIDER=auto` durumunda OpenAI tercihini aç/kapat; şeffaflıkta actual planning provider'ı, otomatik policy ve “LLM final sıralama: kullanılmadı” metnini kontrol et.
+6. Sabit provider ortamında OpenAI checkbox'ının interpret sonrasında disabled olduğunu ve “Sağlayıcı modu sabit: … OpenAI tercihi uygulanmaz.” açıklamasını kontrol et.
+
 ## Owner, responsive ve hata
 
 1. Owner A taslağı açıkken Owner B'ye geç; eski taslak/sonucun tek frame görünmediğini doğrula.

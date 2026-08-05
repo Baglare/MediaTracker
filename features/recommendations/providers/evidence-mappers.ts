@@ -45,6 +45,20 @@ export function mapProviderKeywordClaims(
   }));
 }
 
+export function mapProviderSubjectClaims(
+  provider: RecommendationProvider,
+  subjects: readonly string[] | undefined,
+  reliability: number,
+): MappedRawEvidenceClaim[] {
+  return (subjects ?? []).filter((subject) => subject.trim()).map((subject) => ({
+    id: claimId(provider, "subject", "subjects", subject),
+    sourceKind: "provider_keyword", scope: "candidate_metadata", provider,
+    field: "subjects", value: subject, normalizedValue: normalizeAspectAlias(subject), reliability,
+    explanation: "Provider subject sinyali; exact genre veya aspect strength değildir.",
+    mappedAspectIds: exactRegistryAspects(subject),
+  }));
+}
+
 export function mapAniListTagClaims(
   tags: readonly { name: string; rank?: number; category?: string; isGeneralSpoiler?: boolean; isMediaSpoiler?: boolean }[] | undefined,
 ): MappedRawEvidenceClaim[] {

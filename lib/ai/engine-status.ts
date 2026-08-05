@@ -41,6 +41,14 @@ export function buildAiEngineStatus(args: {
     fallbackUsed: boolean;
     persistentCacheDisabled?: boolean;
   };
+  planning?: Pick<AiEngineStatus,
+    | "planningProvider"
+    | "attemptedPlanningProviders"
+    | "providerPolicyMode"
+    | "configuredPlanningProvider"
+    | "openAiPreferenceApplied"
+    | "planningFallbackUsed"
+  >;
 }): AiEngineStatus {
   const embeddingMode =
     !args.embedding || args.embedding.requested === 0
@@ -66,6 +74,7 @@ export function buildAiEngineStatus(args: {
     feedbackApplied: (args.feedbackAdjustedCount ?? 0) > 0,
     feedbackEventCount: Math.max(0, Math.trunc(args.feedbackEventCount ?? 0)),
     persistentCache,
+    ...(args.planning ?? {}),
   };
 }
 

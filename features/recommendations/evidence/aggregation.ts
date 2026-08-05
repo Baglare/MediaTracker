@@ -7,7 +7,7 @@ import { deriveEvidenceConfidence } from "./confidence";
 import type { NormalizedEvidenceContribution } from "./claim-normalizer";
 
 export const STRUCTURED_EVIDENCE_POLICY = {
-  anilistRomance: {
+  strongCoreGenre: {
     genreFloor: 0.55,
     mediumTagRank: 40,
     highTagRank: 75,
@@ -53,16 +53,24 @@ export function applyStructuredEvidencePolicy(input: {
   structured: readonly NormalizedEvidenceContribution[];
   strength: number;
 }): number {
-  if (input.aspectId !== "romance" || input.snapshot.candidateIdentity.primaryProvider !== "anilist") {
+  const registryEntry = ASPECT_REGISTRY[input.aspectId];
+  if (registryEntry.group !== "core") {
     return input.strength;
   }
-  const genreClaim = input.structured.some((item) => item.claim.sourceKind === "provider_genre");
-  if (!genreClaim) return input.strength;
+  const strongGenreProviders = new Set(input.structured.flatMap((item) => {
+    const provider = item.claim.provider ?? input.snapshot.candidateIdentity.primaryProvider;
+    return item.claim.sourceKind === "provider_genre" && registryEntry.providerSupport[provider] === "strong"
+      ? [provider]
+      : [];
+  }));
+  if (strongGenreProviders.size === 0) return input.strength;
   const strongestTagRank = input.structured.reduce<number | null>((strongest, item) => {
+    const provider = item.claim.provider ?? input.snapshot.candidateIdentity.primaryProvider;
+    if (!strongGenreProviders.has(provider)) return strongest;
     const rank = tagRankForClaim(input.snapshot, item);
     return rank === null ? strongest : Math.max(strongest ?? rank, rank);
   }, null);
-  const policy = STRUCTURED_EVIDENCE_POLICY.anilistRomance;
+  const policy = STRUCTURED_EVIDENCE_POLICY.strongCoreGenre;
   if (strongestTagRank !== null && strongestTagRank >= policy.highTagRank) {
     return Math.max(input.strength, policy.genreWithHighTagFloor);
   }

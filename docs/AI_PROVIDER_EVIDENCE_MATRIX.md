@@ -22,7 +22,7 @@ Gösterim: `Evet` doğrudan kullanım, `Koşullu` başka alan/kanıt gerektirir,
 | Exact identity (`id`, media type) | Evet | Evet: kimlik/tür | Hayır | Hayır | High | Kimlik yoksa aday elenir. |
 | Genres | Evet | Koşullu: geniş genre must | Evet, partial/strong taxonomy'ye göre | Hayır | Medium; başka kanıtla high | Eksikse ilgili aspect unknown. |
 | Tags | Evet | Koşullu | Evet | Hayır | Medium | Tag yoksa genre dışı aspect unknown. |
-| Tag relevance/rank | Evet | Evet, registry eşiği varsa | Evet, merkezilik için temel | Hayır | High/medium | Rank yoksa tag en fazla partial. |
+| Tag relevance/rank | Evet | Koşullu, registry ve başka kanıtla | Evet, bounded relevance sinyali | Hayır | Başka bağımsız alanla high olabilir | Rank yoksa tag en fazla partial; rank merkeziyet yüzdesi değildir. |
 | Format | Evet | Evet | Hayır | Hayır | High | İstenen format must ise aday elenir. |
 | Status | Evet | Evet | Hayır | Hayır | High | Status constraint'i varsa unknown/eliminasyon strictness'e göre. |
 | Length (episodes/chapters/volumes) | Evet | Evet, exact alan olduğunda | Hayır | Hayır | High | Sayı yoksa explicit must karşılanmış sayılmaz. |
@@ -46,7 +46,7 @@ D6-2 kod karşılığı: search/details tag adı, rank, category ve spoiler bayr
 | Synopsis | Evet | Tek başına hayır | Koşullu, verifier ile | Evet | Low | Eksikse semantic evidence unknown. |
 | Anime exclusion signals | Evet | Evet: recommendation TV havuzu hijyeni | Hayır | Hayır | Genre `Anime`: high; birleşik sinyal: medium | Karar verilemiyorsa kayıt TV havuzunda kalabilir, debug riski taşır. |
 
-Mevcut kod boşluğu: `TvmazeRawShow` tipi `show.type` alanını modellemiyor; country normalize sonuçta, language/status/network candidate adaptöründe kayboluyor. Bütün sonuçlar sıradan `tv` adayı oluyor ve recommendation'a özel anime exclusion yok.
+D6 kod karşılığı: `TvmazeRawShow.type`, language/country/status ve exact external ID alanları normalize edilir; recommendation-only adapter classifier uygular. Genel TVMaze search ve release calendar bu filtreden bağımsızdır.
 
 ### Recommendation'a özel anime exclusion
 
@@ -95,7 +95,7 @@ OMDb film discovery için tek otorite değildir. V2'de TMDB candidate üretir; O
 | Description availability | Evet | Tek başına hayır | Koşullu, verifier ile | Evet | Varsa low/medium | Yoksa description evidence unknown. |
 | Page/edition metadata | Evet | Evet: sayfa/edition constraint'i | Hayır | Koşullu | Sayfa medium/high; edition high | Eksik alan explicit must'i karşılamaz. |
 
-Mevcut kod boşluğu: arama route'u work key, author, subject, edition count, ISBN, language ve median pages alıyor; candidate adaptörü subjects'i `genres` alanına sıkıştırıyor ve edition/ISBN/language ayrıntısını kaybediyor. Açıklama çoğu arama sonucunda yok. D6-2, subject taxonomy'sini genre gibi göstermeden evidence alanına taşır.
+D6-5.3 kod karşılığı: Open Library subject claim'i `provider_keyword` kaynak türü ve `field=subjects` ile korunur; `provider_genre` sayılmaz. Work/edition identity ayrımı ve objective metadata korunur; description yokluğu semantic evidence'i `unknown` bırakır.
 
 ## Ortak veri eksikliği ve confidence kuralları
 
@@ -110,7 +110,7 @@ Aspect eşlemelerinin tek doğruluk kaynağı [AI Aspect Taxonomy](AI_ASPECT_TAX
 
 ## D6-1/D6-2 kod karşılığı
 
-D6-3'te reliability, provider support ve source-kind ayrı tutulur; hiçbir genre/tag/keyword doğrudan `primary` ilan edilmez. `unsupported` alan absent değil unknown üretir. Birleşim ve confidence kuralları [AI Recommendation V2 Ranking](AI_RECOMMENDATION_V2_RANKING.md) belgesindedir.
+D6-3/D6-5.3'te reliability, provider support ve source-kind ayrı tutulur. Exact genre tek başına `primary` değildir; yalnız core + strong-support provider genre `significant/medium` tabanı alabilir. Tag/keyword/subject tek başına otomatik primary değildir. `unsupported` alan absent değil unknown üretir. Birleşim ve confidence kuralları [AI Recommendation V2 Ranking](AI_RECOMMENDATION_V2_RANKING.md) belgesindedir.
 
 - Provider capability/ownership matrisi [`features/recommendations/domain/providers.ts`](../features/recommendations/domain/providers.ts) içindedir; hiçbir provider çağrısı yapmaz.
 - TVMaze raw `type` alanı [`lib/tvmaze-types.ts`](../lib/tvmaze-types.ts) içine optional olarak eklendi. Saf classifier [`tvmaze-anime-classifier.ts`](../features/recommendations/providers/tvmaze-anime-classifier.ts) içinde confirmed/likely/non-anime/unknown sonucu üretir.
