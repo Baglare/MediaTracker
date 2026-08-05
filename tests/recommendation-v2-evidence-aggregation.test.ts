@@ -22,7 +22,7 @@ describe("D6-3 aspect evidence aggregation", () => {
     const evidence = aggregateAspectEvidence({ snapshot: snapshot([claim("g", "provider_genre", "genres", 0.85), claim("t", "provider_tag_rank", "tags", 0.9)]) }).get("romance");
     expect(evidence?.strength).toBeGreaterThanOrEqual(0.5);
     expect(evidence?.strength).toBeLessThan(0.9);
-    expect(evidence?.level).toBe("significant");
+    expect(evidence?.level).toBe("primary");
     expect(evidence?.confidence).toBe("high");
   });
 

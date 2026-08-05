@@ -1,6 +1,6 @@
 # AI Recommendation V2 — UI ve Feedback V2
 
-> Durum: D6-4 uygulandı; D6-5.1'de manuel relevance, avoid metni ve kart yerleşimi sorunları düzeltildi. D6-3 deterministik sıralama önceliği değişmedi.
+> Durum: D6-4 uygulandı; D6-5.1 ve D6-5.2'de manuel relevance, Romance evidence, minimum seviye, duplicate mesaj ve near-match kart sorunları düzeltildi. D6-3 deterministik sıralama önceliği değişmedi.
 
 ## İki aşamalı istek
 
@@ -12,6 +12,8 @@ Takip mesajları önceki taslağa patch uygulanarak çözülür. Eski explicit m
 
 UI `features/recommendations/ui` altında bölünmüştür. Aspect seçici doğrudan 43 kayıtlı `ASPECT_REGISTRY` kaynağını ve Türkçe/İngilizce alias'ları kullanır. Rol değişimi, duplicate/unsafe rol, `profile + must`, objektif sayı/aralık ve medya/uzunluk uyumu domain codec/policy ile doğrulanır. Yeni avoid rolü “İkincil ve üzerini çıkar” eşiğiyle başlar; kullanıcı seçtiği eşiği değiştirebilir. Enum ve reason-code'lar merkezi kullanıcı metni mapper'ından Türkçeleştirilir; strength/confidence yüzdesi veya ham scorer puanı gösterilmez.
 
+Must aspect merkeziyeti editörde **Belirgin veya ana unsur** ya da **Yalnız ana unsur** olarak görünür ve düzenlenir. UI'dan yeni must varsayılanı significant'tır; parser'ın “güçlü/ana tema” sonucu primary ise taslak bunu gizlemez. Kullanıcının onayladığı minimum seviye recommendation server'ında yeniden tahmin edilmez.
+
 Strictness owner-scoped AI preferences state'inde version 2 olarak saklanır; version 1 kayıtlar `balanced` ile hydrate edilir. Strictness/draft değişikliği eski sonucu client'ta yeniden sıralamaz; sonuç stale kabul edilip temizlenir.
 
 ## Sonuçlar ve near-match
@@ -19,6 +21,8 @@ Strictness owner-scoped AI preferences state'inde version 2 olarak saklanır; ve
 Primary öneriler mevcut Quick Add/Discover contract'ını korur ve yalnız pozitif satisfied evidence özetini taşır. Avoid kanıtı fit rozeti veya “Neden önerildi” maddesi değildir. `exploratory` modunda must veya güvenilir avoid ihlali olan kanıtlı adaylar en fazla üç öğelik ayrı `nearMatches` read-model'inde dönebilir. Strict/balanced modda veya boş listede bölüm render edilmez. İhlal edilen constraint açıkça gösterilir; near-match primary listeye karışmaz.
 
 Kart başlığı poster ve badge arasında sıkışmaz: fit badge ayrı satırdadır, başlık varsayılan iki satırdır ve hover/focus-within sırasında kart genişliğini bozmadan açılır. Kelimeler karakter karakter bölünmez. Community score provider ve ölçek adıyla ikincil metadata olarak gösterilir. Generic “Doğrulanmış metadata eşleşmesi” kart yüzeyinden kaldırılmıştır.
+
+Primary ve near-match aynı card-header layout'unu paylaşır. Near-match kendi `resultKind` kimliğini, açık ihlal metnini ve confidence özetini korur. Interpret kullanıcı mesajının tek history sahibidir; recommendation submit/retry aynı stable message ID'yi ikinci kez eklemez.
 
 ## Feedback V2 ve owner scope
 

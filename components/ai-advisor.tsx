@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Sparkles,
@@ -55,10 +54,13 @@ import {
   FeedbackReasonDialog,
   NearMatchSection,
   ParsedRequestPanel,
+  RecommendationCardHeader,
   RequestComposer,
+  appendRecommendationMessage,
   buildInterpretReferencePayload,
   buildRecommendationMediaPayload,
   userFacingConstraintLabel,
+  userFacingNoResultSummary,
   userFacingRejectionReason,
 } from "@/features/recommendations/ui";
 export type { AiSettings } from "@/lib/ai/types";
@@ -1334,7 +1336,6 @@ export default function AiAdvisor({
     const promptKey = `${prompt}|${activeContext?.followUpMessage || ""}`.toLowerCase();
     if (inFlightPromptKey.current === promptKey) return;
     setViewingSessionId(null);
-    setMessages((prev) => [...prev, { id: generateId("msg"), role: "user", content: rawPrompt }]);
     setInput("");
     setRecommendations([]);
     setRejected([]);
@@ -1352,6 +1353,7 @@ export default function AiAdvisor({
   async function handleSend(text?: string) {
     const rawPrompt = (text ?? input).trim();
     if (!rawPrompt || isLoading || interpretationLoading) return;
+    const messageId = generateId("msg");
     setInterpretationLoading(true);
     setViewingSessionId(null);
     try {
@@ -1384,7 +1386,7 @@ export default function AiAdvisor({
       setNearMatches([]);
       setRejected([]);
       setEngineStatus(null);
-      setMessages((prev) => [...prev, { id: generateId("msg"), role: "user", content: rawPrompt }]);
+      setMessages((prev) => appendRecommendationMessage(prev, { id: messageId, role: "user", content: rawPrompt }));
       setInput("");
     } catch {
       setPendingClarification({ originalPrompt: rawPrompt, question: "İstek özeti hazırlanamadı. Tekrar dener misin?" });
@@ -1934,43 +1936,8 @@ export default function AiAdvisor({
                       : "bg-zinc-900/50 border-zinc-800/60"
                   }`}
                 >
-                <div className="flex gap-3 min-w-0">
-                  {rec.coverUrl ? (
-                    <div className="relative w-14 h-20 shrink-0 rounded-md overflow-hidden bg-zinc-800">
-                      <Image
-                        src={rec.coverUrl}
-                        alt={rec.title}
-                        fill
-                        sizes="56px"
-                        className="object-cover"
-                        unoptimized
-                      />
-                    </div>
-                  ) : (
-                    <div className="w-14 h-20 shrink-0 rounded-md bg-zinc-800/60 flex items-center justify-center text-zinc-600"><Sparkles className="w-5 h-5" /></div>
-                  )}
-                  <div className="flex flex-col gap-1.5 min-w-0 flex-1">
-                    <div className="min-w-0">
-                      <div className="min-w-0">
-                        <h4 className="line-clamp-2 text-sm font-semibold text-zinc-100 break-normal [overflow-wrap:break-word] group-hover:line-clamp-none group-focus-within:line-clamp-none">
-                          {rec.title}
-                        </h4>
-                        <p className="text-[11px] text-zinc-500 truncate">
-                          {rec.mediaType}
-                          <span className="mx-1 text-zinc-700">·</span>
-                          {rec.source}
-                          {releaseYear ? (
-                            <>
-                              <span className="mx-1 text-zinc-700">·</span>
-                              {releaseYear}
-                            </>
-                          ) : null}
-                        </p>
-                      </div>
-                      <span className="mt-1 inline-flex max-w-full self-start rounded-md border border-violet-500/30 bg-violet-500/15 px-2 py-0.5 text-left text-[10px] font-medium leading-tight text-violet-300 break-normal [overflow-wrap:break-word]">
-                        {rec.fitLabel}
-                      </span>
-                    </div>
+                <RecommendationCardHeader title={rec.title} coverUrl={rec.coverUrl} mediaType={rec.mediaType} source={rec.source} releaseYear={releaseYear} badge={rec.fitLabel} />
+                <div className="mt-2 min-w-0">
                     {rec.overview && (
                       <p className="text-xs text-zinc-500 line-clamp-2 leading-relaxed">
                         {rec.overview}
@@ -1983,7 +1950,6 @@ export default function AiAdvisor({
                         </span>
                       ))}
                     </div>
-                                      </div>
                 </div>
 
                 {reasonBullets.length > 0 && (
@@ -2087,10 +2053,11 @@ export default function AiAdvisor({
         {engineStatus && !isLoading && recommendations.length === 0 && (
           <section className="rounded-2xl border border-amber-500/25 bg-amber-500/5 p-4">
             <h3 className="text-sm font-semibold text-zinc-100">Uygun eser bulamadım</h3>
-            <p className="mt-1 text-xs text-zinc-400">{engineStatus.providerFallbackUsed ? "Bazı kanıt kaynakları kullanılamadı; doğrulanmamış başlık eklenmedi." : "Zorunlu koşullar doğrulanmış aday havuzunu daralttı; liste düşük kaliteli adaylarla doldurulmadı."}</p>
+            <p className="mt-1 text-xs text-zinc-400">{userFacingNoResultSummary({ rejectedReasons: rejected.map((item) => item.reason), providerFallbackUsed: engineStatus.providerFallbackUsed, evaluatedCandidateCount: engineStatus.evaluatedCandidateCount })}</p>
             {structuredRequest && [...structuredRequest.aspectConstraints, ...structuredRequest.objectiveConstraints].filter((constraint) => constraint.role === "must").length > 0 && <p className="mt-1 text-xs text-zinc-500">Daraltan koşullar: {[...structuredRequest.aspectConstraints, ...structuredRequest.objectiveConstraints].filter((constraint) => constraint.role === "must").map(userFacingConstraintLabel).join(", ")}</p>}
             <div className="mt-3 flex flex-wrap gap-2">
               {structuredRequest?.strictness !== "exploratory" && <button type="button" onClick={() => structuredRequest && setStructuredRequest({ ...structuredRequest, strictness: "exploratory" })} className="text-xs text-violet-300">Keşifçi moda geç</button>}
+              {structuredRequest?.aspectConstraints.some((constraint) => constraint.role === "must" && constraint.minimumLevel === "primary") && <button type="button" onClick={() => setStructuredRequest((current) => current ? { ...current, aspectConstraints: current.aspectConstraints.map((constraint) => constraint.role === "must" && constraint.minimumLevel === "primary" ? { ...constraint, minimumLevel: "significant", source: "explicit" } : constraint) } : current)} className="text-xs text-violet-300">{userFacingConstraintLabel(structuredRequest.aspectConstraints.find((constraint) => constraint.role === "must" && constraint.minimumLevel === "primary")!)} için “Belirgin veya ana unsur” seç</button>}
               {structuredRequest?.aspectConstraints.some((constraint) => constraint.role === "must") && <button type="button" onClick={() => setStructuredRequest((current) => current ? { ...current, aspectConstraints: current.aspectConstraints.map((constraint, index) => index === current.aspectConstraints.findIndex((item) => item.role === "must") ? { ...constraint, role: "prefer", source: "explicit", rejectAtLevel: undefined } : constraint) as RecommendationRequestV2["aspectConstraints"] } : current)} className="text-xs text-violet-300">{userFacingConstraintLabel(structuredRequest.aspectConstraints.find((constraint) => constraint.role === "must")!)} koşulunu tercihe çevir</button>}
               {structuredRequest?.objectiveConstraints.some((constraint) => constraint.field === "length" || constraint.field === "release_status") && <button type="button" onClick={() => setStructuredRequest((current) => current ? { ...current, objectiveConstraints: current.objectiveConstraints.filter((constraint) => constraint.field !== "length" && constraint.field !== "release_status") } : current)} className="text-xs text-violet-300">Süre/yayın filtresini kaldır</button>}
               {researchMode === "library-only" && <button type="button" onClick={() => setResearchMode("source-apis")} className="text-xs text-violet-300">Provider kapsamını genişlet</button>}

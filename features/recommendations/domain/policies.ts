@@ -1,7 +1,8 @@
 import type { AspectEvidence } from "./evidence";
 import type { AspectConstraint, LengthConstraint } from "./constraints";
-import { DEFAULT_AVOID_REJECT_LEVEL } from "./constraints";
+import { DEFAULT_AVOID_REJECT_LEVEL, DEFAULT_MUST_MINIMUM_LEVEL } from "./constraints";
 import { aspectConstraintKey } from "./constraints";
+import { ASPECT_REGISTRY } from "./aspect-registry";
 import type { VerifiedRecommendationIdentity } from "./providers";
 import type {
   AspectStrengthLevel,
@@ -80,6 +81,14 @@ function hasStrongRankedProviderTag(evidence: AspectEvidence): boolean {
       && (claim.reliability ?? 0) >= 0.85);
 }
 
+function hasStrongStructuredProviderGenre(evidence: AspectEvidence): boolean {
+  return LEVEL_RANK[evidence.level] >= LEVEL_RANK.significant
+    && evidence.supportingEvidence.some((claim) => claim.sourceKind === "provider_genre"
+      && claim.provider !== undefined
+      && ASPECT_REGISTRY[evidence.aspectId].providerSupport[claim.provider] === "strong"
+      && (claim.reliability ?? 0) >= 0.85);
+}
+
 function confidenceMeetsMust(
   constraint: AspectConstraint,
   evidence: AspectEvidence,
@@ -91,7 +100,9 @@ function confidenceMeetsMust(
   if (evidence.confidence === "high") return true;
   if (strictness !== "strict"
     && evidence.confidence === "medium"
-    && (hasMultipleIndependentSupportingClaims(evidence) || hasStrongRankedProviderTag(evidence))) return true;
+    && (hasMultipleIndependentSupportingClaims(evidence)
+      || hasStrongRankedProviderTag(evidence)
+      || hasStrongStructuredProviderGenre(evidence))) return true;
   return false;
 }
 
@@ -132,7 +143,7 @@ export function evaluateConstraintEligibility(args: {
   }
 
   if (constraint.role === "must") {
-    const levelPassed = LEVEL_RANK[evidence.level] >= LEVEL_RANK[constraint.minimumLevel ?? "primary"];
+    const levelPassed = LEVEL_RANK[evidence.level] >= LEVEL_RANK[constraint.minimumLevel ?? DEFAULT_MUST_MINIMUM_LEVEL];
     const confidencePassed = confidenceMeetsMust(constraint, evidence, strictness);
     if (levelPassed && confidencePassed) {
       return decision(constraint, evidence, true, "passed", ["Must aspect seviyesi ve confidence şartı karşılandı."]);

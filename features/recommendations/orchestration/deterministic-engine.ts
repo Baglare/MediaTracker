@@ -88,6 +88,7 @@ export async function runDeterministicRecommendationV2(input: {
         feedbackApplied: false,
         feedbackEventCount: input.feedback.length,
         persistentCache: "not_used",
+        semanticVerifierMode: "structured_only",
       },
       debug: { provider: "deterministic_v2", note: `clarification:${adapted.issues.join(",")}` },
     };
@@ -119,6 +120,7 @@ export async function runDeterministicRecommendationV2(input: {
       feedbackApplied: input.feedback.length > 0 && selected.some((item) => item.scoreBreakdown.personalFit !== 0),
       feedbackEventCount: input.feedback.length,
       persistentCache: "not_used",
+      semanticVerifierMode: verifier.effectiveMode,
     },
     debug: {
       provider: "deterministic_v2",

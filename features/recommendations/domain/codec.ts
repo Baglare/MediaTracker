@@ -10,6 +10,8 @@ import {
   canonicalizeAspectConstraints,
   canonicalizeObjectiveConstraints,
   DEFAULT_AVOID_REJECT_LEVEL,
+  DEFAULT_MUST_MINIMUM_LEVEL,
+  DEFAULT_PREFER_MINIMUM_LEVEL,
   type AspectConstraint,
   type LengthConstraint,
   type ObjectiveConstraint,
@@ -354,7 +356,8 @@ export function decodeAspectConstraint(value: unknown, path = "constraint"): Rec
   const role = asEnum(value.role, CONSTRAINT_ROLES);
   const source = asEnum(value.source, CONSTRAINT_SOURCES);
   const minimumLevel = value.minimumLevel === undefined
-    ? undefined : asEnum(value.minimumLevel, ASPECT_STRENGTH_LEVELS.filter((item) => item !== "unknown"));
+    ? role === "must" ? DEFAULT_MUST_MINIMUM_LEVEL : role === "prefer" ? DEFAULT_PREFER_MINIMUM_LEVEL : undefined
+    : asEnum(value.minimumLevel, ASPECT_STRENGTH_LEVELS.filter((item) => item !== "unknown"));
   const rejectAtLevel = value.rejectAtLevel === undefined
     ? role === "avoid" ? DEFAULT_AVOID_REJECT_LEVEL : undefined
     : asEnum(value.rejectAtLevel, ["primary", "significant", "incidental"] as const);

@@ -9,3 +9,5 @@ export * from "./near-match-section";
 export * from "./evidence-summary";
 export * from "./feedback-reason-dialog";
 export * from "./engine-transparency";
+export * from "./recommendation-card-header";
+export * from "./message-history";

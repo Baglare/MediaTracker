@@ -89,15 +89,39 @@ export function buildGroundedNearMatchRecommendation(item: ScoredRecommendationC
   const violated = item.aspectDecisions.filter((decision) => (decision.role === "must" && !decision.passed) || decision.outcome === "triggered_avoid").map((decision) => {
     const constraint = request.aspectConstraints.find((entry) => entry.id === decision.constraintId);
     if (!constraint) return "Zorunlu koşul karşılanmadı";
-    return constraint.role === "avoid"
-      ? `${ASPECT_REGISTRY[constraint.aspectId].labelTr}: kaçınılacak içerik eşiği aşıldı`
-      : `${ASPECT_REGISTRY[constraint.aspectId].labelTr}: zorunlu eşik karşılanmadı`;
+    const label = ASPECT_REGISTRY[constraint.aspectId].labelTr;
+    const evidence = item.aspectEvidence.get(constraint.aspectId);
+    if (constraint.role === "avoid") return `${label}: kaçınılacak içerik eşiği aşıldı.`;
+    if (!evidence || evidence.level === "unknown") return `${label} için istenen düzeye dair yeterli kanıt bulunamadı.`;
+    if (constraint.minimumLevel === "primary" && evidence.level === "significant") {
+      return `Yalnız ana unsur koşulu karşılanmadı; ${label.toLocaleLowerCase("tr-TR")} belirgin düzeyde.`;
+    }
+    if (evidence.level === "incidental") return `${label} yalnız ikincil düzeyde kaldı.`;
+    return `${label} için zorunlu merkeziyet düzeyi karşılanmadı.`;
   });
   const satisfied = item.aspectDecisions.filter((decision) => decision.role !== "avoid" && decision.passed).flatMap((decision) => {
     const constraint = request.aspectConstraints.find((entry) => entry.id === decision.constraintId);
     return constraint ? [ASPECT_REGISTRY[constraint.aspectId].labelTr] : [];
   });
-  return { ...base, id: `near-${base.id}`, resultKind: "near_match", fitLabel: "Yakın eşleşme", violatedConstraints: violated, satisfiedConstraints: satisfied, nearMatchReason: violated.join("; ") || "Bir zorunlu koşul karşılanmadı." };
+  const failedEvidence = request.aspectConstraints.flatMap((constraint) => {
+    const decision = item.aspectDecisions.find((entry) => entry.constraintId === constraint.id);
+    const evidence = item.aspectEvidence.get(constraint.aspectId);
+    return decision && !decision.passed && evidence && evidence.level !== "unknown"
+      ? [{ label: ASPECT_REGISTRY[constraint.aspectId].labelTr, value: LEVEL_LABELS[evidence.level], confidenceLabel: CONFIDENCE_LABELS[evidence.confidence] }]
+      : [];
+  });
+  return {
+    ...base,
+    id: `near-${base.id}`,
+    resultKind: "near_match",
+    fitLabel: "Yakın eşleşme",
+    evidenceSummary: [...(base.evidenceSummary ?? []), ...failedEvidence].slice(0, 4),
+    violatedConstraints: violated,
+    satisfiedConstraints: satisfied,
+    nearMatchReason: satisfied.length > 0
+      ? "Diğer doğrulanmış koşullar karşılandığı için ayrı bir yakın eşleşme olarak gösterildi."
+      : "İstenen içerik için kısmi provider kanıtı bulunduğundan ayrı bir yakın eşleşme olarak gösterildi.",
+  };
 }
 
 export function buildGroundedAssistantMessage(count: number, rejectedCount: number): string {

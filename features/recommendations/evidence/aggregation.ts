@@ -4,6 +4,17 @@ import type { SemanticVerifierMode } from "../domain/types";
 import type { CandidateProviderEvidenceSnapshot } from "../providers/types";
 import { normalizeRawEvidenceClaims } from "./claim-normalizer";
 import { deriveEvidenceConfidence } from "./confidence";
+import type { NormalizedEvidenceContribution } from "./claim-normalizer";
+
+export const STRUCTURED_EVIDENCE_POLICY = {
+  anilistRomance: {
+    genreFloor: 0.55,
+    mediumTagRank: 40,
+    highTagRank: 75,
+    genreWithMediumTagFloor: 0.68,
+    genreWithHighTagFloor: 0.78,
+  },
+} as const;
 
 export interface SemanticEvidenceBundle {
   mode: Exclude<SemanticVerifierMode, "structured_only">;
@@ -26,6 +37,41 @@ function supportCap(id: AspectId, provider: CandidateProviderEvidenceSnapshot["c
   }
 }
 
+function tagRankForClaim(
+  snapshot: CandidateProviderEvidenceSnapshot,
+  contribution: NormalizedEvidenceContribution,
+): number | null {
+  if (contribution.claim.sourceKind !== "provider_tag_rank") return null;
+  const claimValue = String(contribution.claim.value ?? "").trim().toLocaleLowerCase("en-US");
+  const tag = snapshot.objectiveMetadata.tags?.find((entry) => entry.name.trim().toLocaleLowerCase("en-US") === claimValue);
+  return typeof tag?.rank === "number" && Number.isFinite(tag.rank) ? tag.rank : null;
+}
+
+export function applyStructuredEvidencePolicy(input: {
+  aspectId: AspectId;
+  snapshot: CandidateProviderEvidenceSnapshot;
+  structured: readonly NormalizedEvidenceContribution[];
+  strength: number;
+}): number {
+  if (input.aspectId !== "romance" || input.snapshot.candidateIdentity.primaryProvider !== "anilist") {
+    return input.strength;
+  }
+  const genreClaim = input.structured.some((item) => item.claim.sourceKind === "provider_genre");
+  if (!genreClaim) return input.strength;
+  const strongestTagRank = input.structured.reduce<number | null>((strongest, item) => {
+    const rank = tagRankForClaim(input.snapshot, item);
+    return rank === null ? strongest : Math.max(strongest ?? rank, rank);
+  }, null);
+  const policy = STRUCTURED_EVIDENCE_POLICY.anilistRomance;
+  if (strongestTagRank !== null && strongestTagRank >= policy.highTagRank) {
+    return Math.max(input.strength, policy.genreWithHighTagFloor);
+  }
+  if (strongestTagRank !== null && strongestTagRank >= policy.mediumTagRank) {
+    return Math.max(input.strength, policy.genreWithMediumTagFloor);
+  }
+  return Math.max(input.strength, policy.genreFloor);
+}
+
 export function aggregateAspectEvidence(input: {
   snapshot: CandidateProviderEvidenceSnapshot;
   semantic?: SemanticEvidenceBundle;
@@ -46,7 +92,12 @@ export function aggregateAspectEvidence(input: {
     const structuredCap = structured.length > 0
       ? Math.max(...structured.map((item) => supportCap(aspectId, item.claim.provider ?? input.snapshot.candidateIdentity.primaryProvider)))
       : 0;
-    const structuredStrength = Math.min(structuredCap, boundedNoisyOr(structured.map((item) => item.contribution)));
+    const structuredStrength = applyStructuredEvidencePolicy({
+      aspectId,
+      snapshot: input.snapshot,
+      structured,
+      strength: Math.min(structuredCap, boundedNoisyOr(structured.map((item) => item.contribution))),
+    });
     const semanticStrength = boundedNoisyOr(semanticSupporting.map((claim) => Math.min(0.65, claim.reliability ?? 0)));
     const strength = Math.min(0.95, boundedNoisyOr([structuredStrength, semanticStrength].filter((value) => value > 0)));
     const supporting = [...structured.map((item) => item.claim), ...semanticSupporting];

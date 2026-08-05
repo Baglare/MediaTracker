@@ -66,7 +66,7 @@ describe("D6-5.1 manual recommendation regressions", () => {
         candidates: [rankable(aspectId, aspectId, evidence(aspectId, 0.3, "medium"))], mediaItems: [], feedback: [],
       });
       expect(result.scored).toHaveLength(0);
-      expect(result.rejected[0]?.reason).toBe("triggered_avoid");
+      expect(result.rejected[0]?.reason).toBe("candidates_failed_avoid");
     },
   );
 
@@ -155,7 +155,7 @@ describe("D6-5.1 manual recommendation regressions", () => {
       ], mediaItems: [], feedback: [],
     });
     expect(result.scored.map((item) => item.candidate.externalId)).toEqual(["Romance-present"]);
-    expect(result.rejected).toContainEqual({ title: "Kakegurui-like", reason: "explicit_request_evidence_missing" });
+    expect(result.rejected).toContainEqual({ title: "Kakegurui-like", reason: "candidates_below_request_coverage" });
   });
 
   it("aspect içermeyen genel istekte minimum explicit coverage uygulamaz", () => {
@@ -174,10 +174,10 @@ describe("D6-5.1 manual recommendation regressions", () => {
   });
 
   it("aktif kartta badge başlık satırını sıkıştırmaz ve uzun başlık iki satırdan güvenle genişler", () => {
-    const source = readFileSync("components/ai-advisor.tsx", "utf8");
+    const source = readFileSync("features/recommendations/ui/recommendation-card-header.tsx", "utf8");
     expect(source).toMatch(/line-clamp-2[^\n]*group-hover:line-clamp-none[^\n]*group-focus-within:line-clamp-none/);
     expect(source).toMatch(/break-normal \[overflow-wrap:break-word\]/);
     expect(source).not.toMatch(/items-start justify-between gap-2/);
-    expect(source).toMatch(/md:grid-cols-2 2xl:grid-cols-3/);
+    expect(readFileSync("components/ai-advisor.tsx", "utf8")).toMatch(/md:grid-cols-2 2xl:grid-cols-3/);
   });
 });

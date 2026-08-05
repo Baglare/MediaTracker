@@ -25,13 +25,54 @@ export function userFacingRejectionReason(reason: string): string {
     triggered_avoid: "Kaçınılacak içerik eşiği aşıldı.",
     constraint_failed: "İstek koşullarından biri karşılanmadı.",
     explicit_request_evidence_missing: "Açık isteğinle doğrulanmış bir içerik ilişkisi bulunamadı.",
+    candidates_below_request_coverage: "Açık isteğinle doğrulanmış bir içerik ilişkisi bulunamadı.",
+    candidates_failed_romance_strength: "Romantizm istenen merkeziyet düzeyine ulaşmadı.",
+    candidates_failed_aspect_strength: "İstenen içerik özelliği yeterince merkezi değil.",
+    candidates_failed_confidence: "Zorunlu koşul için yeterli kanıt güveni bulunamadı.",
+    candidates_failed_avoid: "Kaçınılacak içerik eşiği aşıldı.",
+    candidates_failed_objective: "Objektif filtrelerden biri karşılanmadı.",
     exact_library_identity: "Bu eser zaten kütüphanende.",
     dismissed_exact_identity: "Bu eseri daha önce gizledin.",
+    provider_identity_unverified: "Adayın provider kimliği doğrulanamadı.",
   };
   if (exact[reason]) return exact[reason];
   return /(^|[:_])[a-z0-9_:-]+$/.test(reason) && /[:_]/.test(reason)
     ? "Aday, öneri koşullarından birini karşılamadı."
     : reason;
+}
+
+export function userFacingNoResultSummary(input: {
+  rejectedReasons: readonly string[];
+  providerFallbackUsed: boolean;
+  evaluatedCandidateCount: number;
+}): string {
+  const reasons = new Set(input.rejectedReasons);
+  if (reasons.has("provider_identity_unverified")) {
+    return "Provider aday döndürdü ancak kesin kimliği doğrulanamayan eserler öneri havuzuna alınmadı.";
+  }
+  if (input.evaluatedCandidateCount === 0) {
+    return input.providerFallbackUsed
+      ? "Bazı kaynaklar kullanılamadı ve doğrulanmış aday elde edilemedi."
+      : "Provider, onaylanan istek için doğrulanmış aday döndürmedi.";
+  }
+  if (reasons.has("candidates_failed_romance_strength")) {
+    return "Romantizm için istenen merkeziyet düzeyini karşılayan doğrulanmış aday bulunamadı.";
+  }
+  if (reasons.has("candidates_failed_confidence")) {
+    return "Zorunlu koşul için yeterli kanıt güvenine sahip doğrulanmış aday bulunamadı.";
+  }
+  if (reasons.has("candidates_failed_avoid")) {
+    return "Doğrulanmış adaylar kaçınılacak içerik eşiğini aştı.";
+  }
+  if (reasons.has("candidates_failed_objective")) {
+    return "Doğrulanmış adaylar süre, yayın durumu veya diğer objektif filtrelerden birini karşılamadı.";
+  }
+  if (reasons.has("candidates_below_request_coverage")) {
+    return "Adaylarda açık içerik isteğinle doğrulanmış yeterli ilişki bulunamadı.";
+  }
+  return input.providerFallbackUsed
+    ? "Bazı kanıt kaynakları kullanılamadı; doğrulanmamış başlık eklenmedi."
+    : "Zorunlu koşullar doğrulanmış aday havuzunu daralttı; liste zayıf adaylarla doldurulmadı.";
 }
 
 export function userFacingConstraintLabel(constraint: AspectConstraint | ObjectiveConstraint): string {

@@ -4,7 +4,14 @@ import {
   normalizeAspectAlias,
   type AspectId,
 } from "../domain/aspect-registry";
-import { DEFAULT_AVOID_REJECT_LEVEL, type AspectConstraint, type ObjectiveConstraint } from "../domain/constraints";
+import {
+  DEFAULT_AVOID_REJECT_LEVEL,
+  DEFAULT_MUST_MINIMUM_LEVEL,
+  DEFAULT_PREFER_MINIMUM_LEVEL,
+  type AspectConstraint,
+  type ConstraintStrengthLevel,
+  type ObjectiveConstraint,
+} from "../domain/constraints";
 import type { RecommendationMediaType } from "../domain/types";
 
 export interface ConstraintExtractionResult {
@@ -22,6 +29,7 @@ export interface ConstraintExtractionResult {
 const AVOID_SIGNAL = /\b(olmasin|istemiyorum|istemem|kacin|kacinin|uzak dur|fazla olmasin)\b/;
 const PREFER_SIGNAL = /\b(biraz|olabilir|tercihen|mumkunse|mümkünse|iyi olur)\b/;
 const MUST_SIGNAL = /\b(agirlikli|ağırlıklı|guclu|güçlü|ana tema|olmali|olmalı|istiyorum|isterim)\b/;
+const PRIMARY_LEVEL_SIGNAL = /\b(agirlikli|ağırlıklı|guclu|güçlü|ana tema)\b/;
 
 function normalizedMessage(value: string): string {
   return ` ${normalizeAspectAlias(value)} `;
@@ -77,14 +85,19 @@ function targetProviderSupportSafe(id: AspectId, targets: readonly Recommendatio
   return [...providers].some((provider) => support[provider] === "strong" || support[provider] === "partial");
 }
 
-function aspectConstraint(id: AspectId, role: "must" | "prefer" | "avoid", source: "explicit" | "inferred"): AspectConstraint {
+function aspectConstraint(
+  id: AspectId,
+  role: "must" | "prefer" | "avoid",
+  source: "explicit" | "inferred",
+  minimumLevel: ConstraintStrengthLevel = DEFAULT_MUST_MINIMUM_LEVEL,
+): AspectConstraint {
   if (role === "must") {
-    return { id: `aspect:${id}:${role}:${source}`, kind: "aspect", aspectId: id, role, source, minimumLevel: "significant" };
+    return { id: `aspect:${id}:${role}:${source}`, kind: "aspect", aspectId: id, role, source, minimumLevel };
   }
   if (role === "avoid") {
     return { id: `aspect:${id}:${role}:${source}`, kind: "aspect", aspectId: id, role, source, rejectAtLevel: DEFAULT_AVOID_REJECT_LEVEL };
   }
-  return { id: `aspect:${id}:${role}:${source}`, kind: "aspect", aspectId: id, role, source, minimumLevel: "incidental" };
+  return { id: `aspect:${id}:${role}:${source}`, kind: "aspect", aspectId: id, role, source, minimumLevel: DEFAULT_PREFER_MINIMUM_LEVEL };
 }
 
 function parseLength(text: string, targets: readonly RecommendationMediaType[]): ObjectiveConstraint[] {
@@ -168,7 +181,10 @@ export function extractStructuredConstraints(input: {
     } else if (role === "must" && ASPECT_REGISTRY[id].mustSafety === "conditional") {
       warnings.push(`conditional_must_requires_evidence:${id}`);
     }
-    aspectConstraints.push(aspectConstraint(id, role, source));
+    const minimumLevel = role === "must" && contexts.some((context) => PRIMARY_LEVEL_SIGNAL.test(context))
+      ? "primary"
+      : DEFAULT_MUST_MINIMUM_LEVEL;
+    aspectConstraints.push(aspectConstraint(id, role, source, minimumLevel));
     seen.set(id, role);
   }
 

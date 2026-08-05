@@ -1,4 +1,17 @@
 "use client";
 import { useId, useState } from "react";
 import type { AiEngineStatus, AiSettings } from "@/lib/ai/types";
-export function EngineTransparency({ status, settings, profileEnabled }: { status: AiEngineStatus | null; settings: AiSettings; profileEnabled: boolean }) { const [open, setOpen] = useState(false); const id = useId(); if (!status) return null; const mode = status.embeddingMode === "python_service" ? "Local enhanced" : "Structured only"; return <section className="rounded-xl border border-zinc-800 bg-zinc-950/30"><button type="button" aria-expanded={open} aria-controls={id} onClick={() => setOpen((value) => !value)} className="w-full px-3 py-2 text-left text-xs text-zinc-300">Bu öneriler nasıl seçildi?</button>{open && <ul id={id} className="space-y-1 px-4 pb-3 text-[11px] text-zinc-500"><li>Kimlik ve zorunlu koşullar önce uygulandı.</li><li>Final sıra deterministiktir; LLM final sıralama yapmaz.</li><li>Kanıt modu: {mode}.</li><li>Kaynaklar: {status.sources.join(", ") || "yapılandırılmış kaynak yok"}.</li><li>Profil: {profileEnabled ? "açık" : "kapalı"}; puan {settings.includeRatings === false ? "kapalı" : "açık"}, favori {settings.includeFavorites === false ? "kapalı" : "açık"}, ilerleme {settings.includeProgress === false ? "kapalı" : "açık"}, not {settings.usePersonalNotes ? "açık" : "kapalı"}.</li></ul>}</section>; }
+const MODE_LABEL = {
+  structured_only: "Yapılandırılmış kaynak kanıtları",
+  local_enhanced: "Yerel semantik doğrulama destekli",
+  remote_enhanced: "Uzak semantik doğrulama destekli",
+} as const;
+const SOURCE_LABEL = { anilist: "AniList", tvmaze: "TVMaze", tmdb: "TMDB", omdb: "OMDb", openlibrary: "Open Library", library: "Kütüphane" } as const;
+
+export function EngineTransparency({ status, settings, profileEnabled }: { status: AiEngineStatus | null; settings: AiSettings; profileEnabled: boolean }) {
+  const [open, setOpen] = useState(false);
+  const id = useId();
+  if (!status) return null;
+  const mode = status.semanticVerifierMode ?? (status.embeddingMode === "python_service" ? "local_enhanced" : "structured_only");
+  return <section className="rounded-xl border border-zinc-800 bg-zinc-950/30"><button type="button" aria-expanded={open} aria-controls={id} onClick={() => setOpen((value) => !value)} className="w-full px-3 py-2 text-left text-xs text-zinc-300">Bu öneriler nasıl seçildi?</button>{open && <ul id={id} className="space-y-1 px-4 pb-3 text-[11px] text-zinc-500"><li>Sıralama: Deterministik V2.</li><li>Kimlik ve zorunlu koşullar önce uygulandı.</li><li>LLM final sıralama: kullanılmadı.</li><li>Kanıt modu: {MODE_LABEL[mode]}.</li><li>Kaynak: {status.sources.map((source) => SOURCE_LABEL[source]).join(", ") || "yapılandırılmış kaynak yok"}.</li><li>Profil: {profileEnabled ? "açık" : "kapalı"}; puan {settings.includeRatings === false ? "kapalı" : "açık"}, favori {settings.includeFavorites === false ? "kapalı" : "açık"}, ilerleme {settings.includeProgress === false ? "kapalı" : "açık"}, not {settings.usePersonalNotes ? "açık" : "kapalı"}.</li></ul>}</section>;
+}

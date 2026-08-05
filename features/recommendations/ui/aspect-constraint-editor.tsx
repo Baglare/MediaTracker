@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { ASPECT_IDS, ASPECT_REGISTRY, normalizeAspectAlias, type AspectId } from "../domain/aspect-registry";
 import type { AspectConstraint } from "../domain/constraints";
-import { DEFAULT_AVOID_REJECT_LEVEL } from "../domain/constraints";
+import { DEFAULT_AVOID_REJECT_LEVEL, DEFAULT_MUST_MINIMUM_LEVEL } from "../domain/constraints";
 
 const ROLE_LABEL = { must: "Zorunlu", prefer: "Tercih", avoid: "Kaçınılacak" } as const;
 const GROUP_LABEL = { core: "Tür ve anlatı", narrative: "Tema", relationship: "İlişki", tone_content: "Ton ve içerik", experience: "Deneyim" } as const;
@@ -23,7 +23,7 @@ export function AspectConstraintEditor({ constraints, onChange }: { constraints:
 
   function add(id: AspectId) {
     const role = String(ASPECT_REGISTRY[id].mustSafety) === "unsafe" ? "prefer" : "must";
-    onChange([...constraints, { id: `ui:${id}`, kind: "aspect", aspectId: id, role, source: "explicit", minimumLevel: "significant" }]);
+    onChange([...constraints, { id: `ui:${id}`, kind: "aspect", aspectId: id, role, source: "explicit", minimumLevel: DEFAULT_MUST_MINIMUM_LEVEL }]);
     setSearch("");
   }
 
@@ -34,7 +34,7 @@ export function AspectConstraintEditor({ constraints, onChange }: { constraints:
       || (role === "avoid" && String(entry.avoidSafety) === "unsafe")) return;
     const next: AspectConstraint = {
       id: current.id, kind: "aspect", aspectId: current.aspectId, role, source: "explicit",
-      ...(role === "avoid" ? { rejectAtLevel: current.rejectAtLevel ?? DEFAULT_AVOID_REJECT_LEVEL } : { minimumLevel: current.minimumLevel ?? "significant" }),
+      ...(role === "avoid" ? { rejectAtLevel: current.rejectAtLevel ?? DEFAULT_AVOID_REJECT_LEVEL } : { minimumLevel: current.minimumLevel ?? DEFAULT_MUST_MINIMUM_LEVEL }),
     };
     onChange(constraints.map((item, i) => i === index ? next : item));
   }
@@ -60,13 +60,14 @@ export function AspectConstraintEditor({ constraints, onChange }: { constraints:
           <option value="prefer">{ROLE_LABEL.prefer}</option>
           <option value="avoid" disabled={String(entry.avoidSafety) === "unsafe"}>{ROLE_LABEL.avoid}</option>
         </select>
-        <select aria-label={`${entry.labelTr} eşiği`} value={constraint.role === "avoid" ? constraint.rejectAtLevel ?? DEFAULT_AVOID_REJECT_LEVEL : constraint.minimumLevel ?? "significant"} onChange={(event) => updateLevel(index, event.target.value as "primary" | "significant" | "incidental")} className="rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs">
+        <select aria-label={`${entry.labelTr} eşiği`} value={constraint.role === "avoid" ? constraint.rejectAtLevel ?? DEFAULT_AVOID_REJECT_LEVEL : constraint.minimumLevel ?? DEFAULT_MUST_MINIMUM_LEVEL} onChange={(event) => updateLevel(index, event.target.value as "primary" | "significant" | "incidental")} className="rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs">
           <option value="incidental">{constraint.role === "avoid" ? "İkincil ve üzerini çıkar" : "İkincil veya daha güçlü"}</option>
           <option value="significant">{constraint.role === "avoid" ? "Belirgin ve üzerini çıkar" : "Belirgin veya ana unsur"}</option>
-          <option value="primary">{constraint.role === "avoid" ? "Yalnız ana unsursa çıkar" : "Ana unsur"}</option>
+          <option value="primary">{constraint.role === "avoid" ? "Yalnız ana unsursa çıkar" : "Yalnız ana unsur"}</option>
         </select>
         <span className="text-[10px] text-zinc-500">{constraint.source === "explicit" ? "Kullanıcının açık isteği" : constraint.source === "profile" ? "Profil tercihi" : "Sistem çıkarımı"}</span>
         <button type="button" aria-label={`${entry.labelTr} koşulunu kaldır`} onClick={() => onChange(constraints.filter((_, i) => i !== index))} className="ml-auto px-2 text-xs text-zinc-500 hover:text-zinc-200">Kaldır</button>
+        {constraint.role === "must" && <p className="w-full text-[10px] text-zinc-500">{(constraint.minimumLevel ?? DEFAULT_MUST_MINIMUM_LEVEL) === "primary" ? "Yalnız ana unsur düzeyi kabul edilir." : "Belirgin veya ana unsur düzeyi kabul edilir."}</p>}
         {entry.limitationNoteTr && <p className="w-full text-[10px] text-amber-300/70">{entry.limitationNoteTr}</p>}
       </div>;
     })}

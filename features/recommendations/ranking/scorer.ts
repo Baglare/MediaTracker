@@ -12,6 +12,7 @@ import type { RecommendationFeedbackEventV2 } from "../feedback";
 import { evaluateExplicitRequestCoverage } from "./request-relevance";
 
 const CONFIDENCE_VALUE = { unknown: 0, low: 0.35, medium: 0.7, high: 1 } as const;
+const LEVEL_VALUE = { unknown: -1, absent: 0, incidental: 1, significant: 2, primary: 3 } as const;
 
 function quality(snapshot: CandidateProviderEvidenceSnapshot): number {
   const score = snapshot.objectiveMetadata.communityScore;
@@ -39,6 +40,33 @@ function evidenceConfidence(request: RecommendationRequestV2, evidence: Readonly
   return positiveConstraints.reduce((sum, constraint) => sum + CONFIDENCE_VALUE[evidence.get(constraint.aspectId)?.confidence ?? "unknown"], 0) / positiveConstraints.length;
 }
 
+function rejectionReason(input: {
+  request: RecommendationRequestV2;
+  aspectEvidence: ReadonlyMap<AspectId, AspectEvidence>;
+  aspectDecisions: readonly import("../domain/policies").ConstraintDecision[];
+  objectiveDecisions: readonly import("./types").ObjectiveConstraintDecision[];
+}): string {
+  const failedMust = input.request.aspectConstraints.find((constraint) => constraint.role === "must"
+    && input.aspectDecisions.some((decision) => decision.constraintId === constraint.id && !decision.passed));
+  if (failedMust) {
+    const evidence = input.aspectEvidence.get(failedMust.aspectId);
+    if (evidence && evidence.level !== "unknown" && failedMust.minimumLevel
+      && LEVEL_VALUE[evidence.level] < LEVEL_VALUE[failedMust.minimumLevel]) {
+      return failedMust.aspectId === "romance"
+        ? "candidates_failed_romance_strength"
+        : "candidates_failed_aspect_strength";
+    }
+    return "candidates_failed_confidence";
+  }
+  if (input.aspectDecisions.some((decision) => decision.outcome === "triggered_avoid")) {
+    return "candidates_failed_avoid";
+  }
+  if (input.objectiveDecisions.some((decision) => !decision.passed)) {
+    return "candidates_failed_objective";
+  }
+  return "constraint_failed";
+}
+
 export function scoreEligibleCandidates(input: {
   request: RecommendationRequestV2;
   candidates: readonly { candidate: AiCandidate; snapshot: CandidateProviderEvidenceSnapshot; aspectEvidence: ReadonlyMap<AspectId, AspectEvidence> }[];
@@ -60,7 +88,7 @@ export function scoreEligibleCandidates(input: {
     const objectiveEligible = objectiveDecisionsAllowPrimary(objectiveDecisions);
     const explicitCoverage = evaluateExplicitRequestCoverage({ request: input.request, evidence: item.aspectEvidence });
     if (!aspectEligibility.eligibleForPrimary || !objectiveEligible) {
-      const reason = [...aspectDecisions, ...objectiveDecisions].find((decision) => !decision.passed)?.outcome ?? "constraint_failed";
+      const reason = rejectionReason({ request: input.request, aspectEvidence: item.aspectEvidence, aspectDecisions, objectiveDecisions });
       if (aspectEligibility.eligibleForNearMatch && objectiveEligible && explicitCoverage.meetsMinimum && !hasExactLibraryIdentity(item.snapshot, input.mediaItems)) {
         const breakdown = {
           requestFit: requestFit(aspectDecisions, objectiveDecisions),
@@ -79,7 +107,7 @@ export function scoreEligibleCandidates(input: {
       continue;
     }
     if (!explicitCoverage.meetsMinimum) {
-      rejected.push({ title: item.candidate.title, reason: "explicit_request_evidence_missing" });
+      rejected.push({ title: item.candidate.title, reason: "candidates_below_request_coverage" });
       continue;
     }
     const breakdown = {

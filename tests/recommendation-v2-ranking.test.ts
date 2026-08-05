@@ -26,13 +26,13 @@ describe("D6-3 deterministic eligibility and ranking", () => {
   it("must aspect ihlalini popularity yüksek olsa da scored listeye sokmaz", () => {
     const result = scoreEligibleCandidates({ request, candidates: [rankable("bad", 0.3, 99), rankable("good", 0.65, 60)], mediaItems: [], feedback: [] });
     expect(result.scored.map((item) => item.candidate.externalId)).toEqual(["good"]);
-    expect(result.rejected).toContainEqual({ title: "Anime bad", reason: "failed_must" });
+    expect(result.rejected).toContainEqual({ title: "Anime bad", reason: "candidates_failed_romance_strength" });
   });
 
   it("unknown must primary sonuçtan elenir", () => {
     const result = scoreEligibleCandidates({ request, candidates: [rankable("unknown", null)], mediaItems: [], feedback: [] });
     expect(result.scored).toEqual([]);
-    expect(result.rejected[0]?.reason).toBe("unknown");
+    expect(result.rejected[0]?.reason).toBe("candidates_failed_confidence");
   });
 
   it("aynı girdide deterministik sıra üretir", () => {

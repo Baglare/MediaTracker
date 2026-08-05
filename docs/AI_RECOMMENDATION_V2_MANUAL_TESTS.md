@@ -31,6 +31,14 @@
 4. “Daha kısa olsun”, “Romantizmi daha güçlü olsun”, “Aşk üçgeni olanları çıkar”, “Bunlar yerine manga öner” takiplerini sırayla çözümle; önceki explicit must'ın açıkça değiştirilmedikçe kaldığını doğrula.
 5. **Yeni konu** ile taslak/near-match/context'in temizlendiğini, owner feedback'inin kaldığını doğrula.
 
+## D6-5.2 Romance evidence ve mesaj regresyonu
+
+1. “Anime önerisi istiyorum. Güçlü romantizm öğeleri olsun ama aşk üçgeni olmasın.” isteğini çözümle. Romance minimum seviyesi **Yalnız ana unsur**, love triangle **Kaçınılacak** görünmeli.
+2. Romance seviyesini **Belirgin veya ana unsur** yapıp Balanced çalıştır. Genre-only `significant/medium` fixture primary olabilir; Strict aynı medium-confidence fixture'ı elemelidir.
+3. Exploratory + **Yalnız ana unsur** ile significant/incidental romance fixture'larının yalnız near-match'te ve gerçek ihlal metniyle gösterildiğini; unknown/popüler fixture'ın gösterilmediğini doğrula.
+4. Parse → Önerileri bul → retry → reload akışında kullanıcı iletisinin bir kez göründüğünü doğrula. Aynı cümleyi yeni bir gönderim olarak tekrar yazmanın ayrı mesaj olduğunu kontrol et.
+5. Near-match kartında kapak, okunabilir başlık, medya/provider, confidence, Quick Add/Discover ve İlgilenmiyorum aksiyonlarını; ham tag rank/score/reason code olmadığını kontrol et.
+
 ## Owner, responsive ve hata
 
 1. Owner A taslağı açıkken Owner B'ye geç; eski taslak/sonucun tek frame görünmediğini doğrula.

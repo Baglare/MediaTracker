@@ -41,7 +41,7 @@ export function patchRecommendationRequest(previous: RecommendationRequestV2, fo
   }
   if (/romanti.*(art[ıi]r|g[üu][cç]l[üu]|daha\s+fazla)/i.test(followUpText)
     && !followUpAspects.some((constraint) => constraint.aspectId === "romance")) {
-    followUpAspects.push({ id: "followup:romance:must", kind: "aspect", aspectId: "romance", role: "must", source: "explicit", minimumLevel: "significant" });
+    followUpAspects.push({ id: "followup:romance:must", kind: "aspect", aspectId: "romance", role: "must", source: "explicit", minimumLevel: "primary" });
   }
   if (/fantasti.*(şart\s+değil|sart\s+degil|zorunlu\s+değil|zorunlu\s+degil)/i.test(followUpText)) {
     followUpAspects = followUpAspects.filter((constraint) => constraint.aspectId !== "fantasy");

@@ -1,6 +1,6 @@
 # AI Recommendation V2 — D6 Kabul Raporu
 
-> Durum: D6-0–D6-5 kod ve sentetik sözleşme kapsamı tamamlandı. Bu ifade canlı provider/verifier kalite garantisi veya production-ready iddiası değildir.
+> Durum: D6-0–D6-5.2 kod ve sentetik sözleşme kapsamı tamamlandı; final yeniden doğrulama kapısı açıktır. Bu ifade canlı provider/verifier kalite garantisi veya production-ready iddiası değildir.
 
 ## Kabul özeti
 
@@ -41,5 +41,16 @@ Provider evidence cache yalnız public metadata içerir; `ownerId`, `userId`, ra
 ## Bilinen sınırlar ve D7 kapısı
 
 Sentetik seed'ler sözleşme ve metric matematiğini doğrular; öneri kalitesini ölçmez. Aspect threshold, confidence ve ranking ağırlıkları ancak snapshot'lanmış provider örnekleri ve insan etiketli gold set ile D7'de değerlendirilebilir. D8 deployment, production provider secret/rate-limit, auth iki-owner ve production cutover kapıları bu kabulün dışındadır.
+
+## D6-5.2 ek kabul — 5 Ağustos 2026
+
+- Romance claim hattı trace edildi: parser → approved request → AniList Romance discover → genre/tag claim → aggregation → eligibility zinciri fixture'larla doğrulandı.
+- Genre-only Romance `significant/medium`; genre + orta tag `significant/high`; genre + yüksek tag `primary/high`; low tag-only `incidental`; claim yoksa `unknown` üretir.
+- Balanced registry-strong structured genre baseline'ını kabul eder; Strict medium confidence'ı kabul etmez. Popularity/community/personal fit must ihlalini telafi etmez.
+- UI primary/significant minimum seviyesini Türkçe ve editable gösterir; legacy/session missing level `significant` canonicalize edilir.
+- Interpret mesajın tek history sahibidir. Production browser parse ve reload boyunca mesaj bir kez göründü; aynı metin yeni stable ID ile tekrar yazılabilir.
+- Primary/near-match ortak header kullanır; near-match fixture'ı ihlal ve confidence read-model'ini raw code/score göstermeden taşır.
+- Lint, build ve `git diff --check` temiz; 1646 testin 1612'si geçti, 34 koşullu test skip. Beş viewport'ta overflow ve console error görülmedi.
+- `D6_PROVIDER_LIVE_SMOKE` kapalıydı; live provider trace ve live near-match kalite kabulü skip edildi. Bu durum D7 kalite kalibrasyonunu ikame etmez.
 
 İlgili belgeler: [Mimari](AI_RECOMMENDATION_V2_ARCHITECTURE.md), [Domain](AI_RECOMMENDATION_V2_DOMAIN.md), [Provider](AI_RECOMMENDATION_V2_PROVIDER_ENRICHMENT.md), [Ranking](AI_RECOMMENDATION_V2_RANKING.md), [UI ve Feedback](AI_RECOMMENDATION_V2_UI_AND_FEEDBACK.md), [Evaluation](AI_RECOMMENDATION_EVALUATION_CONTRACT.md), [Manuel testler](AI_RECOMMENDATION_V2_MANUAL_TESTS.md).

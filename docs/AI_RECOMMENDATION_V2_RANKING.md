@@ -1,6 +1,6 @@
 # AI Recommendation V2 — Evidence, Eligibility ve Deterministik Ranking
 
-> Durum: D6-3 deterministik baseline D6-5.1 manuel relevance düzeltmeleriyle korunur. Öncelik tuple'ı değiştirilmedi; D7 kalibrasyonu başlamamıştır. [Manuel düzeltmeler](AI_RECOMMENDATION_V2_D64_MANUAL_FIXES.md) · [Evaluation](AI_RECOMMENDATION_EVALUATION_CONTRACT.md)
+> Durum: D6-3 deterministik baseline D6-5.1 relevance ve D6-5.2 Romance evidence düzeltmeleriyle korunur. Öncelik tuple'ı değiştirilmedi; D7 kalibrasyonu başlamamıştır. [D6-5.2 Romance evidence](AI_RECOMMENDATION_V2_D65_ROMANCE_EVIDENCE.md) · [Evaluation](AI_RECOMMENDATION_EVALUATION_CONTRACT.md)
 
 ## 1. Çalışan akış
 
@@ -46,6 +46,8 @@ Raw provider claim reliability değeri aspect strength değildir. [`claim-normal
 Katkı `source base × claim reliability × provider support × tag-rank factor` ile hesaplanır. Aynı provider/source/field/normalized value/aspect claim'i bir kez sayılır. En güçlü dört bağımsız katkı bounded noisy-or ile birleşir; sonuç `0.95` ile, provider support da `strong=0.90`, `partial=0.74`, `experimental=0.49`, `unsupported=0` ile sınırlıdır.
 
 Bu sayılar D6 baseline sabitleridir; D7 gold label olmadan aspect/provider bazında değiştirilmez.
+
+AniList Romance için registry-driven structured policy bu genel eşikleri değiştirmeden ek bir yorum uygular: genre-only `significant/medium` tabanı; genre + orta tag `significant`, genre + yüksek tag `primary` tabanı. Exact başlangıç sabitleri tek aggregation modülündedir. Balanced, registry `strong` ve güvenilir structured genre baseline'ını kabul eder; Strict high-confidence varsayımını korur. Ayrıntı: [D6-5.2 Romance Evidence](AI_RECOMMENDATION_V2_D65_ROMANCE_EVIDENCE.md).
 
 ### Unknown ve absent
 

@@ -6,6 +6,7 @@ import { MediaItem, ProgressLog, MediaType } from "@/lib/types";
 import { GlobalSearchResult } from "@/lib/global-search-types";
 import type { RecommendationRequestV2 } from "@/features/recommendations/domain/codec";
 import type { RecommendationFeedbackEventV2 } from "@/features/recommendations/feedback";
+import type { SemanticVerifierMode } from "@/features/recommendations/domain/types";
 
 export interface AiSettings {
   useProfile: boolean;
@@ -275,6 +276,7 @@ export interface AiEngineStatus {
   feedbackApplied: boolean;
   feedbackEventCount: number;
   persistentCache: AiPersistentCacheStatus;
+  semanticVerifierMode?: SemanticVerifierMode;
 }
 
 export type RecommendationFeedbackAction =
