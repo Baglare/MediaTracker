@@ -21,6 +21,7 @@
 | D6-3 | **Tamamlandı:** aggregation, hard filter, deterministik ranking ve grounded explanation | V2 ranking baseline authoritative external recommendation yolu oldu. |
 | D6-4 | Tamamlandı: düzenlenebilir constraints, strictness, reason feedback, near-match UI | Kullanıcı kontrolü ve şeffaflık açıldı; V1 additive compatibility korundu. |
 | D6-5 | **Tamamlandı:** regresyon, privacy/performance guardrail, docs ve D7 fixture sözleşmesi | D6 stabilizasyonu; live provider flag yoksa skip açıkça raporlanır. |
+| D6-5.1 | Manuel kabul düzeltmeleri: avoid, explicit relevance, romance retrieval, kart/metin ve güvenli cleanup | D6-3 sort önceliği korunur; fixture/browser kabulü yeniden çalıştırılır. |
 | D7 | Offline kalite değerlendirmesi, kalibrasyon ve karşılaştırmalı deneyler | D6 baseline ölçülmeden model/LLM deneyi üretime alınmaz. |
 
 ## D6-1 — Ortak domain ve compatibility temeli

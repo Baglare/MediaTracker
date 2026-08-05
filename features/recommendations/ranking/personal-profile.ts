@@ -1,6 +1,6 @@
 import type { RecommendationFeedbackEvent } from "@/lib/ai/types";
 import type { MediaItem } from "@/lib/types";
-import { ASPECT_IDS, findAspectByAlias, normalizeAspectAlias, type AspectId } from "../domain/aspect-registry";
+import { ASPECT_IDS, findAspectByAlias, type AspectId } from "../domain/aspect-registry";
 import type { CandidateProviderEvidenceSnapshot } from "../providers/types";
 import type { RecommendationFeedbackEventV2 } from "../feedback";
 
@@ -59,10 +59,12 @@ export function calculatePersonalFit(input: {
   aspectEvidence: ReadonlyMap<AspectId, import("../domain/evidence").AspectEvidence>;
   feedback: readonly RecommendationFeedbackEvent[];
   feedbackV2?: readonly RecommendationFeedbackEventV2[];
+  suppressedAspectIds?: ReadonlySet<AspectId>;
 }): number {
   let total = 0;
   let weight = 0;
   for (const id of ASPECT_IDS) {
+    if (input.suppressedAspectIds?.has(id)) continue;
     const evidence = input.aspectEvidence.get(id);
     if (!evidence || evidence.strength === null) continue;
     const preference = Math.min(2, input.profile.loved.get(id) ?? 0) * 0.45
@@ -78,6 +80,7 @@ export function calculatePersonalFit(input: {
   for (const event of input.feedbackV2 ?? []) {
     if (event.reasonCode === "not_interested_now" || event.reasonCode === "already_known") continue;
     for (const id of event.aspectIds) {
+      if (input.suppressedAspectIds?.has(id)) continue;
       const evidence = input.aspectEvidence.get(id);
       if (!evidence || evidence.strength === null) continue;
       const negative = ["weak_requested_aspect", "too_much_aspect", "wrong_tone", "love_triangle", "fanservice", "violence_gore"].includes(event.reasonCode ?? "");
@@ -94,8 +97,4 @@ export function hasExactLibraryIdentity(snapshot: CandidateProviderEvidenceSnaps
     if (item.imdbId && identity.secondaryIds.some((id) => id.kind === "imdb" && id.externalId === item.imdbId)) return true;
     return false;
   });
-}
-
-export function normalizedExactTitle(value: string): string {
-  return normalizeAspectAlias(value);
 }

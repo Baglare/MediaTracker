@@ -15,6 +15,14 @@
 5. **Önerileri bul** de; primary kartta ham score/tag rank/yüzde olmadığını, Quick Add/Discover'ın çalıştığını doğrula.
 6. Keşifçi modda near-match varsa ayrı, kapalı bölümde ve en fazla üç sonuç olduğunu; must ihlalinin açık yazıldığını doğrula.
 
+## D6-5.1 relevance regresyonları
+
+1. `love_triangle` constraint'ini **Kaçınılacak** yap. Varsayılan eşik “İkincil ve üzerini çıkar” olmalı; incidental+medium aday primary'ye girmemeli ve “Aşk üçgeni eşleşmesi” etiketi oluşmamalı.
+2. Yalnız romance must + exploratory çalıştır. Güçlü/ranked Romance evidence primary, incidental kanıt near-match olabilir; tamamen unknown aday gösterilmemeli. `conditional_must_requires_evidence:romance` yerine Türkçe açıklama görünmeli.
+3. Romance prefer isteğinde romance evidence'i bulunmayan yüksek community-score adayın yalnız puanıyla listeye girmediğini doğrula.
+4. Community değerinin `AniList topluluk puanı: 7.0/10` gibi açık provider/ölçek taşıdığını doğrula.
+5. “A Dark Rabbit Has Seven Lives Picture Drama”, “Thunderbolt Fantasy: Sword Travels in the East”, “Is It Wrong to Try to Pick Up Girls in a Dungeon?” ve uzun kitap/TV sezon başlıklarını poster, fit badge, evidence ve aksiyonlarla kontrol et. Başlık iki satır olmalı; hover veya keyboard focus sırasında açılmalı ve kelimeler karakter karakter bölünmemeli.
+
 ## Feedback ve takip
 
 1. Bir öneride **İlgilenmiyorum** de; kartın reason seçmeden gizlendiğini doğrula.

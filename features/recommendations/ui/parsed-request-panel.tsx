@@ -5,6 +5,7 @@ import { decodeRecommendationRequestV2, type RecommendationRequestV2 } from "../
 import { AspectConstraintEditor } from "./aspect-constraint-editor";
 import { ObjectiveConstraintEditor } from "./objective-constraint-editor";
 import { StrictnessSelector } from "./strictness-selector";
+import { userFacingRecommendationWarning } from "./user-facing-text";
 
 export function ParsedRequestPanel({ request, warnings, onChange }: { request: RecommendationRequestV2; warnings?: readonly string[]; onChange: (request: RecommendationRequestV2) => void }) {
   const [error, setError] = useState<string | null>(null);
@@ -30,7 +31,7 @@ export function ParsedRequestPanel({ request, warnings, onChange }: { request: R
         objectiveConstraints: request.objectiveConstraints.map((constraint) => constraint.field === "media_type" ? { ...constraint, value: targetMediaTypes[0] } : constraint),
       })}
     />
-    {warnings?.length ? <p className="text-[11px] text-amber-300/80">{warnings.join(" · ")}</p> : null}
+    {warnings?.length ? <p className="text-[11px] text-amber-300/80">{[...new Set(warnings.map(userFacingRecommendationWarning))].join(" · ")}</p> : null}
     {error && <p role="alert" className="text-xs text-red-300">{error}</p>}
   </section>;
 }

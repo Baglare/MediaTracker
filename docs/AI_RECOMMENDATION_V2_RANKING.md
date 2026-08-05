@@ -1,6 +1,6 @@
 # AI Recommendation V2 — Evidence, Eligibility ve Deterministik Ranking
 
-> Durum: D6-3 deterministik baseline D6-5 regresyon kabulünden geçti. Öncelik tuple'ı değiştirilmedi; D7 kalibrasyonu başlamamıştır. [Kabul](AI_RECOMMENDATION_V2_ACCEPTANCE.md) · [Evaluation](AI_RECOMMENDATION_EVALUATION_CONTRACT.md)
+> Durum: D6-3 deterministik baseline D6-5.1 manuel relevance düzeltmeleriyle korunur. Öncelik tuple'ı değiştirilmedi; D7 kalibrasyonu başlamamıştır. [Manuel düzeltmeler](AI_RECOMMENDATION_V2_D64_MANUAL_FIXES.md) · [Evaluation](AI_RECOMMENDATION_EVALUATION_CONTRACT.md)
 
 ## 1. Çalışan akış
 
@@ -23,6 +23,7 @@ Authoritative çağrı [`runDeterministicRecommendationV2`](../features/recommen
 - Explicit must bütün strictness modlarında must kalır.
 - Provider desteği `unsupported/experimental` veya registry `mustSafety=unsafe` ise otomatik hard karar uydurulmaz; constraint `prefer` olur ve warning taşır.
 - Retrieval planning sinyalleri yalnız `inferred` kaynaktır ve explicit constraint'i ezmez.
+- Kullanıcıca onaylanmış structured request, provider retrieval planının hedeflerini ve pozitif/avoid sinyallerini guardrail ile yeniden sabitler; provider clarification veya eski mesaj metni bu kararı silemez. AniList hedefinde core/strong registry kaydı olan pozitif constraint'ler structured discover genre filtresine, episode limiti de `episodesLesser` filtresine taşınır.
 - Reference yalnız exact provider + external ID ile `verified` olur. Title-only/fuzzy eşleşme `unresolved` kalır.
 - Medya türü, length, release status/year, format, language ve country objective constraint'tir; aspect registry'ye gömülmez.
 
@@ -67,11 +68,12 @@ Objective evaluator [`objective-filters.ts`](../features/recommendations/ranking
 
 - Must seviye/confidence koşulu karşılanmıyorsa aday scored listeye girmez.
 - Must evidence `unknown` ise aday elenir; popularity veya personal fit bunu telafi edemez.
-- Güvenilir `avoid` eşiği tetiklenirse aday elenir.
+- Yeni veya legacy eşiksiz `avoid` için varsayılan `rejectAtLevel=incidental` değeridir. Incidental veya daha güçlü medium/high-confidence kanıt primary adayı eler.
 - Düşük güvenli avoid, primary sonucu otomatik elemez; warning/risk taşır.
-- Prefer eligibility değiştirmez, yalnız request-fit boyutuna katkı verir.
+- Avoid kararı `requestFit`, `evidenceConfidence`, fit etiketi, olumlu açıklama veya aspect kaynaklı `personalFit` bonusu üretmez.
+- Prefer tek başına hard must değildir. Ancak en az bir explicit pozitif aspect bulunan istekte adayın bu explicit aspect'lerden en az biriyle incidental veya daha güçlü, supporting kanıtlı ilişkisi yoksa minimum relevance kapısını geçemez.
 - Objective must'ta metadata yoksa sonuç `unknown` ve hard fail'dir.
-- Exploratory near-match domain contract'ı korunur; D6-3 public response'ta primary listeyle karıştırılmaz. Near-match UI D6-4'tedir.
+- Exploratory modda must veya güvenilir avoid ihlali primary'ye girmez; kanıtlı ihlal en fazla üç öğelik ayrı near-match listesinde açıkça gösterilebilir. Tamamen kanıtsız explicit-aspect adayı near-match'e zorla eklenmez.
 
 ## 5. Personal fit
 
@@ -89,7 +91,8 @@ Her eligible aday ayrı boyutlar taşır:
 
 | Boyut | Aralık | Kullanım |
 |---|---:|---|
-| `requestFit` | 0–1 | Must/prefer/avoid ve objective karar sonucu. |
+| `requestFit` | 0–1 | Pozitif must/prefer ve objective karar sonucu; avoid pozitif katkı değildir. |
+| `explicitRequestCoverage` | 0–1 | Açık pozitif aspect'lerden kanıtlı olarak kapsanan oran; sort tuple'ına yeni öncelik eklemez, minimum relevance kapısıdır. |
 | `personalFit` | -1–1 | Explicit beğeni/tüketim/avoid ve exact feedback. |
 | `evidenceConfidence` | 0–1 | İstekle ilgili aspect confidence. |
 | `qualitySignal` | 0–1 | Community score ağırlıklı; popularity sınırlı katkı. |
@@ -122,6 +125,8 @@ Bu tuple hard-filter sonrasında uygulanır. Quality/popularity yalnız daha gü
 - Supporting claim'de provider varsa kaynak adı gösterilir.
 - Kanıt yoksa kesin olumlu/olumsuz aspect iddiası üretilmez.
 - Spoiler raw tag açıklama metnine taşınmaz.
+- Avoid aspect olumlu `fitLabel`, evidence chip veya “Neden önerildi” maddesi olamaz; yalnız risk/ihlal yüzeyinde görünür.
+- Community score provider adı ve ölçeğiyle (`AniList topluluk puanı: 7.0/10`) gösterilir; AI relevance skoru değildir.
 
 Baseline tamamen template-driven'dır. Opsiyonel LLM wording daha sonra eklenirse aynı evidence payload'a bağlı kalmalı; yeni fact, title, aspect veya sıra üretemez.
 

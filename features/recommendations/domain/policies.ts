@@ -1,5 +1,6 @@
 import type { AspectEvidence } from "./evidence";
 import type { AspectConstraint, LengthConstraint } from "./constraints";
+import { DEFAULT_AVOID_REJECT_LEVEL } from "./constraints";
 import { aspectConstraintKey } from "./constraints";
 import type { VerifiedRecommendationIdentity } from "./providers";
 import type {
@@ -73,6 +74,12 @@ function hasMultipleIndependentSupportingClaims(evidence: AspectEvidence): boole
   return keys.size >= 2;
 }
 
+function hasStrongRankedProviderTag(evidence: AspectEvidence): boolean {
+  return LEVEL_RANK[evidence.level] >= LEVEL_RANK.significant
+    && evidence.supportingEvidence.some((claim) => claim.sourceKind === "provider_tag_rank"
+      && (claim.reliability ?? 0) >= 0.85);
+}
+
 function confidenceMeetsMust(
   constraint: AspectConstraint,
   evidence: AspectEvidence,
@@ -84,7 +91,7 @@ function confidenceMeetsMust(
   if (evidence.confidence === "high") return true;
   if (strictness !== "strict"
     && evidence.confidence === "medium"
-    && hasMultipleIndependentSupportingClaims(evidence)) return true;
+    && (hasMultipleIndependentSupportingClaims(evidence) || hasStrongRankedProviderTag(evidence))) return true;
   return false;
 }
 
@@ -138,7 +145,7 @@ export function evaluateConstraintEligibility(args: {
   }
 
   if (constraint.role === "avoid") {
-    const thresholdReached = LEVEL_RANK[evidence.level] >= LEVEL_RANK[constraint.rejectAtLevel ?? "significant"];
+    const thresholdReached = LEVEL_RANK[evidence.level] >= LEVEL_RANK[constraint.rejectAtLevel ?? DEFAULT_AVOID_REJECT_LEVEL];
     if (!thresholdReached) {
       return decision(constraint, evidence, true, "passed", ["Avoid eşiği tetiklenmedi."]);
     }
@@ -177,9 +184,9 @@ export function canEnterNearMatches(
   decisions: readonly ConstraintDecision[],
 ): boolean {
   if (strictness !== "exploratory" || canEnterPrimaryResults(decisions)) return false;
-  const hasMustFailure = decisions.some((item) => item.role === "must" && !item.passed);
-  const hasReliableAvoidViolation = decisions.some((item) => item.outcome === "triggered_avoid");
-  return hasMustFailure && !hasReliableAvoidViolation;
+  return decisions.some((item) => item.outcome === "failed_must"
+    || (item.role === "must" && item.outcome === "unknown")
+    || item.outcome === "triggered_avoid");
 }
 
 export function buildCandidateEligibility(

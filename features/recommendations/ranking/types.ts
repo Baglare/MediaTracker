@@ -15,6 +15,7 @@ export interface ObjectiveConstraintDecision {
 
 export interface RecommendationScoreBreakdown {
   requestFit: number;
+  explicitRequestCoverage: number;
   personalFit: number;
   evidenceConfidence: number;
   qualitySignal: number;
@@ -28,6 +29,7 @@ export interface ScoredRecommendationCandidate {
   aspectEvidence: ReadonlyMap<AspectId, AspectEvidence>;
   aspectDecisions: readonly import("../domain/policies").ConstraintDecision[];
   objectiveDecisions: readonly ObjectiveConstraintDecision[];
+  explicitRequestCoverage: import("./request-relevance").ExplicitRequestCoverage;
   scoreBreakdown: RecommendationScoreBreakdown;
   deterministicSortKey: readonly [number, number, number, number, number, string];
   warnings: readonly string[];

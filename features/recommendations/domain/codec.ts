@@ -9,6 +9,7 @@ import { validateStrengthLevelPair } from "./aspect-strength";
 import {
   canonicalizeAspectConstraints,
   canonicalizeObjectiveConstraints,
+  DEFAULT_AVOID_REJECT_LEVEL,
   type AspectConstraint,
   type LengthConstraint,
   type ObjectiveConstraint,
@@ -355,7 +356,8 @@ export function decodeAspectConstraint(value: unknown, path = "constraint"): Rec
   const minimumLevel = value.minimumLevel === undefined
     ? undefined : asEnum(value.minimumLevel, ASPECT_STRENGTH_LEVELS.filter((item) => item !== "unknown"));
   const rejectAtLevel = value.rejectAtLevel === undefined
-    ? undefined : asEnum(value.rejectAtLevel, ["primary", "significant", "incidental"] as const);
+    ? role === "avoid" ? DEFAULT_AVOID_REJECT_LEVEL : undefined
+    : asEnum(value.rejectAtLevel, ["primary", "significant", "incidental"] as const);
   const minimumConfidence = value.minimumConfidence === undefined
     ? undefined : asEnum(value.minimumConfidence, ["high", "medium", "low"] as const);
   const rationale = value.rationale === undefined ? undefined : nonEmptyString(value.rationale, 500);

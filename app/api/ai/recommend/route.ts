@@ -58,6 +58,7 @@ import {
 } from "@/features/recommendations/orchestration";
 import { decodeRecommendationRequestV2 } from "@/features/recommendations/domain/codec";
 import { decodeRecommendationFeedbackEventV2 } from "@/features/recommendations/feedback";
+import { applyStructuredRequestToRetrievalPlan } from "@/features/recommendations/intent/retrieval-guardrails";
 
 export const runtime = "nodejs";
 
@@ -1300,7 +1301,10 @@ export async function POST(req: NextRequest) {
     }
 
     retrievalPlan = retrievalPlan || buildFallbackRetrievalPlan(message, intent);
-    retrievalPlan = applyIntentGuardrails(retrievalPlan, intent, message, deterministicTaste);
+    retrievalPlan = applyStructuredRequestToRetrievalPlan(
+      applyIntentGuardrails(retrievalPlan, intent, message, deterministicTaste),
+      structuredRequest?.ok ? structuredRequest.value : undefined,
+    );
 
     if (!providerPlanSucceeded && (intent.kind === "reference_based" || intent.kind === "cross_media_translation")) {
       deterministicFallbackUsed =
@@ -1354,7 +1358,10 @@ export async function POST(req: NextRequest) {
   ) {
     const deterministicPlan = buildDeterministicFallbackPlan(intent, deterministicTaste);
     if (deterministicPlan) {
-      retrievalPlan = applyIntentGuardrails(deterministicPlan, intent, message, deterministicTaste);
+      retrievalPlan = applyStructuredRequestToRetrievalPlan(
+        applyIntentGuardrails(deterministicPlan, intent, message, deterministicTaste),
+        structuredRequest?.ok ? structuredRequest.value : undefined,
+      );
       searchResult = await getCandidates({
         intent,
         retrievalPlan,
@@ -1403,7 +1410,10 @@ export async function POST(req: NextRequest) {
         settings,
       });
       if (refinedPlan && !refinedPlan.needsClarification) {
-        const guardedRefinedPlan = applyIntentGuardrails(refinedPlan, intent, message, deterministicTaste);
+        const guardedRefinedPlan = applyStructuredRequestToRetrievalPlan(
+          applyIntentGuardrails(refinedPlan, intent, message, deterministicTaste),
+          structuredRequest?.ok ? structuredRequest.value : undefined,
+        );
         const refinedResultRaw = await getCandidates({
           intent,
           retrievalPlan: guardedRefinedPlan,
@@ -1447,7 +1457,7 @@ export async function POST(req: NextRequest) {
   let candidates = searchResult.candidates;
 
   // R37 — "Kaynak API'leriyle öner" modunda harici kaynaklardan ek aday topla.
-  // Sonuçlar mevcut havuza eklenir; ikisi de R36 scorer'ından geçer. Boş/eksik
+  // Sonuçlar mevcut havuza eklenir ve etkin orchestration scoring/ranking yoluna girer. Boş/eksik
   // kaynaklar (TMDB key eksik, OL down vs.) Promise.allSettled ile yutulur,
   // akış durmaz.
   if (researchMode === "source-apis") {
@@ -1457,6 +1467,7 @@ export async function POST(req: NextRequest) {
         profile,
         message,
         scopeMode,
+        structuredRequest: structuredRequest?.ok ? structuredRequest.value : undefined,
       });
       if (sourceApi.candidates.length > 0) {
         const before = candidates.length;
@@ -1488,6 +1499,7 @@ export async function POST(req: NextRequest) {
         profile,
         message,
         scopeMode,
+        structuredRequest: structuredRequest?.ok ? structuredRequest.value : undefined,
       });
       mergeCandidateSearchTelemetry(searchResult, webResearch);
       for (const note of webResearch.notes) debugNotes.push(`r44_${note}`);
@@ -1514,6 +1526,7 @@ export async function POST(req: NextRequest) {
           profile,
           message,
           scopeMode,
+          structuredRequest: structuredRequest?.ok ? structuredRequest.value : undefined,
         });
         mergeCandidateSearchTelemetry(searchResult, sourceApi);
         for (const note of sourceApi.notes) debugNotes.push(`r44_source_api_fallback_${note}`);

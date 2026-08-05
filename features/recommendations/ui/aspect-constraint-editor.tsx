@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { ASPECT_IDS, ASPECT_REGISTRY, normalizeAspectAlias, type AspectId } from "../domain/aspect-registry";
 import type { AspectConstraint } from "../domain/constraints";
+import { DEFAULT_AVOID_REJECT_LEVEL } from "../domain/constraints";
 
 const ROLE_LABEL = { must: "Zorunlu", prefer: "Tercih", avoid: "Kaçınılacak" } as const;
 const GROUP_LABEL = { core: "Tür ve anlatı", narrative: "Tema", relationship: "İlişki", tone_content: "Ton ve içerik", experience: "Deneyim" } as const;
@@ -33,8 +34,16 @@ export function AspectConstraintEditor({ constraints, onChange }: { constraints:
       || (role === "avoid" && String(entry.avoidSafety) === "unsafe")) return;
     const next: AspectConstraint = {
       id: current.id, kind: "aspect", aspectId: current.aspectId, role, source: "explicit",
-      ...(role === "avoid" ? { rejectAtLevel: "significant" } : { minimumLevel: current.minimumLevel ?? "significant" }),
+      ...(role === "avoid" ? { rejectAtLevel: current.rejectAtLevel ?? DEFAULT_AVOID_REJECT_LEVEL } : { minimumLevel: current.minimumLevel ?? "significant" }),
     };
+    onChange(constraints.map((item, i) => i === index ? next : item));
+  }
+
+  function updateLevel(index: number, level: "primary" | "significant" | "incidental") {
+    const current = constraints[index];
+    const next: AspectConstraint = current.role === "avoid"
+      ? { ...current, rejectAtLevel: level }
+      : { ...current, minimumLevel: level };
     onChange(constraints.map((item, i) => i === index ? next : item));
   }
 
@@ -50,6 +59,11 @@ export function AspectConstraintEditor({ constraints, onChange }: { constraints:
           <option value="must" disabled={String(entry.mustSafety) === "unsafe"}>{ROLE_LABEL.must}</option>
           <option value="prefer">{ROLE_LABEL.prefer}</option>
           <option value="avoid" disabled={String(entry.avoidSafety) === "unsafe"}>{ROLE_LABEL.avoid}</option>
+        </select>
+        <select aria-label={`${entry.labelTr} eşiği`} value={constraint.role === "avoid" ? constraint.rejectAtLevel ?? DEFAULT_AVOID_REJECT_LEVEL : constraint.minimumLevel ?? "significant"} onChange={(event) => updateLevel(index, event.target.value as "primary" | "significant" | "incidental")} className="rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs">
+          <option value="incidental">{constraint.role === "avoid" ? "İkincil ve üzerini çıkar" : "İkincil veya daha güçlü"}</option>
+          <option value="significant">{constraint.role === "avoid" ? "Belirgin ve üzerini çıkar" : "Belirgin veya ana unsur"}</option>
+          <option value="primary">{constraint.role === "avoid" ? "Yalnız ana unsursa çıkar" : "Ana unsur"}</option>
         </select>
         <span className="text-[10px] text-zinc-500">{constraint.source === "explicit" ? "Kullanıcının açık isteği" : constraint.source === "profile" ? "Profil tercihi" : "Sistem çıkarımı"}</span>
         <button type="button" aria-label={`${entry.labelTr} koşulunu kaldır`} onClick={() => onChange(constraints.filter((_, i) => i !== index))} className="ml-auto px-2 text-xs text-zinc-500 hover:text-zinc-200">Kaldır</button>

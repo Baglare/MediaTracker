@@ -4,7 +4,7 @@ import {
   normalizeAspectAlias,
   type AspectId,
 } from "../domain/aspect-registry";
-import type { AspectConstraint, ObjectiveConstraint } from "../domain/constraints";
+import { DEFAULT_AVOID_REJECT_LEVEL, type AspectConstraint, type ObjectiveConstraint } from "../domain/constraints";
 import type { RecommendationMediaType } from "../domain/types";
 
 export interface ConstraintExtractionResult {
@@ -82,7 +82,7 @@ function aspectConstraint(id: AspectId, role: "must" | "prefer" | "avoid", sourc
     return { id: `aspect:${id}:${role}:${source}`, kind: "aspect", aspectId: id, role, source, minimumLevel: "significant" };
   }
   if (role === "avoid") {
-    return { id: `aspect:${id}:${role}:${source}`, kind: "aspect", aspectId: id, role, source, rejectAtLevel: "significant" };
+    return { id: `aspect:${id}:${role}:${source}`, kind: "aspect", aspectId: id, role, source, rejectAtLevel: DEFAULT_AVOID_REJECT_LEVEL };
   }
   return { id: `aspect:${id}:${role}:${source}`, kind: "aspect", aspectId: id, role, source, minimumLevel: "incidental" };
 }

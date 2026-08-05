@@ -9,6 +9,7 @@ import { evaluateObjectiveConstraint, objectiveDecisionsAllowPrimary } from "./o
 import { buildPersonalPreferenceProfile, calculatePersonalFit, hasExactLibraryIdentity } from "./personal-profile";
 import type { ScoredRecommendationCandidate } from "./types";
 import type { RecommendationFeedbackEventV2 } from "../feedback";
+import { evaluateExplicitRequestCoverage } from "./request-relevance";
 
 const CONFIDENCE_VALUE = { unknown: 0, low: 0.35, medium: 0.7, high: 1 } as const;
 
@@ -21,7 +22,7 @@ function quality(snapshot: CandidateProviderEvidenceSnapshot): number {
 }
 
 function requestFit(aspect: readonly import("../domain/policies").ConstraintDecision[], objective: readonly import("./types").ObjectiveConstraintDecision[]): number {
-  const decisions = [...aspect, ...objective];
+  const decisions = [...aspect, ...objective].filter((decision) => decision.role !== "avoid");
   if (decisions.length === 0) return 0.5;
   const values: number[] = decisions.map((decision) => {
     if (decision.outcome === "passed" || decision.outcome === "preferred") return 1;
@@ -33,8 +34,9 @@ function requestFit(aspect: readonly import("../domain/policies").ConstraintDeci
 }
 
 function evidenceConfidence(request: RecommendationRequestV2, evidence: ReadonlyMap<AspectId, AspectEvidence>): number {
-  if (request.aspectConstraints.length === 0) return 0.5;
-  return request.aspectConstraints.reduce((sum, constraint) => sum + CONFIDENCE_VALUE[evidence.get(constraint.aspectId)?.confidence ?? "unknown"], 0) / request.aspectConstraints.length;
+  const positiveConstraints = request.aspectConstraints.filter((constraint) => constraint.role !== "avoid");
+  if (positiveConstraints.length === 0) return 0.5;
+  return positiveConstraints.reduce((sum, constraint) => sum + CONFIDENCE_VALUE[evidence.get(constraint.aspectId)?.confidence ?? "unknown"], 0) / positiveConstraints.length;
 }
 
 export function scoreEligibleCandidates(input: {
@@ -48,21 +50,26 @@ export function scoreEligibleCandidates(input: {
   const scored: ScoredRecommendationCandidate[] = [];
   const rejected: { title: string; reason: string }[] = [];
   const nearMatches: ScoredRecommendationCandidate[] = [];
+  const avoidedAspectIds = new Set(input.request.aspectConstraints
+    .filter((constraint) => constraint.role === "avoid")
+    .map((constraint) => constraint.aspectId));
   for (const item of input.candidates) {
     const aspectDecisions = input.request.aspectConstraints.map((constraint) => evaluateConstraintEligibility({ constraint, evidence: item.aspectEvidence.get(constraint.aspectId) ?? null, strictness: input.request.strictness }));
     const objectiveDecisions = input.request.objectiveConstraints.map((constraint) => evaluateObjectiveConstraint({ constraint, snapshot: item.snapshot }));
     const aspectEligibility = buildCandidateEligibility(input.request.strictness, aspectDecisions);
     const objectiveEligible = objectiveDecisionsAllowPrimary(objectiveDecisions);
+    const explicitCoverage = evaluateExplicitRequestCoverage({ request: input.request, evidence: item.aspectEvidence });
     if (!aspectEligibility.eligibleForPrimary || !objectiveEligible) {
       const reason = [...aspectDecisions, ...objectiveDecisions].find((decision) => !decision.passed)?.outcome ?? "constraint_failed";
-      if (aspectEligibility.eligibleForNearMatch && objectiveEligible && !hasExactLibraryIdentity(item.snapshot, input.mediaItems)) {
+      if (aspectEligibility.eligibleForNearMatch && objectiveEligible && explicitCoverage.meetsMinimum && !hasExactLibraryIdentity(item.snapshot, input.mediaItems)) {
         const breakdown = {
           requestFit: requestFit(aspectDecisions, objectiveDecisions),
-          personalFit: input.request.profileSignalsEnabled ? calculatePersonalFit({ profile, snapshot: item.snapshot, aspectEvidence: item.aspectEvidence, feedback: input.feedback, feedbackV2: input.feedbackV2 ?? [] }) : 0,
+          explicitRequestCoverage: explicitCoverage.coverage,
+          personalFit: input.request.profileSignalsEnabled ? calculatePersonalFit({ profile, snapshot: item.snapshot, aspectEvidence: item.aspectEvidence, feedback: input.feedback, feedbackV2: input.feedbackV2 ?? [], suppressedAspectIds: avoidedAspectIds }) : 0,
           evidenceConfidence: evidenceConfidence(input.request, item.aspectEvidence),
           qualitySignal: quality(item.snapshot), novelty: 1, diversityContribution: 1,
         };
-        nearMatches.push({ ...item, aspectDecisions, objectiveDecisions, scoreBreakdown: breakdown, deterministicSortKey: [breakdown.requestFit, breakdown.personalFit, breakdown.evidenceConfidence, breakdown.qualitySignal, breakdown.novelty, item.snapshot.candidateIdentity.canonicalKey], warnings: [...item.snapshot.warnings, ...aspectDecisions.flatMap((decision) => decision.warnings)] });
+        nearMatches.push({ ...item, aspectDecisions, objectiveDecisions, explicitRequestCoverage: explicitCoverage, scoreBreakdown: breakdown, deterministicSortKey: [breakdown.requestFit, breakdown.personalFit, breakdown.evidenceConfidence, breakdown.qualitySignal, breakdown.novelty, item.snapshot.candidateIdentity.canonicalKey], warnings: [...item.snapshot.warnings, ...aspectDecisions.flatMap((decision) => decision.warnings)] });
       }
       rejected.push({ title: item.candidate.title, reason });
       continue;
@@ -71,9 +78,14 @@ export function scoreEligibleCandidates(input: {
       rejected.push({ title: item.candidate.title, reason: "exact_library_identity" });
       continue;
     }
+    if (!explicitCoverage.meetsMinimum) {
+      rejected.push({ title: item.candidate.title, reason: "explicit_request_evidence_missing" });
+      continue;
+    }
     const breakdown = {
       requestFit: requestFit(aspectDecisions, objectiveDecisions),
-      personalFit: input.request.profileSignalsEnabled ? calculatePersonalFit({ profile, snapshot: item.snapshot, aspectEvidence: item.aspectEvidence, feedback: input.feedback, feedbackV2: input.feedbackV2 ?? [] }) : 0,
+      explicitRequestCoverage: explicitCoverage.coverage,
+      personalFit: input.request.profileSignalsEnabled ? calculatePersonalFit({ profile, snapshot: item.snapshot, aspectEvidence: item.aspectEvidence, feedback: input.feedback, feedbackV2: input.feedbackV2 ?? [], suppressedAspectIds: avoidedAspectIds }) : 0,
       evidenceConfidence: evidenceConfidence(input.request, item.aspectEvidence),
       qualitySignal: quality(item.snapshot),
       novelty: 1,
@@ -83,6 +95,7 @@ export function scoreEligibleCandidates(input: {
       ...item,
       aspectDecisions,
       objectiveDecisions,
+      explicitRequestCoverage: explicitCoverage,
       scoreBreakdown: breakdown,
       deterministicSortKey: [breakdown.requestFit, breakdown.personalFit, breakdown.evidenceConfidence, breakdown.qualitySignal, breakdown.novelty, item.snapshot.candidateIdentity.canonicalKey],
       warnings: [...item.snapshot.warnings, ...aspectDecisions.flatMap((decision) => decision.warnings), ...objectiveDecisions.flatMap((decision) => decision.warnings)],

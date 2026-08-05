@@ -12,7 +12,7 @@ describe("D6-3 structured constraint extraction", () => {
     expect(result.aspectConstraints).toEqual(expect.arrayContaining([
       expect.objectContaining({ aspectId: "romance", role: "must", source: "explicit", minimumLevel: "significant" }),
       expect.objectContaining({ aspectId: "fantasy", role: "prefer" }),
-      expect.objectContaining({ aspectId: "love_triangle", role: "avoid", source: "explicit", rejectAtLevel: "significant" }),
+      expect.objectContaining({ aspectId: "love_triangle", role: "avoid", source: "explicit", rejectAtLevel: "incidental" }),
     ]));
     expect(result.objectiveConstraints).toEqual(expect.arrayContaining([
       expect.objectContaining({ field: "media_type", value: "anime", role: "must" }),

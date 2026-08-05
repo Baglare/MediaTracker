@@ -26,6 +26,8 @@ import { TmdbNormalizedResult } from "@/lib/tmdb-types";
 import { GlobalSearchResult } from "@/lib/global-search-types";
 import type { AdvisorScopeMode } from "./types";
 import { expandTargetFamily } from "./target-family";
+import type { RecommendationRequestV2 } from "@/features/recommendations/domain/codec";
+import { ASPECT_REGISTRY } from "@/features/recommendations/domain/aspect-registry";
 
 const PER_SOURCE_LIMIT = 8;
 const MAX_TOTAL = 24;
@@ -447,7 +449,49 @@ interface AniListStructuredPasses {
   relaxed?: AniListStructuredQuery;
 }
 
-function extractAniListStructuredFilters(intent: AiIntent, message: string): AniListStructuredPasses {
+export function extractAniListStructuredFilters(
+  intent: AiIntent,
+  message: string,
+  structuredRequest?: RecommendationRequestV2,
+): AniListStructuredPasses {
+  if (structuredRequest) {
+    const genres = new Set<string>();
+    const reasons: string[] = [];
+    const positiveConstraints = [...structuredRequest.aspectConstraints]
+      .filter((constraint) => constraint.role !== "avoid")
+      .sort((a, b) => (a.role === "must" ? 0 : 1) - (b.role === "must" ? 0 : 1));
+    for (const constraint of positiveConstraints) {
+      const entry = ASPECT_REGISTRY[constraint.aspectId];
+      if (entry.group !== "core" || entry.providerSupport.anilist !== "strong") continue;
+      genres.add(entry.labelEn);
+      reasons.push(`structured:${constraint.role}:${constraint.aspectId}`);
+    }
+    const episodeLimit = structuredRequest.objectiveConstraints.find((constraint) => (
+      constraint.field === "length"
+      && constraint.unit === "episode"
+      && constraint.operator === "lte"
+      && typeof constraint.value === "number"
+      && constraint.role !== "avoid"
+    ));
+    const episodeLimitValue = episodeLimit && typeof episodeLimit.value === "number" ? episodeLimit.value : undefined;
+    const episodesLesser = episodeLimitValue !== undefined ? episodeLimitValue + 1 : undefined;
+    if (episodesLesser !== undefined) reasons.push(`structured:length:<=${episodeLimitValue}`);
+    if (genres.size === 0 && episodesLesser === undefined) return {};
+    const strict: AniListStructuredQuery = {
+      genres: genres.size > 0 ? [...genres] : undefined,
+      episodesLesser,
+      sort: ["POPULARITY_DESC", "SCORE_DESC"],
+      reason: reasons.join("|"),
+    };
+    return {
+      strict,
+      relaxed: {
+        genres: strict.genres?.slice(0, 1),
+        sort: ["POPULARITY_DESC"],
+        reason: `${strict.reason}+relaxed`,
+      },
+    };
+  }
   const text = (message + " " + intent.mood.join(" ")).toLowerCase();
   const genres = new Set<string>();
   const tags = new Set<string>();
@@ -1356,8 +1400,8 @@ export async function searchCandidatesWithDebug(args: {
 // "Kaynak API'leriyle öner" modu için: kullanıcının seçtiği kapsama göre
 // uygun harici API'leri paralel sorgular, scope için anlamsız olanları
 // atlar. Hatalar Promise.allSettled ile yutulur — biri patladığında diğer
-// kaynaklar yine sonuç döndürür. Çıktı R36 scorer'ından geçecek; bu
-// fonksiyon kendi başına filtreleme/sıralama yapmaz.
+// kaynaklar yine sonuç döndürür. Çıktı orchestration katmanındaki etkin
+// scorer/ranking yolundan geçer; bu fonksiyon kendi başına sıralama yapmaz.
 
 interface ScopePlan {
   /** Bu kapsam için sorgulanacak (source, mediaType) çiftleri */
@@ -1435,6 +1479,7 @@ export async function searchWebResearchCandidates(args: {
   message: string;
   scopeMode?: AdvisorScopeMode;
   sharedDebug?: CandidateSearchDebug;
+  structuredRequest?: RecommendationRequestV2;
 }): Promise<SourceApiCandidatesResult> {
   const { intent, profile, message, scopeMode } = args;
   const notes: string[] = [];
@@ -1480,7 +1525,7 @@ export async function searchWebResearchCandidates(args: {
   const tasks: Promise<AiCandidate[]>[] = [];
   for (const pair of pairs) {
     if (pair.source === "anilist") {
-      const structured = extractAniListStructuredFilters(intent, message);
+      const structured = extractAniListStructuredFilters(intent, message, args.structuredRequest);
       const cat = aniListCategoryFor(pair.mediaType);
       if (cat && structured.strict) {
         tasks.push(searchAniListDiscover(ctx, cat, structured.strict));
@@ -1521,6 +1566,7 @@ export async function searchSourceApiCandidates(args: {
   scopeMode?: AdvisorScopeMode;
   /** İstenirse caller'ın paylaşılan debug nesnesi (queries/counts buraya da yazılır) */
   sharedDebug?: CandidateSearchDebug;
+  structuredRequest?: RecommendationRequestV2;
 }): Promise<SourceApiCandidatesResult> {
   const { intent, profile, message, scopeMode } = args;
   const scope = scopeMode || "mixed";
@@ -1553,7 +1599,7 @@ export async function searchSourceApiCandidates(args: {
   // dene. Mood/length intentleri varsa strict pass, 0 dönerse relaxed pass.
   const anilistPairs = pairs.filter((p) => p.source === "anilist");
   const otherPairs = pairs.filter((p) => p.source !== "anilist");
-  const structured = extractAniListStructuredFilters(intent, message);
+  const structured = extractAniListStructuredFilters(intent, message, args.structuredRequest);
 
   if (anilistPairs.length > 0 && structured.strict) {
     const anilistCats = new Set<AniListCategory>();

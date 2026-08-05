@@ -11,6 +11,7 @@ import type {
 } from "./types";
 
 export type ConstraintStrengthLevel = Exclude<AspectStrengthLevel, "unknown">;
+export const DEFAULT_AVOID_REJECT_LEVEL = "incidental" as const;
 export type LengthUnit = "episode" | "chapter" | "page" | "minute";
 export type ObjectiveConstraintField =
   | "media_type"

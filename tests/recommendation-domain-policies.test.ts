@@ -120,7 +120,7 @@ describe("Recommendation V2 strictness policy", () => {
     expect(risk).toMatchObject({ passed: true, outcome: "risk" });
   });
 
-  it("reliable avoid ihlali near-match'e de girmez", () => {
+  it("reliable avoid ihlalini exploratory modda yalnız near-match'e yönlendirir", () => {
     const failedMust = evaluateConstraintEligibility({
       constraint: must,
       evidence: aspectEvidence({ strength: 0.3 }),
@@ -132,7 +132,8 @@ describe("Recommendation V2 strictness policy", () => {
       strictness: "exploratory",
     });
     const eligibility = buildCandidateEligibility("exploratory", [failedMust, triggeredAvoid]);
-    expect(eligibility).toMatchObject({ eligibleForPrimary: false, eligibleForNearMatch: false });
+    expect(eligibility).toMatchObject({ eligibleForPrimary: false, eligibleForNearMatch: true });
+    expect(eligibility.triggeredAvoidConstraints).toContainEqual(triggeredAvoid);
   });
 
   it("prefer eligibility'yi değiştirmez ve policy popularity/personal-fit girdisi almaz", () => {

@@ -51,12 +51,15 @@ import type { RecommendationFeedbackEventV2, RecommendationFeedbackReasonCode } 
 import { ASPECT_REGISTRY } from "@/features/recommendations/domain/aspect-registry";
 import {
   EngineTransparency,
+  EvidenceSummary,
   FeedbackReasonDialog,
   NearMatchSection,
   ParsedRequestPanel,
   RequestComposer,
   buildInterpretReferencePayload,
   buildRecommendationMediaPayload,
+  userFacingConstraintLabel,
+  userFacingRejectionReason,
 } from "@/features/recommendations/ui";
 export type { AiSettings } from "@/lib/ai/types";
 import { useAuth } from "@/hooks/use-auth";
@@ -460,7 +463,7 @@ function reasonKey(text: string): string {
 }
 
 function buildReasonBullets(rec: AiRecommendation): string[] {
-  const scoreReasons = rec.candidate?.scoreReasons;
+  const scoreReasons = rec.resultKind ? undefined : rec.candidate?.scoreReasons;
   if (scoreReasons && scoreReasons.length > 0) {
     const seen = new Set<string>();
     const bullets: string[] = [];
@@ -639,7 +642,7 @@ function recommendationContextLabels(rec: AiRecommendation): string[] {
     labels.push("Devam önerisi");
   } else if (rec.inLibrary) {
     labels.push("Kütüphanende");
-  } else {
+  } else if (rec.fitLabel !== "Yeni keşif") {
     labels.push("Yeni keşif");
   }
   if ((rec.candidate?.feedbackScore ?? 0) < 0) labels.push("Negatif feedback nedeniyle aşağı sıralandı");
@@ -1925,7 +1928,7 @@ export default function AiAdvisor({
               return (
                 <div
                   key={rec.id}
-                  className={`relative p-4 rounded-2xl border min-w-0 transition-opacity ${
+                  className={`group relative p-4 rounded-2xl border min-w-0 transition-opacity ${
                     dismissed
                       ? "bg-zinc-900/20 border-zinc-800/40 opacity-40"
                       : "bg-zinc-900/50 border-zinc-800/60"
@@ -1947,9 +1950,9 @@ export default function AiAdvisor({
                     <div className="w-14 h-20 shrink-0 rounded-md bg-zinc-800/60 flex items-center justify-center text-zinc-600"><Sparkles className="w-5 h-5" /></div>
                   )}
                   <div className="flex flex-col gap-1.5 min-w-0 flex-1">
-                    <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
                       <div className="min-w-0">
-                        <h4 className="text-sm font-semibold text-zinc-100 break-words">
+                        <h4 className="line-clamp-2 text-sm font-semibold text-zinc-100 break-normal [overflow-wrap:break-word] group-hover:line-clamp-none group-focus-within:line-clamp-none">
                           {rec.title}
                         </h4>
                         <p className="text-[11px] text-zinc-500 truncate">
@@ -1964,7 +1967,7 @@ export default function AiAdvisor({
                           ) : null}
                         </p>
                       </div>
-                      <span className="px-2 py-0.5 rounded-md text-[10px] font-medium leading-tight text-center bg-violet-500/15 text-violet-300 border border-violet-500/30 shrink-0 max-w-[7.5rem] break-words">
+                      <span className="mt-1 inline-flex max-w-full self-start rounded-md border border-violet-500/30 bg-violet-500/15 px-2 py-0.5 text-left text-[10px] font-medium leading-tight text-violet-300 break-normal [overflow-wrap:break-word]">
                         {rec.fitLabel}
                       </span>
                     </div>
@@ -2004,6 +2007,8 @@ export default function AiAdvisor({
                     </ul>
                   </div>
                 )}
+
+                <EvidenceSummary items={rec.evidenceSummary} />
 
                 {(rec.risk || rec.communitySignal) && (
                   <div className="mt-2 space-y-1">
@@ -2083,9 +2088,10 @@ export default function AiAdvisor({
           <section className="rounded-2xl border border-amber-500/25 bg-amber-500/5 p-4">
             <h3 className="text-sm font-semibold text-zinc-100">Uygun eser bulamadım</h3>
             <p className="mt-1 text-xs text-zinc-400">{engineStatus.providerFallbackUsed ? "Bazı kanıt kaynakları kullanılamadı; doğrulanmamış başlık eklenmedi." : "Zorunlu koşullar doğrulanmış aday havuzunu daralttı; liste düşük kaliteli adaylarla doldurulmadı."}</p>
+            {structuredRequest && [...structuredRequest.aspectConstraints, ...structuredRequest.objectiveConstraints].filter((constraint) => constraint.role === "must").length > 0 && <p className="mt-1 text-xs text-zinc-500">Daraltan koşullar: {[...structuredRequest.aspectConstraints, ...structuredRequest.objectiveConstraints].filter((constraint) => constraint.role === "must").map(userFacingConstraintLabel).join(", ")}</p>}
             <div className="mt-3 flex flex-wrap gap-2">
               {structuredRequest?.strictness !== "exploratory" && <button type="button" onClick={() => structuredRequest && setStructuredRequest({ ...structuredRequest, strictness: "exploratory" })} className="text-xs text-violet-300">Keşifçi moda geç</button>}
-              {structuredRequest?.aspectConstraints.some((constraint) => constraint.role === "must") && <button type="button" onClick={() => setStructuredRequest((current) => current ? { ...current, aspectConstraints: current.aspectConstraints.map((constraint, index) => index === current.aspectConstraints.findIndex((item) => item.role === "must") ? { ...constraint, role: "prefer", source: "explicit", rejectAtLevel: undefined } : constraint) as RecommendationRequestV2["aspectConstraints"] } : current)} className="text-xs text-violet-300">İlk zorunluyu tercih yap</button>}
+              {structuredRequest?.aspectConstraints.some((constraint) => constraint.role === "must") && <button type="button" onClick={() => setStructuredRequest((current) => current ? { ...current, aspectConstraints: current.aspectConstraints.map((constraint, index) => index === current.aspectConstraints.findIndex((item) => item.role === "must") ? { ...constraint, role: "prefer", source: "explicit", rejectAtLevel: undefined } : constraint) as RecommendationRequestV2["aspectConstraints"] } : current)} className="text-xs text-violet-300">{userFacingConstraintLabel(structuredRequest.aspectConstraints.find((constraint) => constraint.role === "must")!)} koşulunu tercihe çevir</button>}
               {structuredRequest?.objectiveConstraints.some((constraint) => constraint.field === "length" || constraint.field === "release_status") && <button type="button" onClick={() => setStructuredRequest((current) => current ? { ...current, objectiveConstraints: current.objectiveConstraints.filter((constraint) => constraint.field !== "length" && constraint.field !== "release_status") } : current)} className="text-xs text-violet-300">Süre/yayın filtresini kaldır</button>}
               {researchMode === "library-only" && <button type="button" onClick={() => setResearchMode("source-apis")} className="text-xs text-violet-300">Provider kapsamını genişlet</button>}
             </div>
@@ -2107,7 +2113,7 @@ export default function AiAdvisor({
             <ul className="space-y-1.5">
               {rejected.slice(0, 3).map((r, i) => (
                 <li key={`rejected-${i}-${r.title}`} className="text-xs text-zinc-400">
-                  <span className="text-zinc-300">{r.title}</span> — {r.reason}
+                  <span className="text-zinc-300">{r.title}</span> — {userFacingRejectionReason(r.reason)}
                 </li>
               ))}
             </ul>
