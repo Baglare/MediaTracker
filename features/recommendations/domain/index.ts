@@ -2,10 +2,15 @@ export {
   ASPECT_IDS,
   ASPECT_REGISTRY,
   findAspectByAlias,
+  aspectIdsForProviderTaxonomyValue,
   evidenceStrategyForProvider,
   getAspectDefinition,
   isAspectId,
   normalizeAspectAlias,
+  providerRetrievalAllowlist,
+  providerRetrievalMappingsFor,
+  queryableProviderRetrievalMapping,
+  type AspectProviderRetrievalMapping,
   type AspectRegistryEntry,
 } from "./aspect-registry";
 export * from "./aspect-strength";

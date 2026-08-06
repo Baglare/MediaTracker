@@ -69,3 +69,14 @@ Son çalıştırma kaydı ve canlı/fixture ayrımı [AI Recommendation V2 Accep
 8. UI'da ham tag rank, strategy enum, reason code veya strength yüzdesi gösterilmediğini doğrula.
 
 Bu aşamada `D6_PROVIDER_LIVE_SMOKE` çalıştırılmaz; live provider reliability ve final D6 kabulü D6.6-2'ye aittir.
+
+## D6.6-1R ranked-tag retrieval regresyonu
+
+1. “Politik entrikanın ana unsurlardan biri olduğu anime öner.” isteğini onayla; constraint'in Zorunlu/Belirgin kaldığını ve şeffaflık panelinde yapılandırılmış etiket aramasının kullanıldığını doğrula.
+2. Balanced modda yalnız canonical Politics rank `>=40` ve mevcut evidence policy'yi karşılayan adayların primary olabildiğini; tag evidence'i olmayan `FANTASY`/`Fantasy` benzeri title kayıtlarının görünmediğini doğrula.
+3. Exploratory modda rank `20–39` adayın near-match olabildiğini; missing tag + yüksek popularity adayının primary/near-match olmadığını doğrula.
+4. OpenAI planning etkin olsa da planning provider bilgisinin ayrı, “LLM final sıralama: kullanılmadı” bilgisinin sabit ve structured tag retrieval'ın kaynak gerçeği olduğunu kontrol et.
+5. Mapping missing, provider unavailable, tag no-candidate ve below-rank durumlarında kullanıcı metninin ayrıştığını; raw tag, enum, GraphQL veya reason code görünmediğini doğrula.
+6. Console error, request loop ve duplicate assistant message olmadığını kontrol et.
+
+Gerçek provider/browser sonucu yalnız `D6_PROVIDER_LIVE_SMOKE=1` kontrollü ortamda çalıştırılır. Flag kapalıysa sentetik route/retrieval fixture'ları kabul kanıtıdır; canlı sonuç iddiası yapılmaz. Ayrıntı [D6.6-1R Ranked-Tag Retrieval](AI_RECOMMENDATION_V2_D661R_RANKED_TAG_RETRIEVAL.md) belgesindedir.

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { queryableProviderRetrievalMapping } from "@/features/recommendations/domain/aspect-registry";
 import { classifyTvmazeAnime } from "@/features/recommendations/providers/tvmaze-anime-classifier";
 
 const LIVE = process.env.D6_PROVIDER_LIVE_SMOKE === "1";
@@ -9,6 +10,37 @@ describe.skipIf(!LIVE)("D6-2 conditional live provider smoke", () => {
     const body = await response.json() as { data?: { Media?: { id?: number; tags?: { name: string; rank?: number }[] } } };
     expect(body.data?.Media?.id).toBeTypeOf("number");
     expect(body.data?.Media?.tags).toBeInstanceOf(Array);
+  });
+
+  it("AniList canonical ranked-tag strict/relaxed discovery kontratını canlı doğrular", async () => {
+    const mapping = queryableProviderRetrievalMapping("political_intrigue", "anilist", "anime");
+    const canonicalTag = mapping?.canonicalTags?.[0];
+    expect(canonicalTag).toBeTruthy();
+    const query = `query ($tagIn: [String], $minimumTagRank: Int) {
+      Page(page: 1, perPage: 8) {
+        media(type: ANIME, tag_in: $tagIn, minimumTagRank: $minimumTagRank, sort: [POPULARITY_DESC, ID], isAdult: false) {
+          id
+          tags { name rank }
+        }
+      }
+    }`;
+    for (const minimumTagRank of [mapping?.minimumRankPolicy?.strict ?? 40, mapping?.minimumRankPolicy?.relaxed ?? 20]) {
+      const response = await fetch("https://graphql.anilist.co", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ query, variables: { tagIn: [canonicalTag], minimumTagRank } }),
+      });
+      const body = await response.json() as { data?: { Page?: { media?: { id?: number; tags?: { name?: string; rank?: number }[] }[] } } };
+      const media = body.data?.Page?.media ?? [];
+      expect(media.length, `AniList ${minimumTagRank} minimum rank için canonical tag coverage döndürmedi.`).toBeGreaterThan(0);
+      expect(media.some((item) => item.id !== undefined && item.tags?.some((tag) => (
+        tag.name === canonicalTag
+        && typeof tag.rank === "number"
+        && Number.isFinite(tag.rank)
+        && tag.rank >= minimumTagRank
+        && tag.rank <= 100
+      )))).toBe(true);
+    }
   });
 
   it("TVMaze anime ve Batı animasyonu sinyallerini sınıflandırır", async () => {
@@ -35,4 +67,3 @@ describe.skipIf(!LIVE)("D6-2 conditional live provider smoke", () => {
     expect(process.env.OMDB_API_KEY).toBeTruthy();
   });
 });
-

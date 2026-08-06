@@ -20,15 +20,49 @@ export interface AspectRegistryEntry {
   providerSupport: Readonly<Record<RecommendationProvider, AspectSupportLevel>>;
   defaultEvidenceStrategy: AspectEvidenceStrategy;
   providerStrategyOverrides?: Readonly<Partial<Record<RecommendationProvider, AspectEvidenceStrategy>>>;
+  providerRetrievalMappings?: readonly AspectProviderRetrievalMapping[];
   mustSafety: ConstraintSafety;
   avoidSafety: ConstraintSafety;
   semanticVerifier: SemanticVerifierRequirement;
   limitationNoteTr?: string;
 }
 
+export interface AspectProviderRetrievalMapping {
+  provider: RecommendationProvider;
+  strategy: "exact_taxonomy" | "ranked_tag";
+  canonicalGenres?: readonly string[];
+  canonicalTags?: readonly string[];
+  minimumRankPolicy?: Readonly<{ strict: number; relaxed: number }>;
+  supportedMediaTypes: readonly RecommendationMediaType[];
+  queryable: boolean;
+  warning?: string;
+}
+
 const ALL = ["anime", "manga", "manhwa", "manhua", "tv", "movie", "book"] as const;
 const EAST = ["anime", "manga", "manhwa", "manhua"] as const;
 const SCREEN = ["anime", "tv", "movie"] as const;
+
+function anilistGenre(canonicalGenre: string): readonly AspectProviderRetrievalMapping[] {
+  return [{
+    provider: "anilist",
+    strategy: "exact_taxonomy",
+    canonicalGenres: [canonicalGenre],
+    supportedMediaTypes: EAST,
+    queryable: true,
+  }];
+}
+
+function anilistRankedTags(...canonicalTags: string[]): readonly AspectProviderRetrievalMapping[] {
+  return [{
+    provider: "anilist",
+    strategy: "ranked_tag",
+    canonicalTags,
+    minimumRankPolicy: { strict: 40, relaxed: 20 },
+    supportedMediaTypes: EAST,
+    queryable: true,
+    warning: "AniList tag rank provider relevance sinyalidir; ekran süresi veya doğruluk yüzdesi değildir.",
+  }];
+}
 
 export const ASPECT_REGISTRY = {
   romance: {
@@ -36,6 +70,7 @@ export const ASPECT_REGISTRY = {
     descriptionTr: "Romantik ilişkinin anlatıdaki ağırlığı.", aliasesTr: ["romantik", "aşk"], aliasesEn: ["romantic", "love story"], supportedMediaTypes: ALL,
     providerSupport: { anilist: "strong", tvmaze: "partial", tmdb: "partial", omdb: "partial", openlibrary: "partial" },
     defaultEvidenceStrategy: "exact_taxonomy", providerStrategyOverrides: { openlibrary: "soft_only" },
+    providerRetrievalMappings: anilistGenre("Romance"),
     mustSafety: "conditional", avoidSafety: "conditional", semanticVerifier: "recommended", limitationNoteTr: "Genre etiketi merkeziliği tek başına kanıtlamaz.",
   },
   action: {
@@ -43,6 +78,7 @@ export const ASPECT_REGISTRY = {
     descriptionTr: "Çatışma ve hareket odaklı anlatı.", aliasesTr: ["dövüş", "hareketli"], aliasesEn: ["combat", "fight scenes"], supportedMediaTypes: ALL,
     providerSupport: { anilist: "strong", tvmaze: "partial", tmdb: "strong", omdb: "partial", openlibrary: "partial" },
     defaultEvidenceStrategy: "exact_taxonomy", providerStrategyOverrides: { openlibrary: "soft_only" },
+    providerRetrievalMappings: anilistGenre("Action"),
     mustSafety: "conditional", avoidSafety: "conditional", semanticVerifier: "recommended", limitationNoteTr: "Kısa aksiyon sahneleri primary anlamına gelmez.",
   },
   adventure: {
@@ -50,6 +86,7 @@ export const ASPECT_REGISTRY = {
     descriptionTr: "Keşif, yolculuk veya görev odağı.", aliasesTr: ["keşif", "serüven"], aliasesEn: ["quest", "exploration"], supportedMediaTypes: ALL,
     providerSupport: { anilist: "strong", tvmaze: "partial", tmdb: "strong", omdb: "partial", openlibrary: "partial" },
     defaultEvidenceStrategy: "exact_taxonomy", providerStrategyOverrides: { openlibrary: "soft_only" },
+    providerRetrievalMappings: anilistGenre("Adventure"),
     mustSafety: "conditional", avoidSafety: "conditional", semanticVerifier: "recommended", limitationNoteTr: "Genre kapsayıcı olabilir.",
   },
   comedy: {
@@ -57,6 +94,7 @@ export const ASPECT_REGISTRY = {
     descriptionTr: "Mizahın anlatıdaki ağırlığı.", aliasesTr: ["mizah", "komik"], aliasesEn: ["humor", "funny"], supportedMediaTypes: ALL,
     providerSupport: { anilist: "strong", tvmaze: "partial", tmdb: "strong", omdb: "partial", openlibrary: "partial" },
     defaultEvidenceStrategy: "exact_taxonomy", providerStrategyOverrides: { openlibrary: "soft_only" },
+    providerRetrievalMappings: anilistGenre("Comedy"),
     mustSafety: "conditional", avoidSafety: "conditional", semanticVerifier: "recommended", limitationNoteTr: "Komedi yoğunluğu provider'a göre değişebilir.",
   },
   drama: {
@@ -64,6 +102,7 @@ export const ASPECT_REGISTRY = {
     descriptionTr: "Ciddi kişilerarası veya duygusal çatışma.", aliasesTr: ["dramatik", "ağır dram"], aliasesEn: ["dramatic", "serious drama"], supportedMediaTypes: ALL,
     providerSupport: { anilist: "strong", tvmaze: "partial", tmdb: "strong", omdb: "partial", openlibrary: "partial" },
     defaultEvidenceStrategy: "exact_taxonomy", providerStrategyOverrides: { openlibrary: "soft_only" },
+    providerRetrievalMappings: anilistGenre("Drama"),
     mustSafety: "conditional", avoidSafety: "conditional", semanticVerifier: "recommended", limitationNoteTr: "Geniş bir provider etiketidir.",
   },
   mystery: {
@@ -71,6 +110,7 @@ export const ASPECT_REGISTRY = {
     descriptionTr: "Bilinmeyeni çözme odağı.", aliasesTr: ["muamma", "dedektiflik"], aliasesEn: ["whodunit", "detective mystery"], supportedMediaTypes: ALL,
     providerSupport: { anilist: "strong", tvmaze: "partial", tmdb: "strong", omdb: "partial", openlibrary: "partial" },
     defaultEvidenceStrategy: "exact_taxonomy", providerStrategyOverrides: { openlibrary: "soft_only" },
+    providerRetrievalMappings: anilistGenre("Mystery"),
     mustSafety: "conditional", avoidSafety: "conditional", semanticVerifier: "recommended", limitationNoteTr: "Thriller ile örtüşebilir.",
   },
   horror: {
@@ -78,6 +118,7 @@ export const ASPECT_REGISTRY = {
     descriptionTr: "Korkutma ve dehşet odağı.", aliasesTr: ["ürkütücü", "dehşet"], aliasesEn: ["scary", "terror"], supportedMediaTypes: ALL,
     providerSupport: { anilist: "strong", tvmaze: "partial", tmdb: "strong", omdb: "partial", openlibrary: "partial" },
     defaultEvidenceStrategy: "exact_taxonomy", providerStrategyOverrides: { openlibrary: "soft_only" },
+    providerRetrievalMappings: anilistGenre("Horror"),
     mustSafety: "conditional", avoidSafety: "conditional", semanticVerifier: "recommended", limitationNoteTr: "Şiddet yoğunluğu ayrıca değerlendirilir.",
   },
   fantasy: {
@@ -85,6 +126,7 @@ export const ASPECT_REGISTRY = {
     descriptionTr: "Büyü veya doğaüstü dünya düzeni.", aliasesTr: ["büyülü", "fantazi"], aliasesEn: ["magical fantasy", "high fantasy"], supportedMediaTypes: ALL,
     providerSupport: { anilist: "strong", tvmaze: "partial", tmdb: "strong", omdb: "partial", openlibrary: "strong" },
     defaultEvidenceStrategy: "exact_taxonomy", providerStrategyOverrides: { openlibrary: "soft_only" },
+    providerRetrievalMappings: anilistGenre("Fantasy"),
     mustSafety: "safe", avoidSafety: "conditional", semanticVerifier: "not_required", limitationNoteTr: "Alt fantasy türleri tek başına ayrılmaz.",
   },
   sci_fi: {
@@ -92,6 +134,7 @@ export const ASPECT_REGISTRY = {
     descriptionTr: "Bilim veya teknoloji varsayımı odağı.", aliasesTr: ["bilimkurgu", "uzay kurgusu"], aliasesEn: ["sci fi", "science-fiction"], supportedMediaTypes: ALL,
     providerSupport: { anilist: "strong", tvmaze: "partial", tmdb: "strong", omdb: "partial", openlibrary: "strong" },
     defaultEvidenceStrategy: "exact_taxonomy", providerStrategyOverrides: { openlibrary: "soft_only" },
+    providerRetrievalMappings: anilistGenre("Sci-Fi"),
     mustSafety: "safe", avoidSafety: "conditional", semanticVerifier: "not_required", limitationNoteTr: "Space fantasy ile sınır bulanık olabilir.",
   },
   slice_of_life: {
@@ -99,6 +142,7 @@ export const ASPECT_REGISTRY = {
     descriptionTr: "Günlük deneyim ve düşük ölçekli anlatı.", aliasesTr: ["hayatın içinden", "gündelik hayat"], aliasesEn: ["everyday life", "daily life"], supportedMediaTypes: ALL,
     providerSupport: { anilist: "strong", tvmaze: "experimental", tmdb: "experimental", omdb: "experimental", openlibrary: "partial" },
     defaultEvidenceStrategy: "exact_taxonomy", providerStrategyOverrides: { openlibrary: "soft_only" },
+    providerRetrievalMappings: anilistGenre("Slice of Life"),
     mustSafety: "conditional", avoidSafety: "conditional", semanticVerifier: "required_for_hard_decision", limitationNoteTr: "Ekran provider'larında güvenilir taxonomy zayıftır.",
   },
   supernatural: {
@@ -106,6 +150,7 @@ export const ASPECT_REGISTRY = {
     descriptionTr: "Doğa yasaları dışındaki unsurlar.", aliasesTr: ["paranormal", "doğa dışı"], aliasesEn: ["paranormal phenomena", "occult"], supportedMediaTypes: ALL,
     providerSupport: { anilist: "strong", tvmaze: "partial", tmdb: "partial", omdb: "partial", openlibrary: "partial" },
     defaultEvidenceStrategy: "exact_taxonomy", providerStrategyOverrides: { openlibrary: "soft_only" },
+    providerRetrievalMappings: anilistGenre("Supernatural"),
     mustSafety: "conditional", avoidSafety: "conditional", semanticVerifier: "recommended", limitationNoteTr: "Fantasy ile örtüşebilir.",
   },
   psychological: {
@@ -113,6 +158,7 @@ export const ASPECT_REGISTRY = {
     descriptionTr: "Zihinsel süreç, algı ve iç çatışma odağı.", aliasesTr: ["zihin oyunu", "psikolojik gerilim"], aliasesEn: ["mind game", "psychological thriller"], supportedMediaTypes: ALL,
     providerSupport: { anilist: "strong", tvmaze: "experimental", tmdb: "partial", omdb: "experimental", openlibrary: "partial" },
     defaultEvidenceStrategy: "exact_taxonomy", providerStrategyOverrides: { openlibrary: "soft_only" },
+    providerRetrievalMappings: anilistGenre("Psychological"),
     mustSafety: "conditional", avoidSafety: "conditional", semanticVerifier: "required_for_hard_decision", limitationNoteTr: "Pazarlama dili yanlış pozitif üretebilir.",
   },
   historical: {
@@ -127,6 +173,7 @@ export const ASPECT_REGISTRY = {
     descriptionTr: "İktidar pazarlığı ve kurum çatışması.", aliasesTr: ["siyasi entrika", "saray oyunu"], aliasesEn: ["court politics", "power politics"], supportedMediaTypes: ALL,
     providerSupport: { anilist: "strong", tvmaze: "experimental", tmdb: "partial", omdb: "experimental", openlibrary: "partial" },
     defaultEvidenceStrategy: "ranked_tag", providerStrategyOverrides: { tvmaze: "soft_only", tmdb: "soft_only", omdb: "soft_only", openlibrary: "soft_only" },
+    providerRetrievalMappings: anilistRankedTags("Politics"),
     mustSafety: "conditional", avoidSafety: "conditional", semanticVerifier: "required_for_hard_decision", limitationNoteTr: "Genel politika etiketi entrika yoğunluğunu kanıtlamaz.",
   },
   power_progression: {
@@ -141,6 +188,7 @@ export const ASPECT_REGISTRY = {
     descriptionTr: "Misillemenin ana motivasyon olması.", aliasesTr: ["öç", "intikam hikâyesi"], aliasesEn: ["vengeance", "revenge story"], supportedMediaTypes: ALL,
     providerSupport: { anilist: "strong", tvmaze: "experimental", tmdb: "partial", omdb: "experimental", openlibrary: "partial" },
     defaultEvidenceStrategy: "ranked_tag", providerStrategyOverrides: { tvmaze: "soft_only", tmdb: "soft_only", omdb: "soft_only", openlibrary: "soft_only" },
+    providerRetrievalMappings: anilistRankedTags("Revenge"),
     mustSafety: "conditional", avoidSafety: "conditional", semanticVerifier: "required_for_hard_decision", limitationNoteTr: "Tek alt olay primary tema değildir.",
   },
   survival: {
@@ -363,6 +411,50 @@ export function evidenceStrategyForProvider(
 ): AspectEvidenceStrategy {
   const entry = ASPECT_REGISTRY[id] as AspectRegistryEntry;
   return entry.providerStrategyOverrides?.[provider] ?? entry.defaultEvidenceStrategy;
+}
+
+export function providerRetrievalMappingsFor(
+  id: AspectId,
+  provider?: RecommendationProvider,
+  mediaType?: RecommendationMediaType,
+): readonly AspectProviderRetrievalMapping[] {
+  const entry = ASPECT_REGISTRY[id] as AspectRegistryEntry;
+  return (entry.providerRetrievalMappings ?? []).filter((mapping) => (
+    (!provider || mapping.provider === provider)
+    && (!mediaType || mapping.supportedMediaTypes.includes(mediaType))
+  ));
+}
+
+export function queryableProviderRetrievalMapping(
+  id: AspectId,
+  provider: RecommendationProvider,
+  mediaType: RecommendationMediaType,
+): AspectProviderRetrievalMapping | null {
+  return providerRetrievalMappingsFor(id, provider, mediaType).find((mapping) => mapping.queryable) ?? null;
+}
+
+export function aspectIdsForProviderTaxonomyValue(
+  provider: RecommendationProvider,
+  strategy: AspectProviderRetrievalMapping["strategy"],
+  value: string,
+): AspectId[] {
+  const normalized = normalizeAspectAlias(value);
+  return ASPECT_IDS.filter((id) => providerRetrievalMappingsFor(id, provider).some((mapping) => {
+    if (mapping.strategy !== strategy) return false;
+    const values = strategy === "ranked_tag" ? mapping.canonicalTags : mapping.canonicalGenres;
+    return values?.some((candidate) => normalizeAspectAlias(candidate) === normalized) ?? false;
+  }));
+}
+
+export function providerRetrievalAllowlist(provider: RecommendationProvider): {
+  genres: readonly string[];
+  tags: readonly string[];
+} {
+  const mappings = ASPECT_IDS.flatMap((id) => providerRetrievalMappingsFor(id, provider));
+  return {
+    genres: [...new Set(mappings.flatMap((mapping) => mapping.canonicalGenres ?? []))],
+    tags: [...new Set(mappings.flatMap((mapping) => mapping.canonicalTags ?? []))],
+  };
 }
 
 export function findAspectByAlias(value: string, language: "tr" | "en"): AspectId | null {

@@ -134,6 +134,7 @@ export interface AiRetrievalDebug {
   tasteSignalQueries?: string[];
   directTitleQueryUsed?: boolean;
   notes?: string[];
+  rankedTagRetrieval?: RankedTagRetrievalTelemetry;
   providerEvidence?: {
     snapshots: number;
     enrichedCandidates: number;
@@ -148,6 +149,31 @@ export interface AiRetrievalDebug {
     exact_bridge_deduped: number;
     identity_conflicts: number;
   };
+}
+
+export type RankedTagNoResultReason =
+  | "provider_tag_no_candidates"
+  | "provider_tag_query_unavailable"
+  | "provider_tag_mapping_missing"
+  | "candidates_below_tag_rank"
+  | "candidates_failed_ranked_tag_confidence"
+  | "candidates_failed_avoid"
+  | "candidates_failed_objective";
+
+export interface RankedTagRetrievalTelemetry {
+  ranked_tag_constraints: number;
+  ranked_tag_queryable_constraints: number;
+  ranked_tag_unmapped_constraints: number;
+  anilist_strict_tag_queries: number;
+  anilist_relaxed_tag_queries: number;
+  strict_tag_candidate_count: number;
+  relaxed_tag_candidate_count: number;
+  title_fallback_candidate_count: number;
+  candidates_without_requested_tag: number;
+  ranked_tag_primary_count: number;
+  ranked_tag_near_match_count: number;
+  structuredTagRetrievalUsed: boolean;
+  noResultReason?: RankedTagNoResultReason;
 }
 
 export interface AiCandidate {
@@ -290,6 +316,8 @@ export interface AiEngineStatus {
   configuredPlanningProvider?: AiEngineProvider;
   openAiPreferenceApplied?: boolean;
   planningFallbackUsed?: boolean;
+  structuredTagRetrievalUsed?: boolean;
+  rankedTagNoResultReason?: RankedTagNoResultReason;
 }
 
 export type RecommendationFeedbackAction =

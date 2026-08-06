@@ -1,5 +1,19 @@
 import { ASPECT_REGISTRY } from "../domain/aspect-registry";
 import type { AspectConstraint, ObjectiveConstraint } from "../domain/constraints";
+import type { RankedTagNoResultReason } from "@/lib/ai/types";
+
+export function userFacingRankedTagNoResult(
+  reason: RankedTagNoResultReason,
+  aspectLabel = "İstenen içerik özelliği",
+): string {
+  if (reason === "provider_tag_mapping_missing") return "Bu özellik için seçilen kaynakta doğrudan arama desteği bulunmuyor.";
+  if (reason === "provider_tag_no_candidates") return "Seçilen içerik etiketini taşıyan doğrulanmış aday bulunamadı.";
+  if (reason === "provider_tag_query_unavailable") return "İçerik etiketi kaynağı şu anda kullanılamıyor; koşul başarısız sayılmadı.";
+  if (reason === "candidates_below_tag_rank") return `Adaylar bulundu ancak ${aspectLabel.toLocaleLowerCase("tr-TR")} istenen belirginlik düzeyinin altında kaldı.`;
+  if (reason === "candidates_failed_ranked_tag_confidence") return `${aspectLabel} için yeterli kanıt güvenine sahip doğrulanmış aday bulunamadı.`;
+  if (reason === "candidates_failed_avoid") return "Doğrulanmış adaylar kaçınılacak içerik eşiğini aştı.";
+  return "Doğrulanmış adaylar objektif filtrelerden birini karşılamadı.";
+}
 
 export function userFacingRecommendationWarning(code: string): string {
   const [kind, aspectId] = code.split(":", 2);
@@ -45,7 +59,12 @@ export function userFacingNoResultSummary(input: {
   rejectedReasons: readonly string[];
   providerFallbackUsed: boolean;
   evaluatedCandidateCount: number;
+  rankedTagNoResultReason?: RankedTagNoResultReason;
+  rankedTagAspectLabel?: string;
 }): string {
+  if (input.rankedTagNoResultReason) {
+    return userFacingRankedTagNoResult(input.rankedTagNoResultReason, input.rankedTagAspectLabel);
+  }
   const reasons = new Set(input.rejectedReasons);
   if (reasons.has("provider_identity_unverified")) {
     return "Provider aday döndürdü ancak kesin kimliği doğrulanamayan eserler öneri havuzuna alınmadı.";

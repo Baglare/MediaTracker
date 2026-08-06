@@ -1,6 +1,6 @@
 # AI Recommendation V2 — D6 Kabul Raporu
 
-> Durum: D6-0–D6.6-1 kod ve sentetik sözleşme kapsamı tamamlandı; D6.6-2 live provider reliability ve final D6 kabulü bekleniyor. Bu ifade canlı provider/verifier kalite garantisi veya production-ready iddiası değildir.
+> Durum: D6-0–D6.6-1R kod ve sentetik sözleşme kapsamı tamamlandı; D6.6-2 live provider reliability ve final D6 kabulü bekleniyor. Bu ifade canlı provider/verifier kalite garantisi veya production-ready iddiası değildir.
 
 ## Kabul özeti
 
@@ -78,3 +78,14 @@ Sentetik seed'ler sözleşme ve metric matematiğini doğrular; öneri kalitesin
 - Yeni model/provider/dependency eklenmedi; D7 model planı [D7 Aspect Verifier Planı](D7_ASPECT_VERIFIER_PLAN.md) içinde belgelendi. Legacy ML dosyaları silinmedi veya authoritative V2 yoluna bağlanmadı.
 - `D6_PROVIDER_LIVE_SMOKE` çalıştırılmadı. Canlı provider drift/rate-limit/latency ve final D6 kabulü D6.6-2 blocker'ıdır.
 - D6.6-1 doğrulaması: `npm run lint` geçti; standard `npm run test:run` 134 dosyada 1.731 test keşfetti, 1.697 geçti ve 34 koşullu test skip edildi; `npm run build`, Markdown link contract'ı ve `git diff --check` geçti. D6.6-1 kaynak değişikliği 59 yeni test case ekledi.
+
+## D6.6-1R ek kabul — 6 Ağustos 2026
+
+- Read-only audit, initial retrieval'ın onaylı `structuredRequestV2` yerine provider title planıyla başladığını ve narrative ranked-tag aspect'lerin AniList discover filtresine girmediğini doğruladı.
+- Registry canonical provider retrieval mapping'i UI label/alias'tan ayrıdır. Political intrigue AniList `Politics`, revenge `Revenge` tag'ini kullanır; 43 ID ve `13/21/9` strategy dağılımı değişmez.
+- Explicit ranked-tag must strict `40`, yetersizse aynı tag ile relaxed `20` pass'ine gider. Mapping missing, no-candidate ve provider-unavailable durumlarında generic title/source/web fallback ile havuz doldurulmaz.
+- Requested tag pass'i veya enrichment evidence'i olmayan title-only/popularity adayları ranked-tag pool gate'inde elenir. Missing tag absent değildir; quality/community tag evidence değildir.
+- Çoklu ranked-tag must bounded ayrı pass union'ı kullanır; bütün must'lar post-evidence hard eligibility'de zorunludur. Deterministik ranking tuple ve LLM-final-ranking=false değişmez.
+- Koşullu live smoke sabit başlık/ilk sonuç/rank/count assertion'ı kullanmadan canonical tag, strict/relaxed rank, finite evidence ve identity kontrol eder. Flag kapalıysa skip sonucu açıkça raporlanır.
+- Ayrıntılı sözleşme ve test matrisi [D6.6-1R Ranked-Tag Retrieval](AI_RECOMMENDATION_V2_D661R_RANKED_TAG_RETRIEVAL.md) belgesindedir.
+- D6.6-1R doğrulaması: `npm run lint` ve `npm run build` geçti; standard `npm run test:run` 135 dosyada 1.756 test keşfetti, 1.721 geçti ve 35 koşullu test skip edildi. Yeni paket 24 sentetik test ve flag-gated 1 live smoke case ekledi. Markdown link contract'ı ile `git diff --check` geçti. `D6_PROVIDER_LIVE_SMOKE` etkin olmadığı için gerçek provider ve browser sonuç smoke'u çalıştırılmadı; D6.6-2 blocker'ı olarak kaldı.

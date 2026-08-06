@@ -25,6 +25,7 @@ import {
   normalizeAniListMedia,
   rankAniListSearchResults,
 } from "@/lib/anilist";
+import { providerRetrievalAllowlist } from "@/features/recommendations/domain/aspect-registry";
 
 // ---- GraphQL Sorgu Metinleri ----
 // `media(...)` alanı altında MEDIA_FIELDS aynı kalır; sadece dış argümanlar/sort
@@ -69,6 +70,7 @@ query (
   $perPage: Int,
   $genreIn: [String],
   $tagIn: [String],
+  $minimumTagRank: Int,
   $episodesLesser: Int,
   $sort: [MediaSort]
 ) {
@@ -77,6 +79,7 @@ query (
       type: $type,
       genre_in: $genreIn,
       tag_in: $tagIn,
+      minimumTagRank: $minimumTagRank,
       episodes_lesser: $episodesLesser,
       sort: $sort,
       isAdult: false
@@ -188,6 +191,7 @@ async function discoverAniList(args: {
   perPage: number;
   genres?: string[];
   tags?: string[];
+  minimumTagRank?: number;
   episodesLesser?: number;
   sort?: string[];
 }): Promise<AniListRawMedia[]> {
@@ -198,6 +202,7 @@ async function discoverAniList(args: {
   if (args.type) variables.type = args.type;
   if (args.genres && args.genres.length > 0) variables.genreIn = args.genres;
   if (args.tags && args.tags.length > 0) variables.tagIn = args.tags;
+  if (typeof args.minimumTagRank === "number") variables.minimumTagRank = args.minimumTagRank;
   if (typeof args.episodesLesser === "number" && args.episodesLesser > 0) {
     variables.episodesLesser = args.episodesLesser;
   }
@@ -238,6 +243,28 @@ function parseCsv(value: string | null): string[] | undefined {
   return parts.length > 0 ? parts : undefined;
 }
 
+const RETRIEVAL_ALLOWLIST = providerRetrievalAllowlist("anilist");
+const ANILIST_DISCOVER_GENRES = new Set([...RETRIEVAL_ALLOWLIST.genres, "Thriller"]);
+const ANILIST_DISCOVER_TAGS = new Set([
+  ...RETRIEVAL_ALLOWLIST.tags,
+  "Iyashikei",
+  "Heartwarming",
+  "Dark Fantasy",
+]);
+const ANILIST_DISCOVER_SORTS = new Set(["POPULARITY_DESC", "SCORE_DESC", "ID"]);
+
+function parseStructuredValues(
+  params: URLSearchParams,
+  singular: string,
+  plural: string,
+): { ok: true; values?: string[] } | { ok: false } {
+  const raw = [params.get(singular), params.get(plural)].filter((value): value is string => Boolean(value));
+  if (raw.length === 0) return { ok: true };
+  const values = raw.flatMap((value) => value.split(",")).map((value) => value.trim()).filter(Boolean);
+  if (values.length === 0 || values.length > 6 || values.some((value) => value.length > 60)) return { ok: false };
+  return { ok: true, values: [...new Set(values)] };
+}
+
 /**
  * GET /api/anilist/search?q=naruto&category=anime
  * R37.1 ek paramlar (q opsiyonel olur):
@@ -250,15 +277,42 @@ export async function GET(request: NextRequest) {
   // 1) Query parametrelerini al
   const params = request.nextUrl.searchParams;
   const query = params.get("q");
-  const category = (params.get("category") || "all") as AniListCategory;
+  const categoryValue = params.get("category") || "all";
+  if (!["anime", "manga", "manhwa", "manhua", "all"].includes(categoryValue)) {
+    return NextResponse.json({ error: "Medya kategorisi geçersiz." }, { status: 400 });
+  }
+  const category = categoryValue as AniListCategory;
 
   // R37.1 — Structured discover parametreleri
-  const genres = parseCsv(params.get("genres"));
-  const tags = parseCsv(params.get("tags"));
+  const parsedGenres = parseStructuredValues(params, "genre", "genres");
+  const parsedTags = parseStructuredValues(params, "tag", "tags");
+  if (!parsedGenres.ok || !parsedTags.ok) {
+    return NextResponse.json({ error: "Structured filtre sınırları geçersiz." }, { status: 400 });
+  }
+  const genres = parsedGenres.values;
+  const tags = parsedTags.values;
+  if (genres?.some((genre) => !ANILIST_DISCOVER_GENRES.has(genre))) {
+    return NextResponse.json({ error: "Desteklenmeyen AniList tür filtresi." }, { status: 400 });
+  }
+  if (tags?.some((tag) => !ANILIST_DISCOVER_TAGS.has(tag))) {
+    return NextResponse.json({ error: "Desteklenmeyen AniList etiket filtresi." }, { status: 400 });
+  }
   const episodesLteRaw = params.get("episodesLte");
   const episodesLesser =
     episodesLteRaw && /^\d+$/.test(episodesLteRaw) ? Math.min(parseInt(episodesLteRaw, 10), 1000) : undefined;
-  const sortParam = parseCsv(params.get("sort"))?.filter((s) => /^[A-Z_]+$/.test(s));
+  const minimumTagRankRaw = params.get("minimumTagRank");
+  const minimumTagRank = minimumTagRankRaw === null
+    ? undefined
+    : /^\d{1,3}$/.test(minimumTagRankRaw)
+      ? Number(minimumTagRankRaw)
+      : Number.NaN;
+  if (minimumTagRank !== undefined && (!Number.isInteger(minimumTagRank) || minimumTagRank < 0 || minimumTagRank > 100 || !tags?.length)) {
+    return NextResponse.json({ error: "Etiket rank filtresi geçersiz." }, { status: 400 });
+  }
+  const sortParam = parseCsv(params.get("sort"));
+  if (sortParam?.some((sort) => !ANILIST_DISCOVER_SORTS.has(sort))) {
+    return NextResponse.json({ error: "AniList sıralama filtresi geçersiz." }, { status: 400 });
+  }
 
   const hasStructuredFilter =
     (genres && genres.length > 0) ||
@@ -287,6 +341,7 @@ export async function GET(request: NextRequest) {
         perPage,
         genres,
         tags,
+        minimumTagRank,
         episodesLesser,
         sort: sortParam,
       });
@@ -346,7 +401,7 @@ export async function GET(request: NextRequest) {
         category,
         mode: !trimmedQuery && hasStructuredFilter ? "discover" : "search",
         fallbackUsed,
-        filters: hasStructuredFilter ? { genres, tags, episodesLesser, sort: sortParam } : undefined,
+        filters: hasStructuredFilter ? { genres, tags, minimumTagRank, episodesLesser, sort: sortParam } : undefined,
       },
     });
   } catch (err) {

@@ -37,6 +37,7 @@ interface AspectRegistryEntry {
     values?: string[];
   }>;
   defaultEvidenceStrategy: "exact_taxonomy" | "ranked_tag" | "semantic_required" | "soft_only";
+  providerRetrievalMappings?: readonly AspectProviderRetrievalMapping[];
   providerStrategyOverrides?: Partial<Record<"anilist" | "tvmaze" | "tmdb" | "omdb" | "open_library", AspectEvidenceStrategy>>;
   safeForMust: boolean | "conditional";
   safeForAvoid: boolean | "conditional";
@@ -176,3 +177,7 @@ Registry [`features/recommendations/domain/aspect-registry.ts`](../features/reco
 ## D6.6-1 evidence strategy
 
 43 kaydın tamamı strategy sahibidir: 13 `exact_taxonomy`, 21 `ranked_tag`, 9 `semantic_required`. `soft_only`, provider alanı aspect'i yalnız partial/yumuşak sinyal olarak desteklediğinde override'dır. Ranked-tag aspect'lerinde AniList dışı provider'lar; exact-taxonomy aspect'lerinde Open Library subject yolu `soft_only` kullanır. Strategy capability ve aggregation'ın ortak registry kaynağıdır; detay [D6.6-1 Capability ve Parser](AI_RECOMMENDATION_V2_D661_CAPABILITY_AND_PARSER.md) belgesindedir.
+
+## D6.6-1R provider retrieval mapping
+
+`providerRetrievalMappings`, aspect anlamını veya evidence strategy'yi değiştirmez; provider'ın canonical taxonomy değerini gerçekten sorgulayabildiğini bildirir. UI label'dan otomatik tag üretilmez. D6.6-1R'de `political_intrigue` AniList `Politics`, `revenge` AniList `Revenge` tag'ine map olur; iki mapping de anime/manga ailesinde queryable ve `40/20` strict/relaxed policy taşır. Mapping olmayan diğer ranked-tag aspect'ler strategy sahibi kalır fakat retrieval capability `ranked_tag_supported` göstermez. [D6.6-1R sözleşmesi](AI_RECOMMENDATION_V2_D661R_RANKED_TAG_RETRIEVAL.md).

@@ -1,4 +1,8 @@
-import { findAspectByAlias, normalizeAspectAlias } from "../domain/aspect-registry";
+import {
+  aspectIdsForProviderTaxonomyValue,
+  findAspectByAlias,
+  normalizeAspectAlias,
+} from "../domain/aspect-registry";
 import type { AspectId, RecommendationProvider } from "../domain/types";
 import type { RawProviderEvidenceClaim } from "./types";
 
@@ -67,7 +71,10 @@ export function mapAniListTagClaims(
     scope: "candidate_metadata", provider: "anilist", field: "tags", value: tag.name,
     normalizedValue: normalizeAspectAlias(tag.name), reliability: 0.9,
     explanation: `AniList tag rank=${tag.rank ?? "unknown"}; rank merkeziyet garantisi değildir.`,
-    mappedAspectIds: exactRegistryAspects(tag.name),
+    mappedAspectIds: [...new Set([
+      ...exactRegistryAspects(tag.name),
+      ...aspectIdsForProviderTaxonomyValue("anilist", "ranked_tag", tag.name),
+    ])],
     spoiler: Boolean(tag.isGeneralSpoiler || tag.isMediaSpoiler),
   }));
 }

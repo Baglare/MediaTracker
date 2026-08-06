@@ -114,6 +114,10 @@ D6-3/D6-5.3'te reliability, provider support ve source-kind ayrı tutulur. Exact
 
 D6.6-1'de registry strategy provider farkını explicit yapar: AniList ranked tag hard-capable olabilir; TMDB unranked keyword aynı politika değildir; Open Library subject hard must için yeterli değildir. TMDB tek keyword en fazla incidental/low, farklı iki mapped keyword significant/medium olabilir. AniList rank `<20` contribution dışı, `20–39` incidental/low, `40–59` significant/medium, `60+` significant/high'tır; primary ikinci güçlü bağımsız claim gerektirir. Missing tag/rank absent değildir. Ayrıntı [D6.6-1 Capability ve Parser](AI_RECOMMENDATION_V2_D661_CAPABILITY_AND_PARSER.md) içindedir.
 
+## D6.6-1R retrieval capability
+
+Evidence strategy tek başına provider'ın query capability'si değildir. `ranked_tag_supported` için hedef medya türünde queryable canonical provider mapping gerekir. D6.6-1R AniList'te `political_intrigue → Politics` ve `revenge → Revenge` mapping'lerini; exact-taxonomy core genre mapping'lerini registry'de tutar. Mapping bulunmayan hard ranked-tag request generic title search'e düşmez. Strict pass canonical tag ile `minimumTagRank=40`, yetersiz havuzda aynı tag ile relaxed `20` kullanır. TMDB keyword ve Open Library subject bu AniList retrieval sözleşmesini devralmaz. Ayrıntı [D6.6-1R Ranked-Tag Retrieval](AI_RECOMMENDATION_V2_D661R_RANKED_TAG_RETRIEVAL.md) içindedir.
+
 - Provider capability/ownership matrisi [`features/recommendations/domain/providers.ts`](../features/recommendations/domain/providers.ts) içindedir; hiçbir provider çağrısı yapmaz.
 - TVMaze raw `type` alanı [`lib/tvmaze-types.ts`](../lib/tvmaze-types.ts) içine optional olarak eklendi. Saf classifier [`tvmaze-anime-classifier.ts`](../features/recommendations/providers/tvmaze-anime-classifier.ts) içinde confirmed/likely/non-anime/unknown sonucu üretir.
 - Classifier yalnız [`features/recommendations/providers/pipeline.ts`](../features/recommendations/providers/pipeline.ts) recommendation hattında uygulanır. Global Search route'u ve Release Calendar filtresizdir.

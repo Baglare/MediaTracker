@@ -24,6 +24,7 @@ import { applyTextSimilarityScoring } from "@/lib/ai/text-similarity-scorer";
 import {
   CandidateSearchResult,
   CandidateVerificationResult,
+  applyRankedTagCandidatePoolGate,
   searchCandidatesWithDebug,
   searchSourceApiCandidates,
   searchWebResearchCandidates,
@@ -51,6 +52,7 @@ import {
   AiCandidate,
   AiEngineProvider,
   AiProviderPolicyMode,
+  RankedTagNoResultReason,
 } from "@/lib/ai/types";
 import { MediaType } from "@/lib/types";
 import { prepareProviderEvidencePipeline, type ProviderEvidencePipelineResult } from "@/features/recommendations/providers/pipeline";
@@ -58,11 +60,13 @@ import {
   DETERMINISTIC_RECOMMENDATION_V2_ENABLED,
   runDeterministicRecommendationV2,
 } from "@/features/recommendations/orchestration";
-import { decodeRecommendationRequestV2 } from "@/features/recommendations/domain/codec";
+import { decodeRecommendationRequestV2, type RecommendationRequestV2 } from "@/features/recommendations/domain/codec";
 import { evaluateRequestEvidenceCapabilities } from "@/features/recommendations/domain/evidence-capability";
 import { availableSemanticVerifierModes } from "@/features/recommendations/evidence";
 import { decodeRecommendationFeedbackEventV2 } from "@/features/recommendations/feedback";
 import { applyStructuredRequestToRetrievalPlan } from "@/features/recommendations/intent/retrieval-guardrails";
+import { ASPECT_REGISTRY } from "@/features/recommendations/domain/aspect-registry";
+import { userFacingRankedTagNoResult } from "@/features/recommendations/ui/user-facing-text";
 
 export const runtime = "nodejs";
 
@@ -70,6 +74,23 @@ const PROVIDER_RATE_LIMIT_MESSAGE =
   "Sağlayıcı yanıt vermedi, teknik detayları panelde görebilirsin.";
 const ALL_PROVIDERS_MOCK_MESSAGE =
   "Sağlayıcı yanıt vermedi, teknik detayları panelde görebilirsin.";
+
+function resolveRankedTagNoResultReason(
+  searchResult: CandidateSearchResult,
+  response: AiRecommendResponse,
+): RankedTagNoResultReason | undefined {
+  const telemetry = searchResult.debug.rankedTagRetrieval;
+  if (!telemetry || telemetry.ranked_tag_constraints === 0 || response.recommendations.length > 0 || (response.nearMatches?.length ?? 0) > 0) return undefined;
+  if (telemetry.noResultReason) return telemetry.noResultReason;
+  const reasons = new Set((response.rejectedCandidates ?? []).map((item) => item.reason));
+  if (reasons.has("candidates_failed_avoid")) return "candidates_failed_avoid";
+  if (reasons.has("candidates_failed_objective")) return "candidates_failed_objective";
+  const bands = [...(searchResult.internal?.rankedTagTraceByCandidateKey.values() ?? [])].map((trace) => trace.rankBand);
+  if (bands.length > 0 && bands.every((band) => band === "20-39" || band === "below-20" || band === "unknown")) {
+    return "candidates_below_tag_rank";
+  }
+  return "candidates_failed_ranked_tag_confidence";
+}
 
 // R19: `PROVIDER_PLAN_FAILED_MESSAGE` artık tüketilmiyor — bir önceki
 // fallback yolunda kullanılıyordu, akış değişince çağrı düştü. Davranış
@@ -905,6 +926,7 @@ async function getCandidates(args: {
   message: string;
   mediaItems: AiRecommendRequest["mediaItems"];
   progressLogs: AiRecommendRequest["progressLogs"];
+  structuredRequest?: RecommendationRequestV2;
 }): Promise<CandidateSearchResult> {
   return searchCandidatesWithDebug({
     intent: args.intent,
@@ -913,6 +935,7 @@ async function getCandidates(args: {
     message: args.message,
     mediaItems: args.mediaItems,
     progressLogs: args.progressLogs,
+    structuredRequest: args.structuredRequest,
   });
 }
 
@@ -978,6 +1001,7 @@ function buildRetrievalDebug(args: {
     finalCandidateCount: searchDebug?.finalCandidateCount || 0,
     refinedPassUsed,
     providerFallback,
+    rankedTagRetrieval: searchDebug?.rankedTagRetrieval,
     highRatedSourceCount: highRatedSourceCount || 0,
     deterministicTasteSignals: deterministicTasteSignals || [],
     deterministicFallbackUsed: Boolean(deterministicFallbackUsed),
@@ -1401,6 +1425,7 @@ export async function POST(req: NextRequest) {
     message,
     mediaItems,
     progressLogs,
+    structuredRequest: structuredRequest?.ok ? structuredRequest.value : undefined,
   });
   searchResult = applySourceTitleExclusion(searchResult, deterministicTaste.excludedSourceTitles, debugNotes);
   if (deterministicFallbackUsed) {
@@ -1425,6 +1450,7 @@ export async function POST(req: NextRequest) {
         message,
         mediaItems,
         progressLogs,
+        structuredRequest: structuredRequest?.ok ? structuredRequest.value : undefined,
       });
       searchResult = applySourceTitleExclusion(searchResult, deterministicTaste.excludedSourceTitles, debugNotes);
       deterministicFallbackUsed = true;
@@ -1452,6 +1478,7 @@ export async function POST(req: NextRequest) {
     !deterministicFallbackUsed &&
     !providerState.rateLimitHit &&
     !!retrievalPlan &&
+    !searchResult.debug.rankedTagRetrieval &&
     searchResult.candidates.length === 0;
   let refinedPassUsed = false;
 
@@ -1477,6 +1504,7 @@ export async function POST(req: NextRequest) {
           message,
           mediaItems,
           progressLogs,
+          structuredRequest: structuredRequest?.ok ? structuredRequest.value : undefined,
         });
         const refinedResult = applySourceTitleExclusion(
           refinedResultRaw,
@@ -1494,7 +1522,8 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const fallbackSearchUsed = searchResult.candidates.length < 3;
+  const rankedTagRetrievalOwnedPool = Boolean(searchResult.debug.rankedTagRetrieval);
+  const fallbackSearchUsed = !rankedTagRetrievalOwnedPool && searchResult.candidates.length < 3;
   const verificationResult: CandidateVerificationResult = emptyVerificationResult();
 
   if (isWeakTvMoodDiscovery(intent, retrievalPlan, searchResult)) {
@@ -1516,7 +1545,7 @@ export async function POST(req: NextRequest) {
   // Sonuçlar mevcut havuza eklenir ve etkin orchestration scoring/ranking yoluna girer. Boş/eksik
   // kaynaklar (TMDB key eksik, OL down vs.) Promise.allSettled ile yutulur,
   // akış durmaz.
-  if (researchMode === "source-apis") {
+  if (researchMode === "source-apis" && !rankedTagRetrievalOwnedPool) {
     try {
       const sourceApi = await searchSourceApiCandidates({
         intent,
@@ -1546,8 +1575,10 @@ export async function POST(req: NextRequest) {
         `r37_source_apis_error:${error instanceof Error ? error.message.slice(0, 80) : "unknown"}`
       );
     }
+  } else if (researchMode === "source-apis") {
+    debugNotes.push("r37_source_apis_skipped:structured_tag_retrieval_owned_pool");
   }
-  if (researchMode === "web") {
+  if (researchMode === "web" && !rankedTagRetrievalOwnedPool) {
     let webAdded = false;
     try {
       const webResearch = await searchWebResearchCandidates({
@@ -1599,6 +1630,8 @@ export async function POST(req: NextRequest) {
         );
       }
     }
+  } else if (researchMode === "web") {
+    debugNotes.push("r44_web_research_skipped:structured_tag_retrieval_owned_pool");
   }
 
   // D6-2/D6-3 — Recommendation-only provider hygiene/evidence sidecar.
@@ -1627,6 +1660,21 @@ export async function POST(req: NextRequest) {
   } catch {
     // Evidence zenginleştirmesi fail-soft'tur; mevcut V1 aday havuzu korunur.
     debugNotes.push("d6_provider_evidence_error:fail_soft");
+  }
+
+  const rankedTagGate = applyRankedTagCandidatePoolGate({
+    request: structuredRequest?.ok ? structuredRequest.value : undefined,
+    candidates,
+    evidenceByCandidateKey: providerPipelineResult?.evidenceByCandidateKey ?? new Map(),
+    traceByCandidateKey: searchResult.internal?.rankedTagTraceByCandidateKey,
+  });
+  candidates = rankedTagGate.candidates;
+  if (rankedTagGate.rejected.length > 0) d6ProviderRejected.push(...rankedTagGate.rejected);
+  if (searchResult.debug.rankedTagRetrieval) {
+    searchResult.debug.rankedTagRetrieval.candidates_without_requested_tag += rankedTagGate.candidatesWithoutRequestedTag;
+  }
+  if (rankedTagGate.candidatesWithoutRequestedTag > 0) {
+    debugNotes.push(`ranked_tag_candidate_gate:removed=${rankedTagGate.candidatesWithoutRequestedTag}`);
   }
 
   // R39/R42 — persistent feedback suppression.
@@ -1724,6 +1772,29 @@ export async function POST(req: NextRequest) {
       if (!existing.has(key)) { existing.add(key); mergedRejected.push(item); }
     }
     response.rejectedCandidates = mergedRejected.length > 0 ? mergedRejected : undefined;
+    const rankedTagTelemetry = searchResult.debug.rankedTagRetrieval;
+    if (rankedTagTelemetry) {
+      rankedTagTelemetry.ranked_tag_primary_count = response.recommendations.length;
+      rankedTagTelemetry.ranked_tag_near_match_count = response.nearMatches?.length ?? 0;
+      const noResultReason = resolveRankedTagNoResultReason(searchResult, response);
+      if (noResultReason) rankedTagTelemetry.noResultReason = noResultReason;
+      if (response.engineStatus) {
+        response.engineStatus.structuredTagRetrievalUsed = rankedTagTelemetry.structuredTagRetrievalUsed;
+        response.engineStatus.rankedTagNoResultReason = noResultReason;
+      }
+      if (noResultReason) {
+        const aspectId = structuredRequest?.ok
+          ? structuredRequest.value.aspectConstraints.find((constraint) => (
+            constraint.role === "must"
+            && ASPECT_REGISTRY[constraint.aspectId].defaultEvidenceStrategy === "ranked_tag"
+          ))?.aspectId
+          : undefined;
+        response.assistantMessage = userFacingRankedTagNoResult(
+          noResultReason,
+          aspectId ? ASPECT_REGISTRY[aspectId].labelTr : undefined,
+        );
+      }
+    }
     response.debug = {
       ...(response.debug ?? { provider: "deterministic_v2" }),
       provider: "deterministic_v2",
@@ -1734,6 +1805,7 @@ export async function POST(req: NextRequest) {
         executedQueries: searchResult.debug.executedQueries,
         sourceCandidateCounts: searchResult.debug.sourceCandidateCounts,
         providerEvidence: providerEvidenceTelemetry,
+        rankedTagRetrieval: rankedTagTelemetry,
         notes: [...(response.debug.retrieval.notes ?? []), ...debugNotes, "d6_3_deterministic_final_ranking"],
       } : undefined,
     };

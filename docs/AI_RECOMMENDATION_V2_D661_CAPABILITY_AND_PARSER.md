@@ -1,6 +1,6 @@
 # AI Recommendation V2 — D6.6-1 Capability ve Türkçe Parser
 
-> Durum: Parser, evidence capability, ranked-tag aggregation, weighted coverage ve deterministik priority hardening uygulanmıştır. Bu çalışma canlı provider kalite kabulü değildir; `D6_PROVIDER_LIVE_SMOKE` D6.6-2'ye aittir.
+> Durum: Parser, evidence capability, ranked-tag aggregation, weighted coverage ve deterministik priority hardening uygulanmıştır. Ranked-tag constraint'in provider retrieval bağlantısı [D6.6-1R](AI_RECOMMENDATION_V2_D661R_RANKED_TAG_RETRIEVAL.md) içinde tamamlanmıştır. Bu çalışma canlı provider kalite kabulü değildir; `D6_PROVIDER_LIVE_SMOKE` D6.6-2'ye aittir.
 
 ## Read-only audit sonucu
 
@@ -63,6 +63,8 @@ Provider strategy farkları:
 [`evidence-capability.ts`](../features/recommendations/domain/evidence-capability.ts) `structured_supported`, `ranked_tag_supported`, `requires_semantic_verifier`, `soft_only` veya `unsupported_for_target` sonucu; provider listesi, reason code, kullanıcı metni ve role izinlerini üretir.
 
 Explicit hard constraint sessizce prefer'e çevrilmez. Interpret draft capability bilgisini ve gerçekten yapılandırılmış verifier mode'larını döndürür. Editör tercihe çevirme, kaldırma ve yalnız endpoint yapılandırılmışsa local/remote verifier seçme aksiyonu sağlar. Recommendation route aynı policy'yi server'da yeniden çalıştırır; geçersiz hard constraint `structured_request_capability_invalid` kontrollü 422 cevabıdır. Client capability payload'ı güvenlik kaynağı değildir.
+
+D6.6-1R ile `ranked_tag_supported` yalnız hedef provider/media türünde queryable canonical retrieval mapping varsa verilir. Strategy sahibi fakat mapping'i olmayan ranked-tag constraint soft-only/mapping-missing capability gösterir; hard request title-search'e gönderilmez.
 
 ## Ranked-tag ve soft evidence policy
 

@@ -14,6 +14,7 @@ import {
   AiIntent,
   AiRetrievalDebug,
   AiRetrievalPlan,
+  RankedTagRetrievalTelemetry,
   AiSearchPlan,
   LibraryProfile,
   RetrievalSource,
@@ -27,7 +28,13 @@ import { GlobalSearchResult } from "@/lib/global-search-types";
 import type { AdvisorScopeMode } from "./types";
 import { expandTargetFamily } from "./target-family";
 import type { RecommendationRequestV2 } from "@/features/recommendations/domain/codec";
-import { ASPECT_REGISTRY } from "@/features/recommendations/domain/aspect-registry";
+import {
+  evidenceStrategyForProvider,
+  providerRetrievalMappingsFor,
+  type AspectId,
+  type AspectProviderRetrievalMapping,
+} from "@/features/recommendations/domain/aspect-registry";
+import type { CandidateProviderEvidenceSnapshot } from "@/features/recommendations/providers/types";
 
 const PER_SOURCE_LIMIT = 8;
 const MAX_TOTAL = 24;
@@ -65,7 +72,19 @@ export interface CandidateSearchResult {
     filterSummary: AiRetrievalDebug["filterSummary"];
     finalCandidateCount: number;
     notes: string[];
+    rankedTagRetrieval?: RankedTagRetrievalTelemetry;
   };
+  internal?: {
+    rankedTagTraceByCandidateKey: ReadonlyMap<string, CandidateRankedTagTrace>;
+  };
+}
+
+export interface CandidateRankedTagTrace {
+  retrievalPass: "strict_tag" | "relaxed_tag" | "provider_plan" | "title_verification";
+  requestedTagMappings: readonly { aspectId: AspectId; canonicalTags: readonly string[] }[];
+  returnedTagEvidence: readonly { aspectId: AspectId; canonicalTag: string; rank: number }[];
+  rankBand: "85-100" | "60-84" | "40-59" | "20-39" | "below-20" | "unknown";
+  eligibility: "retrieval_qualified" | "missing_requested_tag";
 }
 
 export interface CandidateVerificationResult extends CandidateSearchResult {
@@ -439,6 +458,7 @@ async function searchWeb(ctx: SearchContext, query: string, mediaType: MediaType
 interface AniListStructuredQuery {
   genres?: string[];
   tags?: string[];
+  minimumTagRank?: number;
   episodesLesser?: number;
   sort?: string[];
   reason: string;
@@ -456,15 +476,28 @@ export function extractAniListStructuredFilters(
 ): AniListStructuredPasses {
   if (structuredRequest) {
     const genres = new Set<string>();
+    const tags = new Set<string>();
     const reasons: string[] = [];
+    let rankedTagMust = false;
+    let strictMinimumTagRank: number | undefined;
+    let relaxedMinimumTagRank: number | undefined;
     const positiveConstraints = [...structuredRequest.aspectConstraints]
       .filter((constraint) => constraint.role !== "avoid")
       .sort((a, b) => (a.role === "must" ? 0 : 1) - (b.role === "must" ? 0 : 1));
     for (const constraint of positiveConstraints) {
-      const entry = ASPECT_REGISTRY[constraint.aspectId];
-      if (entry.group !== "core" || entry.providerSupport.anilist !== "strong") continue;
-      genres.add(entry.labelEn);
-      reasons.push(`structured:${constraint.role}:${constraint.aspectId}`);
+      const mappings = providerRetrievalMappingsFor(constraint.aspectId, "anilist")
+        .filter((mapping) => structuredRequest.targetMediaTypes.some((mediaType) => mapping.supportedMediaTypes.includes(mediaType)));
+      for (const mapping of mappings) {
+        for (const genre of mapping.canonicalGenres ?? []) genres.add(genre);
+        for (const tag of mapping.canonicalTags ?? []) tags.add(tag);
+        if (mapping.strategy === "ranked_tag") {
+          const policy = mapping.minimumRankPolicy ?? { strict: 40, relaxed: 20 };
+          strictMinimumTagRank = Math.max(strictMinimumTagRank ?? 0, constraint.role === "must" ? policy.strict : policy.relaxed);
+          relaxedMinimumTagRank = Math.max(relaxedMinimumTagRank ?? 0, policy.relaxed);
+          if (constraint.role === "must") rankedTagMust = true;
+        }
+        reasons.push(`structured:${constraint.role}:${constraint.aspectId}`);
+      }
     }
     const episodeLimit = structuredRequest.objectiveConstraints.find((constraint) => (
       constraint.field === "length"
@@ -476,9 +509,11 @@ export function extractAniListStructuredFilters(
     const episodeLimitValue = episodeLimit && typeof episodeLimit.value === "number" ? episodeLimit.value : undefined;
     const episodesLesser = episodeLimitValue !== undefined ? episodeLimitValue + 1 : undefined;
     if (episodesLesser !== undefined) reasons.push(`structured:length:<=${episodeLimitValue}`);
-    if (genres.size === 0 && episodesLesser === undefined) return {};
+    if (genres.size === 0 && tags.size === 0 && episodesLesser === undefined) return {};
     const strict: AniListStructuredQuery = {
       genres: genres.size > 0 ? [...genres] : undefined,
+      tags: tags.size > 0 ? [...tags] : undefined,
+      minimumTagRank: tags.size > 0 ? strictMinimumTagRank : undefined,
       episodesLesser,
       sort: ["POPULARITY_DESC", "SCORE_DESC"],
       reason: reasons.join("|"),
@@ -487,6 +522,8 @@ export function extractAniListStructuredFilters(
       strict,
       relaxed: {
         genres: strict.genres?.slice(0, 1),
+        tags: rankedTagMust ? strict.tags : undefined,
+        minimumTagRank: rankedTagMust ? relaxedMinimumTagRank : undefined,
         sort: ["POPULARITY_DESC"],
         reason: `${strict.reason}+relaxed`,
       },
@@ -600,11 +637,12 @@ async function searchAniListDiscover(
   ctx: SearchContext,
   cat: AniListCategory,
   filters: AniListStructuredQuery
-): Promise<AiCandidate[]> {
+): Promise<{ candidates: AiCandidate[]; unavailable: boolean }> {
   const url = new URL(`${ctx.baseUrl}/api/anilist/search`);
   url.searchParams.set("category", cat);
   if (filters.genres && filters.genres.length > 0) url.searchParams.set("genres", filters.genres.join(","));
   if (filters.tags && filters.tags.length > 0) url.searchParams.set("tags", filters.tags.join(","));
+  if (typeof filters.minimumTagRank === "number") url.searchParams.set("minimumTagRank", String(filters.minimumTagRank));
   if (typeof filters.episodesLesser === "number") {
     url.searchParams.set("episodesLte", String(filters.episodesLesser));
   }
@@ -620,12 +658,12 @@ async function searchAniListDiscover(
     const res = await fetch(url.toString(), { cache: "no-store" });
     if (!res.ok) {
       recordQuery(ctx.debug, "anilist", debugType, queryLabel, 0);
-      return [];
+      return { candidates: [], unavailable: true };
     }
     const data = (await res.json()) as { results?: AniListNormalizedResult[] };
     const results = (data.results || []).slice(0, PER_SOURCE_LIMIT);
     recordQuery(ctx.debug, "anilist", debugType, queryLabel, results.length);
-    return results.map<AiCandidate>((r) => {
+    return { unavailable: false, candidates: results.map<AiCandidate>((r) => {
       const gs: GlobalSearchResult = {
         source: "anilist",
         externalId: r.externalId,
@@ -653,11 +691,236 @@ async function searchAniListDiscover(
         status: r.anilistStatus,
         globalSearch: gs,
       };
-    });
+    }) };
   } catch {
     recordQuery(ctx.debug, "anilist", debugType, queryLabel, 0);
-    return [];
+    return { candidates: [], unavailable: true };
   }
+}
+
+const MAX_RANKED_TAG_CONSTRAINT_QUERIES = 4;
+const STRICT_TAG_SUFFICIENT_CANDIDATES = 3;
+
+interface ResolvedRankedTagConstraint {
+  aspectId: AspectId;
+  mapping: AspectProviderRetrievalMapping;
+}
+
+function candidateTraceKey(candidate: Pick<AiCandidate, "source" | "type" | "externalId">): string {
+  return `${candidate.source}:${candidate.type}:${candidate.externalId}`;
+}
+
+function normalizeProviderTaxonomy(value: string): string {
+  return value.normalize("NFKC").trim().toLocaleLowerCase("en-US");
+}
+
+function rankBand(rank: number | undefined): CandidateRankedTagTrace["rankBand"] {
+  if (rank === undefined) return "unknown";
+  if (rank >= 85) return "85-100";
+  if (rank >= 60) return "60-84";
+  if (rank >= 40) return "40-59";
+  if (rank >= 20) return "20-39";
+  return "below-20";
+}
+
+function resolveHardRankedTagConstraints(request: RecommendationRequestV2): {
+  constraints: readonly ResolvedRankedTagConstraint[];
+  total: number;
+  unmapped: number;
+} {
+  const hard = request.aspectConstraints.filter((constraint) => (
+    constraint.role === "must"
+    && constraint.source === "explicit"
+    && evidenceStrategyForProvider(constraint.aspectId, "anilist") === "ranked_tag"
+  ));
+  const constraints: ResolvedRankedTagConstraint[] = [];
+  let unmapped = 0;
+  for (const constraint of hard) {
+    const mapping = providerRetrievalMappingsFor(constraint.aspectId, "anilist").find((candidate) => (
+      candidate.queryable
+      && candidate.strategy === "ranked_tag"
+      && (candidate.canonicalTags?.length ?? 0) > 0
+      && request.targetMediaTypes.some((mediaType) => candidate.supportedMediaTypes.includes(mediaType))
+    ));
+    if (!mapping) {
+      unmapped += 1;
+      continue;
+    }
+    constraints.push({ aspectId: constraint.aspectId, mapping });
+  }
+  return { constraints, total: hard.length, unmapped };
+}
+
+function tagEvidenceForCandidate(
+  candidate: AiCandidate,
+  constraint: ResolvedRankedTagConstraint,
+): CandidateRankedTagTrace["returnedTagEvidence"] {
+  const raw = candidate.globalSearch?.raw as Partial<AniListNormalizedResult> | undefined;
+  const tags = Array.isArray(raw?.tags) ? raw.tags : [];
+  const canonical = new Map((constraint.mapping.canonicalTags ?? []).map((tag) => [normalizeProviderTaxonomy(tag), tag]));
+  return tags.flatMap((tag) => {
+    const canonicalTag = canonical.get(normalizeProviderTaxonomy(tag.name));
+    const rank = tag.rank;
+    if (!canonicalTag || typeof rank !== "number" || !Number.isFinite(rank) || rank < 0 || rank > 100) return [];
+    return [{ aspectId: constraint.aspectId, canonicalTag, rank }];
+  });
+}
+
+async function searchHardRankedTagCandidates(
+  ctx: SearchContext,
+  request: RecommendationRequestV2,
+): Promise<{
+  candidates: AiCandidate[];
+  telemetry: RankedTagRetrievalTelemetry;
+  traceByCandidateKey: ReadonlyMap<string, CandidateRankedTagTrace>;
+} | null> {
+  const resolved = resolveHardRankedTagConstraints(request);
+  if (resolved.total === 0) return null;
+  const telemetry: RankedTagRetrievalTelemetry = {
+    ranked_tag_constraints: resolved.total,
+    ranked_tag_queryable_constraints: resolved.constraints.length,
+    ranked_tag_unmapped_constraints: resolved.unmapped,
+    anilist_strict_tag_queries: 0,
+    anilist_relaxed_tag_queries: 0,
+    strict_tag_candidate_count: 0,
+    relaxed_tag_candidate_count: 0,
+    title_fallback_candidate_count: 0,
+    candidates_without_requested_tag: 0,
+    ranked_tag_primary_count: 0,
+    ranked_tag_near_match_count: 0,
+    structuredTagRetrievalUsed: resolved.constraints.length > 0,
+  };
+  const traces = new Map<string, CandidateRankedTagTrace>();
+  if (resolved.unmapped > 0) {
+    telemetry.noResultReason = "provider_tag_mapping_missing";
+    return { candidates: [], telemetry, traceByCandidateKey: traces };
+  }
+  if (resolved.constraints.length > MAX_RANKED_TAG_CONSTRAINT_QUERIES) {
+    telemetry.noResultReason = "provider_tag_query_unavailable";
+    return { candidates: [], telemetry, traceByCandidateKey: traces };
+  }
+  const categories = [...new Set(request.targetMediaTypes.map(aniListCategoryFor).filter((value): value is AniListCategory => value !== null))];
+  if (categories.length === 0 || resolved.constraints.length * categories.length > MAX_RANKED_TAG_CONSTRAINT_QUERIES) {
+    telemetry.noResultReason = "provider_tag_query_unavailable";
+    return { candidates: [], telemetry, traceByCandidateKey: traces };
+  }
+  const structured = extractAniListStructuredFilters({
+    kind: "general_recommendation", references: [], targetTypes: [...request.targetMediaTypes], sourceTypes: [], mood: [], avoid: [],
+    needsLibraryProfile: false, needsCandidateSearch: true, needsWebResearch: false,
+  }, request.queryText, request);
+
+  const runPass = async (pass: "strict_tag" | "relaxed_tag") => {
+    const tasks = resolved.constraints.flatMap((constraint) => categories.map(async (category) => {
+      const policy = constraint.mapping.minimumRankPolicy ?? { strict: 40, relaxed: 20 };
+      const minimumRank = pass === "strict_tag" ? policy.strict : policy.relaxed;
+      const result = await searchAniListDiscover(ctx, category, {
+        genres: structured.strict?.genres,
+        tags: [...(constraint.mapping.canonicalTags ?? [])],
+        minimumTagRank: minimumRank,
+        episodesLesser: pass === "strict_tag" ? structured.strict?.episodesLesser : undefined,
+        sort: ["POPULARITY_DESC", "SCORE_DESC", "ID"],
+        reason: `ranked:${constraint.aspectId}:${pass}`,
+      });
+      return { ...result, constraint, minimumRank };
+    }));
+    if (pass === "strict_tag") telemetry.anilist_strict_tag_queries += tasks.length;
+    else telemetry.anilist_relaxed_tag_queries += tasks.length;
+    const settled = await Promise.allSettled(tasks);
+    const candidates: AiCandidate[] = [];
+    let unavailable = false;
+    let belowMinimum = false;
+    for (const item of settled) {
+      if (item.status === "rejected" || item.value.unavailable) {
+        unavailable = true;
+        continue;
+      }
+      for (const candidate of item.value.candidates) {
+        const returnedTagEvidence = tagEvidenceForCandidate(candidate, item.value.constraint);
+        const qualifying = returnedTagEvidence.filter((evidence) => evidence.rank >= item.value.minimumRank);
+        if (qualifying.length === 0) {
+          telemetry.candidates_without_requested_tag += 1;
+          if (returnedTagEvidence.length > 0) belowMinimum = true;
+          continue;
+        }
+        const bestRank = Math.max(...qualifying.map((evidence) => evidence.rank));
+        const key = candidateTraceKey(candidate);
+        const previous = traces.get(key);
+        traces.set(key, {
+          retrievalPass: previous?.retrievalPass ?? pass,
+          requestedTagMappings: [
+            ...(previous?.requestedTagMappings ?? []),
+            { aspectId: item.value.constraint.aspectId, canonicalTags: [...(item.value.constraint.mapping.canonicalTags ?? [])] },
+          ],
+          returnedTagEvidence: [...(previous?.returnedTagEvidence ?? []), ...qualifying],
+          rankBand: rankBand(Math.max(bestRank, ...(previous?.returnedTagEvidence.map((evidence) => evidence.rank) ?? []))),
+          eligibility: "retrieval_qualified",
+        });
+        candidates.push(candidate);
+      }
+    }
+    return { candidates: dedupeCandidates(candidates), unavailable, belowMinimum };
+  };
+
+  const strict = await runPass("strict_tag");
+  telemetry.strict_tag_candidate_count = strict.candidates.length;
+  if (strict.unavailable) {
+    telemetry.noResultReason = "provider_tag_query_unavailable";
+    return { candidates: [], telemetry, traceByCandidateKey: traces };
+  }
+  let combined = strict.candidates;
+  if (strict.candidates.length < STRICT_TAG_SUFFICIENT_CANDIDATES) {
+    const relaxed = await runPass("relaxed_tag");
+    telemetry.relaxed_tag_candidate_count = relaxed.candidates.length;
+    if (relaxed.unavailable) {
+      if (strict.candidates.length > 0) {
+        return { candidates: strict.candidates.slice(0, MAX_TOTAL), telemetry, traceByCandidateKey: traces };
+      }
+      telemetry.noResultReason = "provider_tag_query_unavailable";
+      return { candidates: [], telemetry, traceByCandidateKey: traces };
+    }
+    combined = dedupeCandidates([...strict.candidates, ...relaxed.candidates]);
+    if (combined.length === 0 && (strict.belowMinimum || relaxed.belowMinimum)) {
+      telemetry.noResultReason = "candidates_below_tag_rank";
+    }
+  }
+  if (combined.length === 0 && !telemetry.noResultReason) telemetry.noResultReason = "provider_tag_no_candidates";
+  return { candidates: combined.slice(0, MAX_TOTAL), telemetry, traceByCandidateKey: traces };
+}
+
+function snapshotHasRequestedRankedTag(
+  snapshot: CandidateProviderEvidenceSnapshot | undefined,
+  requestedAspectIds: ReadonlySet<AspectId>,
+): boolean {
+  if (!snapshot) return false;
+  return snapshot.rawEvidenceClaims.some((claim) => {
+    if (claim.sourceKind !== "provider_tag_rank" || !claim.mappedAspectIds.some((id) => requestedAspectIds.has(id))) return false;
+    const value = normalizeProviderTaxonomy(String(claim.value ?? ""));
+    const rank = snapshot.objectiveMetadata.tags?.find((tag) => normalizeProviderTaxonomy(tag.name) === value)?.rank;
+    return typeof rank === "number" && Number.isFinite(rank) && rank >= 20 && rank <= 100;
+  });
+}
+
+export function applyRankedTagCandidatePoolGate(input: {
+  request?: RecommendationRequestV2;
+  candidates: readonly AiCandidate[];
+  evidenceByCandidateKey: ReadonlyMap<string, CandidateProviderEvidenceSnapshot>;
+  traceByCandidateKey?: ReadonlyMap<string, CandidateRankedTagTrace>;
+}): { candidates: AiCandidate[]; rejected: { title: string; reason: string }[]; candidatesWithoutRequestedTag: number } {
+  if (!input.request) return { candidates: [...input.candidates], rejected: [], candidatesWithoutRequestedTag: 0 };
+  const resolved = resolveHardRankedTagConstraints(input.request);
+  if (resolved.total === 0) return { candidates: [...input.candidates], rejected: [], candidatesWithoutRequestedTag: 0 };
+  const requestedAspectIds = new Set(resolved.constraints.map((constraint) => constraint.aspectId));
+  const snapshots = [...input.evidenceByCandidateKey.values()];
+  const candidates: AiCandidate[] = [];
+  const rejected: { title: string; reason: string }[] = [];
+  for (const candidate of input.candidates) {
+    const trace = input.traceByCandidateKey?.get(candidateTraceKey(candidate));
+    const fromRequestedPass = Boolean(trace?.returnedTagEvidence.some((evidence) => requestedAspectIds.has(evidence.aspectId) && evidence.rank >= 20));
+    const snapshot = snapshots.find((item) => item.candidateIdentity.primaryProvider === candidate.source && item.candidateIdentity.primaryExternalId === candidate.externalId);
+    if (fromRequestedPass || snapshotHasRequestedRankedTag(snapshot, requestedAspectIds)) candidates.push(candidate);
+    else rejected.push({ title: candidate.title, reason: "candidates_failed_ranked_tag_confidence" });
+  }
+  return { candidates, rejected, candidatesWithoutRequestedTag: rejected.length };
 }
 
 // ---- AniList ----
@@ -1235,6 +1498,7 @@ export async function searchCandidates(args: {
   message: string;
   mediaItems: MediaItem[];
   progressLogs: ProgressLog[];
+  structuredRequest?: RecommendationRequestV2;
 }): Promise<AiCandidate[]> {
   const result = await searchCandidatesWithDebug(args);
   return result.candidates;
@@ -1310,10 +1574,13 @@ export async function searchCandidatesWithDebug(args: {
   message: string;
   mediaItems: MediaItem[];
   progressLogs: ProgressLog[];
+  structuredRequest?: RecommendationRequestV2;
 }): Promise<CandidateSearchResult> {
-  const { intent, retrievalPlan, profile, message, mediaItems, progressLogs } = args;
+  const { intent, retrievalPlan, profile, message, mediaItems, progressLogs, structuredRequest } = args;
   const debug = createSearchDebug();
   const notes: string[] = [];
+  let rankedTagRetrieval: RankedTagRetrievalTelemetry | undefined;
+  let rankedTagTraceByCandidateKey: ReadonlyMap<string, CandidateRankedTagTrace> | undefined;
 
   const finish = (candidates: AiCandidate[]): CandidateSearchResult => {
     const filterSummary = {
@@ -1330,7 +1597,9 @@ export async function searchCandidatesWithDebug(args: {
         filterSummary,
         finalCandidateCount: candidates.length,
         notes,
+        rankedTagRetrieval,
       },
+      internal: rankedTagTraceByCandidateKey ? { rankedTagTraceByCandidateKey } : undefined,
     };
   };
 
@@ -1339,6 +1608,23 @@ export async function searchCandidatesWithDebug(args: {
   }
 
   const ctx: SearchContext = { baseUrl: getBaseUrl(), debug };
+
+  if (structuredRequest) {
+    const rankedTagResult = await searchHardRankedTagCandidates(ctx, structuredRequest);
+    if (rankedTagResult) {
+      rankedTagRetrieval = rankedTagResult.telemetry;
+      rankedTagTraceByCandidateKey = rankedTagResult.traceByCandidateKey;
+      notes.push(`ranked_tag_retrieval:strict=${rankedTagRetrieval.strict_tag_candidate_count} relaxed=${rankedTagRetrieval.relaxed_tag_candidate_count}`);
+      if (rankedTagRetrieval.noResultReason) notes.push(`ranked_tag_no_result:${rankedTagRetrieval.noResultReason}`);
+      const targetFamily = [...expandTargetFamily([...structuredRequest.targetMediaTypes], message)];
+      return finish(hygieneFilterCandidates(
+        rankedTagResult.candidates,
+        targetFamily,
+        intent.references,
+        debug,
+      ).slice(0, MAX_TOTAL));
+    }
+  }
 
   if (retrievalPlan) {
     const plan = normalizePlan(retrievalPlan, intent);
@@ -1528,7 +1814,7 @@ export async function searchWebResearchCandidates(args: {
       const structured = extractAniListStructuredFilters(intent, message, args.structuredRequest);
       const cat = aniListCategoryFor(pair.mediaType);
       if (cat && structured.strict) {
-        tasks.push(searchAniListDiscover(ctx, cat, structured.strict));
+        tasks.push(searchAniListDiscover(ctx, cat, structured.strict).then((result) => result.candidates));
       }
     }
     for (const q of webCandidateQueries.slice(0, MAX_WEB_VERIFICATION_QUERIES_PER_SOURCE)) {
@@ -1610,7 +1896,7 @@ export async function searchSourceApiCandidates(args: {
 
     const strictTasks: Promise<AiCandidate[]>[] = [];
     for (const cat of anilistCats) {
-      strictTasks.push(searchAniListDiscover(ctx, cat, structured.strict));
+      strictTasks.push(searchAniListDiscover(ctx, cat, structured.strict).then((result) => result.candidates));
     }
     const strictSettled = await Promise.allSettled(strictTasks);
     const strictBatch: AiCandidate[] = [];
@@ -1624,7 +1910,7 @@ export async function searchSourceApiCandidates(args: {
     if (strictBatch.length === 0 && structured.relaxed) {
       const relaxedTasks: Promise<AiCandidate[]>[] = [];
       for (const cat of anilistCats) {
-        relaxedTasks.push(searchAniListDiscover(ctx, cat, structured.relaxed));
+        relaxedTasks.push(searchAniListDiscover(ctx, cat, structured.relaxed).then((result) => result.candidates));
       }
       const relaxedSettled = await Promise.allSettled(relaxedTasks);
       const relaxedBatch: AiCandidate[] = [];

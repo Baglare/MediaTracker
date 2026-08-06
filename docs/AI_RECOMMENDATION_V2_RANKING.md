@@ -1,6 +1,6 @@
 # AI Recommendation V2 — Evidence, Eligibility ve Deterministik Ranking
 
-> Durum: D6-3 deterministik baseline D6.6-1 capability, ranked-tag, weighted coverage ve evidence-before-personal priority ile güçlendirilmiştir. D7 modeli uygulanmamıştır. [D6.6-1](AI_RECOMMENDATION_V2_D661_CAPABILITY_AND_PARSER.md) · [D7 planı](D7_ASPECT_VERIFIER_PLAN.md)
+> Durum: D6-3 deterministik baseline D6.6-1 capability ve D6.6-1R ranked-tag retrieval ile güçlendirilmiştir. D7 modeli uygulanmamıştır. [D6.6-1](AI_RECOMMENDATION_V2_D661_CAPABILITY_AND_PARSER.md) · [D6.6-1R](AI_RECOMMENDATION_V2_D661R_RANKED_TAG_RETRIEVAL.md) · [D7 planı](D7_ASPECT_VERIFIER_PLAN.md)
 
 ## 1. Çalışan akış
 
@@ -23,7 +23,7 @@ Authoritative çağrı [`runDeterministicRecommendationV2`](../features/recommen
 - Explicit must bütün strictness modlarında must kalır.
 - Provider desteği `unsupported/experimental` veya registry `mustSafety=unsafe` ise otomatik hard karar uydurulmaz; constraint `prefer` olur ve warning taşır.
 - Retrieval planning sinyalleri yalnız `inferred` kaynaktır ve explicit constraint'i ezmez.
-- Kullanıcıca onaylanmış structured request, provider retrieval planının hedeflerini ve pozitif/avoid sinyallerini guardrail ile yeniden sabitler; provider clarification veya eski mesaj metni bu kararı silemez. AniList hedefinde core/strong registry kaydı olan pozitif constraint'ler structured discover genre filtresine, episode limiti de `episodesLesser` filtresine taşınır.
+- Kullanıcıca onaylanmış structured request, provider retrieval planının hedeflerini ve pozitif/avoid sinyallerini guardrail ile yeniden sabitler; provider clarification veya eski mesaj metni bu kararı silemez. AniList provider retrieval mapping'i exact constraint'i canonical genre'a, queryable ranked-tag must'ı canonical tag + `minimumTagRank` strict/relaxed pass'ine taşır. Ranked-tag havuz sahipliğinde generic title fallback yoktur.
 - Reference yalnız exact provider + external ID ile `verified` olur. Title-only/fuzzy eşleşme `unresolved` kalır.
 - Medya türü, length, release status/year, format, language ve country objective constraint'tir; aspect registry'ye gömülmez.
 
