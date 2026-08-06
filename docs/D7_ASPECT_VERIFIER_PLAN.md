@@ -1,140 +1,76 @@
 # D7 Aspect Verifier Planı
 
-> Bu belge plan sözleşmesidir. D6.6-1 kapsamında model eğitimi, inference, provider ağı veya dependency kurulumu yapılmaz.
+Tarih: 6 Ağustos 2026
+Durum: D7-0 tamamlandı; model/data toplama veya training başlamadı.
 
-## Amaç ve görev sınırı
+## Kesin ürün kararı
 
-Yeni modelin tek görevi:
+Yeni modelin tek görevi `CandidateTextBundle + aspect → ordinal probabilities + calibrated confidence + abstention` üretmektir. Çıktı candidate/aspect `AspectEvidence` girdisi olabilir; model candidate seçmez, sıralamaz, must/prefer/avoid veya personal fit uygulamaz. Deterministic V2 eligibility ve ranking üretim karar makamıdır.
 
-`Candidate metadata + aspect → absent | incidental | significant | primary + calibrated confidence`
+Hash/mock embedding semantic evidence değildir. Legacy embedding similarity, lexical similarity ve additive hybrid scorer yeni verifier'ın temeli değildir. Kullanıcı kişisel verileri model input'una, training dataset'ine veya public dataset'e girmez. D7-0 yalnız contract, audit ve plan aşamasıdır.
 
-Kanıt yetersizse model `abstain/unknown` üretir. Model recommendation seçmez, final sıra vermez, hard eligibility'yi atlamaz ve açıklama için taşımadığı claim'i üretmez. Çıktısı versioned `AspectEvidence` girişidir; deterministic V2 final karar sahibi olarak kalır.
+## D7-0 çıktıları
 
-Öncelikli aspect'ler: romance, fantasy, action, comedy, horror, mystery, political_intrigue, power_progression, revenge, academy, love_triangle, fanservice, dark, slow_burn, character_driven, plot_driven.
+- [Data and License Audit](D7_DATA_AND_LICENSE_AUDIT.md): provider/source kullanım sınıfları, retention, telif ve açık izin soruları.
+- [Dataset Provenance](D7_DATASET_PROVENANCE.md): manifest, source policy, provenance, annotation ve verifier codec invariant'ları.
+- [Annotation Guidelines](D7_ANNOTATION_GUIDELINES.md): beş label, 16 aspect ve zorunlu kavram ayrımları.
+- [Model Experiment Plan](D7_MODEL_EXPERIMENT_PLAN.md): 12-aspect MVP, 40–60 pilot, 120–200 gold hedefi, split, baseline, ordinal/calibration planı.
+- [ML Migration Plan](D7_ML_MIGRATION_PLAN.md): legacy uçtan uca audit, removal map, local annotation tool ve D7-0..D7-5 gates.
+- Saf code: `features/recommendations/evaluation/dataset/` ve sentetik contract testleri.
 
-## Korunacak ve aktif gelecek yoldan çıkarılacak yaklaşım
+## MVP kapsamı
 
-Korunacak:
+Seçilen 12 aspect:
 
-- deterministic V2 baseline ve hard eligibility
-- dondurulmuş 43 aspect registry
-- exact provider identity ve versioned evidence snapshots
-- must/prefer/avoid, strictness ve Feedback V2
-- grounded explanation
-- evaluation fixture codec ve mevcut saf metric fonksiyonları
+- Core control: `romance`, `fantasy`, `action`, `comedy`.
+- Ranked ambiguity: `political_intrigue`, `power_progression`, `love_triangle`, `fanservice`, `dark`.
+- Semantic: `slow_burn`, `character_driven`, `plot_driven`.
 
-Aktif gelecek yoldan çıkarılacak:
+Pilot 6–8 aspect ile başlar. `revenge`, `academy`, `horror`, `mystery` post-MVP/holdout adayıdır. 43 aspect'in tamamı ilk model kapsamı değildir.
 
-- hash/mock embedding'in semantic sistem gibi sunulması
-- genel text similarity'nin aspect merkeziyeti yerine kullanılması
-- V1 additive hybrid scorer'ın recommendation authority olması
-- ML modelinin doğrudan final ranking yapması
-- LLM reranking'in production varsayılanı olması
+## Veri ve annotation sınırı
 
-## Dosya haritası
+- Pilot: 40–60 unique work; guideline validation, training yeterliliği iddiası yok.
+- MVP gold: yaklaşık 120–200 unique work; sparse work/aspect matrix, balanced positive/negative/uncertain ve hard negatives.
+- Minimum %15–25 double annotation. İkinci insan yoksa limitation açıkça belgelenir; aynı kişinin ikinci turu bağımsız annotator değildir.
+- Franchise/series/exact identity aware split; alternate title ve duplicate provider identity aynı split'te kalır.
+- Frozen gold test threshold tuning veya active learning'e geri beslenmez.
 
-| Mevcut yüzey | D7 kararı | Korunacak rol / replacement |
-|---|---|---|
-| `lib/ai/embedding-provider.ts` | Deprecate | Mock fallback semantic evidence değildir; yeni verifier port'una taşınmaz. |
-| `lib/ai/embedding-cache.ts`, `persistent-embedding-cache.ts` | Legacy/cache audit sonrası deprecate adayı | Yeni model cache'i exact model/dataset/snapshot version anahtarıyla ayrı tasarlanır. |
-| `lib/ai/embedding-similarity-scorer.ts`, `embedding-text-builder.ts`, `embedding-types.ts` | Final aspect yolundan çıkar | Genel profil benzerliği aspect merkeziyeti değildir. |
-| `lib/ai/text-similarity-scorer.ts` | Aspect evidence için kaldır | Yalnız kontrollü legacy/shadow karşılaştırma. |
-| `lib/ai/hybrid-feature-builder.ts`, `hybrid-scorer.ts` | V1 additive ranking deprecate | Deterministic V2 breakdown authoritative kalır. |
-| `lib/ai/candidate-scorer.ts`, `feedback-aware-scorer.ts` | Legacy adapter/shadow | Exact feedback semantiği V2 personal-fit'te korunur. |
-| `ml-service/app.py`, `embedding.py`, `models.py`, `requirements.txt` | Mevcut genel embedding servisi deprecate | Yeni local aspect verifier ayrı versioned service contract'ı kullanır. |
-| `features/recommendations/domain/*` | Koru | Registry, request, evidence ve eligibility contract'ı. |
-| `features/recommendations/providers/*` | Koru | Exact identity ve bounded provider snapshots. |
-| `features/recommendations/evaluation/*` | Koru/genişlet | Gold label codec ve metric girişleri. |
-| `features/recommendations/orchestration/deterministic-engine.ts` | Koru | Model fail-soft olsa da final seçim/sıra sahibi. |
+Gerçek kullanıcı note/rating/favorite/progress/feedback/prompt, private library, raw provider payload, long synopsis/description/plot, image ve API secret yasaktır. Provider runtime reference provider metninin dataset'e kopyalanması değildir.
 
-Bu dosyalar D6.6-1'de silinmez. Fiziksel kaldırma, tüm çağrı noktaları ve migration/shadow ihtiyaçları D7 acceptance'ta doğrulandıktan sonra ayrı değişikliktir.
+## Model ve ordinal karar
+
+Baseline sırası:
+
+1. TF-IDF + logistic/ordinal classifier.
+2. Frozen multilingual encoder + linear/cumulative ordinal heads.
+3. Yalnız veri yeterliyse encoder fine-tuning.
+
+4-class softmax kontrol baseline'ıdır; doğal sınıf sırası nedeniyle ordinal regression/cumulative heads önceliklidir. Calibration ve abstention ayrı ölçülür; aspect başına class balance/threshold farklı olabilir. Devasa veya generative LLM classifier başlangıç modeli değildir. Model seçimi/indirme D7-2 öncesinde yapılmaz.
+
+## Evaluation ve acceptance
+
+Deterministic structured-only baseline korunur. Verifier için macro/micro/per-aspect F1, mean ordinal error, quadratic weighted kappa, ECE, Brier, abstention coverage, selective accuracy, confidence-error curve, confusion matrix, CPU p50/p95, RAM ve model size raporlanır. Sistem seviyesinde hard violation, Precision@K/NDCG@K, unsupported explanation, provider coverage ve diversity regression kapıları kalır.
+
+Model her aspect'te kazanmak zorunda değildir; yalnız ölçülebilir iyileşme sağladığı aspect'ler adapter'a açılabilir. Hard-constraint violation kötüleşirse model kabul edilmez. Calibration kötüyse confidence eligibility'de kullanılmaz. Gold test'te threshold tuning yapılmaz.
 
 ## Aşamalar
 
-### D7-0 — Veri/lisans audit'i
+| Aşama | Kapsam | Varsayılan rollback |
+| --- | --- | --- |
+| D7-0 | Data/license/provenance/annotation contract | Saf yeni contract/docs kaldırılır; V2 davranışı değişmez |
+| D7-1 | Local-only annotation tool, pilot, guideline revision, gold dataset v1 | Last-good versioned artifact; production route yok |
+| D7-2 | Classical + frozen multilingual baseline, ordinal heads, offline runner | Model artifact kaldırılır; dataset korunur |
+| D7-3 | Calibration, abstention, local verifier API v2, AspectEvidence adapter, fail-soft | Verifier disabled; structured-only V2 |
+| D7-4 | Yalnız yeterli ve izinli veri varsa optional personalized reranker shadow | Experiment silinir; production default hiç açılmaz |
+| D7-5 | Benchmark, model/data card, browser/live integration, final acceptance | Verifier feature kapalı; deterministic V2 authoritative |
 
-- provider alanları ve lisans/retention koşulları
-- annotation guideline ve ordinal level örnekleri
-- priority aspect sırası
-- dataset/version/snapshot manifest contract'ı
-- PII ve telif sınırı
+Her aşamanın giriş/çıktı/test/blocker/scope dışı/rollback matrisi [ML Migration Plan](D7_ML_MIGRATION_PLAN.md) içindedir.
 
-### D7-1 — Annotation ve gold set
+## D7-1 blocker'ları
 
-- küçük annotation aracı
-- human-labeled gold set
-- iki bağımsız annotator
-- anlaşmazlık kaydı ve adjudication
-- franchise-aware train/validation/test split; aynı franchise farklı split'e sızmaz
-
-### D7-2 — Model ve local inference
-
-- multilingual encoder değerlendirmesi
-- ordinal head veya calibrated one-vs-rest aspect heads
-- versioned local inference service
-- model unavailable/timeout/invalid output için structured-only fail-soft
-
-### D7-3 — Calibration ve AspectEvidence entegrasyonu
-
-- probability calibration
-- aspect/provider bazında abstention threshold
-- model output → `AspectEvidence`
-- structured/model contradiction policy; bir kaynak diğerini sessizce ezmez
-- latency/concurrency/cache bütçesi
-
-### D7-4 — Opsiyonel personalized reranker deneyi
-
-- yalnız yeterli consented veri ve offline acceptance varsa
-- deterministic baseline'a karşı shadow/offline deney
-- production ranking varsayılanı yapılmaz
-- kişisel note/rating/progress training dataset'ine girmez
-
-### D7-5 — Benchmark ve kabul
-
-- benchmark ve immutable sonuç manifest'i
-- model card, lisans ve intended-use/limitation
-- p50/p95 latency, memory ve fallback ölçümü
-- deterministic baseline karşılaştırması
-- rollback/fail-soft ve acceptance gate
-
-## Dataset sınırları
-
-- Gerçek kullanıcı prompt'u, notu, rating'i, progress'i veya private feedback'i kullanılmaz.
-- Provider'dan alınan uzun telifli açıklamalar dataset'e kopyalanmaz; kısa bounded alan veya sentetik özet tercih edilir.
-- Exact provider identity, snapshot schema/version ve observation time tutulur.
-- Sentetik contract fixture gerçek kalite dataset'i veya gold label diye sunulmaz.
-- Aynı eserin farklı edition/season/franchise kayıtları leakage audit'inden geçer.
-- Annotation guideline spoiler ve hassas içerik label'larında ayrıntı ifşasını sınırlar.
-
-## Metrikler
-
-- constraint extraction precision, recall, F1
-- aspect ordinal error ve aspect level accuracy
-- hard-constraint violation rate
-- Precision@K ve NDCG@K
-- unsupported explanation rate
-- abstention coverage/accuracy
-- calibration error
-- provider/model fallback rate
-- p50/p95 latency ve peak memory
-
-Metrikler provider/media/aspect slice'larıyla raporlanır. Ortalama iyileşme tek bir hard-constraint veya güvenlik slice'ındaki gerilemeyi gizleyemez.
-
-## Acceptance gate
-
-1. Veri/lisans ve PII audit'i tamamlanmış olmalı.
-2. Gold set iki annotator + adjudication ve franchise-aware split taşımalı.
-3. Model calibration ve abstention raporu versioned olmalı.
-4. Hard-constraint violation deterministic baseline'dan kötüleşmemeli.
-5. Unsupported explanation ve fallback davranışı kabul sınırında olmalı.
-6. Model unavailable iken deterministic structured-only yol aynı request için güvenli sonuç/unknown üretmeli.
-7. LLM veya model final recommendation authority olmamalı.
-
-## D6.6-2 handoff durumu
-
-- 21 ranked-tag aspect provider coverage matrisi hazır; queryable baseline yalnız `Politics` ve `Revenge` mapping'idir.
-- Exact taxonomy deterministic baseline ve ranked-tag rank policy sabittir.
-- Semantic confirmation boşluğu 9 ranked aspect ve registry'deki 9 `semantic_required` aspect için ayrılmıştır.
-- Live drift sonucu bilinir: TVMaze ambiguous first-result assertion'ı kaldırıldı; public AniList/TVMaze/Open Library contract paketi geçti.
-- Evaluation codec ve metric fonksiyonları hazırdır.
-- Veri/lisans audit'i, annotation guideline ve human-labeled gold set D7-0'da başlayacaktır; D6 fixture'ları kalite dataset'i değildir.
+- Annotator agreement, pseudonymous session ve revocation/deletion akışı.
+- İkinci annotator bulunabilirliği veya single-annotator limitation kararı.
+- Sentetik/human-rewritten source policy ve private artifact saklama yeri.
+- TMDB yazılı izni olmadan TMDB content yok; AniList/OMDb corpus yok; TVMaze/Open Library training field audit tamamlanmadan yok.
+- Annotation tool'un production build'e girmediğini garanti eden packaging kararı.

@@ -57,6 +57,16 @@ Doğru biçimde 0 sonuç beklenen strict case `resultCoverage` paydasına körle
 - Gerçek kullanıcı library/note/prompt/feedback public dataset'e girmez.
 - Exact provider identity ile snapshot/dataset/model version birlikte tutulur; sentetik fixture gold kalite etiketi sayılmaz.
 
+## D7-0 dataset ve verifier contract genişletmesi
+
+`features/recommendations/evaluation/dataset/` source policy, manifest, record provenance, candidate text, annotation ve verifier output için saf runtime codec taşır. Contract gerçek dataset içermez. Her record provenance zorunludur; unresolved license train split'e, internal-only source publishable artifact'e giremez. Personal-data flag yalnız literal `false` olabilir; exact provider identity title benzerliğine düşmez; franchise/exact identity split leakage reddedilir.
+
+Annotation beş label taşır: absent, incidental, significant, primary ve insufficient_evidence. `insufficient_evidence` absent değildir; annotation confidence model confidence değildir. Evidence note 280, short summary 600 karakterle sınırlıdır. Duplicate annotator/round ve adjudication invariant'ları codec tarafından doğrulanır.
+
+Verifier output dört ordinal probability, predicted level, calibrated confidence, abstention/reason, model version, input schema version ve warnings taşır. Probability toplam toleransı `1±0.0001`dir; mock/hash model version semantic output sayılmaz.
+
+İlgili belgeler: [data/license audit](D7_DATA_AND_LICENSE_AUDIT.md), [provenance contract](D7_DATASET_PROVENANCE.md), [annotation guideline](D7_ANNOTATION_GUIDELINES.md), [experiment plan](D7_MODEL_EXPERIMENT_PLAN.md).
+
 ## D7 karşılaştırmaları
 
 1. Legacy V1 rule/hybrid yalnız deprecation karşılaştırma baseline'ı.
@@ -65,6 +75,8 @@ Doğru biçimde 0 sonuç beklenen strict case `resultCoverage` paydasına körle
 4. Structured/model contradiction ve fail-soft karşılaştırması.
 5. Yalnız veri yeterliyse opsiyonel personalized reranker shadow deneyi; production varsayılanı değildir.
 
-Rapor constraint extraction precision/recall/F1, aspect ordinal error/level accuracy, hard-constraint violation, Precision@K, NDCG@K, unsupported explanation, abstention coverage/accuracy, calibration error, provider/model fallback ve p50/p95 latency metriklerini taşır. Production threshold, confidence veya ranking ancak human-labeled gold set, tekrar üretilebilir metric raporu ve regression gate kanıtıyla değiştirilebilir. D6.6-1 genel strength/confidence threshold'larını düşürmez.
+Rapor constraint extraction precision/recall/F1, aspect ordinal error/level accuracy, hard-constraint violation, Precision@K, NDCG@K, unsupported explanation, provider/model fallback ve latency yanında verifier macro/micro/per-aspect F1, quadratic weighted kappa, expected calibration error, Brier score, abstention coverage, selective accuracy, confidence-error curve, confusion matrix, p50/p95 inference, peak memory ve model size metriklerini taşır. Production threshold, confidence veya ranking ancak human-labeled gold set, tekrar üretilebilir metric raporu ve regression gate kanıtıyla değiştirilebilir. D6.6-1 genel strength/confidence threshold'larını düşürmez.
+
+Model her aspect'te deterministic baseline'ı geçmek zorunda değildir. Yalnız ölçülebilir kazanç bulunan aspect production adapter adayı olabilir. Hard-constraint violation kötüleşirse model reddedilir; calibration kötüyse model confidence eligibility'de kullanılmaz. Threshold/calibration tuning validation split'te yapılır, frozen gold test'te yapılmaz.
 
 D6.6-2 live katalog sonucunu relevance gold etiketi saymaz. Live örnek yalnız schema, exact identity, canonical tag/rank, provider sınıflandırma ve bounded request invariant'larını doğrular. Determinizm tek normalize snapshot setinin 20 tekrarıyla ölçülür; 20 ayrı live çağrı yapılmaz.
