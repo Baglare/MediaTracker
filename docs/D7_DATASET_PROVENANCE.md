@@ -1,6 +1,6 @@
 # D7 Dataset Provenance Contract
 
-Durum: D7-0 saf domain/codec sözleşmesi. Dataset kaydı içermez ve provider/model ağı kullanmaz.
+Durum: D7-0 sözleşmesi ve D7-1A private workspace uzantısı. Gerçek dataset kaydı içermez ve provider/model ağı kullanmaz.
 
 ## Kod yüzeyi
 
@@ -93,4 +93,10 @@ Codec sonrası validation şu kapıları uygular:
 - Public export ayrı manifest/hash üretir; internal-only source veya reviewer operasyon notlarını taşımaz.
 - Source terms, contributor revocation veya provenance hatası dataset version'ını invalid eder; in-place sessiz düzeltme yerine yeni manifest/hash üretilir.
 - Model artifact normal Git history'ye girmez. D7-2 kararı sonrasında boyuta göre private release artifact veya Git LFS; checksum ve model card zorunludur.
+
+## D7-1A private workspace uzantısı
+
+Workspace metadata, record, task, revision history, adjudication, revocation, audit ve checksum ayrı versioned dosyalarda tutulur. Import/export aynı strict record/provenance codec'ini paylaşır; client path veya filename gönderemez. Her record exact provider identity veya sentetik identity taşır ve `personalData=false` zorunludur.
+
+Annotation update eski kaydı silmez; active/superseded revision history korunur. Revocation source policy/reference/record/workspace kapsamını ve training/evaluation/export action'larını taşır; correction önceki ID'yi referanslayan replacement/reversal record'dur. Private/atomic storage ayrıntısı [D7-1A Architecture](D7_ANNOTATION_TOOL_ARCHITECTURE.md) ve [Private Artifact Policy](D7_PRIVATE_ARTIFACT_POLICY.md) içindedir.
 - Dataset/model card source policy version, intended use, exclusions, known limitations, deletion ve reproduction environment bilgilerini taşır.

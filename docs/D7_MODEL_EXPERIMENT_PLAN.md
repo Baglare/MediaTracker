@@ -1,6 +1,6 @@
 # D7 Model Experiment Plan
 
-Durum: Plan-only. D7-0'da model seçilmez, indirilmez, eğitilmez veya benchmark skoru üretilmez.
+Durum: D7-0 planı ve D7-1A araç sözleşmesi tamamlandı. Model seçilmez, indirilmez, eğitilmez veya benchmark skoru üretilmez.
 
 ## Görev
 
@@ -120,5 +120,7 @@ Verifier metrikleri:
 Deterministic structured-only authoritative baseline'dır. Legacy V1 hybrid yalnız evaluation/deprecation karşılaştırmasıdır. Model her aspect'te kazanmak zorunda değildir; yalnız ölçülebilir iyileşme olan aspect'ler daha sonra adapter'a açılabilir. Hard-constraint violation'ı kötüleştiren model kabul edilmez. Gold test üzerinde threshold tuning yapılmaz. D7-0 gerçek skor üretmez.
 
 ## D7-2 deney çıktısı
+
+D7-2 başlamadan önce D7-1B pilotunun guideline sorunları çözülmeli; private workspace validation critical issue üretmemeli; double-annotation subset/limitation ve frozen split kararı belgelenmelidir. D7-1A sanitised `training_candidate`/`evaluation_candidate` exportları yalnız contract artifact'tir ve kendi başına gerçek gold veya training yeterliliği kanıtı değildir.
 
 Her run şu artifact'leri üretmelidir: immutable config, dataset/model hash, split manifest, environment lock, per-slice metrics, calibration plot verisi, confusion matrices, latency/memory ölçümü ve failure listesi. Model/data card olmadan release candidate sayılmaz; model weights normal Git history'ye yazılmaz.

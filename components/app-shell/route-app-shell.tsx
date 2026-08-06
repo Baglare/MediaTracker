@@ -40,6 +40,19 @@ function activeNavigation(
 
 export function RouteAppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+
+  if (pathname === "/dev/recommendation-annotation") return children;
+
+  return <ProductRouteAppShell pathname={pathname}>{children}</ProductRouteAppShell>;
+}
+
+function ProductRouteAppShell({
+  children,
+  pathname,
+}: {
+  children: ReactNode;
+  pathname: string;
+}) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const startup = useStartupRuntime();

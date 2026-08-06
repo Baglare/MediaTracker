@@ -1,7 +1,7 @@
 # D7 Aspect Verifier Planı
 
 Tarih: 6 Ağustos 2026
-Durum: D7-0 tamamlandı; model/data toplama veya training başlamadı.
+Durum: D7-0 ve D7-1A tamamlandı; gerçek pilot/gold veri, model indirme veya training başlamadı.
 
 ## Kesin ürün kararı
 
@@ -59,7 +59,8 @@ Model her aspect'te kazanmak zorunda değildir; yalnız ölçülebilir iyileşme
 | Aşama | Kapsam | Varsayılan rollback |
 | --- | --- | --- |
 | D7-0 | Data/license/provenance/annotation contract | Saf yeni contract/docs kaldırılır; V2 davranışı değişmez |
-| D7-1 | Local-only annotation tool, pilot, guideline revision, gold dataset v1 | Last-good versioned artifact; production route yok |
+| D7-1A | Local-only annotation tool, private artifact/atomic storage, import-export/adjudication/revocation contract | Flag kapatılır; last-good bounded backup korunur |
+| D7-1B | 40–60 pilot, ikinci annotator/agreement, guideline revision ve gold candidate hazırlığı | Pilot internal-only kalır; sorunlu kayıtlar revoke edilir |
 | D7-2 | Classical + frozen multilingual baseline, ordinal heads, offline runner | Model artifact kaldırılır; dataset korunur |
 | D7-3 | Calibration, abstention, local verifier API v2, AspectEvidence adapter, fail-soft | Verifier disabled; structured-only V2 |
 | D7-4 | Yalnız yeterli ve izinli veri varsa optional personalized reranker shadow | Experiment silinir; production default hiç açılmaz |
@@ -67,7 +68,9 @@ Model her aspect'te kazanmak zorunda değildir; yalnız ölçülebilir iyileşme
 
 Her aşamanın giriş/çıktı/test/blocker/scope dışı/rollback matrisi [ML Migration Plan](D7_ML_MIGRATION_PLAN.md) içindedir.
 
-## D7-1 blocker'ları
+## D7-1A çıktısı ve D7-1B blocker'ları
+
+D7-1A [tool architecture](D7_ANNOTATION_TOOL_ARCHITECTURE.md), [private artifact policy](D7_PRIVATE_ARTIFACT_POLICY.md) ve [workflow](D7_ANNOTATION_WORKFLOW.md) ile tamamlandı. Tool yalnız development + explicit flag + loopback host koşulunda çalışır; production'da 404, public navigation'da görünmez. Gerçek workspace/dataset/model artifact repoya eklenmedi.
 
 - Annotator agreement, pseudonymous session ve revocation/deletion akışı.
 - İkinci annotator bulunabilirliği veya single-annotator limitation kararı.

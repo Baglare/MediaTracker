@@ -15,8 +15,10 @@
 | D6.6-2 — Live provider reliability ve final D6 kabulü | Tamamlandı; key-gated kapılar açık | AniList/TVMaze/Open Library public live geçti; rate-limit/drift/fail-soft/cache/latency sözleşmeleri sağlamlaştırıldı. TMDB/OMDb key-gated canlı kapıları açık ([kabul](AI_RECOMMENDATION_V2_FINAL_ACCEPTANCE.md)). |
 | D7 — Yeni aspect verifier | D7-0 tamamlandı; D7-1..D7-5 planlandı | Human-labeled gold set, calibrated ordinal aspect verifier, abstention/fail-soft ve deterministic baseline benchmark'ı; model final recommendation seçmez ([plan](D7_ASPECT_VERIFIER_PLAN.md)) |
 | D7-0 — Veri/lisans/provenance/annotation contract | Tamamlandı (contract/docs/test) | Provider ve source kullanım policy'si, provenance/manifest/annotation/verifier codec'leri, 12-aspect MVP, sampling/split, ordinal/calibration planı ve legacy ML migration audit'i tamamlandı; model/data indirme, toplama veya training yapılmadı ([plan](D7_ASPECT_VERIFIER_PLAN.md)) |
-| D7-1 — Local annotation ve gold set | Planlandı; blocker'lar açık | Local-only tool, 40–60 pilot, guideline revision ve private gold dataset v1; provider bulk fetch ve production admin route yok |
-| D7-2..D7-5 — Verifier experiment/integration/acceptance | Planlandı | Offline baselines ve ordinal heads; sonra calibration/abstention + local API v2; yalnız kanıtlı aspect integration ve final benchmark. Deterministic V2 final authority kalır. |
+| D7-1A — Annotation tool ve private artifact | Tamamlandı (local tool/contract/test) | Server-side dev+flag+loopback guard, private ignored root, atomic checksum/backup, import/task/revision/adjudication/revocation/export/validation ve sentetik fixture; gerçek pilot/gold yok ([architecture](D7_ANNOTATION_TOOL_ARCHITECTURE.md)) |
+| D7-1B — Pilot annotation ve agreement | Planlandı; insan/data-governance blocker'ları açık | 40–60 unique work, 6–8 aspect, en az yüzde 20 bağımsız double annotation, guideline revision ve internal-only gold candidate hazırlığı; provider bulk fetch yok |
+| D7-2 — Model baselines | D7-1B sonrasına bloklu | TF-IDF ve frozen multilingual encoder baseline, ordinal heads ve offline runner; production ranking/eligibility değişmez |
+| D7-3..D7-5 — Verifier integration/acceptance | Planlandı | Calibration/abstention + local API v2; yalnız kanıtlı aspect integration ve final benchmark. Deterministic V2 final authority kalır. |
 | D8 — Release ve deployment (release candidate) | Planlandı | Frontend release candidate, operasyonel doğrulama, D2C.1 production cutover ve Goal Cloud V1 production migration/flag rollout |
 
 ## Opsiyonel backlog

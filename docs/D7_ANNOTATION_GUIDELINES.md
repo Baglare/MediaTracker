@@ -1,5 +1,7 @@
 # D7 Aspect Annotation Guidelines v1
 
+> D7-1A tool bu guideline versionını workspace metadata ve her annotation üzerinde saklar. UI label'ları Türkçeleştirir; raw enum ve annotation confidence anlamı değişmez. Evidence/contradiction note 280 karakterdir. Kısayol ve adjudication akışı için [D7 Annotation Workflow](D7_ANNOTATION_WORKFLOW.md) kullanılır.
+
 Bu rehber candidate + aspect için anlatı merkeziliğini etiketler. Recommendation uygunluğu, kişisel zevk, kalite, popülerlik veya provider güveni etiketlenmez. Örneklerin tamamı sentetiktir; gerçek eser alıntısı kullanılmaz.
 
 ## Annotation girdisi ve güvenlik
