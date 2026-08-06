@@ -4,6 +4,7 @@ import { POST as interpretPost } from "@/app/api/ai/interpret/route";
 import { ASPECT_IDS } from "@/features/recommendations/domain/aspect-registry";
 import { decodeRecommendationRequestV2, RECOMMENDATION_REQUEST_LIMITS, type RecommendationRequestV2 } from "@/features/recommendations/domain/codec";
 import { evaluateConstraintEligibility } from "@/features/recommendations/domain/policies";
+import { evaluateRequestEvidenceCapabilities } from "@/features/recommendations/domain/evidence-capability";
 import { patchRecommendationRequest } from "@/features/recommendations/intent/request-patch";
 import { compareScoredCandidates } from "@/features/recommendations/ranking/scorer";
 import type { ScoredRecommendationCandidate } from "@/features/recommendations/ranking/types";
@@ -27,11 +28,12 @@ describe("D6-5 request security and interpretation acceptance", () => {
     if (!tooMany.ok) expect(tooMany.issues.map((entry) => entry.code)).toContain("references_limit_exceeded");
   });
 
-  it("rejects conflicting objective constraints and unsafe hard aspect payloads", () => {
+  it("rejects conflicting objectives and routes unsafe hard aspects through capability validation", () => {
     const conflict = decodeRecommendationRequestV2({ ...request(), objectiveConstraints: [{ id: "year-a", kind: "objective", field: "release_year", operator: "gte", value: 2000, role: "must", source: "explicit" }, { id: "year-b", kind: "objective", field: "release_year", operator: "lte", value: 2020, role: "must", source: "explicit" }] });
     expect(conflict.ok).toBe(false);
     const unsafe = decodeRecommendationRequestV2({ ...request(), aspectConstraints: [{ id: "unsafe", kind: "aspect", aspectId: "disturbing_content", role: "must", source: "explicit", minimumLevel: "significant" }] });
-    expect(unsafe.ok).toBe(false);
+    expect(unsafe.ok).toBe(true);
+    if (unsafe.ok) expect(evaluateRequestEvidenceCapabilities({ request: unsafe.value }).issues[0]?.code).toBe("constraint_evidence_hard_role_unsafe");
   });
 
   it("handles malformed JSON, unknown fields and invalid strictness without provider work", async () => {
@@ -48,7 +50,7 @@ describe("D6-5 request security and interpretation acceptance", () => {
 describe("D6-5 follow-up patch acceptance", () => {
   it.each([
     ["Fantastik şart değil", (next: RecommendationRequestV2) => next.aspectConstraints.some((item) => item.aspectId === "fantasy" && item.role === "prefer")],
-    ["Aşk üçgeni olabilir", (next: RecommendationRequestV2) => !next.aspectConstraints.some((item) => item.aspectId === "love_triangle")],
+    ["Aşk üçgeni olabilir", (next: RecommendationRequestV2) => next.aspectConstraints.some((item) => item.aspectId === "love_triangle" && item.role === "prefer")],
     ["Bunlar yerine manga öner", (next: RecommendationRequestV2) => next.targetMediaTypes[0] === "manga" && !next.objectiveConstraints.some((item) => item.field === "length" && item.unit === "episode")],
     ["Devam edenler de olabilir", (next: RecommendationRequestV2) => !next.objectiveConstraints.some((item) => item.field === "release_status")],
     ["Katı olmasın", (next: RecommendationRequestV2) => next.strictness === "balanced"],

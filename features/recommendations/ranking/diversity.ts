@@ -19,8 +19,12 @@ export function rerankForDiversity(input: readonly ScoredRecommendationCandidate
         const franchise = franchiseKey(item);
         return (providerCounts.get(item.snapshot.candidateIdentity.primaryProvider) ?? 0) * 0.04 + (franchise && franchises.has(franchise) ? 0.2 : 0);
       };
-      const aAdjusted = a.scoreBreakdown.requestFit + a.scoreBreakdown.personalFit * 0.25 + a.scoreBreakdown.evidenceConfidence * 0.2 - penalty(a);
-      const bAdjusted = b.scoreBreakdown.requestFit + b.scoreBreakdown.personalFit * 0.25 + b.scoreBreakdown.evidenceConfidence * 0.2 - penalty(b);
+      const requestDelta = b.scoreBreakdown.requestFit - a.scoreBreakdown.requestFit;
+      if (Math.abs(requestDelta) > 1e-9) return requestDelta;
+      const evidenceDelta = b.scoreBreakdown.evidenceConfidence - a.scoreBreakdown.evidenceConfidence;
+      if (Math.abs(evidenceDelta) > 1e-9) return evidenceDelta;
+      const aAdjusted = a.scoreBreakdown.personalFit * 0.25 + a.scoreBreakdown.qualitySignal * 0.1 - penalty(a);
+      const bAdjusted = b.scoreBreakdown.personalFit * 0.25 + b.scoreBreakdown.qualitySignal * 0.1 - penalty(b);
       return Math.abs(bAdjusted - aAdjusted) > 1e-9 ? bAdjusted - aAdjusted : compareScoredCandidates(a, b);
     });
     const chosen = remaining.shift() as ScoredRecommendationCandidate;

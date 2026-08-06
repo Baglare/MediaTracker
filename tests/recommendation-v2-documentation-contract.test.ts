@@ -16,6 +16,9 @@ const DOCS = [
   "docs/AI_RECOMMENDATION_V2_ACCEPTANCE.md",
   "docs/AI_RECOMMENDATION_V2_DEMO_SCRIPT.md",
   "docs/AI_RECOMMENDATION_EVALUATION_CONTRACT.md",
+  "docs/AI_RECOMMENDATION_V2_D661_CAPABILITY_AND_PARSER.md",
+  "docs/D7_ASPECT_VERIFIER_PLAN.md",
+  "docs/ROADMAP.md",
 ] as const;
 
 describe("D6 documentation consolidation", () => {
@@ -35,9 +38,10 @@ describe("D6 documentation consolidation", () => {
   it("closes D6 without claiming quality or production readiness", () => {
     const acceptance = readFileSync("docs/AI_RECOMMENDATION_V2_ACCEPTANCE.md", "utf8");
     const roadmap = readFileSync("docs/ROADMAP.md", "utf8");
-    expect(acceptance).toContain("D6-0–D6-5");
+    expect(acceptance).toContain("D6-0–D6.6-1");
     expect(acceptance).toContain("production-ready iddiası değildir");
     expect(acceptance).toContain("D6_PROVIDER_LIVE_SMOKE");
-    expect(roadmap).toContain("D7 human-label değerlendirme ve kalibrasyondur");
+    expect(roadmap).toContain("D6.6-2 — Live provider reliability ve final D6 kabulü");
+    expect(roadmap).toContain("D7 — Yeni aspect verifier");
   });
 });

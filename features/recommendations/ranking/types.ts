@@ -16,8 +16,8 @@ export interface ObjectiveConstraintDecision {
 export interface RecommendationScoreBreakdown {
   requestFit: number;
   explicitRequestCoverage: number;
-  personalFit: number;
   evidenceConfidence: number;
+  personalFit: number;
   qualitySignal: number;
   novelty: number;
   diversityContribution: number;

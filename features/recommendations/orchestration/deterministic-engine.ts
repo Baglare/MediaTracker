@@ -102,6 +102,9 @@ export async function runDeterministicRecommendationV2(input: {
   });
   const ranking = scoreEligibleCandidates({ request: adapted.request, candidates: rankable, mediaItems: input.mediaItems, feedback: input.feedback, feedbackV2: input.feedbackV2 });
   const selected = rerankForDiversity(ranking.scored, 5);
+  const averageCoverage = selected.length > 0
+    ? selected.reduce((sum, item) => sum + item.explicitRequestCoverage.coverage, 0) / selected.length
+    : 0;
   const nearMatches = adapted.request.strictness === "exploratory" ? ranking.nearMatches.slice(0, 3) : [];
   const rejectedCandidates = [...pipeline.rejectedCandidates, ...dismissedRejected, ...ranking.rejected];
   return {
@@ -109,7 +112,7 @@ export async function runDeterministicRecommendationV2(input: {
     recommendations: selected.map((item, index) => buildGroundedRecommendation(item, adapted.request as NonNullable<typeof adapted.request>, index)),
     nearMatches: nearMatches.map((item, index) => buildGroundedNearMatchRecommendation(item, adapted.request as NonNullable<typeof adapted.request>, index)),
     rejectedCandidates: rejectedCandidates.length > 0 ? rejectedCandidates : undefined,
-    transparencySummary: `Kimlik doğrulama, yapılandırılmış kanıt, hard filter ve deterministik sıralama uygulandı. Semantic verifier: ${verifier.status}.`,
+    transparencySummary: `Kimlik doğrulama, yapılandırılmış kanıt ve hard filter uygulandı; deterministik sıra istek uyumu, kanıt güveni ve ardından kişisel uyumu kullandı. Semantic verifier: ${verifier.status}.`,
     intent: input.intent,
     engineStatus: {
       provider: "deterministic_v2",
@@ -153,6 +156,8 @@ export async function runDeterministicRecommendationV2(input: {
           `v2_constraint_profile=${adapted.telemetry.profile}`,
           `v2_hard_filter_rejected=${ranking.rejected.length}`,
           `v2_semantic_mode=${verifier.effectiveMode}`,
+          `v2_weighted_coverage=${averageCoverage.toFixed(4)}`,
+          "v2_sort=request_fit,evidence_confidence,personal_fit,quality,novelty,identity",
         ],
       },
     },

@@ -1,12 +1,12 @@
 # AI Recommendation V2 — D6 Kabul Raporu
 
-> Durum: D6-0–D6-5.3 kod ve sentetik sözleşme kapsamı tamamlandı; final yeniden doğrulama kapısı açıktır. Bu ifade canlı provider/verifier kalite garantisi veya production-ready iddiası değildir.
+> Durum: D6-0–D6.6-1 kod ve sentetik sözleşme kapsamı tamamlandı; D6.6-2 live provider reliability ve final D6 kabulü bekleniyor. Bu ifade canlı provider/verifier kalite garantisi veya production-ready iddiası değildir.
 
 ## Kabul özeti
 
 | Alan | Sonuç | Kod/test kanıtı |
 |---|---|---|
-| Domain | Kabul | 43 benzersiz registry kaydı; `unknown !== absent`; profile+must ve unsafe hard rol codec reddi; explicit must strictness'ten bağımsızdır. |
+| Domain | Kabul | 43 benzersiz registry kaydı ve evidence strategy; `unknown !== absent`; profile+must codec reddi; capability-unsafe hard rol server policy ile kontrollü reddedilir. |
 | Provider | Kabul | AniList sahipliği, recommendation-only TVMaze anime classifier, exact-ID linking ve verified identity gate fixture testleriyle korunur. Global Search/Release Calendar filtreden bağımsızdır. |
 | Evidence | Kabul | Raw provider claim → bounded aggregation; tag rank strength değildir; structured/semantic claims ayrıdır; contradiction desteği silmez. |
 | Ranking | Kabul | Hard eligibility soft boyutlardan önce; deterministic tuple + stable identity; en fazla 5 primary ve 3 ayrı near-match; LLM final reranking yoktur. |
@@ -66,3 +66,15 @@ Sentetik seed'ler sözleşme ve metric matematiğini doğrular; öneri kalitesin
 - Ayrıntılı kanıt ve smoke kaydı [D6-5.3 Core Genre Kalibrasyonu](AI_RECOMMENDATION_V2_D653_CORE_GENRE_CALIBRATION.md) belgesindedir.
 
 İlgili belgeler: [Mimari](AI_RECOMMENDATION_V2_ARCHITECTURE.md), [Domain](AI_RECOMMENDATION_V2_DOMAIN.md), [Provider](AI_RECOMMENDATION_V2_PROVIDER_ENRICHMENT.md), [Ranking](AI_RECOMMENDATION_V2_RANKING.md), [UI ve Feedback](AI_RECOMMENDATION_V2_UI_AND_FEEDBACK.md), [Evaluation](AI_RECOMMENDATION_EVALUATION_CONTRACT.md), [Manuel testler](AI_RECOMMENDATION_V2_MANUAL_TESTS.md).
+
+## D6.6-1 ek kabul — 6 Ağustos 2026
+
+- Registry'nin 43 kaydının tamamı strategy sahibidir: 13 exact taxonomy, 21 ranked tag, 9 semantic required; provider override çözümü her provider için deterministiktir.
+- Türkçe NFKC/locale/apostrophe/token normalizer ve longest-match registry phrase matcher kontrollü ek fixture'larını ve false-positive korumalarını geçer.
+- Explicit hard constraint sessizce prefer'e düşürülmez. Interpret capability read-model taşır; recommendation route policy'yi yeniden doğrular ve unsupported hard role için raw 500 yerine kontrollü 422 üretir.
+- AniList ranked-tag bantları, duplicate/contradiction, TMDB keyword ve Open Library subject policy'leri sentetik contract testleriyle doğrulanır. Missing evidence absent değildir; popularity/community aspect evidence değildir.
+- D6-5.2 Romance ve D6-5.3 Fantasy exact-taxonomy davranışı korunur.
+- Deterministik tuple evidence confidence'ı personal fit'in önüne alır; weighted explicit coverage requestFit/read-model'e girer, yüzde-50 hard gate eklenmez.
+- Yeni model/provider/dependency eklenmedi; D7 model planı [D7 Aspect Verifier Planı](D7_ASPECT_VERIFIER_PLAN.md) içinde belgelendi. Legacy ML dosyaları silinmedi veya authoritative V2 yoluna bağlanmadı.
+- `D6_PROVIDER_LIVE_SMOKE` çalıştırılmadı. Canlı provider drift/rate-limit/latency ve final D6 kabulü D6.6-2 blocker'ıdır.
+- D6.6-1 doğrulaması: `npm run lint` geçti; standard `npm run test:run` 134 dosyada 1.731 test keşfetti, 1.697 geçti ve 34 koşullu test skip edildi; `npm run build`, Markdown link contract'ı ve `git diff --check` geçti. D6.6-1 kaynak değişikliği 59 yeni test case ekledi.

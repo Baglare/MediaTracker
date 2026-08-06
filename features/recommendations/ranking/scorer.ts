@@ -22,20 +22,35 @@ function quality(snapshot: CandidateProviderEvidenceSnapshot): number {
   return normalizedScore * 0.8 + normalizedPopularity * 0.2;
 }
 
-function requestFit(aspect: readonly import("../domain/policies").ConstraintDecision[], objective: readonly import("./types").ObjectiveConstraintDecision[]): number {
+function requestFit(request: RecommendationRequestV2, aspect: readonly import("../domain/policies").ConstraintDecision[], objective: readonly import("./types").ObjectiveConstraintDecision[], coverage: import("./request-relevance").ExplicitRequestCoverage): number {
   const decisions = [...aspect, ...objective].filter((decision) => decision.role !== "avoid");
   if (decisions.length === 0) return 0.5;
-  const values: number[] = decisions.map((decision) => {
-    if (decision.outcome === "passed" || decision.outcome === "preferred") return 1;
-    if (decision.outcome === "risk") return 0.45;
-    if (decision.outcome === "not_preferred") return 0.25;
-    return 0;
-  });
-  return values.reduce((sum, value) => sum + value, 0) / values.length;
+  let totalWeight = 0;
+  let total = 0;
+  for (const decision of decisions) {
+    const value = decision.outcome === "passed" || decision.outcome === "preferred"
+      ? 1
+      : decision.outcome === "risk"
+        ? 0.45
+        : decision.outcome === "not_preferred"
+          ? 0.25
+          : 0;
+    const constraint = request.aspectConstraints.find((item) => item.id === decision.constraintId);
+    if (constraint?.source === "profile") continue;
+    const weight = constraint?.source === "explicit" && constraint.role === "must"
+      ? 2
+      : constraint?.source === "inferred"
+        ? 0.5
+        : 1;
+    total += value * weight;
+    totalWeight += weight;
+  }
+  const decisionFit = totalWeight > 0 ? total / totalWeight : 0.5;
+  return coverage.applicable ? decisionFit * 0.8 + coverage.coverage * 0.2 : decisionFit;
 }
 
 function evidenceConfidence(request: RecommendationRequestV2, evidence: ReadonlyMap<AspectId, AspectEvidence>): number {
-  const positiveConstraints = request.aspectConstraints.filter((constraint) => constraint.role !== "avoid");
+  const positiveConstraints = request.aspectConstraints.filter((constraint) => constraint.role !== "avoid" && constraint.source !== "profile");
   if (positiveConstraints.length === 0) return 0.5;
   return positiveConstraints.reduce((sum, constraint) => sum + CONFIDENCE_VALUE[evidence.get(constraint.aspectId)?.confidence ?? "unknown"], 0) / positiveConstraints.length;
 }
@@ -91,13 +106,13 @@ export function scoreEligibleCandidates(input: {
       const reason = rejectionReason({ request: input.request, aspectEvidence: item.aspectEvidence, aspectDecisions, objectiveDecisions });
       if (aspectEligibility.eligibleForNearMatch && objectiveEligible && explicitCoverage.meetsMinimum && !hasExactLibraryIdentity(item.snapshot, input.mediaItems)) {
         const breakdown = {
-          requestFit: requestFit(aspectDecisions, objectiveDecisions),
+          requestFit: requestFit(input.request, aspectDecisions, objectiveDecisions, explicitCoverage),
           explicitRequestCoverage: explicitCoverage.coverage,
-          personalFit: input.request.profileSignalsEnabled ? calculatePersonalFit({ profile, snapshot: item.snapshot, aspectEvidence: item.aspectEvidence, feedback: input.feedback, feedbackV2: input.feedbackV2 ?? [], suppressedAspectIds: avoidedAspectIds }) : 0,
           evidenceConfidence: evidenceConfidence(input.request, item.aspectEvidence),
+          personalFit: input.request.profileSignalsEnabled ? calculatePersonalFit({ profile, snapshot: item.snapshot, aspectEvidence: item.aspectEvidence, feedback: input.feedback, feedbackV2: input.feedbackV2 ?? [], suppressedAspectIds: avoidedAspectIds }) : 0,
           qualitySignal: quality(item.snapshot), novelty: 1, diversityContribution: 1,
         };
-        nearMatches.push({ ...item, aspectDecisions, objectiveDecisions, explicitRequestCoverage: explicitCoverage, scoreBreakdown: breakdown, deterministicSortKey: [breakdown.requestFit, breakdown.personalFit, breakdown.evidenceConfidence, breakdown.qualitySignal, breakdown.novelty, item.snapshot.candidateIdentity.canonicalKey], warnings: [...item.snapshot.warnings, ...aspectDecisions.flatMap((decision) => decision.warnings)] });
+        nearMatches.push({ ...item, aspectDecisions, objectiveDecisions, explicitRequestCoverage: explicitCoverage, scoreBreakdown: breakdown, deterministicSortKey: [breakdown.requestFit, breakdown.evidenceConfidence, breakdown.personalFit, breakdown.qualitySignal, breakdown.novelty, item.snapshot.candidateIdentity.canonicalKey], warnings: [...item.snapshot.warnings, ...aspectDecisions.flatMap((decision) => decision.warnings)] });
       }
       rejected.push({ title: item.candidate.title, reason });
       continue;
@@ -111,10 +126,10 @@ export function scoreEligibleCandidates(input: {
       continue;
     }
     const breakdown = {
-      requestFit: requestFit(aspectDecisions, objectiveDecisions),
+      requestFit: requestFit(input.request, aspectDecisions, objectiveDecisions, explicitCoverage),
       explicitRequestCoverage: explicitCoverage.coverage,
-      personalFit: input.request.profileSignalsEnabled ? calculatePersonalFit({ profile, snapshot: item.snapshot, aspectEvidence: item.aspectEvidence, feedback: input.feedback, feedbackV2: input.feedbackV2 ?? [], suppressedAspectIds: avoidedAspectIds }) : 0,
       evidenceConfidence: evidenceConfidence(input.request, item.aspectEvidence),
+      personalFit: input.request.profileSignalsEnabled ? calculatePersonalFit({ profile, snapshot: item.snapshot, aspectEvidence: item.aspectEvidence, feedback: input.feedback, feedbackV2: input.feedbackV2 ?? [], suppressedAspectIds: avoidedAspectIds }) : 0,
       qualitySignal: quality(item.snapshot),
       novelty: 1,
       diversityContribution: 1,
@@ -125,7 +140,7 @@ export function scoreEligibleCandidates(input: {
       objectiveDecisions,
       explicitRequestCoverage: explicitCoverage,
       scoreBreakdown: breakdown,
-      deterministicSortKey: [breakdown.requestFit, breakdown.personalFit, breakdown.evidenceConfidence, breakdown.qualitySignal, breakdown.novelty, item.snapshot.candidateIdentity.canonicalKey],
+      deterministicSortKey: [breakdown.requestFit, breakdown.evidenceConfidence, breakdown.personalFit, breakdown.qualitySignal, breakdown.novelty, item.snapshot.candidateIdentity.canonicalKey],
       warnings: [...item.snapshot.warnings, ...aspectDecisions.flatMap((decision) => decision.warnings), ...objectiveDecisions.flatMap((decision) => decision.warnings)],
     });
   }

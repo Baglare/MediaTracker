@@ -15,6 +15,12 @@ export type AspectSupportLevel =
   | "experimental"
   | "unsupported";
 
+export type AspectEvidenceStrategy =
+  | "exact_taxonomy"
+  | "ranked_tag"
+  | "semantic_required"
+  | "soft_only";
+
 export type AspectStrengthLevel =
   | "primary"
   | "significant"
@@ -75,6 +81,13 @@ export const ASPECT_SUPPORT_LEVELS: readonly AspectSupportLevel[] = [
   "partial",
   "experimental",
   "unsupported",
+];
+
+export const ASPECT_EVIDENCE_STRATEGIES: readonly AspectEvidenceStrategy[] = [
+  "exact_taxonomy",
+  "ranked_tag",
+  "semantic_required",
+  "soft_only",
 ];
 
 export const ASPECT_STRENGTH_LEVELS: readonly AspectStrengthLevel[] = [

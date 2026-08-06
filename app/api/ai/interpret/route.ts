@@ -6,6 +6,7 @@ import { interpretRecommendationRequest } from "@/features/recommendations/inten
 import type { ReferenceMediaItem } from "@/features/recommendations/intent/reference-policy";
 import { RECOMMENDATION_REQUEST_LIMITS } from "@/features/recommendations/domain/codec";
 import { getPlanningProviderPolicy } from "@/lib/ai/provider";
+import { availableSemanticVerifierModes } from "@/features/recommendations/evidence";
 
 const ALLOWED_FIELDS = new Set(["message", "mediaItems", "settings", "previousStructuredRequestV2", "strictness"]);
 const REFERENCE_MEDIA_LIMIT = 500;
@@ -50,7 +51,7 @@ export async function POST(request: Request) {
   if (strictness !== "strict" && strictness !== "balanced" && strictness !== "exploratory") {
     return NextResponse.json({ code: "interpret_strictness_invalid" }, { status: 400 });
   }
-  const result = interpretRecommendationRequest({ message, intent: analyzeIntent(message), settings, mediaItems, previousRequest: body.previousStructuredRequestV2, strictness });
+  const result = interpretRecommendationRequest({ message, intent: analyzeIntent(message), settings, mediaItems, previousRequest: body.previousStructuredRequestV2, strictness, availableVerifierModes: availableSemanticVerifierModes() });
   return NextResponse.json({
     ...result,
     planningPolicy: getPlanningProviderPolicy(settings),

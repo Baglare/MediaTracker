@@ -56,3 +56,16 @@
 4. Abort edilen eski request'in yeni owner/state'e uygulanmadığını; hydration/request loop ve console error olmadığını doğrula.
 
 Son çalıştırma kaydı ve canlı/fixture ayrımı [AI Recommendation V2 Acceptance](AI_RECOMMENDATION_V2_ACCEPTANCE.md) belgesine yazılır. Demo akışı [AI Recommendation V2 Demo Script](AI_RECOMMENDATION_V2_DEMO_SCRIPT.md) içindedir.
+
+## D6.6-1 parser ve capability regresyonu
+
+1. “politik entrikanın ana unsurlardan biri olduğu fantastik anime” isteğinde political intrigue **Zorunlu / Belirgin veya ana unsur** ve AniList tag capability metnini doğrula.
+2. `politik entrikası güçlü`, `biraz politik entrika olabilir`, `politik entrika olmasın`, `romantizmi güçlü`, `fantastiğin baskın olduğu`, `fanservice’i az`, `karakter odaklı bir drama`, `yavaş tempolu ama umutlu`, `aşk üçgeninden kaçın` örneklerini çözümle.
+3. `politika hakkında belgesel`, `romantik komedi`, `karakter tasarımı güçlü`, `okul sahnesi var`, `güçlü ana karakter` örneklerinde ilgili false-positive aspect'in oluşmadığını doğrula.
+4. Character-driven must için structured-only uyarısını; tercihe çevirme ve kaldırma aksiyonunu kontrol et. Verifier endpoint yapılandırılmamışsa local/remote seçenek görünmemeli.
+5. Open Library subject-only Fantasy must'ın soft-only uyarı verdiğini; AniList Fantasy'nin structured supported olduğunu doğrula.
+6. Aynı request için confidence'ı yüksek/personal fit'i düşük adayın confidence'ı düşük/personal fit'i yüksek adaydan önce geldiğini kontrol et.
+7. İki explicit prefer içeren fixture'da iki eşleşmeli adayın tek eşleşmeliden önce geldiğini; profile/popularity'nin coverage açığını kapatmadığını doğrula.
+8. UI'da ham tag rank, strategy enum, reason code veya strength yüzdesi gösterilmediğini doğrula.
+
+Bu aşamada `D6_PROVIDER_LIVE_SMOKE` çalıştırılmaz; live provider reliability ve final D6 kabulü D6.6-2'ye aittir.

@@ -33,25 +33,8 @@ export function patchRecommendationRequest(previous: RecommendationRequestV2, fo
   const target = targetIn(followUpText);
   const targetMediaTypes = target ? [target] : [...previous.targetMediaTypes];
   const extracted = extractStructuredConstraints({ message: followUpText, targetMediaTypes });
-  let followUpAspects = [...extracted.aspectConstraints];
-  let previousAspects = [...previous.aspectConstraints];
-  if (/a[sş]k\s+[uü][cç]gen.*(çıkar|cikar|olmas[ıi]n|istemi)/i.test(followUpText)) {
-    followUpAspects = followUpAspects.filter((constraint) => constraint.aspectId !== "love_triangle");
-    followUpAspects.push({ id: "followup:love_triangle:avoid", kind: "aspect", aspectId: "love_triangle", role: "avoid", source: "explicit", rejectAtLevel: "significant" });
-  }
-  if (/romanti.*(art[ıi]r|g[üu][cç]l[üu]|daha\s+fazla)/i.test(followUpText)
-    && !followUpAspects.some((constraint) => constraint.aspectId === "romance")) {
-    followUpAspects.push({ id: "followup:romance:must", kind: "aspect", aspectId: "romance", role: "must", source: "explicit", minimumLevel: "primary" });
-  }
-  if (/fantasti.*(şart\s+değil|sart\s+degil|zorunlu\s+değil|zorunlu\s+degil)/i.test(followUpText)) {
-    followUpAspects = followUpAspects.filter((constraint) => constraint.aspectId !== "fantasy");
-    previousAspects = previousAspects.filter((constraint) => constraint.aspectId !== "fantasy");
-    followUpAspects.push({ id: "followup:fantasy:prefer", kind: "aspect", aspectId: "fantasy", role: "prefer", source: "explicit", minimumLevel: "incidental" });
-  }
-  if (/a[sş]k\s+[uü][cç]gen.*(olabilir|sorun\s+değil|sorun\s+degil)/i.test(followUpText)) {
-    followUpAspects = followUpAspects.filter((constraint) => constraint.aspectId !== "love_triangle");
-    previousAspects = previousAspects.filter((constraint) => constraint.aspectId !== "love_triangle");
-  }
+  const followUpAspects = [...extracted.aspectConstraints];
+  const previousAspects = [...previous.aspectConstraints];
 
   let previousObjectives = [...previous.objectiveConstraints];
   if (target) {

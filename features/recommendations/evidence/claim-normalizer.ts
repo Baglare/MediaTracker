@@ -1,4 +1,4 @@
-import { ASPECT_REGISTRY } from "../domain/aspect-registry";
+import { ASPECT_REGISTRY, evidenceStrategyForProvider } from "../domain/aspect-registry";
 import type { AspectId, AspectSupportLevel } from "../domain/types";
 import type { CandidateProviderEvidenceSnapshot, RawProviderEvidenceClaim } from "../providers/types";
 
@@ -36,6 +36,14 @@ function tagRankFactor(snapshot: CandidateProviderEvidenceSnapshot, claim: RawPr
   return 0.5 + (tag.rank / 100) * 0.5;
 }
 
+function tagRank(snapshot: CandidateProviderEvidenceSnapshot, claim: RawProviderEvidenceClaim): number | undefined | null {
+  if (claim.sourceKind !== "provider_tag_rank") return undefined;
+  const value = String(claim.value ?? "").trim();
+  const rank = snapshot.objectiveMetadata.tags?.find((entry) => entry.name === value)?.rank;
+  if (rank === undefined) return undefined;
+  return Number.isFinite(rank) && rank >= 0 && rank <= 100 ? rank : null;
+}
+
 export function normalizeRawEvidenceClaims(snapshot: CandidateProviderEvidenceSnapshot): {
   contributions: NormalizedEvidenceContribution[];
   warnings: string[];
@@ -61,6 +69,22 @@ export function normalizeRawEvidenceClaims(snapshot: CandidateProviderEvidenceSn
       if (support === "unsupported") {
         warnings.push(`unsupported_provider_aspect:${aspectId}:${evidenceProvider}`);
         continue;
+      }
+      const strategy = evidenceStrategyForProvider(aspectId, evidenceProvider);
+      if (strategy === "semantic_required") {
+        warnings.push(`semantic_required_structured_ignored:${aspectId}:${claim.id}`);
+        continue;
+      }
+      const rank = tagRank(snapshot, claim);
+      if (claim.sourceKind === "provider_tag_rank" && strategy === "ranked_tag") {
+        if (rank === undefined) {
+          warnings.push(`ranked_tag_rank_missing:${aspectId}:${claim.id}`);
+          continue;
+        }
+        if (rank !== null && rank < 20) {
+          warnings.push(`ranked_tag_below_contribution:${aspectId}:${claim.id}`);
+          continue;
+        }
       }
       const key = `${claim.provider ?? "-"}:${claim.sourceKind}:${claim.field ?? "-"}:${String(claim.normalizedValue)}:${aspectId}`;
       if (seen.has(key)) continue;

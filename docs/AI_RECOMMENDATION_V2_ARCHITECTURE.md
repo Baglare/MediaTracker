@@ -1,6 +1,6 @@
 # AI Recommendation V2 Architecture
 
-> Durum: D6-0–D6-5 uygulanmıştır. D6 kabul sonucu [AI_RECOMMENDATION_V2_ACCEPTANCE.md](AI_RECOMMENDATION_V2_ACCEPTANCE.md), D7 ölçüm sınırı [AI_RECOMMENDATION_EVALUATION_CONTRACT.md](AI_RECOMMENDATION_EVALUATION_CONTRACT.md) içindedir.
+> Durum: D6-0–D6.6-1 uygulanmıştır. D6 kabul sonucu [AI_RECOMMENDATION_V2_ACCEPTANCE.md](AI_RECOMMENDATION_V2_ACCEPTANCE.md), D6.6-1 parser/capability sözleşmesi [AI_RECOMMENDATION_V2_D661_CAPABILITY_AND_PARSER.md](AI_RECOMMENDATION_V2_D661_CAPABILITY_AND_PARSER.md), D7 planı [D7_ASPECT_VERIFIER_PLAN.md](D7_ASPECT_VERIFIER_PLAN.md) içindedir.
 
 ## 1. Amaç ve değişmez kararlar
 
@@ -373,3 +373,4 @@ D6-1 tamamlandı; domain ayrıntıları [AI Recommendation V2 Domain](AI_RECOMME
 - D6-3 raw claim normalization, `AspectEvidence` aggregation, objective/aspect hard filter, ayrı score breakdown, deterministik sort key, diversity rerank ve grounded açıklamayı `features/recommendations/` içinde uygulamıştır. Ayrıntı [AI Recommendation V2 Ranking](AI_RECOMMENDATION_V2_RANKING.md) belgesindedir.
 - External recommendation final seçimi artık `runDeterministicRecommendationV2` tarafından yapılır; LLM retrieval planning için kalabilir fakat final aday/sıra kararı vermez. V1 scorer/embedding yolu authoritative production branch değildir.
 - D6-4 tamamlandı: `/api/ai/interpret`, onaylı structured request transport'u, editable constraint/strictness UI, ayrı near-match ve reason-level owner feedback eklendi. D6-3 deterministik sıra anahtarı korunmuştur.
+- D6.6-1 tamamlandı: Türkçe morphology-aware longest-match parser, 43 aspect evidence strategy, provider override'ları, capability read-model/server validation, ranked-tag band policy ve weighted explicit coverage eklendi. Deterministik sıra `requestFit → evidenceConfidence → personalFit → qualitySignal → novelty → exact identity` olarak güncellendi; LLM final ranking'e girmedi.

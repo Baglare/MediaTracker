@@ -112,6 +112,8 @@ Aspect eşlemelerinin tek doğruluk kaynağı [AI Aspect Taxonomy](AI_ASPECT_TAX
 
 D6-3/D6-5.3'te reliability, provider support ve source-kind ayrı tutulur. Exact genre tek başına `primary` değildir; yalnız core + strong-support provider genre `significant/medium` tabanı alabilir. Tag/keyword/subject tek başına otomatik primary değildir. `unsupported` alan absent değil unknown üretir. Birleşim ve confidence kuralları [AI Recommendation V2 Ranking](AI_RECOMMENDATION_V2_RANKING.md) belgesindedir.
 
+D6.6-1'de registry strategy provider farkını explicit yapar: AniList ranked tag hard-capable olabilir; TMDB unranked keyword aynı politika değildir; Open Library subject hard must için yeterli değildir. TMDB tek keyword en fazla incidental/low, farklı iki mapped keyword significant/medium olabilir. AniList rank `<20` contribution dışı, `20–39` incidental/low, `40–59` significant/medium, `60+` significant/high'tır; primary ikinci güçlü bağımsız claim gerektirir. Missing tag/rank absent değildir. Ayrıntı [D6.6-1 Capability ve Parser](AI_RECOMMENDATION_V2_D661_CAPABILITY_AND_PARSER.md) içindedir.
+
 - Provider capability/ownership matrisi [`features/recommendations/domain/providers.ts`](../features/recommendations/domain/providers.ts) içindedir; hiçbir provider çağrısı yapmaz.
 - TVMaze raw `type` alanı [`lib/tvmaze-types.ts`](../lib/tvmaze-types.ts) içine optional olarak eklendi. Saf classifier [`tvmaze-anime-classifier.ts`](../features/recommendations/providers/tvmaze-anime-classifier.ts) içinde confirmed/likely/non-anime/unknown sonucu üretir.
 - Classifier yalnız [`features/recommendations/providers/pipeline.ts`](../features/recommendations/providers/pipeline.ts) recommendation hattında uygulanır. Global Search route'u ve Release Calendar filtresizdir.

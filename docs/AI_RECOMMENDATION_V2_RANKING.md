@@ -1,6 +1,6 @@
 # AI Recommendation V2 — Evidence, Eligibility ve Deterministik Ranking
 
-> Durum: D6-3 deterministik baseline D6-5.1 relevance, D6-5.2 Romance ve D6-5.3 core genre evidence düzeltmeleriyle korunur. Öncelik tuple'ı değiştirilmedi; D7 kalibrasyonu başlamamıştır. [D6-5.3 core genre](AI_RECOMMENDATION_V2_D653_CORE_GENRE_CALIBRATION.md) · [Evaluation](AI_RECOMMENDATION_EVALUATION_CONTRACT.md)
+> Durum: D6-3 deterministik baseline D6.6-1 capability, ranked-tag, weighted coverage ve evidence-before-personal priority ile güçlendirilmiştir. D7 modeli uygulanmamıştır. [D6.6-1](AI_RECOMMENDATION_V2_D661_CAPABILITY_AND_PARSER.md) · [D7 planı](D7_ASPECT_VERIFIER_PLAN.md)
 
 ## 1. Çalışan akış
 
@@ -94,9 +94,9 @@ Her eligible aday ayrı boyutlar taşır:
 | Boyut | Aralık | Kullanım |
 |---|---:|---|
 | `requestFit` | 0–1 | Pozitif must/prefer ve objective karar sonucu; avoid pozitif katkı değildir. |
-| `explicitRequestCoverage` | 0–1 | Açık pozitif aspect'lerden kanıtlı olarak kapsanan oran; sort tuple'ına yeni öncelik eklemez, minimum relevance kapısıdır. |
-| `personalFit` | -1–1 | Explicit beğeni/tüketim/avoid ve exact feedback. |
+| `explicitRequestCoverage` | 0–1 | Explicit must=2.0, explicit prefer=1.0, inferred prefer=0.5 ağırlıklı kapsam; profile/avoid hariçtir. |
 | `evidenceConfidence` | 0–1 | İstekle ilgili aspect confidence. |
+| `personalFit` | -1–1 | Explicit beğeni/tüketim/avoid ve exact feedback. |
 | `qualitySignal` | 0–1 | Community score ağırlıklı; popularity sınırlı katkı. |
 | `novelty` | 0–1 | Exact library identity dışlamasından sonra 1. |
 | `diversityContribution` | 0–1 | Rerank sırasında ayrı read-model alanı. |
@@ -105,14 +105,14 @@ Authoritative additive “score çorbası” yoktur. İlk deterministik sıra an
 
 ```text
 requestFit desc
-personalFit desc
 evidenceConfidence desc
+personalFit desc
 qualitySignal desc
 novelty desc
 canonicalProviderIdentity asc
 ```
 
-Bu tuple hard-filter sonrasında uygulanır. Quality/popularity yalnız daha güçlü istek ve personal/evidence boyutlarını geçemez. Eşitlik exact canonical identity ile deterministik çözülür.
+Bu tuple hard-filter sonrasında uygulanır. Quality/popularity yalnız daha güçlü istek, evidence ve personal boyutlarını geçemez. Diversity requestFit/evidenceConfidence eşitliğini bozamaz. Eşitlik exact canonical identity ile deterministik çözülür.
 
 ## 7. Diversity
 
@@ -155,6 +155,6 @@ Internal debug notları constraint source sayıları, evidence snapshot sayısı
 
 ## 11. D6-4 ve D7 sınırı
 
-D6-4 tamamlandı: editable constraints, strict/balanced/exploratory, reason-level feedback, ayrı near-match UI ve kullanıcı şeffaflığı bağlandı. Primary deterministic sort key değiştirilmedi. D7 learned ranking, threshold kalibrasyonu ve karşılaştırmalı deney kapsamıdır.
+D6-4 tamamlandı: editable constraints, strict/balanced/exploratory, reason-level feedback, ayrı near-match UI ve kullanıcı şeffaflığı bağlandı. D6.6-1 evidence confidence'ı personal fit'in önüne aldı ve weighted explicit coverage'ı requestFit/read-model'e bağladı; yüzde-50 hard gate eklemedi. D7 learned aspect verifier planı [D7 Aspect Verifier](D7_ASPECT_VERIFIER_PLAN.md) belgesindedir.
 
 D7: gold labels, aspect threshold/confidence kalibrasyonu, Precision@K/NDCG@K, hard-violation/unsupported-explanation ölçümü ve deterministik baseline'a karşı kontrollü verifier/LLM deneyleri. D7 hiçbir ölçüm sonucu olmadan D6 sabitlerini sessizce değiştirmez.

@@ -1,4 +1,4 @@
-import { ASPECT_REGISTRY, isAspectId } from "./aspect-registry";
+import { isAspectId } from "./aspect-registry";
 import type {
   AspectId,
   AspectStrengthLevel,
@@ -113,13 +113,6 @@ export function validateAspectConstraint(
   const issues = validConstraintBase(constraint, path);
   if (!isAspectId(constraint.aspectId)) {
     issues.push(issue("aspect_id_unknown", `${path}.aspectId`, "Aspect ID registry'de bulunmuyor."));
-  } else {
-    const safety = ASPECT_REGISTRY[constraint.aspectId] as { mustSafety: string; avoidSafety: string };
-    if (constraint.role === "must" && safety.mustSafety === "unsafe") {
-      issues.push(issue("aspect_must_unsupported", `${path}.role`, "Bu aspect güvenilir bir must constraint olarak kullanılamaz."));
-    } else if (constraint.role === "avoid" && safety.avoidSafety === "unsafe") {
-      issues.push(issue("aspect_avoid_unsupported", `${path}.role`, "Bu aspect güvenilir bir avoid constraint olarak kullanılamaz."));
-    }
   }
   if (constraint.minimumLevel !== undefined && !THRESHOLD_LEVELS.has(constraint.minimumLevel)) {
     issues.push(issue("minimum_level_invalid", `${path}.minimumLevel`, "minimumLevel geçersiz."));

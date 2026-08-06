@@ -32,6 +32,11 @@ function endpointFor(mode: SemanticVerifierMode): string | null {
   return null;
 }
 
+export function availableSemanticVerifierModes(): Exclude<SemanticVerifierMode, "structured_only">[] {
+  return (["local_enhanced", "remote_enhanced"] as const)
+    .filter((mode) => endpointFor(mode) !== null);
+}
+
 function publicMetadata(snapshot: CandidateProviderEvidenceSnapshot) {
   return {
     identity: snapshot.candidateIdentity,

@@ -27,10 +27,10 @@ describe("D6-3 structured constraint extraction", () => {
     ]);
   });
 
-  it("desteklenmeyen hard aspect'i prefer'e düşürüp warning üretir", () => {
+  it("desteklenmeyen hard aspect'i sessizce prefer'e düşürmez", () => {
     const result = extractStructuredConstraints({ message: "güçlü oyun sistemi olan dizi istiyorum", targetMediaTypes: ["tv"] });
-    expect(result.aspectConstraints).toContainEqual(expect.objectContaining({ aspectId: "game_system", role: "prefer" }));
-    expect(result.warnings).toContain("must_downgraded_unsupported:game_system");
+    expect(result.aspectConstraints).toContainEqual(expect.objectContaining({ aspectId: "game_system", role: "must" }));
+    expect(result.warnings).toContain("conditional_must_requires_evidence:game_system");
   });
 
   it("verified reference için exact provider identity ister; title-only unresolved kalır", () => {

@@ -1,6 +1,6 @@
 # AI Recommendation V2 — UI ve Feedback V2
 
-> Durum: D6-4 uygulandı; D6-5.1 ve D6-5.2'de manuel relevance, Romance evidence, minimum seviye, duplicate mesaj ve near-match kart sorunları düzeltildi. D6-3 deterministik sıralama önceliği değişmedi.
+> Durum: D6-4 UI/Feedback V2 uygulanmış, D6.6-1 capability açıklamaları ve verifier seçimi eklenmiştir. Kart/grid başlık düzeni bu aşamada değiştirilmemiştir.
 
 ## İki aşamalı istek
 
@@ -13,6 +13,8 @@ Takip mesajları önceki taslağa patch uygulanarak çözülür. Eski explicit m
 UI `features/recommendations/ui` altında bölünmüştür. Aspect seçici doğrudan 43 kayıtlı `ASPECT_REGISTRY` kaynağını ve Türkçe/İngilizce alias'ları kullanır. Rol değişimi, duplicate/unsafe rol, `profile + must`, objektif sayı/aralık ve medya/uzunluk uyumu domain codec/policy ile doğrulanır. Yeni avoid rolü “İkincil ve üzerini çıkar” eşiğiyle başlar; kullanıcı seçtiği eşiği değiştirebilir. Enum ve reason-code'lar merkezi kullanıcı metni mapper'ından Türkçeleştirilir; strength/confidence yüzdesi veya ham scorer puanı gösterilmez.
 
 Must aspect merkeziyeti editörde **Belirgin veya ana unsur** ya da **Yalnız ana unsur** olarak görünür ve düzenlenir. UI'dan yeni must varsayılanı significant'tır; parser'ın “güçlü/ana tema” sonucu primary ise taslak bunu gizlemez. Kullanıcının onayladığı minimum seviye recommendation server'ında yeniden tahmin edilmez.
+
+D6.6-1 capability read-model her aspect için kullanıcı metni gösterir; raw strategy/enum göstermez. Structured destek, AniList tag desteği, semantic verifier gereksinimi, soft-only veya hedefte provider yokluğu ayrılır. Unsupported hard role otomatik tercihe çevrilmez: kullanıcı tercihe çevirebilir veya kaldırabilir. Local/remote verifier seçeneği yalnız ilgili endpoint gerçekten yapılandırılmışsa görünür. `/api/ai/recommend` capability'yi client payload'ına güvenmeden server'da yeniden doğrular.
 
 Strictness owner-scoped AI preferences state'inde version 2 olarak saklanır; version 1 kayıtlar `balanced` ile hydrate edilir. Strictness/draft değişikliği eski sonucu client'ta yeniden sıralamaz; sonuç stale kabul edilip temizlenir.
 

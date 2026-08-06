@@ -36,6 +36,8 @@ interface AspectRegistryEntry {
     fields: string[];
     values?: string[];
   }>;
+  defaultEvidenceStrategy: "exact_taxonomy" | "ranked_tag" | "semantic_required" | "soft_only";
+  providerStrategyOverrides?: Partial<Record<"anilist" | "tvmaze" | "tmdb" | "omdb" | "open_library", AspectEvidenceStrategy>>;
   safeForMust: boolean | "conditional";
   safeForAvoid: boolean | "conditional";
   semanticVerifier: "not_required" | "recommended" | "required_for_hard_decision";
@@ -170,3 +172,7 @@ Eşikler D6 sözleşme başlangıcıdır; D7 gold-label ölçümü olmadan provi
 D6-3 kod karşılığı: registry alias'ları [`constraint-extractor.ts`](../features/recommendations/intent/constraint-extractor.ts) ve provider raw claim mapping/aggregation tarafından tek aspect doğruluk kaynağı olarak tüketilir. Ayrıntılı katkı, confidence ve unknown semantiği [V2 Ranking](AI_RECOMMENDATION_V2_RANKING.md) belgesindedir. V1 regex'leri compatibility kodunda bulunabilir fakat V2 final eligibility için kanıt değildir.
 
 Registry [`features/recommendations/domain/aspect-registry.ts`](../features/recommendations/domain/aspect-registry.ts), merkezi eşikler [`aspect-strength.ts`](../features/recommendations/domain/aspect-strength.ts), runtime invariant'lar [`codec.ts`](../features/recommendations/domain/codec.ts) içindedir. Kod 43 kaydı ve beş explicit provider mapping'ini taşır; D6-3 V2 constraint/evidence/ranking yolu registry'yi kullanır. Legacy V1 regex'leri yalnız compatibility/migration karşılaştırmasıdır. Ayrıntı için [AI Recommendation V2 Domain](AI_RECOMMENDATION_V2_DOMAIN.md) belgesine bakın.
+
+## D6.6-1 evidence strategy
+
+43 kaydın tamamı strategy sahibidir: 13 `exact_taxonomy`, 21 `ranked_tag`, 9 `semantic_required`. `soft_only`, provider alanı aspect'i yalnız partial/yumuşak sinyal olarak desteklediğinde override'dır. Ranked-tag aspect'lerinde AniList dışı provider'lar; exact-taxonomy aspect'lerinde Open Library subject yolu `soft_only` kullanır. Strategy capability ve aggregation'ın ortak registry kaynağıdır; detay [D6.6-1 Capability ve Parser](AI_RECOMMENDATION_V2_D661_CAPABILITY_AND_PARSER.md) belgesindedir.

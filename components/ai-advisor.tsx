@@ -46,7 +46,7 @@ import type {
   RecommendationFeedbackAction,
 } from "@/lib/ai/types";
 import type { RecommendationRequestV2 } from "@/features/recommendations/domain/codec";
-import type { RecommendationStrictness } from "@/features/recommendations/domain/types";
+import type { RecommendationStrictness, SemanticVerifierMode } from "@/features/recommendations/domain/types";
 import type { RecommendationFeedbackEventV2, RecommendationFeedbackReasonCode } from "@/features/recommendations/feedback";
 import { ASPECT_REGISTRY } from "@/features/recommendations/domain/aspect-registry";
 import {
@@ -674,6 +674,7 @@ export default function AiAdvisor({
   const [nearMatches, setNearMatches] = useState<AiNearMatchRecommendation[]>([]);
   const [structuredRequest, setStructuredRequest] = useState<RecommendationRequestV2 | null>(null);
   const [draftWarnings, setDraftWarnings] = useState<string[]>([]);
+  const [availableVerifierModes, setAvailableVerifierModes] = useState<Exclude<SemanticVerifierMode, "structured_only">[]>([]);
   const [recommendationStrictness, setRecommendationStrictness] = useState<RecommendationStrictness>("balanced");
   const [interpretationLoading, setInterpretationLoading] = useState(false);
   const [rejected, setRejected] = useState<RejectedCandidate[]>([]);
@@ -1392,6 +1393,7 @@ export default function AiAdvisor({
       setStructuredRequest(draft);
       setRecommendationStrictness(draft.strictness);
       setDraftWarnings(Array.isArray(data.warnings) ? data.warnings : []);
+      setAvailableVerifierModes(Array.isArray(data.availableVerifierModes) ? data.availableVerifierModes : []);
       setPendingClarification(null);
       setRecommendations([]);
       setNearMatches([]);
@@ -1859,6 +1861,7 @@ export default function AiAdvisor({
           <ParsedRequestPanel
             request={structuredRequest}
             warnings={draftWarnings}
+            availableVerifierModes={availableVerifierModes}
             onChange={(next) => {
               setStructuredRequest(next);
               setRecommendationStrictness(next.strictness);

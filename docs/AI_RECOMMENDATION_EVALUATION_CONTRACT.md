@@ -1,6 +1,6 @@
 # AI Recommendation — D7 Evaluation Contract
 
-> Bu belge ve seed'ler gerçek kalite dataset'i değildir. D6 davranışını ölçülebilir yapan versioned sözleşme ve sentetik contract fixture'larıdır.
+> Bu belge ve seed'ler gerçek kalite dataset'i değildir. D6 davranışını ölçülebilir yapan versioned sözleşme ve sentetik contract fixture'larıdır. Yeni model planı [D7 Aspect Verifier Planı](D7_ASPECT_VERIFIER_PLAN.md) içindedir.
 
 ## Kod yüzeyi
 
@@ -55,13 +55,14 @@ Doğru biçimde 0 sonuç beklenen strict case `resultCoverage` paydasına körle
 - Provider metadata değişirse fixture immutable snapshot olarak yeni sürüm alır; eski gold sessizce güncellenmez.
 - Telifli uzun synopsis kopyalanmaz; bounded provider metadata veya sentetik kısa özet kullanılır.
 - Gerçek kullanıcı library/note/prompt/feedback public dataset'e girmez.
+- Exact provider identity ile snapshot/dataset/model version birlikte tutulur; sentetik fixture gold kalite etiketi sayılmaz.
 
 ## D7 karşılaştırmaları
 
-1. V1 rule/hybrid baseline.
-2. Deterministic V2 structured-only.
-3. V2 local verifier.
-4. V2 remote verifier.
-5. Opsiyonel LLM reranker deneyi; production varsayılanı değildir.
+1. Legacy V1 rule/hybrid yalnız deprecation karşılaştırma baseline'ı.
+2. Deterministic V2 structured-only authoritative baseline.
+3. D7 local aspect verifier + abstention.
+4. Structured/model contradiction ve fail-soft karşılaştırması.
+5. Yalnız veri yeterliyse opsiyonel personalized reranker shadow deneyi; production varsayılanı değildir.
 
-Production threshold, confidence veya ranking ancak human-labeled gold set, tekrar üretilebilir metric raporu ve regression gate kanıtıyla değiştirilebilir. D6-5 hiçbir ağırlık/threshold optimize etmez.
+Rapor constraint extraction precision/recall/F1, aspect ordinal error/level accuracy, hard-constraint violation, Precision@K, NDCG@K, unsupported explanation, abstention coverage/accuracy, calibration error, provider/model fallback ve p50/p95 latency metriklerini taşır. Production threshold, confidence veya ranking ancak human-labeled gold set, tekrar üretilebilir metric raporu ve regression gate kanıtıyla değiştirilebilir. D6.6-1 genel strength/confidence threshold'larını düşürmez.

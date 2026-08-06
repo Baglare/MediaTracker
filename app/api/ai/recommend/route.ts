@@ -59,6 +59,8 @@ import {
   runDeterministicRecommendationV2,
 } from "@/features/recommendations/orchestration";
 import { decodeRecommendationRequestV2 } from "@/features/recommendations/domain/codec";
+import { evaluateRequestEvidenceCapabilities } from "@/features/recommendations/domain/evidence-capability";
+import { availableSemanticVerifierModes } from "@/features/recommendations/evidence";
 import { decodeRecommendationFeedbackEventV2 } from "@/features/recommendations/feedback";
 import { applyStructuredRequestToRetrievalPlan } from "@/features/recommendations/intent/retrieval-guardrails";
 
@@ -1145,6 +1147,19 @@ export async function POST(req: NextRequest) {
     : decodeRecommendationRequestV2(body.structuredRequestV2);
   if (structuredRequest && !structuredRequest.ok) {
     return NextResponse.json({ code: "structured_request_invalid", issues: structuredRequest.issues }, { status: 400 });
+  }
+  if (structuredRequest?.ok) {
+    const capabilityValidation = evaluateRequestEvidenceCapabilities({
+      request: structuredRequest.value,
+      availableVerifierModes: availableSemanticVerifierModes(),
+    });
+    if (capabilityValidation.issues.length > 0) {
+      return NextResponse.json({
+        code: "structured_request_capability_invalid",
+        issues: capabilityValidation.issues,
+        capabilities: capabilityValidation.capabilities,
+      }, { status: 422 });
+    }
   }
   const recommendationFeedbackV2 = Array.isArray(body.recommendationFeedbackV2)
     ? body.recommendationFeedbackV2.flatMap((event) => {

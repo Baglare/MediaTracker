@@ -22,6 +22,7 @@ import { providerSupports } from "./providers";
 import { validateLengthMediaTypeCompatibility } from "./policies";
 import {
   ASPECT_GROUPS,
+  ASPECT_EVIDENCE_STRATEGIES,
   ASPECT_STRENGTH_LEVELS,
   ASPECT_SUPPORT_LEVELS,
   CONSTRAINT_ROLES,
@@ -169,6 +170,14 @@ export function validateAspectRegistry(): RecommendationDecodeResult<typeof ASPE
       if (!ASPECT_SUPPORT_LEVELS.includes(entry.providerSupport[provider])) {
         issues.push(issue("aspect_support_level_invalid", `${id}.providerSupport.${provider}`, "Support level geçersiz."));
       }
+      const override = (entry as typeof entry & { providerStrategyOverrides?: Partial<Record<RecommendationProvider, string>> })
+        .providerStrategyOverrides?.[provider];
+      if (override !== undefined && !ASPECT_EVIDENCE_STRATEGIES.includes(override as (typeof ASPECT_EVIDENCE_STRATEGIES)[number])) {
+        issues.push(issue("aspect_evidence_strategy_override_invalid", `${id}.providerStrategyOverrides.${provider}`, "Provider evidence strategy override geçersiz."));
+      }
+    }
+    if (!ASPECT_EVIDENCE_STRATEGIES.includes(entry.defaultEvidenceStrategy)) {
+      issues.push(issue("aspect_evidence_strategy_invalid", `${id}.defaultEvidenceStrategy`, "Aspect evidence strategy zorunlu ve geçerli olmalıdır."));
     }
     const safetyValues: readonly string[] = ["safe", "conditional", "unsafe"];
     if (!safetyValues.includes(entry.mustSafety) || !safetyValues.includes(entry.avoidSafety)) {
