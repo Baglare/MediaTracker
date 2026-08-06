@@ -56,6 +56,7 @@ import {
 } from "@/lib/ai/types";
 import { MediaType } from "@/lib/types";
 import { prepareProviderEvidencePipeline, type ProviderEvidencePipelineResult } from "@/features/recommendations/providers/pipeline";
+import { emptyProviderRequestTelemetry, mergeProviderRequestTelemetry } from "@/features/recommendations/providers/request-policy";
 import {
   DETERMINISTIC_RECOMMENDATION_V2_ENABLED,
   runDeterministicRecommendationV2,
@@ -1002,6 +1003,7 @@ function buildRetrievalDebug(args: {
     refinedPassUsed,
     providerFallback,
     rankedTagRetrieval: searchDebug?.rankedTagRetrieval,
+    providerRequests: searchDebug?.providerRequests,
     highRatedSourceCount: highRatedSourceCount || 0,
     deterministicTasteSignals: deterministicTasteSignals || [],
     deterministicFallbackUsed: Boolean(deterministicFallbackUsed),
@@ -1026,6 +1028,7 @@ function mergeCandidateSearchTelemetry(
   external: {
     executedQueries?: CandidateSearchResult["debug"]["executedQueries"];
     sourceCandidateCounts?: Record<string, number>;
+    providerRequests?: CandidateSearchResult["debug"]["providerRequests"];
   }
 ) {
   if (external.executedQueries?.length) {
@@ -1034,6 +1037,14 @@ function mergeCandidateSearchTelemetry(
   for (const [source, count] of Object.entries(external.sourceCandidateCounts || {})) {
     searchResult.debug.sourceCandidateCounts[source] =
       (searchResult.debug.sourceCandidateCounts[source] || 0) + count;
+  }
+  for (const [provider, telemetry] of Object.entries(external.providerRequests || {})) {
+    if (!telemetry) continue;
+    const typedProvider = provider as keyof NonNullable<CandidateSearchResult["debug"]["providerRequests"]>;
+    const current = searchResult.debug.providerRequests?.[typedProvider]
+      ?? emptyProviderRequestTelemetry(typedProvider);
+    if (!searchResult.debug.providerRequests) searchResult.debug.providerRequests = {};
+    searchResult.debug.providerRequests[typedProvider] = mergeProviderRequestTelemetry(current, telemetry);
   }
 }
 
@@ -1147,6 +1158,8 @@ function applySourceTitleExclusion(
 }
 
 export async function POST(req: NextRequest) {
+  const requestStartedAt = performance.now();
+  const stageLatencyMs: NonNullable<AiRetrievalDebug["latencyMs"]> = {};
   let body: AiRecommendRequest;
   try {
     body = (await req.json()) as AiRecommendRequest;
@@ -1195,6 +1208,7 @@ export async function POST(req: NextRequest) {
   const settings = body.settings;
   const mediaItems = Array.isArray(body.mediaItems) ? body.mediaItems : [];
   const progressLogs = Array.isArray(body.progressLogs) ? body.progressLogs : [];
+  const interpretationStartedAt = performance.now();
   let intent = analyzeIntent(message);
   if (structuredRequest?.ok) {
     intent = {
@@ -1204,6 +1218,7 @@ export async function POST(req: NextRequest) {
       avoid: structuredRequest.value.aspectConstraints.filter((constraint) => constraint.role === "avoid").map((constraint) => constraint.aspectId),
     };
   }
+  stageLatencyMs.interpretation = Number((performance.now() - interpretationStartedAt).toFixed(2));
   const researchMode = (body as { researchMode?: string }).researchMode || "library-only";
   const scopeMode = (body as { scopeMode?: string }).scopeMode as
     | "mixed"
@@ -1321,6 +1336,7 @@ export async function POST(req: NextRequest) {
   }
 
   // library-only zaten yukarıda erken döndü; buraya yalnızca dış kaynak/web modları düşer.
+  const planningStartedAt = performance.now();
   {
     retrievalPlan = await runPlanningWithProviders({
       providers,
@@ -1416,8 +1432,10 @@ export async function POST(req: NextRequest) {
       );
     }
   }
+  stageLatencyMs.planning = Number((performance.now() - planningStartedAt).toFixed(2));
 
   const debugNotes: string[] = [];
+  const retrievalStartedAt = performance.now();
   let searchResult: CandidateSearchResult = await getCandidates({
     intent,
     retrievalPlan,
@@ -1633,12 +1651,14 @@ export async function POST(req: NextRequest) {
   } else if (researchMode === "web") {
     debugNotes.push("r44_web_research_skipped:structured_tag_retrieval_owned_pool");
   }
+  stageLatencyMs.retrieval = Number((performance.now() - retrievalStartedAt).toFixed(2));
 
   // D6-2/D6-3 — Recommendation-only provider hygiene/evidence sidecar.
   // Snapshot kullanıcı response'una sızmaz; authoritative V2 engine'e verilir.
   let providerEvidenceTelemetry: AiRetrievalDebug["providerEvidence"];
   let providerPipelineResult: ProviderEvidencePipelineResult | undefined;
   let d6ProviderRejected: { title: string; reason: string }[] = [];
+  const enrichmentStartedAt = performance.now();
   try {
     const providerPipeline = await prepareProviderEvidencePipeline({
       candidates,
@@ -1661,6 +1681,7 @@ export async function POST(req: NextRequest) {
     // Evidence zenginleştirmesi fail-soft'tur; mevcut V1 aday havuzu korunur.
     debugNotes.push("d6_provider_evidence_error:fail_soft");
   }
+  stageLatencyMs.enrichment = Number((performance.now() - enrichmentStartedAt).toFixed(2));
 
   const rankedTagGate = applyRankedTagCandidatePoolGate({
     request: structuredRequest?.ok ? structuredRequest.value : undefined,
@@ -1806,6 +1827,12 @@ export async function POST(req: NextRequest) {
         sourceCandidateCounts: searchResult.debug.sourceCandidateCounts,
         providerEvidence: providerEvidenceTelemetry,
         rankedTagRetrieval: rankedTagTelemetry,
+        latencyMs: {
+          ...stageLatencyMs,
+          ...response.debug.retrieval.latencyMs,
+          enrichment: stageLatencyMs.enrichment,
+          total: Number((performance.now() - requestStartedAt).toFixed(2)),
+        },
         notes: [...(response.debug.retrieval.notes ?? []), ...debugNotes, "d6_3_deterministic_final_ranking"],
       } : undefined,
     };

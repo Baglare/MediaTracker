@@ -18,6 +18,7 @@ export * from "./codec";
 export * from "./constraints";
 export * from "./evidence";
 export * from "./evidence-capability";
+export * from "./ranked-tag-provider-coverage";
 export * from "./policies";
 export * from "./providers";
 export * from "./types";

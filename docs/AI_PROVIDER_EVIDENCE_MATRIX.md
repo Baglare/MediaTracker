@@ -108,6 +108,10 @@ D6-5.3 kod karşılığı: Open Library subject claim'i `provider_keyword` kayna
 
 Aspect eşlemelerinin tek doğruluk kaynağı [AI Aspect Taxonomy](AI_ASPECT_TAXONOMY.md), aggregation ve ranking sözleşmesi [AI Recommendation V2 Architecture](AI_RECOMMENDATION_V2_ARCHITECTURE.md) belgesidir.
 
+## D6.6-2 ranked-tag coverage
+
+21 ranked-tag aspect'in beş provider kaydı merkezi read-model'den üretilir. Queryable canonical AniList mapping yalnız `political_intrigue→Politics` ve `revenge→Revenge` için doğrulanmıştır. Diğer aspect'ler label'dan türetilmez; evidence-only, semantic-confirmation veya provider-specific unsupported kalır. Tam tablo [Ranked-Tag Provider Coverage](AI_RECOMMENDATION_RANKED_TAG_COVERAGE.md) belgesindedir.
+
 ## D6-1/D6-2 kod karşılığı
 
 D6-3/D6-5.3'te reliability, provider support ve source-kind ayrı tutulur. Exact genre tek başına `primary` değildir; yalnız core + strong-support provider genre `significant/medium` tabanı alabilir. Tag/keyword/subject tek başına otomatik primary değildir. `unsupported` alan absent değil unknown üretir. Birleşim ve confidence kuralları [AI Recommendation V2 Ranking](AI_RECOMMENDATION_V2_RANKING.md) belgesindedir.

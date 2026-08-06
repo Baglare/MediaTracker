@@ -18,6 +18,9 @@ const DOCS = [
   "docs/AI_RECOMMENDATION_EVALUATION_CONTRACT.md",
   "docs/AI_RECOMMENDATION_V2_D661_CAPABILITY_AND_PARSER.md",
   "docs/AI_RECOMMENDATION_V2_D661R_RANKED_TAG_RETRIEVAL.md",
+  "docs/AI_RECOMMENDATION_V2_D662_LIVE_PROVIDER_RELIABILITY.md",
+  "docs/AI_RECOMMENDATION_RANKED_TAG_COVERAGE.md",
+  "docs/AI_RECOMMENDATION_V2_FINAL_ACCEPTANCE.md",
   "docs/D7_ASPECT_VERIFIER_PLAN.md",
   "docs/ROADMAP.md",
 ] as const;
@@ -44,5 +47,10 @@ describe("D6 documentation consolidation", () => {
     expect(acceptance).toContain("D6_PROVIDER_LIVE_SMOKE");
     expect(roadmap).toContain("D6.6-2 — Live provider reliability ve final D6 kabulü");
     expect(roadmap).toContain("D7 — Yeni aspect verifier");
+    const coverage = readFileSync("docs/AI_RECOMMENDATION_RANKED_TAG_COVERAGE.md", "utf8");
+    expect(coverage).toContain("mapped_queryable` (2)");
+    expect(coverage).toContain("evidence_only` (10)");
+    expect(coverage).toContain("semantic_confirmation_required` (9)");
+    expect(coverage).not.toContain("production-ready AI");
   });
 });

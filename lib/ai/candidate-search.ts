@@ -35,6 +35,14 @@ import {
   type AspectProviderRetrievalMapping,
 } from "@/features/recommendations/domain/aspect-registry";
 import type { CandidateProviderEvidenceSnapshot } from "@/features/recommendations/providers/types";
+import {
+  ProviderRequestError,
+  emptyProviderRequestTelemetry,
+  fetchWithProviderRequestPolicy,
+  mergeProviderRequestTelemetry,
+  type ProviderRequestTelemetry,
+} from "@/features/recommendations/providers/request-policy";
+import type { RecommendationProvider } from "@/features/recommendations/domain/types";
 
 const PER_SOURCE_LIMIT = 8;
 const MAX_TOTAL = 24;
@@ -62,6 +70,7 @@ interface CandidateSearchDebug {
   sourceCandidateCounts: Record<string, number>;
   filterReasons: Record<string, number>;
   filterBefore: number;
+  providerRequests: Partial<Record<RecommendationProvider, ProviderRequestTelemetry>>;
 }
 
 export interface CandidateSearchResult {
@@ -73,6 +82,7 @@ export interface CandidateSearchResult {
     finalCandidateCount: number;
     notes: string[];
     rankedTagRetrieval?: RankedTagRetrievalTelemetry;
+    providerRequests?: Partial<Record<RecommendationProvider, ProviderRequestTelemetry>>;
   };
   internal?: {
     rankedTagTraceByCandidateKey: ReadonlyMap<string, CandidateRankedTagTrace>;
@@ -100,7 +110,30 @@ function createSearchDebug(): CandidateSearchDebug {
     sourceCandidateCounts: {},
     filterReasons: {},
     filterBefore: 0,
+    providerRequests: {},
   };
+}
+
+function recordProviderRequest(debug: CandidateSearchDebug | undefined, telemetry: ProviderRequestTelemetry): void {
+  if (!debug) return;
+  const current = debug.providerRequests[telemetry.provider] ?? emptyProviderRequestTelemetry(telemetry.provider);
+  debug.providerRequests[telemetry.provider] = mergeProviderRequestTelemetry(current, telemetry);
+}
+
+async function providerFetch(
+  ctx: SearchContext,
+  provider: RecommendationProvider,
+  url: string,
+  init?: RequestInit,
+): Promise<Response> {
+  try {
+    const result = await fetchWithProviderRequestPolicy({ provider, url, init });
+    recordProviderRequest(ctx.debug, result.telemetry);
+    return result.response;
+  } catch (error) {
+    if (error instanceof ProviderRequestError) recordProviderRequest(ctx.debug, error.telemetry);
+    throw error;
+  }
 }
 
 function addSourceCount(debug: CandidateSearchDebug | undefined, source: string, count: number) {
@@ -134,6 +167,47 @@ function stripHtml(value: string): string {
     .replace(/&nbsp;/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function decodeProviderResults<T extends { externalId: string; title: string; type: MediaType; overview?: string }>(
+  value: unknown,
+  debug: CandidateSearchDebug | undefined,
+  allowedTypes: readonly MediaType[],
+): T[] {
+  if (!Array.isArray(value)) {
+    addFilterReason(debug, "provider_response_schema_invalid");
+    return [];
+  }
+  const decoded: T[] = [];
+  for (const item of value.slice(0, PER_SOURCE_LIMIT * 2)) {
+    if (!item || typeof item !== "object") {
+      addFilterReason(debug, "provider_response_item_malformed");
+      continue;
+    }
+    const candidate = item as Partial<T>;
+    if (
+      typeof candidate.externalId !== "string"
+      || candidate.externalId.length === 0
+      || candidate.externalId.length > 160
+      || typeof candidate.title !== "string"
+      || candidate.title.trim().length === 0
+      || candidate.title.length > 500
+      || typeof candidate.type !== "string"
+      || !allowedTypes.includes(candidate.type as MediaType)
+    ) {
+      addFilterReason(debug, "provider_response_item_malformed");
+      continue;
+    }
+    decoded.push({
+      ...candidate,
+      title: candidate.title.trim(),
+      overview: typeof candidate.overview === "string"
+        ? stripHtml(candidate.overview).slice(0, 2_000)
+        : undefined,
+    } as T);
+    if (decoded.length >= PER_SOURCE_LIMIT) break;
+  }
+  return decoded;
 }
 
 function getBaseUrl(): string {
@@ -655,13 +729,22 @@ async function searchAniListDiscover(
   const queryLabel = `[discover:${filters.reason || "structured"}]`;
 
   try {
-    const res = await fetch(url.toString(), { cache: "no-store" });
+    const res = await providerFetch(ctx, "anilist", url.toString(), { cache: "no-store" });
     if (!res.ok) {
       recordQuery(ctx.debug, "anilist", debugType, queryLabel, 0);
       return { candidates: [], unavailable: true };
     }
-    const data = (await res.json()) as { results?: AniListNormalizedResult[] };
-    const results = (data.results || []).slice(0, PER_SOURCE_LIMIT);
+    const data = (await res.json()) as { results?: unknown };
+    if (!Array.isArray(data?.results)) {
+      addFilterReason(ctx.debug, "provider_response_schema_invalid");
+      recordQuery(ctx.debug, "anilist", debugType, queryLabel, 0);
+      return { candidates: [], unavailable: true };
+    }
+    const results = decodeProviderResults<AniListNormalizedResult>(
+      data.results,
+      ctx.debug,
+      ["anime", "manga", "manhwa", "manhua"],
+    );
     recordQuery(ctx.debug, "anilist", debugType, queryLabel, results.length);
     return { unavailable: false, candidates: results.map<AiCandidate>((r) => {
       const gs: GlobalSearchResult = {
@@ -938,10 +1021,14 @@ async function searchAniList(
     "anime";
   try {
     const url = `${ctx.baseUrl}/api/anilist/search?q=${encodeURIComponent(q)}&category=${cat}`;
-    const res = await fetch(url, { cache: "no-store" });
+    const res = await providerFetch(ctx, "anilist", url, { cache: "no-store" });
     if (!res.ok) return [];
-    const data = (await res.json()) as { results?: AniListNormalizedResult[] };
-    const results = (data.results || []).slice(0, PER_SOURCE_LIMIT);
+    const data = (await res.json()) as { results?: unknown };
+    const results = decodeProviderResults<AniListNormalizedResult>(
+      data.results,
+      ctx.debug,
+      ["anime", "manga", "manhwa", "manhua"],
+    );
     recordQuery(ctx.debug, "anilist", type, q, results.length);
     return results.map<AiCandidate>((r) => {
       const gs: GlobalSearchResult = {
@@ -983,10 +1070,10 @@ async function searchTvmaze(ctx: SearchContext, q: string): Promise<AiCandidate[
   if (!q.trim()) return [];
   try {
     const url = `${ctx.baseUrl}/api/tvmaze/search?q=${encodeURIComponent(q)}`;
-    const res = await fetch(url, { cache: "no-store" });
+    const res = await providerFetch(ctx, "tvmaze", url, { cache: "no-store" });
     if (!res.ok) return [];
-    const data = (await res.json()) as { results?: TvmazeNormalizedResult[] };
-    const results = (data.results || []).slice(0, PER_SOURCE_LIMIT);
+    const data = (await res.json()) as { results?: unknown };
+    const results = decodeProviderResults<TvmazeNormalizedResult>(data.results, ctx.debug, ["tv"]);
     recordQuery(ctx.debug, "tvmaze", "tv", q, results.length);
     return results.map<AiCandidate>((r) => {
       const gs: GlobalSearchResult = {
@@ -1023,10 +1110,10 @@ async function searchOpenLibrary(ctx: SearchContext, q: string): Promise<AiCandi
   if (!q.trim()) return [];
   try {
     const url = `${ctx.baseUrl}/api/openlibrary/search?q=${encodeURIComponent(q)}`;
-    const res = await fetch(url, { cache: "no-store" });
+    const res = await providerFetch(ctx, "openlibrary", url, { cache: "no-store" });
     if (!res.ok) return [];
-    const data = (await res.json()) as { results?: OpenLibraryNormalizedResult[] };
-    const results = (data.results || []).slice(0, PER_SOURCE_LIMIT);
+    const data = (await res.json()) as { results?: unknown };
+    const results = decodeProviderResults<OpenLibraryNormalizedResult>(data.results, ctx.debug, ["book"]);
     recordQuery(ctx.debug, "openlibrary", "book", q, results.length);
     return results.map<AiCandidate>((r) => {
       const gs: GlobalSearchResult = {
@@ -1396,13 +1483,13 @@ async function searchTmdb(ctx: SearchContext, q: string, mediaType: "movie" | "t
   if (!q.trim()) return [];
   try {
     const url = `${ctx.baseUrl}/api/tmdb/search?q=${encodeURIComponent(q)}&mediaType=${mediaType}`;
-    const res = await fetch(url, { cache: "no-store" });
+    const res = await providerFetch(ctx, "tmdb", url, { cache: "no-store" });
     if (!res.ok) {
       recordQuery(ctx.debug, "tmdb", mediaType, q, 0);
       return [];
     }
-    const data = (await res.json()) as { results?: TmdbNormalizedResult[] };
-    const results = (data.results || []).filter((r) => r.type === mediaType).slice(0, PER_SOURCE_LIMIT);
+    const data = (await res.json()) as { results?: unknown };
+    const results = decodeProviderResults<TmdbNormalizedResult>(data.results, ctx.debug, [mediaType]);
     recordQuery(ctx.debug, "tmdb", mediaType, q, results.length);
     return results.map<AiCandidate>((r) => {
       const gs: GlobalSearchResult = {
@@ -1438,10 +1525,10 @@ async function searchOmdb(ctx: SearchContext, q: string): Promise<AiCandidate[]>
   if (!q.trim()) return [];
   try {
     const url = `${ctx.baseUrl}/api/omdb/search?q=${encodeURIComponent(q)}`;
-    const res = await fetch(url, { cache: "no-store" });
+    const res = await providerFetch(ctx, "omdb", url, { cache: "no-store" });
     if (!res.ok) return [];
-    const data = (await res.json()) as { results?: OmdbNormalizedResult[] };
-    const results = (data.results || []).slice(0, PER_SOURCE_LIMIT);
+    const data = (await res.json()) as { results?: unknown };
+    const results = decodeProviderResults<OmdbNormalizedResult>(data.results, ctx.debug, ["movie"]);
     recordQuery(ctx.debug, "omdb", "movie", q, results.length);
     return results.map<AiCandidate>((r) => {
       const gs: GlobalSearchResult = {
@@ -1598,6 +1685,7 @@ export async function searchCandidatesWithDebug(args: {
         finalCandidateCount: candidates.length,
         notes,
         rankedTagRetrieval,
+        providerRequests: debug.providerRequests,
       },
       internal: rankedTagTraceByCandidateKey ? { rankedTagTraceByCandidateKey } : undefined,
     };

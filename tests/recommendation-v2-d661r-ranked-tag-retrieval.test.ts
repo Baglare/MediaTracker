@@ -127,10 +127,10 @@ describe("D6.6-1R provider retrieval mapping and route", () => {
     });
   });
 
-  it("mapping varsa ranked_tag_supported, mapping yoksa soft_only gösterir", () => {
+  it("mapping varsa ranked_tag_supported, geniş bileşik aspect mapping yoksa semantic confirmation gösterir", () => {
     const base = { id: "x", kind: "aspect" as const, role: "must" as const, source: "explicit" as const, minimumLevel: "significant" as const };
     expect(evaluateConstraintEvidenceCapability({ constraint: { ...base, aspectId: "political_intrigue" }, targetMediaTypes: ["anime"], semanticVerifierMode: "structured_only" }).status).toBe("ranked_tag_supported");
-    expect(evaluateConstraintEvidenceCapability({ constraint: { ...base, aspectId: "power_progression" }, targetMediaTypes: ["anime"], semanticVerifierMode: "structured_only" })).toMatchObject({ status: "soft_only", reasonCode: "provider_tag_mapping_missing", canUseAsMust: false });
+    expect(evaluateConstraintEvidenceCapability({ constraint: { ...base, aspectId: "power_progression" }, targetMediaTypes: ["anime"], semanticVerifierMode: "structured_only" })).toMatchObject({ status: "requires_semantic_verifier", reasonCode: "constraint_evidence_semantic_verifier_required", canUseAsMust: false });
   });
 
   it("route canonical tag ve minimumTagRank'i GraphQL variables'a taşır", async () => {
@@ -210,6 +210,24 @@ describe("D6.6-1R strict/relaxed ranked-tag candidate discovery", () => {
     const result = await searchCandidatesWithDebug({ intent, retrievalPlan: providerPlan, profile: null, message: request().queryText, mediaItems: [], progressLogs: [], structuredRequest: request() });
     expect(result.debug.rankedTagRetrieval?.noResultReason).toBe("provider_tag_query_unavailable");
     expect(result.candidates).toEqual([]);
+  });
+
+  it("schema drift'i boş katalog gibi yorumlamaz", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ results: { unexpected: true } }), { status: 200 })));
+    const result = await searchCandidatesWithDebug({ intent, retrievalPlan: providerPlan, profile: null, message: request().queryText, mediaItems: [], progressLogs: [], structuredRequest: request() });
+    expect(result.debug.rankedTagRetrieval?.noResultReason).toBe("provider_tag_query_unavailable");
+    expect(result.debug.filterSummary.reasons.provider_response_schema_invalid).toBeGreaterThan(0);
+  });
+
+  it("tek malformed kayıt bütün response'u düşürmez ve büyük HTML metni taşınmaz", async () => {
+    const valid = { ...normalized("valid", " Valid ", 63), overview: `<script>secret()</script>${"x".repeat(2_500)}` };
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ results: [null, { externalId: "", title: "" }, valid, normalized("two", "Two", 45)] }), { status: 200 })));
+    const result = await searchCandidatesWithDebug({ intent, retrievalPlan: providerPlan, profile: null, message: request().queryText, mediaItems: [], progressLogs: [], structuredRequest: request() });
+    expect(result.candidates.map((item) => item.externalId)).toEqual(["valid", "two"]);
+    expect(result.candidates[0].title).toBe("Valid");
+    expect(result.candidates[0].overview).not.toContain("<script>");
+    expect(result.candidates[0].overview?.length).toBeLessThanOrEqual(2_000);
+    expect(result.debug.filterSummary.reasons.provider_response_item_malformed).toBe(2);
   });
 
   it("strict pass geçerli aday bulduysa relaxed provider hatasında bu adayı kaybetmez", async () => {

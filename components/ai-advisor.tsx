@@ -61,6 +61,7 @@ import {
   buildInterpretReferencePayload,
   buildRecommendationMediaPayload,
   userFacingConstraintLabel,
+  userFacingCapabilityValidationSummary,
   userFacingNoResultSummary,
   userFacingRejectionReason,
 } from "@/features/recommendations/ui";
@@ -1115,7 +1116,30 @@ export default function AiAdvisor({
           structuredRequestV2: structuredRequest,
         }),
       });
-      if (!res.ok) return null;
+      if (!res.ok) {
+        const errorPayload = await res.json().catch(() => null) as {
+          code?: string;
+          capabilities?: import("@/features/recommendations/domain/evidence-capability").ConstraintEvidenceCapability[];
+        } | null;
+        if (
+          res.status === 422
+          && errorPayload?.code === "structured_request_capability_invalid"
+          && structuredRequest
+          && Array.isArray(errorPayload.capabilities)
+        ) {
+          return {
+            recs: [],
+            text: userFacingCapabilityValidationSummary({
+              request: structuredRequest,
+              capabilities: errorPayload.capabilities,
+              availableVerifierModes,
+            }),
+            rejected: [],
+            nearMatches: [],
+          };
+        }
+        return null;
+      }
       const data = await res.json();
       if (!Array.isArray(data?.recommendations)) return null;
       const recs: AiRecommendation[] = data.recommendations.map(

@@ -146,6 +146,8 @@ Verifier payload kişisel not, rating, progress veya profile içermez. Response 
 
 Internal debug notları constraint source sayıları, evidence snapshot sayısı, hard-filter rejection sayısı, eligible count ve effective verifier mode taşır. D6-2 cache/TVMaze/identity sayaçları korunur.
 
+D6.6-2 debug read-model'i provider request retry/timeout/rate-limit/unavailable/fallback sayaçlarını ve `interpretation/planning/retrieval/enrichment/evidence/ranking/explanation/total` latency aşamalarını taşır. Latency kırılgan pass/fail eşiği değildir; evaluation count/mean/p50/p95/max ile raporlar.
+
 - V1 request ve `AiRecommendResponse` şekli korunur.
 - `AiRecommendation.candidate` Quick Add için korunur.
 - Engine provider `deterministic_v2`, embedding mode `disabled` olarak görünür.

@@ -7,6 +7,7 @@ import { GlobalSearchResult } from "@/lib/global-search-types";
 import type { RecommendationRequestV2 } from "@/features/recommendations/domain/codec";
 import type { RecommendationFeedbackEventV2 } from "@/features/recommendations/feedback";
 import type { SemanticVerifierMode } from "@/features/recommendations/domain/types";
+import type { ProviderRequestTelemetry } from "@/features/recommendations/providers/request-policy";
 
 export interface AiSettings {
   useProfile: boolean;
@@ -135,11 +136,14 @@ export interface AiRetrievalDebug {
   directTitleQueryUsed?: boolean;
   notes?: string[];
   rankedTagRetrieval?: RankedTagRetrievalTelemetry;
+  providerRequests?: Partial<Record<"anilist" | "tvmaze" | "tmdb" | "omdb" | "openlibrary", ProviderRequestTelemetry>>;
+  latencyMs?: Partial<Record<"interpretation" | "planning" | "retrieval" | "enrichment" | "evidence" | "ranking" | "explanation" | "total", number>>;
   providerEvidence?: {
     snapshots: number;
     enrichedCandidates: number;
     cacheHits: number;
     cacheMisses: number;
+    coalescedRequests: number;
     enrichmentFailures: number;
     tvmaze_anime_excluded: number;
     tvmaze_anime_likely_excluded: number;

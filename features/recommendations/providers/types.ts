@@ -89,6 +89,7 @@ export interface ProviderEvidenceTelemetry {
   enrichedCandidates: number;
   cacheHits: number;
   cacheMisses: number;
+  coalescedRequests: number;
   enrichmentFailures: number;
   tvmaze_anime_excluded: number;
   tvmaze_anime_likely_excluded: number;
@@ -105,6 +106,7 @@ export function emptyProviderEvidenceTelemetry(): ProviderEvidenceTelemetry {
     enrichedCandidates: 0,
     cacheHits: 0,
     cacheMisses: 0,
+    coalescedRequests: 0,
     enrichmentFailures: 0,
     tvmaze_anime_excluded: 0,
     tvmaze_anime_likely_excluded: 0,

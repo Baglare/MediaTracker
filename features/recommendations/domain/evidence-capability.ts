@@ -13,6 +13,7 @@ import type {
   RecommendationProvider,
   SemanticVerifierMode,
 } from "./types";
+import { rankedTagProviderCoverageFor } from "./ranked-tag-provider-coverage";
 
 export type ConstraintEvidenceCapabilityStatus =
   | "structured_supported"
@@ -96,19 +97,59 @@ export function evaluateConstraintEvidenceCapability(input: {
     const hardRoleUnsafe = (input.constraint.role === "must" && !canUseAsMust)
       || (input.constraint.role === "avoid" && !canUseAsAvoid);
     const mediaTypes = input.targetMediaTypes.length > 0 ? input.targetMediaTypes : supportedMediaTypes;
+    const coverage = providers.flatMap((provider) => mediaTypes.flatMap((mediaType) => {
+      const item = rankedTagProviderCoverageFor(input.constraint.aspectId, provider, mediaType);
+      return item ? [item] : [];
+    }));
     const queryableProviders = providers.filter((provider) => mediaTypes.some((mediaType) => (
       queryableProviderRetrievalMapping(input.constraint.aspectId, provider, mediaType)?.strategy === "ranked_tag"
     )));
     if (queryableProviders.length === 0) {
+      const semanticProviders = [...new Set(coverage
+        .filter((item) => item.status === "semantic_confirmation_required")
+        .map((item) => item.provider))];
+      if (semanticProviders.length > 0) {
+        const enhancedMode = input.semanticVerifierMode !== "structured_only"
+          && (input.availableVerifierModes ?? []).includes(input.semanticVerifierMode);
+        return {
+          ...base,
+          providers: semanticProviders,
+          status: "requires_semantic_verifier",
+          reasonCode: hardRoleUnsafe
+            ? "constraint_evidence_hard_role_unsafe"
+            : enhancedMode
+              ? "constraint_evidence_semantic_verifier_selected"
+              : "constraint_evidence_semantic_verifier_required",
+          userMessage: hardRoleUnsafe
+            ? "Bu özellik mevcut kanıtlarla zorunlu filtre olarak güvenle kullanılamıyor."
+            : "Bu koşul için içerik özeti üzerinde semantik doğrulama gerekiyor.",
+          canUseAsMust: enhancedMode && canUseAsMust,
+          canUseAsAvoid: enhancedMode && canUseAsAvoid,
+          canUseAsPrefer: true,
+        };
+      }
+      const evidenceOnly = coverage.filter((item) => item.status === "evidence_only");
+      if (evidenceOnly.length === 0) {
+        return {
+          ...base,
+          status: "unsupported_for_target",
+          reasonCode: "constraint_evidence_unsupported_for_target",
+          userMessage: "Seçilen medya türünde güvenilir veri kaynağı bulunmuyor.",
+          canUseAsMust: false,
+          canUseAsAvoid: false,
+          canUseAsPrefer: false,
+        };
+      }
       return {
         ...base,
+        providers: [...new Set(evidenceOnly.map((item) => item.provider))],
         status: "soft_only",
-        reasonCode: hardRoleUnsafe ? "constraint_evidence_hard_role_unsafe" : "provider_tag_mapping_missing",
+        reasonCode: hardRoleUnsafe ? "constraint_evidence_hard_role_unsafe" : "constraint_evidence_ranked_tag_evidence_only",
         userMessage: hardRoleUnsafe
           ? "Bu özellik mevcut kanıtlarla zorunlu filtre olarak güvenle kullanılamıyor."
-          : "Bu özellik için seçilen kaynakta doğrudan arama desteği bulunmuyor.",
+          : "Mevcut kaynak bu koşulu yalnız yumuşak tercih veya sonradan kanıt kontrolü olarak destekliyor.",
         canUseAsMust: false,
-        canUseAsAvoid,
+        canUseAsAvoid: evidenceOnly.some((item) => item.canUseAsAvoid) && canUseAsAvoid,
         canUseAsPrefer: true,
       };
     }

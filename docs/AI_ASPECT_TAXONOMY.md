@@ -181,3 +181,5 @@ Registry [`features/recommendations/domain/aspect-registry.ts`](../features/reco
 ## D6.6-1R provider retrieval mapping
 
 `providerRetrievalMappings`, aspect anlamını veya evidence strategy'yi değiştirmez; provider'ın canonical taxonomy değerini gerçekten sorgulayabildiğini bildirir. UI label'dan otomatik tag üretilmez. D6.6-1R'de `political_intrigue` AniList `Politics`, `revenge` AniList `Revenge` tag'ine map olur; iki mapping de anime/manga ailesinde queryable ve `40/20` strict/relaxed policy taşır. Mapping olmayan diğer ranked-tag aspect'ler strategy sahibi kalır fakat retrieval capability `ranked_tag_supported` göstermez. [D6.6-1R sözleşmesi](AI_RECOMMENDATION_V2_D661R_RANKED_TAG_RETRIEVAL.md).
+
+D6.6-2 canlı doğrulaması iki mapping'i gerçek AniList media tag alanında teyit etti; yeni mapping eklemedi. 21 aspect'in coverage sınıfları [Ranked-Tag Provider Coverage](AI_RECOMMENDATION_RANKED_TAG_COVERAGE.md) belgesindedir.

@@ -43,7 +43,10 @@ export async function runDeterministicRecommendationV2(input: {
   providerPipeline?: ProviderEvidencePipelineResult;
   structuredRequest?: RecommendationRequestV2;
 }): Promise<AiRecommendResponse> {
+  const engineStartedAt = performance.now();
+  const pipelineStartedAt = performance.now();
   const pipeline = input.providerPipeline ?? await prepareProviderEvidencePipeline({ candidates: input.candidates, baseUrl: input.baseUrl, fetchImpl: input.fetchImpl });
+  const enrichmentMs = input.providerPipeline ? 0 : performance.now() - pipelineStartedAt;
   const identityVerified = input.candidates.filter((candidate) => candidate.source !== "library" && findSnapshot(candidate, pipeline.evidenceByCandidateKey));
   const dismissedRejected = identityVerified.filter((candidate) => isExactlyDismissed(candidate, input.dismissed)).map((candidate) => ({ title: candidate.title, reason: "dismissed_exact_identity" }));
   const candidates = identityVerified.filter((candidate) => !isExactlyDismissed(candidate, input.dismissed));
@@ -93,13 +96,16 @@ export async function runDeterministicRecommendationV2(input: {
       debug: { provider: "deterministic_v2", note: `clarification:${adapted.issues.join(",")}` },
     };
   }
+  const evidenceStartedAt = performance.now();
   const verifier = await runSemanticVerifier({ mode: adapted.request.semanticVerifierMode, snapshots: pipeline.evidenceByCandidateKey, fetchImpl: input.fetchImpl });
   const evidence = aggregateEvidenceSnapshots({ snapshots: pipeline.evidenceByCandidateKey, semanticByCandidateKey: verifier.evidenceByCandidateKey });
+  const evidenceMs = performance.now() - evidenceStartedAt;
   const rankable = candidates.flatMap((candidate) => {
     const snapshot = findSnapshot(candidate, pipeline.evidenceByCandidateKey);
     if (!snapshot) return [];
     return [{ candidate, snapshot, aspectEvidence: evidence.get(snapshot.candidateIdentity.canonicalKey) ?? new Map() }];
   });
+  const rankingStartedAt = performance.now();
   const ranking = scoreEligibleCandidates({ request: adapted.request, candidates: rankable, mediaItems: input.mediaItems, feedback: input.feedback, feedbackV2: input.feedbackV2 });
   const selected = rerankForDiversity(ranking.scored, 5);
   const averageCoverage = selected.length > 0
@@ -107,10 +113,16 @@ export async function runDeterministicRecommendationV2(input: {
     : 0;
   const nearMatches = adapted.request.strictness === "exploratory" ? ranking.nearMatches.slice(0, 3) : [];
   const rejectedCandidates = [...pipeline.rejectedCandidates, ...dismissedRejected, ...ranking.rejected];
+  const rankingMs = performance.now() - rankingStartedAt;
+  const explanationStartedAt = performance.now();
+  const assistantMessage = buildGroundedAssistantMessage(selected.length, rejectedCandidates.length);
+  const recommendations = selected.map((item, index) => buildGroundedRecommendation(item, adapted.request as NonNullable<typeof adapted.request>, index));
+  const groundedNearMatches = nearMatches.map((item, index) => buildGroundedNearMatchRecommendation(item, adapted.request as NonNullable<typeof adapted.request>, index));
+  const explanationMs = performance.now() - explanationStartedAt;
   return {
-    assistantMessage: buildGroundedAssistantMessage(selected.length, rejectedCandidates.length),
-    recommendations: selected.map((item, index) => buildGroundedRecommendation(item, adapted.request as NonNullable<typeof adapted.request>, index)),
-    nearMatches: nearMatches.map((item, index) => buildGroundedNearMatchRecommendation(item, adapted.request as NonNullable<typeof adapted.request>, index)),
+    assistantMessage,
+    recommendations,
+    nearMatches: groundedNearMatches,
     rejectedCandidates: rejectedCandidates.length > 0 ? rejectedCandidates : undefined,
     transparencySummary: `Kimlik doğrulama, yapılandırılmış kanıt ve hard filter uygulandı; deterministik sıra istek uyumu, kanıt güveni ve ardından kişisel uyumu kullandı. Semantic verifier: ${verifier.status}.`,
     intent: input.intent,
@@ -150,6 +162,13 @@ export async function runDeterministicRecommendationV2(input: {
         refinedPassUsed: false,
         providerFallback: false,
         providerEvidence: pipeline.telemetry,
+        latencyMs: {
+          enrichment: Number(enrichmentMs.toFixed(2)),
+          evidence: Number(evidenceMs.toFixed(2)),
+          ranking: Number(rankingMs.toFixed(2)),
+          explanation: Number(explanationMs.toFixed(2)),
+          total: Number((performance.now() - engineStartedAt).toFixed(2)),
+        },
         notes: [
           `v2_constraint_explicit=${adapted.telemetry.explicit}`,
           `v2_constraint_inferred=${adapted.telemetry.inferred}`,

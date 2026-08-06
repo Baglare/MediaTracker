@@ -83,6 +83,7 @@ Search normalizer work ID ile ilk exact edition ID'yi ayrı alanlarda korur. Aut
 - In-memory cache en fazla `256` entry; schema version cache key'dedir.
 - TTL: AniList/TMDB 6 saat, TVMaze 30 dakika, OMDb/Open Library 24 saat.
 - Aynı key için request coalescing vardır; bozuk snapshot ve `user_feedback` claim'i reddedilir.
+- Pipeline `getOrLoadWithStatus` kullanır; eşzamanlı aynı key tek promise'e coalesce edilir ve `coalescedRequests` telemetry'sinde ayrılır.
 - Başarısız loader kalıcı negative-cache edilmez.
 - Cache best-effort ve process-local'dır; kalıcı olduğu varsayılmaz. D3 Release Calendar cache'iyle paylaşılmaz.
 
@@ -91,6 +92,8 @@ Search normalizer work ID ile ilk exact edition ID'yi ayrı alanlarda korur. Aut
 Enrichment hatası mevcut doğrulanmış adayı düşürmez; identity üretilemeyen external aday ise recommendation havuzuna alınmaz. Provider/raw hata ve token kullanıcıya açılmaz. D6-2'nin kendi üretim etkisi recommendation candidate hijyeni, TVMaze anime exclusion, TMDB TV discovery ve exact-ID dedupe'dur; D6-3 sonrasında snapshot'lar deterministik scorer tarafından tüketilir.
 
 Conditional live smoke `D6_PROVIDER_LIVE_SMOKE=1` olmadan tamamen skip edilir. TMDB ve OMDb kontrolleri ayrıca ilgili env anahtarını gerektirir; DB veya mutation yapmaz.
+
+D6.6-2 merkezi request budget provider başına timeout, attempts, concurrency, retryable status, Retry-After, candidate/enrichment/query üst sınırlarını taşır. 429 ve 5xx bounded retry; permanent 4xx no-retry; abort stale-request korumasıdır. Ayrıntı [D6.6-2 Reliability](AI_RECOMMENDATION_V2_D662_LIVE_PROVIDER_RELIABILITY.md).
 
 ## D6-3 consumer sözleşmesi
 

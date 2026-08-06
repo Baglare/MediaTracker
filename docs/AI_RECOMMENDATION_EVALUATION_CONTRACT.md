@@ -66,3 +66,5 @@ Doğru biçimde 0 sonuç beklenen strict case `resultCoverage` paydasına körle
 5. Yalnız veri yeterliyse opsiyonel personalized reranker shadow deneyi; production varsayılanı değildir.
 
 Rapor constraint extraction precision/recall/F1, aspect ordinal error/level accuracy, hard-constraint violation, Precision@K, NDCG@K, unsupported explanation, abstention coverage/accuracy, calibration error, provider/model fallback ve p50/p95 latency metriklerini taşır. Production threshold, confidence veya ranking ancak human-labeled gold set, tekrar üretilebilir metric raporu ve regression gate kanıtıyla değiştirilebilir. D6.6-1 genel strength/confidence threshold'larını düşürmez.
+
+D6.6-2 live katalog sonucunu relevance gold etiketi saymaz. Live örnek yalnız schema, exact identity, canonical tag/rank, provider sınıflandırma ve bounded request invariant'larını doğrular. Determinizm tek normalize snapshot setinin 20 tekrarıyla ölçülür; 20 ayrı live çağrı yapılmaz.

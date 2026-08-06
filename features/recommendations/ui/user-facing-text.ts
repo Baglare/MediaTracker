@@ -1,6 +1,40 @@
 import { ASPECT_REGISTRY } from "../domain/aspect-registry";
 import type { AspectConstraint, ObjectiveConstraint } from "../domain/constraints";
 import type { RankedTagNoResultReason } from "@/lib/ai/types";
+import type { RecommendationRequestV2 } from "../domain/codec";
+import type { ConstraintEvidenceCapability } from "../domain/evidence-capability";
+import type { SemanticVerifierMode } from "../domain/types";
+
+const PROVIDER_LABELS = {
+  anilist: "AniList",
+  tvmaze: "TVMaze",
+  tmdb: "TMDB",
+  omdb: "OMDb",
+  openlibrary: "Open Library",
+} as const;
+
+export function userFacingCapabilityValidationSummary(input: {
+  request: RecommendationRequestV2;
+  capabilities: readonly ConstraintEvidenceCapability[];
+  availableVerifierModes?: readonly Exclude<SemanticVerifierMode, "structured_only">[];
+}): string {
+  const capability = input.capabilities.find((item) => {
+    const constraint = input.request.aspectConstraints.find((candidate) => candidate.id === item.constraintId);
+    return constraint?.role === "must" ? !item.canUseAsMust
+      : constraint?.role === "avoid" ? !item.canUseAsAvoid
+        : !item.canUseAsPrefer;
+  });
+  if (!capability) return "İstek koşullarından biri mevcut kaynaklarla doğrulanamıyor. İstek özetini gözden geçir.";
+  const aspectLabel = ASPECT_REGISTRY[capability.aspectId].labelTr;
+  const providerLabels = capability.providers.map((provider) => PROVIDER_LABELS[provider]);
+  const support = providerLabels.length > 0
+    ? `Mevcut kaynak desteği: ${providerLabels.join(", ")}.`
+    : "Seçilen medya türünde uygun kaynak desteği yok.";
+  const verifierAction = capability.status === "requires_semantic_verifier" && (input.availableVerifierModes?.length ?? 0) > 0
+    ? " İstek özetinde gerçekten kullanılabilir içerik doğrulayıcıyı da seçebilirsin."
+    : "";
+  return `${aspectLabel}: ${capability.userMessage} ${support} Koşulu tercihe çevirebilir veya kaldırabilirsin.${verifierAction}`;
+}
 
 export function userFacingRankedTagNoResult(
   reason: RankedTagNoResultReason,

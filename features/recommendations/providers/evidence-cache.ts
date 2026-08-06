@@ -32,6 +32,7 @@ function isSnapshot(value: unknown): value is CandidateProviderEvidenceSnapshot 
 }
 
 interface CacheRecord { snapshot: CandidateProviderEvidenceSnapshot; expiresAt: number }
+export type ProviderEvidenceCacheLoadSource = "cache" | "coalesced" | "loaded";
 
 export class ProviderEvidenceCache {
   private readonly entries = new Map<string, CacheRecord>();
@@ -67,17 +68,25 @@ export class ProviderEvidenceCache {
     loader: () => Promise<CandidateProviderEvidenceSnapshot>,
     ttlMs = PROVIDER_EVIDENCE_DEFAULT_TTL_MS,
   ): Promise<CandidateProviderEvidenceSnapshot> {
+    return (await this.getOrLoadWithStatus(key, loader, ttlMs)).snapshot;
+  }
+
+  async getOrLoadWithStatus(
+    key: string,
+    loader: () => Promise<CandidateProviderEvidenceSnapshot>,
+    ttlMs = PROVIDER_EVIDENCE_DEFAULT_TTL_MS,
+  ): Promise<{ snapshot: CandidateProviderEvidenceSnapshot; source: ProviderEvidenceCacheLoadSource }> {
     const cached = this.get(key);
-    if (cached) return cached;
+    if (cached) return { snapshot: cached, source: "cache" };
     const active = this.pending.get(key);
-    if (active) return active;
+    if (active) return { snapshot: await active, source: "coalesced" };
     const pending = loader().then((snapshot) => {
       if (!isSnapshot(snapshot)) throw new Error("provider_evidence_snapshot_invalid");
       this.set(key, snapshot, ttlMs);
       return { ...snapshot, cacheStatus: "miss" as const };
     }).finally(() => this.pending.delete(key));
     this.pending.set(key, pending);
-    return pending;
+    return { snapshot: await pending, source: "loaded" };
   }
 
   get size(): number { return this.entries.size; }

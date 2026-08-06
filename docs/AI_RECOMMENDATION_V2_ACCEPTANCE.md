@@ -89,3 +89,12 @@ Sentetik seed'ler sözleşme ve metric matematiğini doğrular; öneri kalitesin
 - Koşullu live smoke sabit başlık/ilk sonuç/rank/count assertion'ı kullanmadan canonical tag, strict/relaxed rank, finite evidence ve identity kontrol eder. Flag kapalıysa skip sonucu açıkça raporlanır.
 - Ayrıntılı sözleşme ve test matrisi [D6.6-1R Ranked-Tag Retrieval](AI_RECOMMENDATION_V2_D661R_RANKED_TAG_RETRIEVAL.md) belgesindedir.
 - D6.6-1R doğrulaması: `npm run lint` ve `npm run build` geçti; standard `npm run test:run` 135 dosyada 1.756 test keşfetti, 1.721 geçti ve 35 koşullu test skip edildi. Yeni paket 24 sentetik test ve flag-gated 1 live smoke case ekledi. Markdown link contract'ı ile `git diff --check` geçti. `D6_PROVIDER_LIVE_SMOKE` etkin olmadığı için gerçek provider ve browser sonuç smoke'u çalıştırılmadı; D6.6-2 blocker'ı olarak kaldı.
+
+## D6.6-2 final provider kabulü — 6 Ağustos 2026
+
+- Önceki TVMaze canlı hatası classifier değil, ambiguous `One Piece` singlesearch first-result ve `genres` içinde `Animation` bekleyen kırılgan test varsayımıydı. Test metadata invariant'ına geçirildi; threshold/classifier değiştirilmedi.
+- 21 ranked-tag aspect × 5 provider coverage read-model'i eksiksizdir. Queryable canonical mapping yalnız `Politics` ve `Revenge`; 10 aspect evidence-only, 9 aspect semantic confirmation gerektirir.
+- Merkezi timeout/retry/Retry-After/request-count budget, provider request telemetry, recommendation-only malformed-record recovery ve schema-drift unavailable ayrımı eklendi.
+- Public live contract paketi AniList, TVMaze ve Open Library için geçti; TMDB/OMDb anahtar olmadığı için kontrollü skip edildi.
+- Cache max 256/TTL/schema key/negative-cache yasağı korunur; pipeline eşzamanlı enrichment için gerçek coalescing yolunu kullanır.
+- Ayrıntılı karar [D6 Final Acceptance](AI_RECOMMENDATION_V2_FINAL_ACCEPTANCE.md), coverage [Ranked-Tag Coverage](AI_RECOMMENDATION_RANKED_TAG_COVERAGE.md), canlı kanıt [D6.6-2 Reliability](AI_RECOMMENDATION_V2_D662_LIVE_PROVIDER_RELIABILITY.md) belgelerindedir.

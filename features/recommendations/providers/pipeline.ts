@@ -110,14 +110,18 @@ export async function prepareProviderEvidencePipeline(input: {
     if (!base) return;
     const key = providerEvidenceCacheKey({ provider: base.candidateIdentity.primaryProvider, mediaType: base.candidateIdentity.mediaType, externalId: base.candidateIdentity.primaryExternalId });
     try {
-      const cached = providerEvidenceCache.get(key);
-      if (cached) { telemetry.cacheHits += 1; snapshots.set(candidate, cached); return; }
-      telemetry.cacheMisses += 1;
-      const enriched = candidate.source === "tmdb"
-        ? await fetchTmdbEvidenceDetail({ baseUrl: input.baseUrl, externalId: candidate.externalId, mediaType: candidate.type as "movie" | "tv", fetchImpl: input.fetchImpl, timeoutMs: PROVIDER_ENRICHMENT_TIMEOUT_MS })
-        : await fetchOpenLibraryWorkEvidence({ result: candidate.globalSearch?.raw as OpenLibraryNormalizedResult, fetchImpl: input.fetchImpl, timeoutMs: PROVIDER_ENRICHMENT_TIMEOUT_MS });
-      providerEvidenceCache.set(key, enriched, TTL_MS[base.candidateIdentity.primaryProvider]);
-      snapshots.set(candidate, enriched); telemetry.enrichedCandidates += 1;
+      const loaded = await providerEvidenceCache.getOrLoadWithStatus(
+        key,
+        () => candidate.source === "tmdb"
+          ? fetchTmdbEvidenceDetail({ baseUrl: input.baseUrl, externalId: candidate.externalId, mediaType: candidate.type as "movie" | "tv", fetchImpl: input.fetchImpl, timeoutMs: PROVIDER_ENRICHMENT_TIMEOUT_MS })
+          : fetchOpenLibraryWorkEvidence({ result: candidate.globalSearch?.raw as OpenLibraryNormalizedResult, fetchImpl: input.fetchImpl, timeoutMs: PROVIDER_ENRICHMENT_TIMEOUT_MS }),
+        TTL_MS[base.candidateIdentity.primaryProvider],
+      );
+      if (loaded.source === "cache") telemetry.cacheHits += 1;
+      else telemetry.cacheMisses += 1;
+      if (loaded.source === "coalesced") telemetry.coalescedRequests += 1;
+      if (loaded.source === "loaded") telemetry.enrichedCandidates += 1;
+      snapshots.set(candidate, loaded.snapshot);
     } catch {
       telemetry.enrichmentFailures += 1;
     }

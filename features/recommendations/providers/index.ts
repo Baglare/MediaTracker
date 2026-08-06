@@ -9,3 +9,4 @@ export * from "./omdb-adapter";
 export * from "./openlibrary-adapter";
 export * from "./pipeline";
 export * from "./tvmaze-anime-classifier";
+export * from "./request-policy";

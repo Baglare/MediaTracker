@@ -129,3 +129,12 @@ Metrikler provider/media/aspect slice'larıyla raporlanır. Ortalama iyileşme t
 5. Unsupported explanation ve fallback davranışı kabul sınırında olmalı.
 6. Model unavailable iken deterministic structured-only yol aynı request için güvenli sonuç/unknown üretmeli.
 7. LLM veya model final recommendation authority olmamalı.
+
+## D6.6-2 handoff durumu
+
+- 21 ranked-tag aspect provider coverage matrisi hazır; queryable baseline yalnız `Politics` ve `Revenge` mapping'idir.
+- Exact taxonomy deterministic baseline ve ranked-tag rank policy sabittir.
+- Semantic confirmation boşluğu 9 ranked aspect ve registry'deki 9 `semantic_required` aspect için ayrılmıştır.
+- Live drift sonucu bilinir: TVMaze ambiguous first-result assertion'ı kaldırıldı; public AniList/TVMaze/Open Library contract paketi geçti.
+- Evaluation codec ve metric fonksiyonları hazırdır.
+- Veri/lisans audit'i, annotation guideline ve human-labeled gold set D7-0'da başlayacaktır; D6 fixture'ları kalite dataset'i değildir.

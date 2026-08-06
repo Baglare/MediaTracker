@@ -66,6 +66,8 @@ Explicit hard constraint sessizce prefer'e çevrilmez. Interpret draft capabilit
 
 D6.6-1R ile `ranked_tag_supported` yalnız hedef provider/media türünde queryable canonical retrieval mapping varsa verilir. Strategy sahibi fakat mapping'i olmayan ranked-tag constraint soft-only/mapping-missing capability gösterir; hard request title-search'e gönderilmez.
 
+D6.6-2 coverage ayrımı geniş/bileşik ranked aspect'leri daha dürüst sınıflandırır: `power_progression`, `found_family`, `coming_of_age`, `antihero`, `enemies_to_lovers`, `friendship_focus`, `family_focus`, `dark`, `disturbing_content` mapping yoksa `requires_semantic_verifier`; kalan mapping'siz ranked aspect'ler evidence-only/soft-only kalır. Tam matris [Ranked-Tag Provider Coverage](AI_RECOMMENDATION_RANKED_TAG_COVERAGE.md) belgesindedir.
+
 ## Ranked-tag ve soft evidence policy
 
 | AniList tag rank | Level/confidence başlangıcı |

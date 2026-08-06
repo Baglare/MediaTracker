@@ -80,3 +80,12 @@ Bu aşamada `D6_PROVIDER_LIVE_SMOKE` çalıştırılmaz; live provider reliabili
 6. Console error, request loop ve duplicate assistant message olmadığını kontrol et.
 
 Gerçek provider/browser sonucu yalnız `D6_PROVIDER_LIVE_SMOKE=1` kontrollü ortamda çalıştırılır. Flag kapalıysa sentetik route/retrieval fixture'ları kabul kanıtıdır; canlı sonuç iddiası yapılmaz. Ayrıntı [D6.6-1R Ranked-Tag Retrieval](AI_RECOMMENDATION_V2_D661R_RANKED_TAG_RETRIEVAL.md) belgesindedir.
+
+## D6.6-2 provider final smoke
+
+1. Standard testte flag'i kapalı tut ve provider canlı dosyasının kontrollü skip olduğunu doğrula.
+2. `D6_PROVIDER_LIVE_SMOKE=1` ile yalnız provider live testini çalıştır; AniList Fantasy, Politics/Revenge 40/20, TVMaze üç sınıf ve Open Library work/edition invariant'larını doğrula.
+3. Key varsa TMDB movie/TV ve OMDb exact IMDb testlerini çalıştır; key yokluğunu UI/provider hatası olarak sunma.
+4. Character-driven hard 422 akışında ham status/code/enum yerine Türkçe aspect, kaynak, tercihe çevir/kaldır ve yalnız mevcut verifier seçimini doğrula.
+5. Malformed provider item fixture'ında valid kayıtların kurtarıldığını, büyük HTML'in taşınmadığını ve schema drift'in boş katalog sayılmadığını doğrula.
+6. Aynı snapshot'ı 20 kez ve karışık input sırasıyla çalıştır; primary/near-match/eligibility/explanation ve stable identity sırasını karşılaştır.

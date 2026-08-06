@@ -58,8 +58,12 @@ describe("D6-2 provider evidence cache", () => {
   it("aynı request'i coalesce eder", async () => {
     const cache = new ProviderEvidenceCache();
     const loader = vi.fn(async () => adaptOmdbEvidence({ externalSource: "omdb", externalId: "tt3", type: "movie", title: "C", totalProgress: 1 }));
-    await Promise.all([cache.getOrLoad("c", loader), cache.getOrLoad("c", loader)]);
+    const [first, second] = await Promise.all([
+      cache.getOrLoadWithStatus("c", loader),
+      cache.getOrLoadWithStatus("c", loader),
+    ]);
     expect(loader).toHaveBeenCalledTimes(1);
+    expect([first.source, second.source].sort()).toEqual(["coalesced", "loaded"]);
   });
 
   it("bozuk snapshot ve user feedback claim'ini cache'e almaz", () => {
