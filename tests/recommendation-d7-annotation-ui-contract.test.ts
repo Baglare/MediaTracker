@@ -11,6 +11,7 @@ const ui = readFileSync(path.join(root, "features/recommendations/evaluation/ann
 const page = readFileSync(path.join(root, "app/dev/recommendation-annotation/page.tsx"), "utf8");
 const api = readFileSync(path.join(root, "app/api/dev/recommendation-annotation/route.ts"), "utf8");
 const navigation = readFileSync(path.join(root, "components/app-shell/route-app-shell.tsx"), "utf8");
+const taskPlan = readFileSync(path.join(root, "features/recommendations/evaluation/annotation-tool/ui/task-generation-plan.ts"), "utf8");
 
 describe("D7-1A UI and shortcut contract", () => {
   it("default 12 aspect doğrudan 43-aspect registry'den gelir", () => {
@@ -75,6 +76,26 @@ describe("D7-1A UI and shortcut contract", () => {
     expect(api).toContain('runtime = "nodejs"');
     expect(api).toContain('dynamic = "force-dynamic"');
     expect(api).toContain("annotationJson");
+  });
+
+  it("all-selected ve explicit sparse modlarını aynı mevcut generate_tasks action'ına gönderir", () => {
+    expect(ui).toContain('mode: "all_selected"');
+    expect(ui).toContain('mode: "explicit"');
+    expect(ui).toContain('action: "generate_tasks"');
+    expect(ui).toContain("Sparse task&apos;ları üret");
+  });
+
+  it("50 üstü all-selected üretim için açık checkbox confirmation ister", () => {
+    expect(taskPlan).toContain("creatableTaskCount > 50");
+    expect(ui).toContain('type="checkbox"');
+    expect(ui).toContain("50&apos;den fazla");
+    expect(ui).toContain("!allSelectedConfirmed");
+  });
+
+  it("sparse preview ayrı aksiyondur ve expected annotation label preselect etmez", () => {
+    expect(ui).toContain("previewSparseTaskPlanJson");
+    expect(ui).toContain('useState<AspectAnnotationLabel | null>(null)');
+    expect(ui).toContain("!label || busy");
   });
 
   it("annotation route ürün kabuğundan ayrıdır ve public navigation link'i değildir", () => {

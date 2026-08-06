@@ -10,6 +10,13 @@ import type {
   AnnotationValidationIssue,
 } from "../domain/types";
 import { isEditableShortcutTarget, resolveAnnotationShortcut } from "./shortcuts";
+import {
+  previewAllSelectedTasks,
+  previewSparseTaskPlanJson,
+  sparseTaskPlanIssueMessageTr,
+  taskGenerationErrorMessageTr,
+  type SparseTaskPlanPreview,
+} from "./task-generation-plan";
 
 const API = "/api/dev/recommendation-annotation";
 
@@ -33,7 +40,7 @@ export function AnnotationToolClient() {
   const [actorId, setActorId] = useState("ann_internal_01");
   const [model, setModel] = useState<AnnotationToolReadModel | null>(null);
   const [activeTaskId, setActiveTaskId] = useState("");
-  const [label, setLabel] = useState<AspectAnnotationLabel>("insufficient_evidence");
+  const [label, setLabel] = useState<AspectAnnotationLabel | null>(null);
   const [confidence, setConfidence] = useState<AnnotationConfidence>("low");
   const [evidenceNote, setEvidenceNote] = useState("");
   const [contradictionNote, setContradictionNote] = useState("");
@@ -41,6 +48,10 @@ export function AnnotationToolClient() {
   const [busy, setBusy] = useState(false);
   const [importRaw, setImportRaw] = useState("");
   const [importPreview, setImportPreview] = useState<AnnotationImportPreview | null>(null);
+  const [taskGenerationMode, setTaskGenerationMode] = useState<"all_selected" | "explicit">("explicit");
+  const [allSelectedConfirmed, setAllSelectedConfirmed] = useState(false);
+  const [sparsePlanRaw, setSparsePlanRaw] = useState("");
+  const [sparsePlanPreview, setSparsePlanPreview] = useState<SparseTaskPlanPreview | null>(null);
   const [validation, setValidation] = useState<readonly AnnotationValidationIssue[]>([]);
   const [exportPreview, setExportPreview] = useState("");
 
@@ -56,6 +67,9 @@ export function AnnotationToolClient() {
     setModel(result);
     setValidation(result.validation);
     setActiveTaskId((current) => result.tasks.some((task) => task.taskId === current) ? current : result.tasks[0]?.taskId ?? "");
+    setLabel(null);
+    setSparsePlanPreview(null);
+    setAllSelectedConfirmed(false);
   }, []);
 
   useEffect(() => {
@@ -93,11 +107,12 @@ export function AnnotationToolClient() {
     && entry.annotation.annotatorId === actorId) ?? null;
   const completed = tasks.filter((task) => ["annotated", "adjudicated"].includes(task.status)).length;
   const progress = tasks.length === 0 ? 0 : Math.round((completed / tasks.length) * 100);
+  const allSelectedPreview = useMemo(() => model ? previewAllSelectedTasks(model) : null, [model]);
 
   const post = useCallback(async <T,>(body: Record<string, unknown>): Promise<T> => requestJson<T>(API, { method: "POST", body: JSON.stringify(body) }), []);
 
   const save = useCallback(async () => {
-    if (!activeTask || !model) return;
+    if (!activeTask || !model || !label) return;
     setBusy(true);
     try {
       const result = await post<AnnotationToolReadModel>({
@@ -133,7 +148,7 @@ export function AnnotationToolClient() {
       && entry.annotation.aspectId === task?.aspectId
       && entry.annotation.annotationRound === task?.annotationRound
       && entry.annotation.annotatorId === actorId);
-    setLabel(existing?.annotation.label ?? "insufficient_evidence");
+    setLabel(existing?.annotation.label ?? null);
     setConfidence(existing?.annotation.confidence ?? "low");
     setEvidenceNote(existing?.annotation.evidenceNotes[0] ?? "");
     setContradictionNote(existing?.annotation.contradictionNotes[0] ?? "");
@@ -197,14 +212,42 @@ export function AnnotationToolClient() {
     finally { setBusy(false); }
   }
 
-  async function generateTasks() {
+  async function generateTasks(selection: { mode: "all_selected" } | { mode: "explicit"; pairs: readonly { recordId: string; aspectId: string }[] }) {
     if (!model) return;
     setBusy(true);
     try {
-      const result = await post<AnnotationToolReadModel>({ action: "generate_tasks", workspaceId, actorId, selection: { mode: "all_selected" }, requiredAnnotationCount: 1 });
-      setModel(result); setValidation(result.validation); setActiveTaskId(result.tasks[0]?.taskId ?? ""); setMessage("Deterministik sparse-compatible task listesi oluşturuldu.");
-    } catch (error) { setMessage(error instanceof Error ? error.message : "Task üretilemedi."); }
+      const result = await post<AnnotationToolReadModel>({ action: "generate_tasks", workspaceId, actorId, selection, requiredAnnotationCount: 1 });
+      setModel(result); setValidation(result.validation); setActiveTaskId(result.tasks[0]?.taskId ?? ""); setMessage(selection.mode === "explicit" ? "Sparse explicit task listesi oluşturuldu." : "Tüm seçili aspect task'ları oluşturuldu.");
+      setAllSelectedConfirmed(false);
+      if (selection.mode === "explicit") setSparsePlanPreview(previewSparseTaskPlanJson(sparsePlanRaw, result));
+    } catch (error) { setMessage(taskGenerationErrorMessageTr(error)); }
     finally { setBusy(false); }
+  }
+
+  function previewSparsePlan() {
+    if (!model) return;
+    const preview = previewSparseTaskPlanJson(sparsePlanRaw, model);
+    setSparsePlanPreview(preview);
+    setMessage(preview.plan
+      ? "Sparse task planı doğrulandı; henüz mutation yapılmadı."
+      : preview.issueCodes.map(sparseTaskPlanIssueMessageTr).join(" "));
+  }
+
+  function generateAllSelectedTasks() {
+    if (!allSelectedPreview) return;
+    if (allSelectedPreview.requiresConfirmation && !allSelectedConfirmed) {
+      setMessage("50'den fazla yeni task için ikinci açık onay gereklidir.");
+      return;
+    }
+    void generateTasks({ mode: "all_selected" });
+  }
+
+  function generateSparseTasks() {
+    if (!sparsePlanPreview?.plan) {
+      setMessage("Önce geçerli sparse task planını önizleyin.");
+      return;
+    }
+    void generateTasks({ mode: "explicit", pairs: sparsePlanPreview.plan.pairs });
   }
 
   async function runValidation() {
@@ -228,7 +271,7 @@ export function AnnotationToolClient() {
   }
 
   async function adjudicateConflict() {
-    if (!model || !conflictTask || conflictAnnotations.length < 2) return;
+    if (!model || !conflictTask || conflictAnnotations.length < 2 || !label) return;
     try {
       const result = await post<AnnotationToolReadModel>({
         action: "adjudicate", workspaceId, taskId: conflictTask.taskId,
@@ -257,18 +300,49 @@ export function AnnotationToolClient() {
     <main className="mx-auto w-full max-w-[1600px] space-y-4 p-3 text-zinc-100 md:p-6" data-testid="annotation-tool">
       <header className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div><p className="text-xs font-semibold uppercase tracking-[0.18em] text-violet-300">D7-1A · local development</p><h1 className="text-2xl font-semibold">Aspect Annotation Workspace</h1><p className="text-sm text-zinc-400">Provider fetch, model prediction ve kişisel veri yoktur.</p></div>
+          <div><p className="text-xs font-semibold uppercase tracking-[0.18em] text-violet-300">D7-1B hazırlığı · local development</p><h1 className="text-2xl font-semibold">Aspect Annotation Workspace</h1><p className="text-sm text-zinc-400">Provider fetch, model prediction ve kişisel veri yoktur.</p></div>
           <div className="text-right text-sm"><p>Durum: <strong>{model?.workspace.status ?? "workspace yok"}</strong></p><p aria-live="polite">İlerleme: {completed}/{tasks.length} (%{progress})</p></div>
         </div>
-        <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
           <label className="text-sm">Workspace<select className="mt-1 w-full rounded border border-zinc-700 bg-zinc-950 p-2" value={workspaceId} onChange={(event) => void loadWorkspace(event.target.value)}><option value="">Seç</option>{workspaceIds.map((id) => <option key={id}>{id}</option>)}</select></label>
           <label className="text-sm">Yeni workspace ID<input className="mt-1 w-full rounded border border-zinc-700 bg-zinc-950 p-2" value={newWorkspaceId} onChange={(event) => setNewWorkspaceId(event.target.value)} /></label>
           <label className="text-sm">Pseudonymous annotator<input className="mt-1 w-full rounded border border-zinc-700 bg-zinc-950 p-2" value={actorId} onChange={(event) => setActorId(event.target.value)} /></label>
           <button className="self-end rounded bg-violet-600 px-3 py-2 font-medium disabled:opacity-50" disabled={busy} onClick={() => void createWorkspace()}>Draft oluştur</button>
-          <button className="self-end rounded border border-zinc-700 px-3 py-2 disabled:opacity-50" disabled={!model || busy} onClick={() => void generateTasks()}>Task üret</button>
         </div>
         {message && <p role="status" className="mt-3 rounded border border-zinc-700 bg-zinc-950 p-2 text-sm">{message}</p>}
       </header>
+
+      <section className="min-w-0 rounded-2xl border border-zinc-800 bg-zinc-900 p-4" aria-labelledby="task-generation-heading">
+        <h2 id="task-generation-heading" className="font-semibold">Task üretimi</h2>
+        <p className="mt-1 text-sm text-zinc-400">Plan önizlemesi mutation yapmaz. Backend mevcut deterministic task generation ve duplicate-skip kurallarının source of truth&apos;udur.</p>
+        <div className="mt-3 flex flex-wrap gap-4">
+          <label className="flex items-center gap-2"><input type="radio" name="task-generation-mode" checked={taskGenerationMode === "all_selected"} onChange={() => { setTaskGenerationMode("all_selected"); setAllSelectedConfirmed(false); }} />Tüm seçili aspect&apos;ler</label>
+          <label className="flex items-center gap-2"><input type="radio" name="task-generation-mode" checked={taskGenerationMode === "explicit"} onChange={() => { setTaskGenerationMode("explicit"); setAllSelectedConfirmed(false); }} />Sparse explicit plan</label>
+        </div>
+        {taskGenerationMode === "all_selected" && allSelectedPreview && <div className="mt-3 rounded-xl border border-zinc-700 bg-zinc-950 p-3 text-sm">
+          <p><strong>{allSelectedPreview.recordCount} kayıt × {allSelectedPreview.aspectCount} aspect = {allSelectedPreview.totalPairCount} task</strong></p>
+          <p className="text-zinc-400">Mevcut {allSelectedPreview.existingTaskCount} task atlanır; {allSelectedPreview.creatableTaskCount} yeni task oluşturulabilir.</p>
+          {allSelectedPreview.requiresConfirmation && <label className="mt-3 flex items-start gap-2 rounded border border-amber-500/40 bg-amber-500/10 p-2"><input type="checkbox" checked={allSelectedConfirmed} onChange={(event) => setAllSelectedConfirmed(event.target.checked)} /><span>50&apos;den fazla ({allSelectedPreview.creatableTaskCount}) yeni task üretimini açıkça onaylıyorum.</span></label>}
+          <button className="mt-3 rounded bg-violet-600 px-3 py-2 font-medium disabled:opacity-50" disabled={!model || busy || allSelectedPreview.creatableTaskCount === 0 || (allSelectedPreview.requiresConfirmation && !allSelectedConfirmed)} onClick={generateAllSelectedTasks}>Tüm seçili aspect task&apos;larını üret</button>
+        </div>}
+        {taskGenerationMode === "explicit" && <div className="mt-3 grid min-w-0 gap-3 lg:grid-cols-2">
+          <div className="min-w-0">
+            <label className="block text-sm" htmlFor="sparse-task-plan-file">Sparse task planı JSON dosyası</label>
+            <input id="sparse-task-plan-file" className="my-2 block w-full text-sm" type="file" accept="application/json,.json" onChange={(event) => { const file = event.target.files?.[0]; if (file) void file.text().then((raw) => { setSparsePlanRaw(raw); setSparsePlanPreview(null); }); }} />
+            <label className="block text-sm" htmlFor="sparse-task-plan-json">Plan JSON</label>
+            <textarea id="sparse-task-plan-json" className="mt-1 min-h-40 w-full rounded border border-zinc-700 bg-zinc-950 p-2 font-mono text-xs" value={sparsePlanRaw} onChange={(event) => { setSparsePlanRaw(event.target.value); setSparsePlanPreview(null); }} />
+            <button className="mt-2 rounded border border-zinc-700 px-3 py-2 disabled:opacity-50" disabled={!model || !sparsePlanRaw.trim() || busy} onClick={previewSparsePlan}>Sparse planı önizle</button>
+          </div>
+          <div className="min-w-0 rounded-xl border border-zinc-700 bg-zinc-950 p-3 text-sm" aria-live="polite">
+            <h3 className="font-semibold">Sparse plan preview</h3>
+            {sparsePlanPreview ? <>
+              <dl className="mt-2 grid grid-cols-2 gap-2"><div><dt className="text-zinc-500">Toplam pair</dt><dd>{sparsePlanPreview.totalPairs}</dd></div><div><dt className="text-zinc-500">Benzersiz record</dt><dd>{sparsePlanPreview.uniqueRecordCount}</dd></div><div><dt className="text-zinc-500">Benzersiz aspect</dt><dd>{sparsePlanPreview.uniqueAspectCount}</dd></div><div><dt className="text-zinc-500">Duplicate</dt><dd>{sparsePlanPreview.duplicatePairCount}</dd></div><div><dt className="text-zinc-500">Geçersiz record</dt><dd>{sparsePlanPreview.invalidRecordCount}</dd></div><div><dt className="text-zinc-500">Geçersiz aspect</dt><dd>{sparsePlanPreview.invalidAspectCount}</dd></div><div><dt className="text-zinc-500">Mevcut task</dt><dd>{sparsePlanPreview.existingTaskCount}</dd></div><div><dt className="text-zinc-500">Oluşturulabilir</dt><dd>{sparsePlanPreview.creatableTaskCount}</dd></div></dl>
+              {sparsePlanPreview.issueCodes.length > 0 && <ul className="mt-3 list-disc space-y-1 pl-5 text-rose-300">{sparsePlanPreview.issueCodes.map((code) => <li key={code}>{sparseTaskPlanIssueMessageTr(code)}</li>)}</ul>}
+              <button className="mt-3 rounded bg-emerald-600 px-3 py-2 font-semibold disabled:opacity-50" disabled={!sparsePlanPreview.plan || sparsePlanPreview.creatableTaskCount === 0 || busy} onClick={generateSparseTasks}>Sparse task&apos;ları üret</button>
+            </> : <p className="mt-2 text-zinc-500">Dosya veya textarea içeriğini seçip önizleyin.</p>}
+          </div>
+        </div>}
+      </section>
 
       <section className="grid min-w-0 gap-4 lg:grid-cols-[minmax(220px,0.75fr)_minmax(0,1.5fr)_minmax(280px,1fr)]">
         <aside className="min-w-0 rounded-2xl border border-zinc-800 bg-zinc-900 p-3">
@@ -292,7 +366,7 @@ export function AnnotationToolClient() {
           <fieldset><legend className="mb-2 font-semibold">Annotation confidence</legend><div className="flex flex-wrap gap-3">{(Object.keys(ANNOTATION_CONFIDENCE_UI) as AnnotationConfidence[]).map((value, index) => <label key={value} className="flex items-center gap-2"><input type="radio" name="annotation-confidence" value={value} checked={confidence === value} onChange={() => setConfidence(value)} /><span>Shift+{index + 1} {ANNOTATION_CONFIDENCE_UI[value]}</span></label>)}</div></fieldset>
           <label className="block text-sm" htmlFor="evidence-note">Kısa evidence note<textarea id="evidence-note" aria-describedby="evidence-help" className="mt-1 min-h-20 w-full rounded border border-zinc-700 bg-zinc-950 p-2" maxLength={280} value={evidenceNote} onChange={(event) => setEvidenceNote(event.target.value)} /><span id="evidence-help" className="text-xs text-zinc-500">En fazla 280 karakter; uzun provider alıntısı yok.</span></label>
           <label className="block text-sm" htmlFor="contradiction-note">Çelişki notu<textarea id="contradiction-note" className="mt-1 min-h-16 w-full rounded border border-zinc-700 bg-zinc-950 p-2" maxLength={280} value={contradictionNote} onChange={(event) => setContradictionNote(event.target.value)} /></label>
-          <button className="w-full rounded bg-emerald-600 px-3 py-2 font-semibold disabled:opacity-50" type="submit" disabled={!activeTask || busy}>Ctrl+S · Kaydet</button>
+          <button className="w-full rounded bg-emerald-600 px-3 py-2 font-semibold disabled:opacity-50" type="submit" disabled={!activeTask || !label || busy}>Ctrl+S · Kaydet</button>
         </form>
       </section>
 

@@ -28,17 +28,13 @@ import {
   previewRecordImport,
   saveAnnotation,
   validateAnnotationWorkspace,
-  type TaskGenerationSelection,
 } from "./workflows";
+import { decodeTaskGenerationSelection } from "./task-selection";
 
 export class AnnotationRequestError extends Error {
   constructor(readonly status: 400 | 404 | 409 | 413, code: string) {
     super(code);
   }
-}
-
-function object(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function text(value: unknown, max: number): string | undefined {
@@ -113,10 +109,8 @@ export class AnnotationToolService {
   async generateTasks(input: Record<string, unknown>): Promise<AnnotationToolReadModel> {
     const id = workspaceId(input.workspaceId);
     const actorId = actor(input.actorId);
-    const selection = input.selection as TaskGenerationSelection;
-    if (!object(selection) || !["all_selected", "aspect_group", "explicit", "aspect_ids"].includes(selection.mode)) {
-      throw new AnnotationRequestError(400, "invalid_task_selection");
-    }
+    const selection = decodeTaskGenerationSelection(input.selection);
+    if (!selection) throw new AnnotationRequestError(400, "invalid_task_selection");
     await this.repository.mutateWorkspace({
       workspaceId: id,
       actorId,

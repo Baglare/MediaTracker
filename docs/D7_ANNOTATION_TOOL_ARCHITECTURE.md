@@ -1,7 +1,7 @@
 # D7-1A Annotation Tool Architecture
 
-Tarih: 6 Ağustos 2026  
-Durum: Local-development araç ve sözleşme tamamlandı; gerçek pilot/gold veri yoktur.
+Tarih: 7 Ağustos 2026
+Durum: Local-development araç, explicit sparse task planı ve sözleşme tamamlandı; gerçek annotation label/gold veri yoktur.
 
 ## Güvenlik sınırı
 
@@ -68,7 +68,9 @@ Backup'lar workspace başına en fazla 10'dur; en eski lexical timestamp/sequenc
 
 Masaüstü task/record/form üçlü düzeni; mobil tek kolon düzeni kullanır. Aspect adı/açıklaması 43-aspect registry'den gelir. Raw provider payload, private path, gerçek annotator kimliği veya model prediction gösterilmez.
 
-Label ve confidence alanları radio semantics, ilişkili label, screen-reader progress ve alan açıklaması taşır. Kısayollar `1..5`, `Shift+1..3`, `Ctrl+S`, `N`, `P` şeklindedir; input/textarea/select/contenteditable odağında tetiklenmez. Sürekli her tuşta autosave yoktur; explicit submit kullanılır.
+Task üretimi mevcut backend modlarını değiştirmez. UI `all_selected` için record × aspect ve yeni task sayısını gösterir; 50 üstünde ikinci açık onay ister. Version 1 sparse plan codec'i exact-field JSON, aktif workspace, en fazla 1000 unique pair, mevcut record ve selected registry aspect doğrulaması yapar. Preview salt-okunurdur; açık üretim eylemi sonrasında yalnız `{ mode: "explicit", pairs }` mevcut guarded API'ye gönderilir. Server doğrulaması ve duplicate task skip source of truth olarak kalır.
+
+Label ve confidence alanları radio semantics, ilişkili label, screen-reader progress ve alan açıklaması taşır. Yeni task açıldığında hiçbir expected label preselect edilmez. Kısayollar `1..5`, `Shift+1..3`, `Ctrl+S`, `N`, `P` şeklindedir; input/textarea/select/contenteditable odağında tetiklenmez. Sürekli her tuşta autosave yoktur; explicit submit kullanılır.
 
 ## Fixture ve test sınırı
 

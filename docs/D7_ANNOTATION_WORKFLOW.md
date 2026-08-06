@@ -1,7 +1,7 @@
-# D7-1A Annotation Workflow
+# D7-1A Annotation Workflow ve D7-1B Sparse Hazırlık
 
-Tarih: 6 Ağustos 2026  
-Durum: Local tool workflow hazır; pilot annotation D7-1B'de başlayacaktır.
+Tarih: 7 Ağustos 2026
+Durum: Local tool workflow ve explicit sparse task planı hazır; pilot annotation/label üretimi henüz başlamadı.
 
 ## Başlatma
 
@@ -29,6 +29,15 @@ Import önce salt-okunur preview üretir: total, valid, invalid, duplicate-same,
 ## 3. Task üretimi
 
 Deterministik seçenekler bütün seçili aspect'ler, registry aspect grubu, explicit record/aspect listesi veya explicit aspect/record filtresidir. D7-1A akıllı sampling yapmaz. Duplicate record/aspect/round atlanır. Sıra priority descending, record ID, aspect ID ve round'dur.
+
+UI iki açık mod sunar:
+
+- **Tüm seçili aspect'ler:** `record × selected aspect` toplamını ve mevcut task'lar düşüldükten sonra oluşacak yeni sayıyı önceden gösterir. 50'den fazla yeni task için ayrı checkbox onayı olmadan mutation göndermez. Mevcut `all_selected` backend davranışı korunur.
+- **Sparse explicit plan:** Version 1 local JSON dosyası veya textarea kullanır. Yalnız `version`, `workspaceId`, `pairs`; her pair içinde yalnız `recordId`, `aspectId` kabul edilir. En fazla 1000 pair, duplicate olmama, aktif workspace eşleşmesi, mevcut record ve registry + selected aspect şartları preview'da doğrulanır. Unknown alan fail-closed'dur.
+
+Sparse preview toplam pair, benzersiz record/aspect, duplicate, geçersiz record/aspect, mevcut task ve oluşturulabilir task sayılarını gösterir; mutation yapmaz. Kullanıcı ayrıca “Sparse task'ları üret” demeden API çağrısı yapılmaz. UI doğrulaması ergonomiktir; server mevcut `generate_tasks` + `{ mode: "explicit", pairs }` akışında record/aspect/immutability ve duplicate-skip kurallarının source of truth'u kalır.
+
+Private D7-1B planı `private/recommendation-ml/imports/aspect-pilot-anime-v1-task-plan.json` konumundadır ve Git'e girmez. Yalnız task ataması taşır; label, confidence, expected result, provider tag/rank veya annotation cevabı içermez.
 
 Default round 1 ve required count 1'dir. Gold validation/test subset D7-1B'de count 2 yapabilir.
 
@@ -61,7 +70,7 @@ Candidate export browser download olarak verilebilir; private path gösterilmez.
 1. Private root ve yedekleme/erişim kararını verin.
 2. Pilot annotator pseudonym'lerini atayın; mümkünse ikinci bağımsız insanı belirleyin.
 3. Yalnız izinli sentetik/insan-yazımı kısa bundle hazırlayın; checksum/provenance validation çalıştırın.
-4. 40–60 unique work ve 6–8 aspect pilot task listesini sampling planına göre dışarıda belirleyip explicit import edin.
+4. 40–60 unique work ve 6–8 aspect pilot task listesini sampling planına göre dışarıda belirleyip sparse plan preview ile doğrulayın; explicit üretim için ayrıca onay verin.
 5. En az yüzde 20 double-annotation subset'i seçin; conflict'leri adjudicate edin.
 6. Guideline sorunlarını belgeleyin; gold_candidate durumuna otomatik geçmeyin.
 
