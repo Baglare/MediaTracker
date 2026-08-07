@@ -1,5 +1,7 @@
 # D7 Aspect Annotation Guidelines v1
 
+> **D7-R0 durum notu (8 Ağustos 2026):** Bu belge archived calibration/evaluation tooling içindir; aktif D7 release yolu değildir. Mevcut private workspaces ve annotation artifact'ları korunur. Yeni annotation yapılması beklenmez. Aktif yol: [D7 Grounded Research Architecture](D7_GROUNDED_RESEARCH_ARCHITECTURE.md).
+
 > D7-1A tool bu guideline versionını workspace metadata ve her annotation üzerinde saklar. UI label'ları Türkçeleştirir; raw enum ve annotation confidence anlamı değişmez. Evidence/contradiction note 280 karakterdir. Kısayol ve adjudication akışı için [D7 Annotation Workflow](D7_ANNOTATION_WORKFLOW.md) kullanılır.
 
 Bu rehber candidate + aspect için anlatı merkeziliğini etiketler. Recommendation uygunluğu, kişisel zevk, kalite, popülerlik veya provider güveni etiketlenmez. Örneklerin tamamı sentetiktir; gerçek eser alıntısı kullanılmaz.

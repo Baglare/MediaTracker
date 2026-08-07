@@ -1,7 +1,9 @@
 # D7-1A Annotation Workflow ve D7-1B Sparse Hazırlık
 
-Tarih: 7 Ağustos 2026
-Durum: Local tool workflow ve explicit sparse task planı hazır; pilot annotation/label üretimi henüz başlamadı.
+> **D7-R0 durum notu (8 Ağustos 2026):** Bu workflow archived calibration/evaluation tooling kaydıdır; aktif D7 release yolu değildir. Mevcut private workspaces korunur. D7-1B ana pilotu veya başka yeni annotation yapılması beklenmez. Aktif yol: [D7 Grounded Research Architecture](D7_GROUNDED_RESEARCH_ARCHITECTURE.md).
+
+Tarih: 8 Ağustos 2026
+Durum: Local tool workflow arşivlendi; yeni pilot annotation/label üretimi planlanmıyor.
 
 ## Başlatma
 

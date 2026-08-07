@@ -1,7 +1,9 @@
 # D7-1A Annotation Tool Architecture
 
-Tarih: 7 Ağustos 2026
-Durum: Local-development araç, explicit sparse task planı ve sözleşme tamamlandı; gerçek annotation label/gold veri yoktur.
+> **D7-R0 durum notu (8 Ağustos 2026):** Bu local tool archived calibration/evaluation tooling olarak korunur; aktif D7 release yolu değildir. Private workspaces/artifact'lar silinmez veya dönüştürülmez. Yeni annotation yapılması beklenmez. Aktif yol: [D7 Grounded Research Architecture](D7_GROUNDED_RESEARCH_ARCHITECTURE.md).
+
+Tarih: 8 Ağustos 2026
+Durum: Local-development calibration/evaluation aracı arşivlendi; gerçek annotation label/gold veri yoktur.
 
 ## Güvenlik sınırı
 
