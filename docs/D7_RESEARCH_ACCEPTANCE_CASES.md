@@ -1,7 +1,7 @@
 # D7 Grounded Research Acceptance Cases
 
 Tarih: 8 Ağustos 2026
-Durum: D7-R0 executable-fixture öncesi kabul contract'ı.
+Durum: D7-R1 sentetik executable fixture kabulü tamamlandı; live/network kabulü değildir.
 
 ## Ortak kabul invariant'ları
 
@@ -85,6 +85,6 @@ Kabul: model world knowledge ile boşluğu doldurmaz; unknown açık kalır.
 
 ## 7. Fixture çıktısı
 
-D7-R1'de her case; request, exact identity, structured evidence, source envelopes, passages, extractor JSON, merged `AspectEvidence`, deterministic eligibility, near-match ve no-result reason fixture'larına ayrılır. Fixture'lar sentetik veya lisanslı bounded içerik kullanır; network testine bağlı olmaz.
+D7-R1'de Steins;Gate, Kakegurui, political intrigue, love triangle avoid, character-driven ve no-source→unknown senaryoları sentetik exact-identity/source-envelope/decision fixture'larına çevrilmiştir. Dört hedefli test dosyasındaki 46 test contract seviyesinde geçer. Gerçek Wikimedia/search passage'ı, network davranışı, extractor modeli ve production deterministic merge D7-R2..R6 kapılarıdır.
 
 İlgili belgeler: [Grounded Research Architecture](D7_GROUNDED_RESEARCH_ARCHITECTURE.md), [Research Source Policy](D7_RESEARCH_SOURCE_POLICY.md), [Research Security Model](D7_RESEARCH_SECURITY_MODEL.md).

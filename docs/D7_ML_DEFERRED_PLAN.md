@@ -18,7 +18,7 @@ Student output tek başına `supported`, `contradicted` veya `absent` authority 
 
 - Human gold dataset, yeni annotation, model download, training, calibration ve model serving D7/D8 release kabulünün zorunlu girdisi değildir.
 - Annotation workspace/tooling silinmez; archived calibration/evaluation artifact olarak korunur.
-- D7-R1..R5 ML olmadan tamamlanabilir.
+- D7-R1..R6 ML olmadan tamamlanabilir.
 - D8 structured-only D6 veya grounded research feature kapalı halde yayınlanabilir.
 
 ## 3. Opsiyonel giriş kapıları

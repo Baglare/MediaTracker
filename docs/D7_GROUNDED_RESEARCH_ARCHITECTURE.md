@@ -1,7 +1,7 @@
 # D7 Grounded Aspect Research Engine Mimarisi
 
 Tarih: 8 Ağustos 2026
-Durum: D7-R0 mimari kararı; production entegrasyonu yoktur.
+Durum: D7-R1 saf contract/fixture temeli tamamlandı; production entegrasyonu yoktur.
 
 ## 1. Karar ve sınır
 
@@ -26,7 +26,7 @@ Mevcut web fallback de research engine değildir. `candidate-search.ts`, DuckDuc
 
 1. `runDeterministicRecommendationV2` uygunluk ve final sıra otoritesidir.
 2. Structured provider evidence ilk ve temel kanıt katmanıdır.
-3. Research yalnız unresolved explicit `must`/`avoid` constraint için çalışır; `prefer`, kişisel uyum ve popülerlik research bütçesi açamaz.
+3. Research öncelikle unresolved explicit `must`/`avoid`, bütçe kalırsa explicit `prefer` constraint için çalışır; inferred/profile sinyalleri, kişisel uyum ve popülerlik research bütçesi açamaz.
 4. Missing field, boş snippet, arama sonucu bulunamaması veya provider unavailable `absent` değildir.
 5. Research yalnız retrieval ile exact identity'si doğrulanmış top-N aday üzerinde çalışır.
 6. Research sonucu citation-bound `AspectEvidence` girdisidir; deterministic policy'yi değiştirmez.
@@ -42,7 +42,7 @@ Structured request
   -> high-recall provider retrieval
   -> exact identity + edition/season isolation
   -> structured evidence aggregation
-  -> unresolved must/avoid queue
+  -> unresolved explicit must/avoid/prefer queue
   -> bounded top-N targeted research
   -> source fetch + sanitize + passage selection
   -> citation-bound structured extraction
@@ -98,7 +98,7 @@ Search provider sonucu tek başına aspect evidence değildir. Search, izinli di
 
 Research task ancak aşağıdaki koşulların tamamında oluşturulur:
 
-- constraint explicit `must` veya `avoid`;
+- constraint explicit `must`, `avoid` veya `prefer`; planner sırası `must > avoid > prefer`;
 - candidate exact identity doğrulanmış;
 - structured aggregation sonucu constraint için `unknown` veya karar eşiğinin altında güven;
 - aspect registry source-backed research'e izin veriyor;
@@ -109,12 +109,11 @@ Research task ancak aşağıdaki koşulların tamamında oluşturulur:
 D7-R1 başlangıç bütçeleri contract sabitidir; ölçüm olmadan artırılmaz:
 
 - en çok 8 candidate;
-- candidate başına en çok 2 unresolved hard aspect;
-- aspect başına en çok 2 search query ve 3 direct source;
-- toplam en çok 16 search query;
+- candidate başına en çok 3 unresolved aspect;
+- toplam en çok 12 research job;
+- toplam en çok 6 external search reservation;
 - concurrency 2;
-- search timeout 4 saniye, direct fetch 3 saniye, extraction 5 saniye;
-- request toplam research bütçesi 12 saniye.
+- request toplam research timeout/bütçesi 8 saniye.
 
 Aynı normalized research key için in-flight request coalescing yapılır. Her stage bağımsız timeout/error üretir. Bir source veya provider hatası diğer evidence'i silmez. `provider_unavailable`, `no_allowlisted_source`, `no_relevant_passage`, `contradictory_sources` ve gerçek `supported/contradicted/unknown` sonuçları ayrıdır.
 
@@ -164,7 +163,7 @@ Kurallar:
 ## 9. E. Deterministic integration
 
 - `must`: minimum level ve confidence karşılanırsa geçer. `unknown` primary sonuçtan geçmez; research sonrası da unknown ise aynı kalır.
-- `prefer`: research tetiklemez. Varsa grounded evidence request fit'e girer; yoksa eligibility değişmez.
+- `prefer`: hard eligibility'yi değiştirmez. Explicit prefer, must/avoid sonrasında bütçe kalırsa research alabilir; evidence varsa request fit'e girer, yoksa contribution sıfır kalır.
 - `avoid`: güvenilir evidence `rejectAtLevel` eşiğine ulaşırsa reject. Evidence yokluğu absence değildir; otomatik bonus veya güvenli etiketi üretmez.
 - `unknown policy`: strict/balanced primary listede explicit must unknown elenir. Exploratory yalnız açık near-match reason ile gösterebilir.
 - `near-match`: ihlal edilen constraint, verdict ve kaynak durumu açıkça taşınır; normal öneriyle karışmaz.
@@ -188,7 +187,7 @@ Saklanan claim; verdict/level/confidence, normalized source IDs, exact revision/
 - Derived claim, source revision'dan ayrı versionlanır. Source değişirse eski claim audit için superseded olabilir fakat serving'de stale sayılır.
 - TTL source class'a göre belirlenir: identity/fact daha uzun; narrative passage ve derived claim daha kısa. Revision check TTL dolmadan da invalidation tetikleyebilir.
 - Policy/allowlist/extractor schema değişimi affected keys'i invalid eder. Revoked/blocked domain sonuçları serving'den hemen çıkarılır.
-- D7-R0 DB şeması tanımlamaz veya migration yapmaz; persistence port'u D7-R1'de storage kararı sonrası uygulanır.
+- D7-R1 owner-independent persistence port'unu ve bounded in-memory test adapter'ını tanımlar; production DB adapter'ı veya migration içermez.
 
 ## 11. Telemetry ve privacy
 
@@ -200,21 +199,26 @@ Internal telemetry; research requested/completed/coalesced, source/provider unav
 | --- | --- | --- |
 | D7-R0 | Mimari/source/security/acceptance/deferred-ML contract'ları | Davranış değişmez |
 | D7-R1 | Saf domain codec'leri, source registry, research planner, cache port'u, fixture testleri | Production route'a bağlı değil |
-| D7-R2 | Wikidata + MediaWiki direct adapters, sanitization/citation validation, ephemeral search ports | Shadow/fixture; network kapısı ayrı |
-| D7-R3 | OpenAI Responses web_search adapter, optional Brave adapter, bounded orchestrator | Feature flag/shadow; D6 authoritative |
-| D7-R4 | Deterministic evidence merge, acceptance fixtures, telemetry ve fail-soft | Kontrollü opt-in |
-| D7-R5 | Live contract, security, source compliance ve final acceptance | D8 release gate adayı |
+| D7-R2 | Direct Wikimedia ve ephemeral OpenAI/Brave search adapter implementasyonları | Network ve source compliance kapısı; route'a bağlı değil |
+| D7-R3 | Supplied-passage grounded claim extraction | Strict schema/citation; D6 authoritative |
+| D7-R4 | Deterministic evidence integration | Kontrollü opt-in; LLM ranking yok |
+| D7-R5 | Runtime security/cache ve kullanıcı citation görünümü | Feature flag/shadow |
+| D7-R6 | Live source compliance, fail-soft ve final acceptance | D8 research feature gate adayı |
+| D7-ML | Opsiyonel post-release distillation/student shadow | Release blocker değil |
 
-## 13. D7-R1 giriş koşulları
+## 13. D7-R1 sonucu ve D7-R2 giriş koşulları
 
-- Bu beş D7-R0 belgesi onaylı ve birbiriyle linklidir.
-- `queryable|research_required|queryable_then_research|unsupported` capability matrisi 43 aspect için versionlanmıştır.
-- Exact identity/versionScope ve research key codec'i kararlaştırılmıştır.
-- Source allowlist başlangıçta yalnız Wikidata ve Wikipedia/MediaWiki direct domains ile kapalı varsayılanlıdır.
-- OpenAI/Brave adapter'ları interface seviyesinde ayrılmış; Gemini ve ANN hard allowlist dışında tutulmuştur.
-- Storage port'u search payload ile direct licensed content'i ayırır.
-- Security limits, no-source→unknown ve citation validation fixture'ları acceptance testlerine çevrilebilir durumdadır.
-- D6 regression fixture'ları baseline olarak dondurulmuş; ranking constant değişikliği kapsam dışıdır.
+D7-R1; 43 aspect için versionlı capability matrisi, exact `work|season|installment|edition` scope codec'i, kapalı-varsayılan source registry, citation/no-source domain kararları, deterministic bounded planner, owner-independent cache port'u ve executable fixture'ları teslim eder. Dağılım `structured_only=2`, `research_fallback=16`, `research_required_for_hard_decision=25`, `unsupported=0` şeklindedir.
+
+D7-R2 ancak şu açık kapılarla başlar:
+
+- gerçek fetch sınırında DNS/private-address/rebinding ve redirect tekrar doğrulaması;
+- Wikidata/MediaWiki resmî endpoint, terms, attribution ve revision uygulaması;
+- raw search payload'ını kalıcı içerikten ayıran ephemeral OpenAI/Brave adapter contract'ı;
+- gerçek HTML sanitizer, compressed/decoded limit, rate-limit, timeout ve secret redaction uygulaması;
+- network test doubles ve compliance fixture'ları.
+
+Bu kapılar production route entegrasyonu izni değildir. D6 regression fixture'ları ve ranking sabitleri değişmeden kalır.
 
 ## 14. D8 etkisi
 

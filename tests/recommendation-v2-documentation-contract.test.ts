@@ -46,7 +46,7 @@ describe("D6 documentation consolidation", () => {
     expect(acceptance).toContain("production-ready iddiası değildir");
     expect(acceptance).toContain("D6_PROVIDER_LIVE_SMOKE");
     expect(roadmap).toContain("D6.6-2 — Live provider reliability ve final D6 kabulü");
-    expect(roadmap).toContain("D7 — Yeni aspect verifier");
+    expect(roadmap).toContain("D7 — Grounded Aspect Research Engine");
     const coverage = readFileSync("docs/AI_RECOMMENDATION_RANKED_TAG_COVERAGE.md", "utf8");
     expect(coverage).toContain("mapped_queryable` (2)");
     expect(coverage).toContain("evidence_only` (10)");

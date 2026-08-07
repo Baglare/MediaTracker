@@ -1,7 +1,7 @@
 # D7 Research Security Model
 
 Tarih: 8 Ağustos 2026
-Durum: D7-R0 tehdit ve kontrol contract'ı; runtime uygulaması yoktur.
+Durum: D7-R1 saf URL/content/citation policy contract'ları ve fixture'ları tamamlandı; runtime fetch/sanitizer uygulaması yoktur.
 
 ## 1. Güven sınırları
 
@@ -93,15 +93,18 @@ Minimum internal reason code'ları:
 
 Log yalnız reason code, source class/domain tokenı, süre, byte bucket, cache state ve request-scoped opaque trace ID taşır. Raw URL query, content, prompt, output, secret veya kişisel kimlik taşımaz.
 
-## 9. D7-R1 güvenlik kabul kapısı
+## 9. D7-R1 sonucu ve D7-R2 güvenlik kapısı
 
-- URL canonicalization ve private-address test matrisi.
-- Redirect revalidation ve DNS rebinding adapter contract'ı.
-- HTML/script/style/hidden content stripping fixture'ları.
-- Compressed/decoded/content/passage limit fixture'ları.
-- Prompt injection passage'larının output authority'yi değiştiremediği testler.
-- Secret/PII redaction ve log allowlist testleri.
-- Citation source/passage/revision mismatch fail-closed testleri.
-- Timeout/rate-limit/provider unavailable ayrımı ve no-source→unknown testi.
+D7-R1'de saf policy seviyesinde HTTPS/exact-host allowlist, user-info/non-default-port/IP-literal/local/punycode reddi, fragment temizleme, redirect URL tekrar doğrulaması, bounded text envelope, unsafe HTML/prompt-injection/source-mismatch flag'leri, citation referential integrity ve no-source→unknown fixture'ları tamamlandı.
+
+D7-R2'de gerçek I/O açılmadan önce ayrıca şunlar gerekir:
+
+- DNS çözümünde private/reserved adres ve rebinding koruması;
+- redirect sonrası connect-target doğrulaması;
+- gerçek HTML/script/style/hidden-content sanitizer'ı;
+- compressed/decoded byte, DOM ve passage limitlerinin streaming uygulaması;
+- secret/PII redaction, rate-limit, timeout, abort ve provider circuit-breaker testleri.
+
+Bu kontrollerin D7-R1'de yalnız contract/flag olarak bulunması runtime koruması sayılmaz.
 
 İlgili belgeler: [Grounded Research Architecture](D7_GROUNDED_RESEARCH_ARCHITECTURE.md), [Research Source Policy](D7_RESEARCH_SOURCE_POLICY.md).
