@@ -28,7 +28,7 @@ Her hop için akış:
 
 Node 24/Windows ortamında `dns.lookup` ve `System.Net.Dns.GetHostAddresses` üç Wikimedia hostu için başarılı olurken c-ares tabanlı `resolve4/resolve6` çağrıları `ECONNREFUSED` verdi. Önceki resolver iki çağrıyı `Promise.allSettled` ile birleştirip her iki exception'ı da boş diziye çevirdiği için gerçek lookup failure yanlış biçimde `dns_result_empty` görünüyordu.
 
-Default resolver'ın OS lookup yoluna geçirilmesi SSRF politikasını gevşetmez: dönen **bütün** IPv4/IPv6 adresleri aynı public/global IP policy'den geçer; bir private/special-use veya mixed sonuç tüm hop'u reddeder. Deterministik seçim yalnız doğrulanmış set içinde yapılır. Custom HTTPS `lookup` callback'i yalnız seçilmiş pin'i döndürür; TLS SNI ve internal Host header canonical hostname olarak kalır. Kontrolsüz ikinci resolve veya hostname connection yoktur.
+Default resolver'ın OS lookup yoluna geçirilmesi SSRF politikasını gevşetmez: dönen **bütün** IPv4/IPv6 adresleri aynı public/global IP policy'den geçer; bir private/special-use veya mixed sonuç tüm hop'u reddeder. Deterministik seçim yalnız doğrulanmış set içinde yapılır. Custom HTTPS `lookup` callback'i yalnız seçilmiş pin'i döndürür; Node auto-family seçimi kapalı ve family explicit'tir. Node yine `all:true` isterse callback aynı prevalidated pin'i tek-elemanlı dizi olarak döndürür. TLS SNI ve internal Host header canonical hostname olarak kalır. Kontrolsüz ikinci resolve veya hostname connection yoktur.
 
 DNS/network failure sınıfları `dns_lookup_failed`, `dns_result_empty`, `dns_security_rejected`, `dns_timeout`, `connect_failed`, `tls_failed` ve `http_failed` olarak ayrılır. `ENOTFOUND|EAI_AGAIN|ETIMEDOUT|ECONNREFUSED` gibi allowlisted kodlar yalnız bounded internal telemetry'de tutulur; raw resolver detail public warning'e taşınmaz.
 
@@ -45,7 +45,7 @@ IPv4 policy unspecified, RFC1918, CGNAT, loopback, link-local/metadata, special-
 
 ## Streaming ve response policy
 
-Transport `Content-Length` değerine güvenmez. `identity|gzip|deflate` stream decompressed halde sayılır; limit aşımında stream durdurulur ve partial body kullanılmaz. Wikimedia Action API ve WDQS yalnız `application/json` kabul eder. JSON response limiti 256 KiB'dir. Wikipedia plaintext limiti R1 transient-document invariant'ıyla aynı kalmak için 24.000 UTF-8 byte'tır. JSON decode fatal UTF-8 kullanır; plaintext control karakteri fail-closed reddedilir.
+Transport `Content-Length` değerine güvenmez. `identity|gzip|deflate` stream decompressed halde sayılır; limit aşımında stream durdurulur ve partial body kullanılmaz. Wikimedia Action API yalnız `application/json`; WDQS yalnız exact `application/sparql-results+json|application/json` kabul eder. Genel `+json`, HTML veya text wildcard'ı yoktur. JSON response limiti 256 KiB'dir. Wikipedia plaintext limiti R1 transient-document invariant'ıyla aynı kalmak için 24.000 UTF-8 byte'tır. JSON decode fatal UTF-8 kullanır; plaintext control karakteri fail-closed reddedilir.
 
 ## Environment ve User-Agent
 

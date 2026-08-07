@@ -15,7 +15,8 @@ export type WikidataIdentityResolution =
   | { status: "verified"; identity: ResolvedWikimediaIdentity; propertyId: string; resultCount: 1; warnings: readonly string[] }
   | { status: "identity_not_found" | "identity_ambiguous" | "identity_unverified" | "adapter_unavailable" | "security_rejected" | "budget_exhausted"; propertyId?: string; resultCount: number; warnings: readonly string[] };
 
-const JSON_TYPES = ["application/json"] as const;
+const WDQS_JSON_TYPES = ["application/sparql-results+json", "application/json"] as const;
+const ACTION_API_JSON_TYPES = ["application/json"] as const;
 
 export async function resolveExactWikidataIdentity(input: {
   identity: RecommendationCandidateIdentity;
@@ -37,8 +38,8 @@ export async function resolveExactWikidataIdentity(input: {
     try {
       const query = await input.httpClient.request({
         sourceId: "wikidata", url: buildExactWikidataQueryUrl(candidate), method: "GET",
-        headers: { userAgent: input.userAgent, apiUserAgent: input.userAgent, accept: "application/json", acceptEncoding: "gzip, deflate" },
-        timeoutMs: 3_000, maxResponseBytes: WIKIDATA_JSON_MAX_BYTES, acceptedContentTypes: JSON_TYPES,
+        headers: { userAgent: input.userAgent, apiUserAgent: input.userAgent, accept: "application/sparql-results+json, application/json", acceptEncoding: "gzip, deflate" },
+        timeoutMs: 3_000, maxResponseBytes: WIKIDATA_JSON_MAX_BYTES, acceptedContentTypes: WDQS_JSON_TYPES,
         redirectPolicy: { mode: "manual", maxRedirects: 2 }, requestId: `wdqs-${candidate.registryKey}`, maxAttempts: 2, signal: input.signal,
       });
       if (query.status !== 200) return { status: "adapter_unavailable", propertyId: candidate.propertyId, resultCount: 0, warnings: [`wdqs_http_${query.status}`] };
@@ -50,7 +51,7 @@ export async function resolveExactWikidataIdentity(input: {
       const entityResponse = await input.httpClient.request({
         sourceId: "wikidata", url: buildWikidataEntityUrl(entityId), method: "GET",
         headers: { userAgent: input.userAgent, apiUserAgent: input.userAgent, accept: "application/json", acceptEncoding: "gzip, deflate" },
-        timeoutMs: 3_000, maxResponseBytes: WIKIDATA_JSON_MAX_BYTES, acceptedContentTypes: JSON_TYPES,
+        timeoutMs: 3_000, maxResponseBytes: WIKIDATA_JSON_MAX_BYTES, acceptedContentTypes: ACTION_API_JSON_TYPES,
         redirectPolicy: { mode: "manual", maxRedirects: 2 }, requestId: `wikidata-entity-${entityId}`, maxAttempts: 2, signal: input.signal,
       });
       if (entityResponse.status !== 200) return { status: "adapter_unavailable", propertyId: candidate.propertyId, resultCount: 1, warnings: [`wikidata_entity_http_${entityResponse.status}`] };

@@ -215,6 +215,7 @@ describe("D7-R2A pinned HTTPS, redirect ve retry", () => {
     const options = createPinnedHttpsRequestOptions(transportRequest);
     expect(options.servername).toBe("www.wikidata.org");
     expect(options.headers).toMatchObject({ host: "www.wikidata.org" });
+    expect(options).toMatchObject({ family: 4, autoSelectFamily: false });
 
     const lookup = createPinnedResearchLookup(PUBLIC[0]);
     const pinned = await new Promise<{ address: string; family: number }>((resolve, reject) => {
@@ -224,6 +225,15 @@ describe("D7-R2A pinned HTTPS, redirect ve retry", () => {
       });
     });
     expect(pinned).toEqual(PUBLIC[0]);
+
+    const pinnedAll = await new Promise<readonly { address: string; family: number }[]>((resolve, reject) => {
+      lookup("ignored.example", { all: true }, (error, addresses) => {
+        if (error) reject(error);
+        else if (typeof addresses === "string") reject(new Error("pinned_lookup_all_contract_invalid"));
+        else resolve(addresses);
+      });
+    });
+    expect(pinnedAll).toEqual(PUBLIC);
   });
 
   it("aynı Wikimedia host'una farklı request'leri seri bağlar", async () => {
@@ -278,6 +288,7 @@ describe("D7-R2A streaming/content limits", () => {
 
   it("JSON content type charset'i kabul eder, HTML'i reddeder", () => {
     expect(assertResearchContentType("application/json; charset=utf-8", ["application/json"])).toBe("application/json");
+    expect(assertResearchContentType("application/sparql-results+json; charset=utf-8", ["application/sparql-results+json"])).toBe("application/sparql-results+json");
     expect(() => assertResearchContentType("text/html", ["application/json"])).toThrowError(/content_type_rejected/);
   });
 

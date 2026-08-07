@@ -1,7 +1,7 @@
 # D7-R2A Conditional Wikimedia Live Smoke
 
 Tarih: 8 Ağustos 2026  
-Durum: D7-R2A.1 DNS compatibility patch hazır; varsayılan standard test koşusunda skip edilir, canlı kanıt üç env koşuluyla alınır.
+Durum: D7-R2A.1 canlı kapısı 3/3 geçmiştir; varsayılan standard test koşusunda conditional skip davranışı korunur.
 
 ## Kapı
 
@@ -34,6 +34,16 @@ Sabit paragraf, metin boyu, revision ID veya zorunlu sitelink assertion'ı yoktu
 
 İlk canlı koşuda üç senaryo da `dns_result_empty` ile kapanmıştı. Kontrollü teşhis OS `dns.lookup` yolunun çalıştığını, direct `resolve4/resolve6` yolunun yerel Windows/network düzeninde `ECONNREFUSED` aldığını ve eski `allSettled` resolver'ın bu exception'ları boş sonuç gibi gösterdiğini kanıtladı. Default resolver OS lookup'a geçirilmiştir; all-address IP validation, deterministic pin, SNI/Host ve redirect revalidation korunur.
 
-Canlı doğrulama raporunda gerçek 3/3 sonucu yalnız flag'ler ve anlamlı User-Agent ile tamamlanan koşudan sonra yazılır. Env eksik olduğu için skip edilen koşu geçiş kanıtı değildir.
+DNS ve Node 24 pinned lookup düzeltmesinden sonra WDQS'nin gerçek response contract'ı `application/sparql-results+json` olarak doğrulandı. Bu MIME yalnız WDQS adapter allowlist'ine exact eklenmiştir; Action API `application/json` sınırı değişmez.
+
+## D7-R2A.1 canlı sonuç
+
+Sanitize edilmiş ve unauthenticated olarak public doğrulanmış GitHub repository origin URL'si yalnız live-smoke child process'inde User-Agent contact olarak kullanıldı. `.git`, credential/userinfo, token, query, fragment veya local metadata taşınmadı; env `finally` bloğunda kaldırıldı ve config dosyasına yazılmadı.
+
+Verbose live sonucu: `3 passed / 0 failed / 0 skipped`.
+
+- Steins;Gate AniList exact identity: `document_ready`.
+- IMDb exact identity: `verified`, property `P345`.
+- Olmayan bounded AniList ID: `identity_not_found`; fuzzy fallback yok.
 
 İlgili belgeler: [network foundation](D7_RESEARCH_NETWORK_FOUNDATION.md), [Wikidata identity](D7_WIKIDATA_IDENTITY_RESOLUTION.md), [Wikipedia direct source](D7_WIKIPEDIA_DIRECT_SOURCE.md).

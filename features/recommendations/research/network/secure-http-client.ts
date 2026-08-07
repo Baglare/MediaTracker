@@ -95,16 +95,27 @@ export class NodeResearchHttpsTransport implements ResearchHttpsTransport {
 }
 
 export function createPinnedResearchLookup(pinnedAddress: ResearchTransportRequest["pinnedAddress"]): LookupFunction {
-  return (_hostname, _options, callback) => {
+  return (_hostname, options, callback) => {
+    if (options.all) {
+      callback(null, [pinnedAddress]);
+      return;
+    }
     callback(null, pinnedAddress.address, pinnedAddress.family);
   };
 }
 
-export function createPinnedHttpsRequestOptions(input: ResearchTransportRequest): RequestOptions {
+export type PinnedHttpsRequestOptions = RequestOptions & {
+  autoSelectFamily: false;
+  family: 4 | 6;
+};
+
+export function createPinnedHttpsRequestOptions(input: ResearchTransportRequest): PinnedHttpsRequestOptions {
   return {
     method: "GET",
     headers: { ...input.headers, host: input.hostname },
     lookup: createPinnedResearchLookup(input.pinnedAddress),
+    family: input.pinnedAddress.family,
+    autoSelectFamily: false,
     servername: input.hostname,
     agent: false,
   };

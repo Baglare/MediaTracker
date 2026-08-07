@@ -110,7 +110,12 @@ describe("D7-R2A exact Wikidata resolver", () => {
     const result = await resolveExactWikidataIdentity({ identity, versionScope: scope, httpClient: client, userAgent: "MediaTracker/0.1 (contact@example.invalid)", now: () => new Date("2026-08-08T00:00:00Z") });
     expect(result).toMatchObject({ status: "verified", propertyId: "P8729", resultCount: 1, identity: { wikidataEntityId: "Q123", matchedExternalId: "9253", versionScopeKey: scope.scopeKey } });
     expect(client.requests).toHaveLength(2);
-    expect(client.requests.every((request) => request.method === "GET" && request.headers.accept === "application/json")).toBe(true);
+    expect(client.requests[0]).toMatchObject({
+      method: "GET",
+      headers: { accept: "application/sparql-results+json, application/json" },
+      acceptedContentTypes: ["application/sparql-results+json", "application/json"],
+    });
+    expect(client.requests[1]).toMatchObject({ method: "GET", headers: { accept: "application/json" }, acceptedContentTypes: ["application/json"] });
     expect(client.requests.map((request) => request.url).join(" ")).not.toMatch(/opensearch|title=/i);
   });
 
@@ -132,4 +137,3 @@ describe("D7-R2A exact Wikidata resolver", () => {
     expect(client.requests).toHaveLength(0);
   });
 });
-

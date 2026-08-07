@@ -20,7 +20,7 @@ Research katmanı üç ayrı boundary kullanır:
 - Username/password, fragment, non-default port, IP literal ve encoded/alternative IP biçimleri reddedilir.
 - DNS çözümü OS-compatible `dns.lookup(..., { all: true, verbatim: true })` kullanır. Dönen bütün adreslerde loopback, link-local, private, carrier-grade NAT, multicast, reserved ve metadata service aralıkları reddedilir; IPv4/IPv6 birlikte kontrol edilir ve mixed public/private fail-closed'dur.
 - Her redirect yeniden scheme/domain/DNS validation'dan geçer; en çok 2 redirect.
-- DNS rebinding'e karşı tek kontrollü OS lookup sonucu doğrulanır; retry aynı prevalidated pin'i kullanır, redirect yeni validation alır ve socket custom lookup yalnız exact pinned family/address döndürür.
+- DNS rebinding'e karşı tek kontrollü OS lookup sonucu doğrulanır; retry aynı prevalidated pin'i kullanır, redirect yeni validation alır ve socket custom lookup yalnız exact pinned family/address döndürür. Node auto-family selection kapalıdır; `all:true` callback yolu da yalnız aynı pin'in tek-elemanlı dizisini döndürür.
 - TLS `servername` ve internal Host header canonical allowlisted hostname olarak kalır; sertifika doğrulaması kapatılmaz.
 - Proxy ortamında da nihai hedef policy'si uygulanır; `localhost`, `.local`, intranet ve file/data/blob URI'ları yasaktır.
 

@@ -52,7 +52,10 @@ export function decodeStrictUtf8(bytes: Uint8Array): string {
 export function assertResearchContentType(value: string | undefined, accepted: readonly string[]): string {
   const normalized = (value ?? "").split(";", 1)[0].trim().toLowerCase();
   if (!normalized || !accepted.map((item) => item.toLowerCase()).includes(normalized)) {
-    throw new SecureResearchHttpError("content_type_rejected", "content_type_not_allowed");
+    const boundedType = /^[a-z0-9.+-]+\/[a-z0-9.+-]+$/.test(normalized) && normalized.length <= 100
+      ? normalized.replace(/[^a-z0-9]+/g, "_")
+      : "unknown";
+    throw new SecureResearchHttpError("content_type_rejected", `content_type_not_allowed_${boundedType}`);
   }
   return normalized;
 }
