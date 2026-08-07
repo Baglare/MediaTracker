@@ -80,7 +80,7 @@ export async function resolveExactWikidataIdentity(input: {
       };
     } catch (error) {
       if (input.signal?.aborted) return { status: "budget_exhausted", propertyId: candidate.propertyId, resultCount: 0, warnings: ["direct_source_budget_exhausted"] };
-      if (error instanceof SecureResearchHttpError && ["security_rejected", "redirect_rejected"].includes(error.kind)) {
+      if (error instanceof SecureResearchHttpError && ["security_rejected", "dns_security_rejected", "redirect_rejected"].includes(error.kind)) {
         return { status: "security_rejected", propertyId: candidate.propertyId, resultCount: 0, warnings: [error.reason] };
       }
       return { status: "adapter_unavailable", propertyId: candidate.propertyId, resultCount: 0, warnings: [error instanceof Error ? error.message : "wikidata_adapter_failure"] };

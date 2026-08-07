@@ -1,7 +1,7 @@
 # D7-R2A Conditional Wikimedia Live Smoke
 
 Tarih: 8 Ağustos 2026  
-Durum: Test contract'ı hazır; varsayılan standard test koşusunda skip edilir.
+Durum: D7-R2A.1 DNS compatibility patch hazır; varsayılan standard test koşusunda skip edilir, canlı kanıt üç env koşuluyla alınır.
 
 ## Kapı
 
@@ -28,7 +28,12 @@ npm.cmd run test:run -- tests/recommendation-d7-r2a-wikimedia-live.integration.t
 3. Bilinmeyen bounded AniList ID: `identity_not_found`; fuzzy fallback yok.
 4. Ambiguous sonuç live drift'e bağlanmaz; sentetik codec fixture'ında test edilir.
 
-Sabit paragraf, metin boyu, revision ID veya zorunlu sitelink assertion'ı yoktur. Conditional kapı açıkken network/contract başarısızsa test controlled failure verir; başarı gibi raporlanmaz. Bu teslimde environment kapalı olduğu için live smoke çalıştırılmamış/skip edilmiştir.
+Sabit paragraf, metin boyu, revision ID veya zorunlu sitelink assertion'ı yoktur. Conditional kapı açıkken network/contract başarısızsa test controlled failure verir; başarı gibi raporlanmaz.
+
+## D7-R2A.1 DNS compatibility notu
+
+İlk canlı koşuda üç senaryo da `dns_result_empty` ile kapanmıştı. Kontrollü teşhis OS `dns.lookup` yolunun çalıştığını, direct `resolve4/resolve6` yolunun yerel Windows/network düzeninde `ECONNREFUSED` aldığını ve eski `allSettled` resolver'ın bu exception'ları boş sonuç gibi gösterdiğini kanıtladı. Default resolver OS lookup'a geçirilmiştir; all-address IP validation, deterministic pin, SNI/Host ve redirect revalidation korunur.
+
+Canlı doğrulama raporunda gerçek 3/3 sonucu yalnız flag'ler ve anlamlı User-Agent ile tamamlanan koşudan sonra yazılır. Env eksik olduğu için skip edilen koşu geçiş kanıtı değildir.
 
 İlgili belgeler: [network foundation](D7_RESEARCH_NETWORK_FOUNDATION.md), [Wikidata identity](D7_WIKIDATA_IDENTITY_RESOLUTION.md), [Wikipedia direct source](D7_WIKIPEDIA_DIRECT_SOURCE.md).
-

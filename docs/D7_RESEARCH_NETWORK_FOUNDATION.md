@@ -1,7 +1,7 @@
 # D7-R2A Secure Research Network Foundation
 
 Tarih: 8 Ağustos 2026  
-Durum: Server-side HTTP/DNS foundation tamamlandı; Recommendation V2 production akışına bağlı değildir.
+Durum: D7-R2A.1 OS-compatible DNS düzeltmesi uygulanmıştır; Recommendation V2 production akışına bağlı değildir.
 
 ## Audit sonucu
 
@@ -18,11 +18,19 @@ Node uygulaması `node:https` kullanır. Universal domain/planning barrel'ı Nod
 Her hop için akış:
 
 1. R1 URL policy exact source host allowlist'ini doğrular.
-2. `node:dns/promises` ile A ve AAAA sonuçları bounded 1250 ms içinde çözülür.
+2. `node:dns/promises.lookup(hostname, { all: true, verbatim: true })` ile işletim sisteminin `getaddrinfo` yolu bounded 1250 ms içinde çağrılır.
 3. Sonuçların tamamı public/global policy'den geçer; tek private/special sonuç mixed DNS'i fail-closed reddeder.
 4. Deterministik public adres seçilir ve `https.request.lookup` callback'ine pinlenir.
 5. TLS `servername` ve HTTP Host canonical hostname olarak kalır; sertifika hostname'e göre doğrulanır.
-6. Redirect veya retry yeni request sayılır ve DNS sıfırdan doğrulanır.
+6. Aynı hop'un retry'ları aynı prevalidated address setini/pin'i kullanır; HTTPS transport ikinci DNS çağrısı yapmaz. Redirect yeni hop olduğu için sıfırdan URL/DNS validation alır.
+
+### D7-R2A.1 Windows uyumluluk teşhisi
+
+Node 24/Windows ortamında `dns.lookup` ve `System.Net.Dns.GetHostAddresses` üç Wikimedia hostu için başarılı olurken c-ares tabanlı `resolve4/resolve6` çağrıları `ECONNREFUSED` verdi. Önceki resolver iki çağrıyı `Promise.allSettled` ile birleştirip her iki exception'ı da boş diziye çevirdiği için gerçek lookup failure yanlış biçimde `dns_result_empty` görünüyordu.
+
+Default resolver'ın OS lookup yoluna geçirilmesi SSRF politikasını gevşetmez: dönen **bütün** IPv4/IPv6 adresleri aynı public/global IP policy'den geçer; bir private/special-use veya mixed sonuç tüm hop'u reddeder. Deterministik seçim yalnız doğrulanmış set içinde yapılır. Custom HTTPS `lookup` callback'i yalnız seçilmiş pin'i döndürür; TLS SNI ve internal Host header canonical hostname olarak kalır. Kontrolsüz ikinci resolve veya hostname connection yoktur.
+
+DNS/network failure sınıfları `dns_lookup_failed`, `dns_result_empty`, `dns_security_rejected`, `dns_timeout`, `connect_failed`, `tls_failed` ve `http_failed` olarak ayrılır. `ENOTFOUND|EAI_AGAIN|ETIMEDOUT|ECONNREFUSED` gibi allowlisted kodlar yalnız bounded internal telemetry'de tutulur; raw resolver detail public warning'e taşınmaz.
 
 IPv4 policy unspecified, RFC1918, CGNAT, loopback, link-local/metadata, special-use, documentation, benchmark, multicast ve reserved aralıkları reddeder. IPv6 policy unspecified/loopback, IPv4-mapped private, NAT/special-use, benchmark/documentation, 6to4, unique-local, link/site-local ve multicast aralıklarını reddeder. IP-literal URL R1 URL policy'de zaten yasaktır.
 
@@ -49,7 +57,7 @@ Transport `Content-Length` değerine güvenmez. `identity|gzip|deflate` stream d
 
 ## Telemetry ve açık sınırlar
 
-Counter'lar DNS count/duration, private/redirect rejects, request/retry/429/timeout, decompressed bytes, size/content-type rejects ve coalescing taşır. Raw body, Wikipedia text, full SPARQL query, external ID, header, owner/user veya secret loglanmaz.
+Counter'lar DNS count/duration/failure code, private/redirect rejects, connect/TLS/HTTP failure, request/retry/429/timeout, decompressed bytes, size/content-type rejects ve coalescing taşır. Raw body, Wikipedia text, full SPARQL query, external ID, header, owner/user veya secret loglanmaz.
 
 D7-R2A HTML fetch/sanitizer, proxy desteği, OpenAI/Brave discovery, LLM extraction, DB cache, UI veya production route entegrasyonu içermez.
 

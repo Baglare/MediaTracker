@@ -55,24 +55,54 @@ export interface SecureResearchHttpClient {
   request(input: SecureResearchHttpRequest): Promise<SecureResearchHttpResponse>;
 }
 
+export type BoundedResearchNetworkErrorCode =
+  | "ENOTFOUND"
+  | "EAI_AGAIN"
+  | "ETIMEDOUT"
+  | "ECONNREFUSED"
+  | "ECONNRESET"
+  | "ENETUNREACH"
+  | "EHOSTUNREACH"
+  | "EPIPE"
+  | "TLS_CERTIFICATE"
+  | "TLS_PROTOCOL"
+  | "UNKNOWN";
+
 export type SecureResearchHttpErrorKind =
   | "invalid_request"
   | "security_rejected"
-  | "dns_unavailable"
+  | "dns_lookup_failed"
+  | "dns_result_empty"
+  | "dns_security_rejected"
   | "dns_timeout"
   | "timeout"
   | "aborted"
-  | "network"
+  | "connect_failed"
+  | "tls_failed"
+  | "http_failed"
   | "redirect_rejected"
   | "content_type_rejected"
   | "oversized_content"
   | "invalid_encoding";
+
+export function boundedResearchNetworkErrorCode(error: unknown): BoundedResearchNetworkErrorCode {
+  const code = typeof error === "object" && error !== null && "code" in error && typeof error.code === "string"
+    ? error.code.toUpperCase()
+    : "";
+  if (["ENOTFOUND", "EAI_AGAIN", "ETIMEDOUT", "ECONNREFUSED", "ECONNRESET", "ENETUNREACH", "EHOSTUNREACH", "EPIPE"].includes(code)) {
+    return code as BoundedResearchNetworkErrorCode;
+  }
+  if (/^(CERT_|ERR_TLS_CERT_|UNABLE_TO_VERIFY|DEPTH_ZERO_SELF_SIGNED|SELF_SIGNED_CERT)/.test(code)) return "TLS_CERTIFICATE";
+  if (/^(ERR_TLS_|ERR_SSL_)/.test(code)) return "TLS_PROTOCOL";
+  return "UNKNOWN";
+}
 
 export class SecureResearchHttpError extends Error {
   constructor(
     readonly kind: SecureResearchHttpErrorKind,
     readonly reason: string,
     readonly retryable = false,
+    readonly internalCode?: BoundedResearchNetworkErrorCode,
   ) {
     super(`secure_research_http_${kind}:${reason}`);
     this.name = "SecureResearchHttpError";
@@ -101,4 +131,3 @@ export interface ResearchTransportResponse {
 export interface ResearchHttpsTransport {
   request(input: ResearchTransportRequest): Promise<ResearchTransportResponse>;
 }
-

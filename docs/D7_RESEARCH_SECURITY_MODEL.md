@@ -1,7 +1,7 @@
 # D7 Research Security Model
 
 Tarih: 8 Ağustos 2026
-Durum: D7-R2A pinned DNS/HTTPS, redirect, streaming JSON/plaintext limitleri ve direct Wikimedia codec'leri hazırdır; search/HTML sanitizer yoktur.
+Durum: D7-R2A.1 OS-compatible all-address DNS validation, pinned HTTPS, redirect, streaming JSON/plaintext limitleri ve direct Wikimedia codec'leri hazırdır; search/HTML sanitizer yoktur.
 
 ## 1. Güven sınırları
 
@@ -18,9 +18,10 @@ Research katmanı üç ayrı boundary kullanır:
 - Scheme yalnız `https`.
 - URL kullanıcıdan veya LLM'den doğrudan fetch edilmez; parse/canonicalize sonrası adapter route template'i kullanılır.
 - Username/password, fragment, non-default port, IP literal ve encoded/alternative IP biçimleri reddedilir.
-- DNS çözümünde loopback, link-local, private, carrier-grade NAT, multicast, reserved ve metadata service aralıkları reddedilir; IPv4/IPv6 birlikte kontrol edilir.
+- DNS çözümü OS-compatible `dns.lookup(..., { all: true, verbatim: true })` kullanır. Dönen bütün adreslerde loopback, link-local, private, carrier-grade NAT, multicast, reserved ve metadata service aralıkları reddedilir; IPv4/IPv6 birlikte kontrol edilir ve mixed public/private fail-closed'dur.
 - Her redirect yeniden scheme/domain/DNS validation'dan geçer; en çok 2 redirect.
-- DNS rebinding'e karşı connect target ile validated address uyumu korunur.
+- DNS rebinding'e karşı tek kontrollü OS lookup sonucu doğrulanır; retry aynı prevalidated pin'i kullanır, redirect yeni validation alır ve socket custom lookup yalnız exact pinned family/address döndürür.
+- TLS `servername` ve internal Host header canonical allowlisted hostname olarak kalır; sertifika doğrulaması kapatılmaz.
 - Proxy ortamında da nihai hedef policy'si uygulanır; `localhost`, `.local`, intranet ve file/data/blob URI'ları yasaktır.
 
 ## 3. Content sanitization
@@ -95,7 +96,7 @@ Log yalnız reason code, source class/domain tokenı, süre, byte bucket, cache 
 
 ## 9. D7-R2A sonucu ve D7-R2B güvenlik kapısı
 
-D7-R1 saf URL/content/citation contract'larını tanımladı. D7-R2A gerçek socket hedefini validated A/AAAA sonucuna pinler; mixed public/private DNS'i, retry/redirect üzerindeki yeni private resolve'u ve special-use IPv4/IPv6 aralıklarını fail-closed reddeder. TLS SNI/Host canonical hostname olarak korunur. Manual redirect en çok iki hop ve her hop tam URL/DNS validation alır.
+D7-R1 saf URL/content/citation contract'larını tanımladı. D7-R2A.1 gerçek socket hedefini OS resolver'ın döndürdüğü ve tamamı doğrulanmış address setinden deterministik seçilen adrese pinler. c-ares `resolve4/resolve6` hatalarını boş sonuç gibi yutan eski uyumluluk kusuru kaldırılmıştır. Mixed public/private DNS ve special-use IPv4/IPv6 fail-closed kalır. Retry ikinci DNS açmaz; manual redirect en çok iki hop ve her hop tam URL/DNS validation alır. TLS SNI/Host canonical hostname olarak korunur.
 
 D7-R2B/search veya HTML I/O açılmadan önce ayrıca şunlar gerekir:
 

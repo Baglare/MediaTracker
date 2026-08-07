@@ -1,6 +1,7 @@
 import "server-only";
 
 import { request as httpsRequest } from "node:https";
+import type { RequestOptions } from "node:https";
 import type { IncomingHttpHeaders, IncomingMessage } from "node:http";
 import type { LookupFunction } from "node:net";
 import { NodeResearchDnsResolver, resolvePinnedResearchAddress } from "./dns-policy";
@@ -18,6 +19,7 @@ import type {
   SecureResearchHttpResponse,
 } from "./types";
 import { SecureResearchHttpError } from "./types";
+import { boundedResearchNetworkErrorCode } from "./types";
 
 const RESPONSE_HEADER_ALLOWLIST = new Set(["content-type", "content-length", "content-encoding", "etag", "last-modified", "retry-after", "location"]);
 const REQUEST_HEADER_KEYS = new Set(["userAgent", "accept", "acceptEncoding", "apiUserAgent"]);
@@ -54,16 +56,7 @@ export class NodeResearchHttpsTransport implements ResearchHttpsTransport {
   async request(input: ResearchTransportRequest): Promise<ResearchTransportResponse> {
     return new Promise((resolve, reject) => {
       let settled = false;
-      const lookup: LookupFunction = (_hostname, _options, callback) => {
-        callback(null, input.pinnedAddress.address, input.pinnedAddress.family);
-      };
-      const request = httpsRequest(input.url, {
-        method: "GET",
-        headers: input.headers,
-        lookup,
-        servername: input.hostname,
-        agent: false,
-      }, async (response: IncomingMessage) => {
+      const request = httpsRequest(input.url, createPinnedHttpsRequestOptions(input), async (response: IncomingMessage) => {
         try {
           const headers = selectedHeaders(response.headers);
           const status = response.statusCode ?? 0;
@@ -93,12 +86,39 @@ export class NodeResearchHttpsTransport implements ResearchHttpsTransport {
         input.signal?.removeEventListener("abort", abort);
         if (settled) return;
         if (error instanceof SecureResearchHttpError) reject(error);
-        else reject(new SecureResearchHttpError("network", "transport_failure", true));
+        else reject(classifyTransportError(error));
       });
       request.once("close", () => input.signal?.removeEventListener("abort", abort));
       request.end();
     });
   }
+}
+
+export function createPinnedResearchLookup(pinnedAddress: ResearchTransportRequest["pinnedAddress"]): LookupFunction {
+  return (_hostname, _options, callback) => {
+    callback(null, pinnedAddress.address, pinnedAddress.family);
+  };
+}
+
+export function createPinnedHttpsRequestOptions(input: ResearchTransportRequest): RequestOptions {
+  return {
+    method: "GET",
+    headers: { ...input.headers, host: input.hostname },
+    lookup: createPinnedResearchLookup(input.pinnedAddress),
+    servername: input.hostname,
+    agent: false,
+  };
+}
+
+function classifyTransportError(error: unknown): SecureResearchHttpError {
+  const internalCode = boundedResearchNetworkErrorCode(error);
+  if (internalCode === "TLS_CERTIFICATE" || internalCode === "TLS_PROTOCOL") {
+    return new SecureResearchHttpError("tls_failed", "tls_failed", false, internalCode);
+  }
+  if (["ETIMEDOUT", "ECONNREFUSED", "ECONNRESET", "ENETUNREACH", "EHOSTUNREACH", "EPIPE"].includes(internalCode)) {
+    return new SecureResearchHttpError("connect_failed", "connect_failed", true, internalCode);
+  }
+  return new SecureResearchHttpError("http_failed", "http_failed", true, internalCode);
 }
 
 class Semaphore {
@@ -171,19 +191,25 @@ export class SecureResearchHttpClientImpl implements SecureResearchHttpClient {
     let finalResponse: ResearchTransportResponse | null = null;
 
     for (let redirects = 0; redirects <= input.redirectPolicy.maxRedirects; redirects += 1) {
+      const parsed = new URL(currentUrl);
+      this.telemetry.dnsLookupCount += 1;
+      let resolved;
+      try {
+        resolved = await resolvePinnedResearchAddress({ hostname: parsed.hostname, resolver: this.resolver });
+        this.telemetry.dnsDurationMs += resolved.durationMs;
+      } catch (error) {
+        if (error instanceof SecureResearchHttpError) {
+          if (error.kind === "dns_security_rejected") this.telemetry.privateAddressRejects += 1;
+          if (error.kind === "dns_lookup_failed") {
+            this.telemetry.dnsLookupFailures += 1;
+            if (error.internalCode) this.telemetry.dnsLastErrorCode = error.internalCode;
+          }
+        }
+        throw error;
+      }
+      for (const address of resolved.addresses) allAddresses.set(`${address.family}:${address.address}`, address);
       let response: ResearchTransportResponse | null = null;
       for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-        const parsed = new URL(currentUrl);
-        this.telemetry.dnsLookupCount += 1;
-        let resolved;
-        try {
-          resolved = await resolvePinnedResearchAddress({ hostname: parsed.hostname, resolver: this.resolver });
-          this.telemetry.dnsDurationMs += resolved.durationMs;
-        } catch (error) {
-          if (error instanceof SecureResearchHttpError && error.kind === "security_rejected") this.telemetry.privateAddressRejects += 1;
-          throw error;
-        }
-        for (const address of resolved.addresses) allAddresses.set(`${address.family}:${address.address}`, address);
         try {
           this.telemetry.requestCount += 1;
           response = await this.runTransport(parsed.hostname, {
@@ -205,6 +231,9 @@ export class SecureResearchHttpClientImpl implements SecureResearchHttpClient {
         } catch (error) {
           if (error instanceof SecureResearchHttpError) {
             if (error.kind === "timeout") this.telemetry.timeouts += 1;
+            if (error.kind === "connect_failed") this.telemetry.connectFailures += 1;
+            if (error.kind === "tls_failed") this.telemetry.tlsFailures += 1;
+            if (error.kind === "http_failed") this.telemetry.httpFailures += 1;
             if (error.kind === "oversized_content") this.telemetry.oversizedRejects += 1;
             if (error.kind === "content_type_rejected") this.telemetry.contentTypeRejects += 1;
             if (error.retryable && attempt < maxAttempts) {
@@ -216,7 +245,7 @@ export class SecureResearchHttpClientImpl implements SecureResearchHttpClient {
           throw error;
         }
       }
-      if (!response) throw new SecureResearchHttpError("network", "response_missing");
+      if (!response) throw new SecureResearchHttpError("http_failed", "response_missing");
       if (!RESEARCH_REDIRECT_STATUSES.has(response.status)) {
         finalResponse = response;
         break;

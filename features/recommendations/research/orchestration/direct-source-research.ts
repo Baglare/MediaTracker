@@ -106,7 +106,7 @@ export async function researchDirectWikimediaSource(input: DirectSourceResearchI
     tagged.resolution?.warnings?.forEach((warning) => warnings.add(warning));
     tagged.pageResolution?.warnings?.forEach((warning) => warnings.add(warning));
     const securityFailure = error instanceof SecureResearchHttpError
-      ? ["security_rejected", "redirect_rejected", "content_type_rejected", "oversized_content", "invalid_encoding"].includes(error.kind)
+      ? ["security_rejected", "dns_security_rejected", "redirect_rejected", "content_type_rejected", "oversized_content", "invalid_encoding"].includes(error.kind)
       : error instanceof Error && /revision_changed|identity_mismatch|control_character|oversized|document_invalid|citation_invalid/.test(error.message);
     const status = controller.signal.aborted ? "budget_exhausted"
       : tagged.resolution?.status ?? (securityFailure ? "security_rejected" : tagged.pageResolution ? (tagged.pageResolution.status === "security_rejected" ? "security_rejected" : "wikipedia_unavailable") : "adapter_unavailable");
