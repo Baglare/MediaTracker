@@ -6,6 +6,7 @@ import type {
   AnnotationWorkspaceState,
 } from "@/features/recommendations/evaluation/annotation-tool/domain/types";
 import type { AspectAnnotationRecord, DatasetManifest } from "@/features/recommendations/evaluation/dataset";
+import { computeEmptyWorkspaceDatasetContentHash } from "@/features/recommendations/evaluation/annotation-tool/storage/workspace-integrity";
 
 export const TEST_NOW = "2026-08-06T00:00:00.000Z";
 
@@ -34,7 +35,7 @@ export function testManifest(overrides: Partial<DatasetManifest> = {}): DatasetM
     splitPolicy: { strategy: "franchise_group_aware", trainPercent: 70, validationPercent: 15, testPercent: 15, groupKeys: ["leakageGroupId", "exactProviderIdentity"], holdout: "none", goldTestFrozen: true },
     annotationPolicyVersion: "d7_annotation_v1",
     licenseAuditVersion: "d7_license_v1",
-    contentHash: `sha256:${"0".repeat(64)}`,
+    contentHash: computeEmptyWorkspaceDatasetContentHash("d7_1a_test_workspace"),
     releaseStatus: "draft",
     ...overrides,
   };
@@ -78,6 +79,7 @@ export function annotation(overrides: Partial<AspectAnnotationRecord> = {}): Asp
     createdAt: TEST_NOW,
     guidelineVersion: "d7_annotation_v1",
     labelSource: "human_annotation",
+    assistanceMode: "independent_human",
     adjudicationStatus: "not_required",
     ...overrides,
   };

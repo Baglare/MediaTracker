@@ -51,8 +51,10 @@ export async function POST(request: Request) {
                   : action === "validate" ? await api.validate(input)
                     : action === "export" ? await api.export(input)
                       : action === "backup" ? await api.backup(input)
-                        : action === "change_status" ? await api.changeStatus(input)
-                          : (() => { throw new Error("unknown_action"); })();
+                        : action === "preview_reconcile" ? await api.previewReconcile(input)
+                          : action === "reconcile_workspace_metadata" ? await api.reconcile(input)
+                            : action === "change_status" ? await api.changeStatus(input)
+                              : (() => { throw new Error("unknown_action"); })();
     return annotationJson(result);
   } catch (error) {
     const mapped = mapAnnotationServiceError(error);

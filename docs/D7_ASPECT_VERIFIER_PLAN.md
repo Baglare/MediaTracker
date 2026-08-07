@@ -1,7 +1,7 @@
 # D7 Aspect Verifier Planı
 
 Tarih: 6 Ağustos 2026
-Durum: D7-0 ve D7-1A tamamlandı; gerçek pilot/gold veri, model indirme veya training başlamadı.
+Durum: D7-0/D7-1A tamamlandı; D7-1B calibration mini-pilot ve D7-1B.1 provenance/hash/sufficiency hardening tamamlandı. Gold veri, model indirme veya training başlamadı.
 
 ## Kesin ürün kararı
 
@@ -60,7 +60,7 @@ Model her aspect'te kazanmak zorunda değildir; yalnız ölçülebilir iyileşme
 | --- | --- | --- |
 | D7-0 | Data/license/provenance/annotation contract | Saf yeni contract/docs kaldırılır; V2 davranışı değişmez |
 | D7-1A | Local-only annotation tool, private artifact/atomic storage, import-export/adjudication/revocation contract | Flag kapatılır; last-good bounded backup korunur |
-| D7-1B | 40–60 pilot, ikinci annotator/agreement, guideline revision ve gold candidate hazırlığı | Pilot internal-only kalır; sorunlu kayıtlar revoke edilir |
+| D7-1B | Calibration mini-pilot tamamlandı; sırada 40–60 work, 6-aspect independent-human ana pilot, ikinci annotator/agreement ve guideline revision | Pilot internal-only kalır; assisted/legacy labels gold sayılmaz |
 | D7-2 | Classical + frozen multilingual baseline, ordinal heads, offline runner | Model artifact kaldırılır; dataset korunur |
 | D7-3 | Calibration, abstention, local verifier API v2, AspectEvidence adapter, fail-soft | Verifier disabled; structured-only V2 |
 | D7-4 | Yalnız yeterli ve izinli veri varsa optional personalized reranker shadow | Experiment silinir; production default hiç açılmaz |
@@ -77,3 +77,9 @@ D7-1A [tool architecture](D7_ANNOTATION_TOOL_ARCHITECTURE.md), [private artifact
 - Sentetik/human-rewritten source policy ve private artifact saklama yeri.
 - TMDB yazılı izni olmadan TMDB content yok; AniList/OMDb corpus yok; TVMaze/Open Library training field audit tamamlanmadan yok.
 - Annotation tool'un production build'e girmediğini garanti eden packaging kararı.
+
+## D7-1B.1 calibration kararı
+
+[Aggregate calibration raporu](D7_1B_CALIBRATION_PILOT_REPORT.md), 10 record/27 annotation/8 task-aspect mini-pilotun assistance provenance'i olmadığı için `unknown_legacy` ve calibration-only kaldığını belgeler. Gold agreement yalnız explicit `independent_human` annotation'larla hesaplanır. Manifest dataset hash lifecycle ve task-derived aspect scope reconcile edilmeden candidate export kabul edilmez.
+
+Sonraki ana pilot 6 aspect ile başlar: `romance`, `fantasy`, `political_intrigue`, `power_progression`, `love_triangle`, `character_driven`. `dark` geçici deferred; `fanservice` insufficient-sample/presentation-dependent backlog'dur. Registry, 12-aspect tool capability ve Recommendation V2 davranışı değişmez.

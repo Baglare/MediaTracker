@@ -47,7 +47,7 @@ Annotator gerçek ad/e-posta yerine 3–32 karakter pseudonymous internal ID kul
 
 Save task/workspace mutable, record/aspect/annotator geçerli ve revision güncel ise çalışır. Stale revision 409 verir ve client current state'i yeniden yükler. Update eski annotation'ı silmez; inactive/superseded history tutar. Her annotator/task/round için tek active revision vardır.
 
-Tek annotator pilot `internal_pilot` kalır. Aynı kişinin ikinci revision/geçişi bağımsız annotation değildir. Gold validation/test için taskların en az yüzde 20'sinde iki farklı insan annotator ID ve bağımsız annotation gerekir. AI/LLM pre-label D7-1A'da yoktur ve gelecekte human count'a giremez.
+Tek annotator pilot `internal_pilot` kalır. Yeni human save için `assistanceMode` explicit seçilir: `independent_human` veya `assisted_human`. Eski kayıtta alan yoksa read-model `unknown_legacy` üretir; ham legacy dosya otomatik migration için rewrite edilmez. Aynı kişinin ikinci revision/geçişi bağımsız annotation değildir. Gold validation/test için taskların en az yüzde 20'sinde iki farklı insan annotator ID ve yalnız `independent_human` annotation gerekir. Assisted, unknown legacy, AI/model veya synthetic contract annotation agreement sayılmaz.
 
 ## 5. Conflict ve adjudication
 
@@ -61,16 +61,18 @@ Revocation source policy, source reference, record veya workspace kapsamındadı
 
 ## 7. Validation ve export
 
-Validation critical, warning ve info issue'ları Türkçe mesaj + stable code olarak üretir. Critical: provenance/license/personal-data/exact identity/checksum/duplicate/revoked/annotation/split sorunları. Warning: single annotator, düşük double coverage, conflict, coverage ve excessive insufficient evidence. Info: progress ve aspect dağılımı.
+Validation critical, warning ve info issue'ları Türkçe mesaj + stable code olarak üretir. Manifest dataset hash mismatch critical'dir. Assistance unknown/assisted, independent double coverage eksikliği, conflict ve input sufficiency warning'dir. Coverage yalnız non-excluded task aspect'lerinde ölçülür; selected olup task planına girmeyen aspect info'dur. Her task aspect'i için annotation/insufficient sayısı ve oranı raporlanır; `n >= 3` ve oran `>= %50` ise `annotation_aspect_input_insufficient` üretilir.
 
-Candidate export browser download olarak verilebilir; private path gösterilmez. Evaluation candidate unresolved conflict'i kabul etmez. Bütün exportlar internal-only ve checksum'lıdır; gerçek training/gold artifact iddiası taşımaz.
+Candidate export browser download olarak verilebilir; private path gösterilmez. `annotation_only` assistance provenance ile bütün active kayıtları audit için koruyabilir. Training/evaluation/adjudicated label setleri assisted veya unknown legacy annotation kabul etmez ve limitation raporlar. Export manifest hash'i current workspace dataset hash'idir; top-level export hash'i export bundle bütünlüğünü kanıtlayan ayrı değerdir.
+
+Metadata reconcile önce salt-okunur preview verir. Explicit apply, current `workspace.json` için atomic bounded backup oluşturur; manifest content hash'i recompute eder ve task varsa manifest aspect kapsamını non-excluded task aspect'lerine getirir. Annotation label/confidence/note dosyası rewrite edilmez.
 
 ## D7-1B operatör adımları
 
 1. Private root ve yedekleme/erişim kararını verin.
 2. Pilot annotator pseudonym'lerini atayın; mümkünse ikinci bağımsız insanı belirleyin.
 3. Yalnız izinli sentetik/insan-yazımı kısa bundle hazırlayın; checksum/provenance validation çalıştırın.
-4. 40–60 unique work ve 6–8 aspect pilot task listesini sampling planına göre dışarıda belirleyip sparse plan preview ile doğrulayın; explicit üretim için ayrıca onay verin.
+4. 40–60 unique work için başlangıçta `romance`, `fantasy`, `political_intrigue`, `power_progression`, `love_triangle`, `character_driven` task planını preview ile doğrulayın; explicit üretim için ayrıca onay verin.
 5. En az yüzde 20 double-annotation subset'i seçin; conflict'leri adjudicate edin.
 6. Guideline sorunlarını belgeleyin; gold_candidate durumuna otomatik geçmeyin.
 

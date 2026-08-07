@@ -18,6 +18,7 @@ export const SYNTHETIC_CONTRADICTORY_ANNOTATIONS: readonly AspectAnnotationRecor
     createdAt,
     guidelineVersion: "d7_annotation_v1",
     labelSource: "synthetic_contract",
+    assistanceMode: "unknown_legacy",
     adjudicationStatus: "pending",
   },
   {
@@ -35,6 +36,7 @@ export const SYNTHETIC_CONTRADICTORY_ANNOTATIONS: readonly AspectAnnotationRecor
     createdAt,
     guidelineVersion: "d7_annotation_v1",
     labelSource: "synthetic_contract",
+    assistanceMode: "unknown_legacy",
     adjudicationStatus: "pending",
   },
 ] as const;

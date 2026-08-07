@@ -119,3 +119,9 @@ Karmaşık lore veya zaman çizgisi plot-driven garantisi değildir. Plot-driven
 Minimum %15–25 kayıt/aspect çifti double annotation alır. Farklı insan annotator mümkün değilse data card açıkça `single-annotator limitation` yazar. Aynı kişinin ikinci turu quality review olabilir ama inter-annotator agreement değildir.
 
 Adjudicator ham label'ları, evidence note'ları ve contradiction'ı görür; yeni kısa gerekçe ile `finalLabel` verir. `insufficient_evidence` anlaşmazlığı veri eksikliğine işaret eder; zorla absent/positive etikete çevrilmez.
+
+## Assistance provenance ve input sufficiency
+
+Annotator save öncesi assistance durumunu explicit beyan eder. Başka annotator/AI cevabını görmeden verilen karar `independent_human`; kararı etkileyebilecek öneri görüldüyse `assisted_human`dır. Alanı olmayan eski kayıt `unknown_legacy`dir. Assisted ve unknown kayıt calibration için korunabilir fakat agreement/gold hesabına girmez.
+
+Aspect için en az 3 annotation ve `insufficient_evidence >= %50` ise sorun annotator performansı diye yorumlanmaz. Input strategy, annotation reference, short-summary design ve runtime model input availability yeniden incelenir; aspect bir sonraki gold-like pilot kapsamına otomatik taşınmaz. Calibration mini-pilot aggregate sonucu [D7-1B raporunda](D7_1B_CALIBRATION_PILOT_REPORT.md) tutulur.

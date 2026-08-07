@@ -9,6 +9,7 @@ import { createCandidateCanonicalKey } from "../../providers/candidate-identity"
 import type { RecommendationCandidateIdentity } from "../../providers/types";
 import { validateDatasetPackage } from "./validation";
 import {
+  ANNOTATION_ASSISTANCE_MODES,
   ANNOTATION_LABELS,
   ANNOTATION_SCHEMA_VERSION,
   ASPECT_VERIFIER_LEVELS,
@@ -339,7 +340,7 @@ function decodeDatasetRecord(value: unknown, path: string): RecommendationDecode
 
 export function decodeAspectAnnotationRecord(value: unknown, path = "$" ): RecommendationDecodeResult<AspectAnnotationRecord> {
   if (!record(value)) return { ok: false, issues: [issue("annotation_invalid", path, "AspectAnnotationRecord nesne olmalıdır.")] };
-  const issues = unknownFields(value, ["version", "annotationId", "recordId", "aspectId", "label", "confidence", "evidenceSpans", "evidenceNotes", "contradictionNotes", "annotatorId", "annotationRound", "createdAt", "guidelineVersion", "labelSource", "adjudicationStatus", "finalLabel"], path);
+  const issues = unknownFields(value, ["version", "annotationId", "recordId", "aspectId", "label", "confidence", "evidenceSpans", "evidenceNotes", "contradictionNotes", "annotatorId", "annotationRound", "createdAt", "guidelineVersion", "labelSource", "assistanceMode", "adjudicationStatus", "finalLabel"], path);
   const annotationId = textValue(value.annotationId, 120);
   const recordId = textValue(value.recordId, 120);
   const aspectId = isAspectId(value.aspectId) ? value.aspectId : undefined;
@@ -348,6 +349,9 @@ export function decodeAspectAnnotationRecord(value: unknown, path = "$" ): Recom
   const annotatorId = textValue(value.annotatorId, 80);
   const guidelineVersion = textValue(value.guidelineVersion, 120);
   const labelSource = asEnum(value.labelSource, ["human_annotation", "synthetic_contract"] as const);
+  const assistanceMode = value.assistanceMode === undefined
+    ? "unknown_legacy"
+    : asEnum(value.assistanceMode, ANNOTATION_ASSISTANCE_MODES);
   const adjudicationStatus = asEnum(value.adjudicationStatus, ["not_required", "pending", "resolved"] as const);
   const finalLabel = value.finalLabel === undefined ? undefined : asEnum(value.finalLabel, ANNOTATION_LABELS);
   if (value.version !== ANNOTATION_SCHEMA_VERSION) issues.push(issue("annotation_version_invalid", `${path}.version`, "Annotation version=1 olmalıdır."));
@@ -375,12 +379,13 @@ export function decodeAspectAnnotationRecord(value: unknown, path = "$" ): Recom
   if (!isoInstant(value.createdAt)) issues.push(issue("annotation_created_at_invalid", `${path}.createdAt`, "createdAt canonical ISO instant olmalıdır."));
   if (!guidelineVersion || !ID_PATTERN.test(guidelineVersion)) issues.push(issue("annotation_guideline_version_invalid", `${path}.guidelineVersion`, "guidelineVersion canonical olmalıdır."));
   if (!labelSource) issues.push(issue("annotation_label_source_invalid", `${path}.labelSource`, "labelSource geçersizdir."));
+  if (!assistanceMode) issues.push(issue("annotation_assistance_mode_invalid", `${path}.assistanceMode`, "Annotation assistance mode geçersizdir."));
   if (!adjudicationStatus) issues.push(issue("annotation_adjudication_invalid", `${path}.adjudicationStatus`, "adjudicationStatus geçersizdir."));
   if (value.finalLabel !== undefined && !finalLabel) issues.push(issue("annotation_final_label_invalid", `${path}.finalLabel`, "finalLabel geçersizdir."));
   if (adjudicationStatus === "resolved" && !finalLabel) issues.push(issue("annotation_final_label_required", `${path}.finalLabel`, "Resolved adjudication finalLabel taşımalıdır."));
   if (adjudicationStatus !== "resolved" && value.finalLabel !== undefined) issues.push(issue("annotation_final_label_forbidden", `${path}.finalLabel`, "finalLabel yalnız resolved adjudication sonrasında yazılabilir."));
-  if (issues.length > 0 || !annotationId || !recordId || !aspectId || !label || !confidence || !evidenceNotes || !contradictionNotes || !annotatorId || !guidelineVersion || !labelSource || !adjudicationStatus) return { ok: false, issues };
-  return { ok: true, value: { version: ANNOTATION_SCHEMA_VERSION, annotationId, recordId, aspectId, label, confidence, evidenceSpans, evidenceNotes, contradictionNotes, annotatorId, annotationRound: value.annotationRound as number, createdAt: value.createdAt as string, guidelineVersion, labelSource, adjudicationStatus, ...(finalLabel ? { finalLabel } : {}) } };
+  if (issues.length > 0 || !annotationId || !recordId || !aspectId || !label || !confidence || !evidenceNotes || !contradictionNotes || !annotatorId || !guidelineVersion || !labelSource || !assistanceMode || !adjudicationStatus) return { ok: false, issues };
+  return { ok: true, value: { version: ANNOTATION_SCHEMA_VERSION, annotationId, recordId, aspectId, label, confidence, evidenceSpans, evidenceNotes, contradictionNotes, annotatorId, annotationRound: value.annotationRound as number, createdAt: value.createdAt as string, guidelineVersion, labelSource, assistanceMode, adjudicationStatus, ...(finalLabel ? { finalLabel } : {}) } };
 }
 
 export function decodeDatasetPackage(value: unknown): RecommendationDecodeResult<DatasetPackage> {

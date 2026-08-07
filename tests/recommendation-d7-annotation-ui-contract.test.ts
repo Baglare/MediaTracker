@@ -95,7 +95,27 @@ describe("D7-1A UI and shortcut contract", () => {
   it("sparse preview ayrı aksiyondur ve expected annotation label preselect etmez", () => {
     expect(ui).toContain("previewSparseTaskPlanJson");
     expect(ui).toContain('useState<AspectAnnotationLabel | null>(null)');
-    expect(ui).toContain("!label || busy");
+    expect(ui).toContain("!label || !assistanceMode || busy");
+  });
+
+  it("assistance mode explicit radio seçimi olmadan save'i açmaz", () => {
+    expect(ui).toContain('useState<Exclude<AnnotationAssistanceMode, "unknown_legacy"> | null>(null)');
+    expect(ui).toContain('value="independent_human"');
+    expect(ui).toContain('value="assisted_human"');
+    expect(ui).toContain("!assistanceMode || busy");
+    expect(ui).toContain("assistanceMode,");
+  });
+
+  it("assistance tercihini yalnız sessionStorage enum değeri olarak hatırlar", () => {
+    expect(ui).toContain("window.sessionStorage.getItem(ASSISTANCE_SESSION_KEY)");
+    expect(ui).toContain("window.sessionStorage.setItem(ASSISTANCE_SESSION_KEY, value)");
+    expect(ui).not.toContain("localStorage");
+  });
+
+  it("metadata reconcile salt-okunur preview ve ayrı explicit apply action'ı taşır", () => {
+    expect(ui).toContain('action: "preview_reconcile"');
+    expect(ui).toContain('action: "reconcile_workspace_metadata"');
+    expect(ui).toContain("Backup al ve reconcile uygula");
   });
 
   it("annotation route ürün kabuğundan ayrıdır ve public navigation link'i değildir", () => {

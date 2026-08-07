@@ -209,7 +209,18 @@ export function decodeStoredAspectAnnotation(value: unknown, path = "$"): Recomm
   if (typeof value.active !== "boolean") issues.push(issue("annotation_active_invalid", `${path}.active`, "active boolean olmalıdır."));
   if (value.supersedesAnnotationId !== undefined && !isValidBoundedId(value.supersedesAnnotationId)) issues.push(issue("annotation_supersedes_invalid", `${path}.supersedesAnnotationId`, "supersedesAnnotationId geçersizdir."));
   if (!iso(value.updatedAt)) issues.push(issue("annotation_updated_at_invalid", `${path}.updatedAt`, "updatedAt ISO instant olmalıdır."));
-  return issues.length === 0 ? { ok: true, value: value as unknown as StoredAspectAnnotation } : { ok: false, issues };
+  if (issues.length > 0 || !annotation.ok) return { ok: false, issues };
+  return {
+    ok: true,
+    value: {
+      version: 1,
+      annotation: annotation.value,
+      revision: value.revision as number,
+      active: value.active as boolean,
+      ...(value.supersedesAnnotationId === undefined ? {} : { supersedesAnnotationId: value.supersedesAnnotationId as string }),
+      updatedAt: value.updatedAt as string,
+    },
+  };
 }
 
 export function decodeAdjudication(value: unknown, path = "$"): RecommendationDecodeResult<AnnotationAdjudicationRecord> {

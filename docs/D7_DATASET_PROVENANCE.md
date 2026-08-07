@@ -99,4 +99,10 @@ Codec sonrası validation şu kapıları uygular:
 Workspace metadata, record, task, revision history, adjudication, revocation, audit ve checksum ayrı versioned dosyalarda tutulur. Import/export aynı strict record/provenance codec'ini paylaşır; client path veya filename gönderemez. Her record exact provider identity veya sentetik identity taşır ve `personalData=false` zorunludur.
 
 Annotation update eski kaydı silmez; active/superseded revision history korunur. Revocation source policy/reference/record/workspace kapsamını ve training/evaluation/export action'larını taşır; correction önceki ID'yi referanslayan replacement/reversal record'dur. Private/atomic storage ayrıntısı [D7-1A Architecture](D7_ANNOTATION_TOOL_ARCHITECTURE.md) ve [Private Artifact Policy](D7_PRIVATE_ARTIFACT_POLICY.md) içindedir.
+
+## D7-1B.1 assistance ve hash provenance
+
+`labelSource=human_annotation` tek başına independent kanıt değildir. `assistanceMode` zorunlu provenance alanıdır: independent, assisted veya fail-closed legacy unknown. Yalnız active `independent_human` kayıtlar gold agreement hesabına girebilir. Annotation-only audit exportu diğer modları taşıyabilir; training/evaluation label seti taşıyamaz.
+
+Workspace manifest `contentHash`, manifest'in kendisini hariç tutan normalized dataset state hash'idir. Input: `schemaVersion`, `datasetId`, canonical records/provenance, active annotations, adjudications ve active revocations. Export `manifest.contentHash` bu workspace dataset kimliğini; export top-level `contentHash` ise oluşan export paketinin bütünlüğünü ifade eder. Zero placeholder yalnız eski lifecycle eksikliğiydi ve geçerli bütünlük kanıtı sayılmaz.
 - Dataset/model card source policy version, intended use, exclusions, known limitations, deletion ve reproduction environment bilgilerini taşır.

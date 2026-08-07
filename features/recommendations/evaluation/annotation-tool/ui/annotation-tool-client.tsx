@@ -2,12 +2,17 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import type { AnnotationConfidence, AspectAnnotationLabel } from "../../dataset";
+import type {
+  AnnotationAssistanceMode,
+  AnnotationConfidence,
+  AspectAnnotationLabel,
+} from "../../dataset";
 import { ANNOTATION_CONFIDENCE_UI, ANNOTATION_LABEL_UI } from "../domain/constants";
 import type {
   AnnotationImportPreview,
   AnnotationToolReadModel,
   AnnotationValidationIssue,
+  WorkspaceMetadataReconcilePreview,
 } from "../domain/types";
 import { isEditableShortcutTarget, resolveAnnotationShortcut } from "./shortcuts";
 import {
@@ -19,6 +24,7 @@ import {
 } from "./task-generation-plan";
 
 const API = "/api/dev/recommendation-annotation";
+const ASSISTANCE_SESSION_KEY = "d7-annotation-assistance-mode";
 
 async function requestJson<T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> {
   const response = await fetch(input, { ...init, cache: "no-store", headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) } });
@@ -41,6 +47,7 @@ export function AnnotationToolClient() {
   const [model, setModel] = useState<AnnotationToolReadModel | null>(null);
   const [activeTaskId, setActiveTaskId] = useState("");
   const [label, setLabel] = useState<AspectAnnotationLabel | null>(null);
+  const [assistanceMode, setAssistanceMode] = useState<Exclude<AnnotationAssistanceMode, "unknown_legacy"> | null>(null);
   const [confidence, setConfidence] = useState<AnnotationConfidence>("low");
   const [evidenceNote, setEvidenceNote] = useState("");
   const [contradictionNote, setContradictionNote] = useState("");
@@ -54,6 +61,7 @@ export function AnnotationToolClient() {
   const [sparsePlanPreview, setSparsePlanPreview] = useState<SparseTaskPlanPreview | null>(null);
   const [validation, setValidation] = useState<readonly AnnotationValidationIssue[]>([]);
   const [exportPreview, setExportPreview] = useState("");
+  const [reconcilePreview, setReconcilePreview] = useState<WorkspaceMetadataReconcilePreview | null>(null);
 
   const loadList = useCallback(async () => {
     const result = await requestJson<{ workspaceIds: string[] }>(API);
@@ -69,6 +77,7 @@ export function AnnotationToolClient() {
     setActiveTaskId((current) => result.tasks.some((task) => task.taskId === current) ? current : result.tasks[0]?.taskId ?? "");
     setLabel(null);
     setSparsePlanPreview(null);
+    setReconcilePreview(null);
     setAllSelectedConfirmed(false);
   }, []);
 
@@ -95,6 +104,19 @@ export function AnnotationToolClient() {
     return () => { cancelled = true; };
   }, []);
 
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      const stored = window.sessionStorage.getItem(ASSISTANCE_SESSION_KEY);
+      if (stored === "independent_human" || stored === "assisted_human") setAssistanceMode(stored);
+    }, 0);
+    return () => window.clearTimeout(timeout);
+  }, []);
+
+  const chooseAssistanceMode = useCallback((value: "independent_human" | "assisted_human") => {
+    setAssistanceMode(value);
+    window.sessionStorage.setItem(ASSISTANCE_SESSION_KEY, value);
+  }, []);
+
   const tasks = useMemo(() => model?.tasks ?? [], [model?.tasks]);
   const activeTask = tasks.find((task) => task.taskId === activeTaskId) ?? null;
   const activeIndex = activeTask ? tasks.indexOf(activeTask) : -1;
@@ -112,7 +134,7 @@ export function AnnotationToolClient() {
   const post = useCallback(async <T,>(body: Record<string, unknown>): Promise<T> => requestJson<T>(API, { method: "POST", body: JSON.stringify(body) }), []);
 
   const save = useCallback(async () => {
-    if (!activeTask || !model || !label) return;
+    if (!activeTask || !model || !label || !assistanceMode) return;
     setBusy(true);
     try {
       const result = await post<AnnotationToolReadModel>({
@@ -123,6 +145,7 @@ export function AnnotationToolClient() {
         aspectId: activeTask.aspectId,
         annotationRound: activeTask.annotationRound,
         label,
+        assistanceMode,
         confidence,
         evidenceNote,
         contradictionNote,
@@ -138,7 +161,7 @@ export function AnnotationToolClient() {
         : error instanceof Error ? error.message : "Annotation kaydedilemedi.");
       await loadWorkspace(model.workspace.workspaceId).catch(() => undefined);
     } finally { setBusy(false); }
-  }, [activeAnnotation, activeTask, actorId, confidence, contradictionNote, evidenceNote, label, loadWorkspace, model, post]);
+  }, [activeAnnotation, activeTask, actorId, assistanceMode, confidence, contradictionNote, evidenceNote, label, loadWorkspace, model, post]);
 
   const selectTask = useCallback((taskId: string) => {
     setActiveTaskId(taskId);
@@ -256,6 +279,33 @@ export function AnnotationToolClient() {
     catch (error) { setMessage(error instanceof Error ? error.message : "Validation çalışmadı."); }
   }
 
+  async function previewReconcileMetadata() {
+    if (!model) return;
+    try {
+      const preview = await post<WorkspaceMetadataReconcilePreview>({ action: "preview_reconcile", workspaceId });
+      setReconcilePreview(preview);
+      setMessage("Metadata reconcile önizlemesi hazır; workspace henüz değişmedi.");
+    } catch (error) { setMessage(error instanceof Error ? error.message : "Reconcile önizlenemedi."); }
+  }
+
+  async function applyReconcileMetadata() {
+    if (!model || !reconcilePreview) return;
+    setBusy(true);
+    try {
+      const result = await post<AnnotationToolReadModel>({
+        action: "reconcile_workspace_metadata",
+        workspaceId,
+        actorId,
+        confirmed: true,
+      });
+      setModel(result);
+      setValidation(result.validation);
+      setReconcilePreview(null);
+      setMessage("Workspace metadata backup sonrası atomic olarak reconcile edildi; annotation içeriği değiştirilmedi.");
+    } catch (error) { setMessage(error instanceof Error ? error.message : "Metadata reconcile uygulanamadı."); }
+    finally { setBusy(false); }
+  }
+
   async function exportBundle(purpose: string) {
     if (!model) return;
     try {
@@ -362,17 +412,18 @@ export function AnnotationToolClient() {
         </article>
 
         <form className="min-w-0 space-y-4 rounded-2xl border border-zinc-800 bg-zinc-900 p-4" onSubmit={(event) => { event.preventDefault(); void save(); }}>
+          <fieldset><legend className="mb-2 font-semibold">Annotation kaynağı</legend><div className="space-y-2"><label className="flex items-start gap-2 rounded border border-zinc-800 p-2"><input type="radio" name="annotation-assistance" value="independent_human" checked={assistanceMode === "independent_human"} onChange={() => chooseAssistanceMode("independent_human")} /><span><strong>Bağımsız insan</strong><span className="block text-xs text-zinc-400">Bu görev için başka bir annotator veya AI tarafından önerilmiş label/cevap görmedim.</span></span></label><label className="flex items-start gap-2 rounded border border-zinc-800 p-2"><input type="radio" name="annotation-assistance" value="assisted_human" checked={assistanceMode === "assisted_human"} onChange={() => chooseAssistanceMode("assisted_human")} /><span><strong>Yardım alınmış</strong><span className="block text-xs text-zinc-400">Bu görevde kararımı etkileyebilecek harici öneri veya cevap gördüm.</span></span></label></div></fieldset>
           <fieldset><legend className="mb-2 font-semibold">Aspect seviyesi</legend><div className="space-y-2">{(Object.keys(ANNOTATION_LABEL_UI) as AspectAnnotationLabel[]).map((value, index) => <label key={value} className="flex cursor-pointer items-center gap-2 rounded border border-zinc-800 p-2"><input type="radio" name="annotation-label" value={value} checked={label === value} onChange={() => setLabel(value)} /><span>{index + 1}. {ANNOTATION_LABEL_UI[value]}</span></label>)}</div></fieldset>
           <fieldset><legend className="mb-2 font-semibold">Annotation confidence</legend><div className="flex flex-wrap gap-3">{(Object.keys(ANNOTATION_CONFIDENCE_UI) as AnnotationConfidence[]).map((value, index) => <label key={value} className="flex items-center gap-2"><input type="radio" name="annotation-confidence" value={value} checked={confidence === value} onChange={() => setConfidence(value)} /><span>Shift+{index + 1} {ANNOTATION_CONFIDENCE_UI[value]}</span></label>)}</div></fieldset>
           <label className="block text-sm" htmlFor="evidence-note">Kısa evidence note<textarea id="evidence-note" aria-describedby="evidence-help" className="mt-1 min-h-20 w-full rounded border border-zinc-700 bg-zinc-950 p-2" maxLength={280} value={evidenceNote} onChange={(event) => setEvidenceNote(event.target.value)} /><span id="evidence-help" className="text-xs text-zinc-500">En fazla 280 karakter; uzun provider alıntısı yok.</span></label>
           <label className="block text-sm" htmlFor="contradiction-note">Çelişki notu<textarea id="contradiction-note" className="mt-1 min-h-16 w-full rounded border border-zinc-700 bg-zinc-950 p-2" maxLength={280} value={contradictionNote} onChange={(event) => setContradictionNote(event.target.value)} /></label>
-          <button className="w-full rounded bg-emerald-600 px-3 py-2 font-semibold disabled:opacity-50" type="submit" disabled={!activeTask || !label || busy}>Ctrl+S · Kaydet</button>
+          <button className="w-full rounded bg-emerald-600 px-3 py-2 font-semibold disabled:opacity-50" type="submit" disabled={!activeTask || !label || !assistanceMode || busy}>Ctrl+S · Kaydet</button>
         </form>
       </section>
 
       <section className="grid min-w-0 gap-4 lg:grid-cols-2">
         <div className="min-w-0 rounded-2xl border border-zinc-800 bg-zinc-900 p-4"><h2 className="font-semibold">Versioned local bundle import</h2><p className="text-sm text-zinc-400">Dosya yalnız tarayıcıda okunur; server provider fetch yapmaz.</p><input className="my-3 block w-full text-sm" type="file" accept="application/json,.json" onChange={(event) => { const file = event.target.files?.[0]; if (file) void file.text().then(setImportRaw); }} /><textarea aria-label="Import JSON" className="min-h-36 w-full rounded border border-zinc-700 bg-zinc-950 p-2 font-mono text-xs" value={importRaw} onChange={(event) => setImportRaw(event.target.value)} /><div className="mt-2 flex gap-2"><button className="rounded border border-zinc-700 px-3 py-2" onClick={() => void previewImport()}>Önizle</button><button className="rounded bg-violet-600 px-3 py-2 disabled:opacity-50" disabled={!importPreview || importPreview.invalid > 0 || importPreview.duplicateConflict > 0} onClick={() => void applyImportConfirmed()}>Onayla ve import et</button></div>{importPreview && <p className="mt-2 text-sm">Toplam {importPreview.total}; geçerli {importPreview.valid}; bozuk {importPreview.invalid}; same-skip {importPreview.duplicateSame}; conflict {importPreview.duplicateConflict}; unresolved {importPreview.unresolvedLicense}; revoked {importPreview.revoked}.</p>}</div>
-        <div className="min-w-0 rounded-2xl border border-zinc-800 bg-zinc-900 p-4"><div className="flex flex-wrap justify-between gap-2"><h2 className="font-semibold">Workspace validation</h2><button className="rounded border border-zinc-700 px-3 py-1" onClick={() => void runValidation()}>Yenile</button></div><div className="mt-3 max-h-72 space-y-2 overflow-y-auto">{validation.map((entry, index) => <div key={`${entry.code}-${index}`} className={`rounded border p-2 text-sm ${issueTone(entry)}`}><strong>{entry.severity === "critical" ? "Kritik" : entry.severity === "warning" ? "Uyarı" : "Bilgi"}</strong><p>{entry.messageTr}</p><code className="text-xs text-zinc-400">{entry.code}</code></div>)}</div></div>
+        <div className="min-w-0 rounded-2xl border border-zinc-800 bg-zinc-900 p-4"><div className="flex flex-wrap justify-between gap-2"><h2 className="font-semibold">Workspace validation</h2><button className="rounded border border-zinc-700 px-3 py-1" onClick={() => void runValidation()}>Yenile</button></div><div className="mt-3 max-h-72 space-y-2 overflow-y-auto">{validation.map((entry, index) => <div key={`${entry.code}-${index}`} className={`rounded border p-2 text-sm ${issueTone(entry)}`}><strong>{entry.severity === "critical" ? "Kritik" : entry.severity === "warning" ? "Uyarı" : "Bilgi"}</strong><p>{entry.messageTr}</p><code className="text-xs text-zinc-400">{entry.code}</code></div>)}</div><div className="mt-4 border-t border-zinc-800 pt-4"><h3 className="font-semibold">Workspace metadata reconcile</h3><p className="mt-1 text-xs text-zinc-400">Manifest hash ve gerçek task aspect kapsamını salt-okunur önizler; uygulama explicit onayla ve atomic metadata backup ile yapılır.</p><button className="mt-2 rounded border border-zinc-700 px-3 py-2" disabled={!model || busy} onClick={() => void previewReconcileMetadata()}>Önizle</button>{reconcilePreview && <div className="mt-3 rounded border border-zinc-700 bg-zinc-950 p-3 text-sm"><p>Content hash: {reconcilePreview.contentHashChanged ? "güncellenecek" : "güncel"}</p><p>Aspect kapsamı: {reconcilePreview.currentAspectIds.length} → {reconcilePreview.computedAspectIds.length}</p><button className="mt-2 rounded bg-amber-600 px-3 py-2 font-semibold disabled:opacity-50" disabled={busy || (!reconcilePreview.contentHashChanged && !reconcilePreview.aspectScopeChanged)} onClick={() => void applyReconcileMetadata()}>Backup al ve reconcile uygula</button></div>}</div></div>
       </section>
 
       <section className="grid gap-4 lg:grid-cols-3">

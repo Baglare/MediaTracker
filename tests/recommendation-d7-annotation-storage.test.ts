@@ -7,7 +7,14 @@ vi.mock("server-only", () => ({}));
 
 import { atomicWriteJson, withWorkspaceWriteLock } from "@/features/recommendations/evaluation/annotation-tool/storage/atomic";
 import { AnnotationWorkspaceRepository } from "@/features/recommendations/evaluation/annotation-tool/storage/repository";
-import { testManifest } from "./recommendation-d7-annotation-test-helpers";
+import { reconcileWorkspaceMetadata } from "@/features/recommendations/evaluation/annotation-tool/storage/workspace-integrity";
+import {
+  applyRecordImport,
+  generateAnnotationTasks,
+  saveAnnotation,
+  validateAnnotationWorkspace,
+} from "@/features/recommendations/evaluation/annotation-tool/server/workflows";
+import { annotation, syntheticBundle, testManifest, TEST_NOW } from "./recommendation-d7-annotation-test-helpers";
 
 const temporary: string[] = [];
 async function tempRoot() { const root = await mkdtemp(path.join(tmpdir(), "mt-d7-storage-")); temporary.push(root); return root; }
@@ -72,7 +79,9 @@ describe("D7-1A workspace repository", () => {
     await repository.createWorkspace({ workspaceId: "test-workspace", manifest: testManifest(), actorId: "annotator-01", now: "2026-08-06T00:00:00.000Z" });
     const names = await readdir(path.join(root, "workspaces", "test-workspace"));
     expect(names.sort()).toEqual(["adjudications.json", "annotations.json", "audit-log.ndjson", "checksums.json", "records.json", "revocations.json", "tasks.json", "workspace.json"]);
-    expect((await repository.readWorkspace("test-workspace")).workspace.status).toBe("draft");
+    const state = await repository.readWorkspace("test-workspace");
+    expect(state.workspace.status).toBe("draft");
+    expect(state.workspace.manifest.contentHash).toMatch(/^sha256:(?!0{64})[a-f0-9]{64}$/);
   });
 
   it("workspace create duplicate'ini reddeder", async () => {
@@ -92,5 +101,50 @@ describe("D7-1A workspace repository", () => {
     const root = await tempRoot();
     expect(root.startsWith(tmpdir())).toBe(true);
     expect(root).not.toContain("private/recommendation-ml");
+  });
+
+  it("explicit metadata reconcile workspace backup alır ve annotations dosyasını byte-for-byte korur", async () => {
+    const root = await tempRoot(); const repository = new AnnotationWorkspaceRepository(root);
+    await repository.createWorkspace({ workspaceId: "test-workspace", manifest: testManifest(), actorId: "annotator-01", now: TEST_NOW });
+    await repository.mutateWorkspace({
+      workspaceId: "test-workspace",
+      actorId: "annotator-01",
+      event: { eventType: "records_imported", targetIds: ["test-workspace"], metadata: { test: true } },
+      mutate: (state) => ({ state: applyRecordImport(state, syntheticBundle(), true, TEST_NOW).state, result: null }),
+      now: TEST_NOW,
+    });
+    await repository.mutateWorkspace({
+      workspaceId: "test-workspace",
+      actorId: "annotator-01",
+      event: { eventType: "validation_run", targetIds: ["test-workspace"], metadata: { test: true } },
+      mutate: (state) => ({ state: generateAnnotationTasks(state, { mode: "explicit", pairs: [{ recordId: "synthetic-01", aspectId: "romance" }] }, { now: TEST_NOW }).state, result: null }),
+      now: TEST_NOW,
+    });
+    await repository.mutateWorkspace({
+      workspaceId: "test-workspace",
+      actorId: "ann_internal_01",
+      event: { eventType: "annotation_saved", targetIds: ["synthetic-01", "romance"], metadata: { revision: 1 } },
+      mutate: (state) => ({ state: saveAnnotation(state, annotation(), 0, TEST_NOW).state, result: null }),
+      now: TEST_NOW,
+    });
+    await repository.mutateWorkspace({
+      workspaceId: "test-workspace",
+      actorId: "annotator-01",
+      event: { eventType: "validation_run", targetIds: ["test-workspace"], metadata: { tamper: true } },
+      mutate: (state) => ({ state: { ...state, workspace: { ...state.workspace, manifest: { ...state.workspace.manifest, contentHash: `sha256:${"f".repeat(64)}` } } }, result: null }),
+      now: TEST_NOW,
+    });
+    const annotationFile = path.join(root, "workspaces", "test-workspace", "annotations.json");
+    const before = await readFile(annotationFile, "utf8");
+    await repository.reconcileWorkspaceMetadata({
+      workspaceId: "test-workspace",
+      actorId: "annotator-01",
+      now: TEST_NOW,
+      reconcile: (state) => ({ state: reconcileWorkspaceMetadata(state, TEST_NOW), result: null }),
+    });
+    expect(await readFile(annotationFile, "utf8")).toBe(before);
+    expect((await readdir(path.join(root, "backups", "test-workspace"))).some((name) => name.endsWith("workspace.json.bak"))).toBe(true);
+    expect(validateAnnotationWorkspace(await repository.readWorkspace("test-workspace"))
+      .some((entry) => entry.code === "annotation_manifest_content_hash_mismatch")).toBe(false);
   });
 });

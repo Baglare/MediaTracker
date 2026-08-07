@@ -119,6 +119,7 @@ function annotation(overrides: Record<string, unknown> = {}) {
     createdAt: at,
     guidelineVersion: "d7_annotation_v1",
     labelSource: "synthetic_contract",
+    assistanceMode: "unknown_legacy",
     adjudicationStatus: "not_required",
     ...overrides,
   };

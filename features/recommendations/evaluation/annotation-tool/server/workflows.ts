@@ -26,11 +26,17 @@ import type {
   AnnotationValidationIssue,
   AnnotationWorkspaceRecord,
   AnnotationWorkspaceState,
+  AspectInputSufficiencyMetric,
   DatasetRevocationAction,
   DatasetRevocationRecord,
   StoredAspectAnnotation,
 } from "../domain/types";
 import { serializeCanonicalJson, sha256Text } from "../storage/atomic";
+import {
+  computeWorkspaceDatasetContentHash,
+  deriveTaskAspectIds,
+  withWorkspaceDatasetContentHash,
+} from "../storage/workspace-integrity";
 
 export class AnnotationRevisionConflictError extends Error {
   constructor() {
@@ -235,7 +241,7 @@ export function applyRecordImport(
   const timestamp = nowIso(now);
   const nextRecords = [...state.records, ...imported];
   return {
-    state: {
+    state: withWorkspaceDatasetContentHash({
       ...state,
       workspace: {
         ...state.workspace,
@@ -244,7 +250,7 @@ export function applyRecordImport(
         updatedAt: timestamp,
       },
       records: nextRecords,
-    },
+    }),
     preview,
     importedRecordIds: imported.map((entry) => entry.record.recordId),
   };
@@ -256,6 +262,15 @@ function activeAnnotationsForTask(state: AnnotationWorkspaceState, task: Annotat
     && entry.annotation.aspectId === task.aspectId
     && entry.annotation.annotationRound === task.annotationRound
     && entry.annotation.labelSource === "human_annotation");
+}
+
+function independentHumanAnnotationsForTask(
+  state: AnnotationWorkspaceState,
+  task: AnnotationTask,
+): StoredAspectAnnotation[] {
+  return activeAnnotationsForTask(state, task).filter((entry) => (
+    entry.annotation.assistanceMode === "independent_human"
+  ));
 }
 
 function statusForTask(state: AnnotationWorkspaceState, task: AnnotationTask): AnnotationTask["status"] {
@@ -274,6 +289,7 @@ export function saveAnnotation(
 ): { state: AnnotationWorkspaceState; saved: StoredAspectAnnotation } {
   mutable(state);
   if (!isValidAnnotatorId(annotation.annotatorId)) throw new AnnotationWorkflowError("annotation_annotator_invalid");
+  if (annotation.assistanceMode === "unknown_legacy") throw new AnnotationWorkflowError("annotation_assistance_required");
   const task = state.tasks.find((entry) => entry.recordId === annotation.recordId
     && entry.aspectId === annotation.aspectId && entry.annotationRound === annotation.annotationRound);
   if (!task || task.status === "excluded") throw new AnnotationWorkflowError("annotation_task_missing_or_excluded");
@@ -310,12 +326,12 @@ export function saveAnnotation(
     }
     : entry);
   return {
-    state: {
+    state: withWorkspaceDatasetContentHash({
       ...state,
       workspace: { ...state.workspace, status: "annotation_in_progress", updatedAt: timestamp },
       annotations,
       tasks,
-    },
+    }),
     saved: decoded.value,
   };
 }
@@ -339,12 +355,12 @@ export function adjudicateTask(
   if (state.adjudications.some((entry) => entry.taskId === task.taskId)) throw new AnnotationWorkflowError("annotation_adjudication_duplicate");
   const timestamp = nowIso(now);
   return {
-    state: {
+    state: withWorkspaceDatasetContentHash({
       ...state,
       workspace: { ...state.workspace, updatedAt: timestamp },
       adjudications: [...state.adjudications, decoded.value],
       tasks: state.tasks.map((entry) => entry.taskId === task.taskId ? { ...entry, status: "adjudicated", updatedAt: timestamp } : entry),
-    },
+    }),
     saved: decoded.value,
   };
 }
@@ -369,7 +385,7 @@ export function addRevocation(
   const affected = state.records.filter((record) => revocationAppliesToRecord(decoded.value, record, state.workspace.workspaceId));
   const affectedIds = new Set(affected.map((entry) => entry.record.recordId));
   return {
-    state: {
+    state: withWorkspaceDatasetContentHash({
       ...state,
       workspace: {
         ...state.workspace,
@@ -383,7 +399,7 @@ export function addRevocation(
           ? { ...task, status: "excluded", updatedAt: timestamp }
           : task;
       }),
-    },
+    }),
     affectedRecordIds: [...affectedIds].sort(),
   };
 }
@@ -391,6 +407,10 @@ export function addRevocation(
 export function validateAnnotationWorkspace(state: AnnotationWorkspaceState): AnnotationValidationIssue[] {
   const issues: AnnotationValidationIssue[] = [];
   const activeAnnotations = state.annotations.filter((entry) => entry.active).map((entry) => entry.annotation);
+  const computedContentHash = computeWorkspaceDatasetContentHash(state);
+  if (computedContentHash !== state.workspace.manifest.contentHash) {
+    issues.push(validationIssue("annotation_manifest_content_hash_mismatch", "critical", "Workspace manifest content hash mevcut dataset içeriğiyle eşleşmiyor.", [], "workspace.manifest.contentHash"));
+  }
   const dataset = decodeDatasetPackage({
     manifest: { ...state.workspace.manifest, recordCount: state.records.length },
     records: state.records.map((entry) => entry.record),
@@ -414,25 +434,68 @@ export function validateAnnotationWorkspace(state: AnnotationWorkspaceState): An
       issues.push(validationIssue("annotation_revoked_data_present", "critical", "Aktif revocation kapsamındaki kayıt workspace'te işaretlenmiş durumda.", [record.record.recordId]));
     }
   }
+  const unknownAssistance = activeAnnotations.filter((entry) => entry.assistanceMode === "unknown_legacy");
+  if (unknownAssistance.length > 0) {
+    issues.push(validationIssue("annotation_assistance_unknown", "warning", "Legacy annotation assistance provenance bilinmiyor.", unknownAssistance.map((entry) => entry.annotationId)));
+  }
+  const assistedHuman = activeAnnotations.filter((entry) => entry.assistanceMode === "assisted_human");
+  if (assistedHuman.length > 0) {
+    issues.push(validationIssue("annotation_assisted_human_present", "warning", "Yardım alınmış annotation kayıtları bağımsız gold agreement hesabına girmez.", assistedHuman.map((entry) => entry.annotationId)));
+  }
+  const eligibleTasks = state.tasks.filter((task) => task.status !== "excluded");
   const activeByTask = new Map<string, StoredAspectAnnotation[]>();
-  for (const task of state.tasks) activeByTask.set(task.taskId, activeAnnotationsForTask(state, task));
+  for (const task of eligibleTasks) activeByTask.set(task.taskId, independentHumanAnnotationsForTask(state, task));
   const doubleAnnotated = [...activeByTask.values()].filter((entries) => new Set(entries.map((entry) => entry.annotation.annotatorId)).size >= 2).length;
-  const coverage = state.tasks.length === 0 ? 0 : (doubleAnnotated / state.tasks.length) * 100;
-  if (state.tasks.length > 0 && doubleAnnotated === 0) issues.push(validationIssue("annotation_single_annotator_limitation", "warning", "Workspace yalnız tek annotator kanıtı taşıyor; agreement hesaplanamaz."));
-  if (state.tasks.length > 0 && coverage < 20) issues.push(validationIssue("annotation_double_coverage_low", "warning", "Bağımsız çift annotation kapsamı yüzde 20'nin altında."));
+  const coverage = eligibleTasks.length === 0 ? 0 : (doubleAnnotated / eligibleTasks.length) * 100;
+  if (eligibleTasks.length > 0 && doubleAnnotated === 0) issues.push(validationIssue("annotation_single_annotator_limitation", "warning", "Workspace yalnız tek bağımsız annotator kanıtı taşıyor; agreement hesaplanamaz."));
+  if (eligibleTasks.length > 0 && coverage < 20) issues.push(validationIssue("annotation_double_coverage_low", "warning", "Bağımsız çift annotation kapsamı yüzde 20'nin altında."));
   const conflicts = state.tasks.filter((task) => task.status === "conflict");
   if (conflicts.length > 0) issues.push(validationIssue("annotation_conflict_unresolved", "warning", "Çözülmemiş annotation conflict bulunuyor.", conflicts.map((entry) => entry.taskId)));
+  const taskAspectIds = deriveTaskAspectIds(state);
   const coveredAspects = new Set(activeAnnotations.map((entry) => entry.aspectId));
-  const missingAspects = state.workspace.selectedAspectIds.filter((id) => !coveredAspects.has(id));
-  if (missingAspects.length > 0) issues.push(validationIssue("annotation_aspect_coverage_missing", "warning", "Seçili bazı aspect'lerde aktif annotation yok.", missingAspects));
+  const missingAspects = taskAspectIds.filter((id) => !coveredAspects.has(id));
+  if (missingAspects.length > 0) issues.push(validationIssue("annotation_aspect_coverage_missing", "warning", "Mevcut task planındaki bazı aspect'lerde aktif annotation yok.", missingAspects));
+  const unusedSelectedAspects = state.workspace.selectedAspectIds.filter((id) => !taskAspectIds.includes(id));
+  if (unusedSelectedAspects.length > 0) issues.push(validationIssue("annotation_aspect_not_in_current_plan", "info", "Workspace capability kapsamındaki bazı aspect'ler mevcut task planında yer almıyor.", unusedSelectedAspects));
   const insufficient = activeAnnotations.filter((entry) => entry.label === "insufficient_evidence").length;
   if (activeAnnotations.length >= 5 && insufficient / activeAnnotations.length > 0.5) issues.push(validationIssue("annotation_insufficient_evidence_excessive", "warning", "Yetersiz kanıt etiketi oranı yüzde 50'nin üzerinde."));
   issues.push(validationIssue("annotation_progress", "info", `${state.tasks.filter((task) => ["annotated", "adjudicated"].includes(task.status)).length}/${state.tasks.length} görev tamamlandı.`));
-  for (const aspectId of state.workspace.selectedAspectIds) {
+  for (const metric of aspectInputSufficiencyMetrics(state)) {
+    const aspectId = metric.aspectId;
     const labels = activeAnnotations.filter((entry) => entry.aspectId === aspectId);
     issues.push(validationIssue("annotation_aspect_distribution", "info", `${ASPECT_REGISTRY[aspectId].labelTr}: ${labels.length} aktif annotation.`, [aspectId]));
+    issues.push(validationIssue(
+      "annotation_aspect_input_sufficiency",
+      "info",
+      `${ASPECT_REGISTRY[aspectId].labelTr}: ${metric.totalActiveAnnotations} annotation, ${metric.insufficientCount} yetersiz kanıt (%${Math.round(metric.insufficientRate * 100)}).`,
+      [aspectId],
+    ));
+    if (metric.totalActiveAnnotations >= 3 && metric.insufficientRate >= 0.5) {
+      issues.push(validationIssue(
+        "annotation_aspect_input_insufficient",
+        "warning",
+        `${ASPECT_REGISTRY[aspectId].labelTr}: mevcut annotation girdileri güvenilir etiketleme için sık sık yetersiz kalıyor.`,
+        [aspectId],
+      ));
+    }
   }
   return issues;
+}
+
+export function aspectInputSufficiencyMetrics(
+  state: AnnotationWorkspaceState,
+): AspectInputSufficiencyMetric[] {
+  const activeAnnotations = state.annotations.filter((entry) => entry.active).map((entry) => entry.annotation);
+  return deriveTaskAspectIds(state).map((aspectId) => {
+    const annotations = activeAnnotations.filter((entry) => entry.aspectId === aspectId);
+    const insufficientCount = annotations.filter((entry) => entry.label === "insufficient_evidence").length;
+    return {
+      aspectId,
+      totalActiveAnnotations: annotations.length,
+      insufficientCount,
+      insufficientRate: annotations.length === 0 ? 0 : insufficientCount / annotations.length,
+    };
+  });
 }
 
 export function changeWorkspaceStatus(
@@ -447,7 +510,10 @@ export function changeWorkspaceStatus(
     if (!manuallyApproved) throw new AnnotationWorkflowError("annotation_gold_manual_approval_required");
     if (state.tasks.length === 0) throw new AnnotationWorkflowError("annotation_gold_requirements_unmet");
     const blocking = validateAnnotationWorkspace(state).filter((entry) => entry.severity === "critical"
-      || entry.code === "annotation_double_coverage_low" || entry.code === "annotation_conflict_unresolved");
+      || entry.code === "annotation_double_coverage_low"
+      || entry.code === "annotation_conflict_unresolved"
+      || entry.code === "annotation_assistance_unknown"
+      || entry.code === "annotation_assisted_human_present");
     if (blocking.length > 0) throw new AnnotationWorkflowError("annotation_gold_requirements_unmet");
   }
   return { ...state, workspace: { ...state.workspace, status, updatedAt: nowIso(now) } };
@@ -465,8 +531,14 @@ export function createAnnotationExport(
   }
   const limitations: string[] = [];
   const active = state.annotations.filter((entry) => entry.active);
-  const distinctAnnotators = new Set(active.map((entry) => entry.annotation.annotatorId));
+  const independentActive = active.filter((entry) => entry.annotation.labelSource === "human_annotation"
+    && entry.annotation.assistanceMode === "independent_human");
+  const unknownLegacyCount = active.filter((entry) => entry.annotation.assistanceMode === "unknown_legacy").length;
+  const assistedHumanCount = active.filter((entry) => entry.annotation.assistanceMode === "assisted_human").length;
+  const distinctAnnotators = new Set(independentActive.map((entry) => entry.annotation.annotatorId));
   if (distinctAnnotators.size < 2) limitations.push("single-annotator limitation: bağımsız agreement kanıtı yoktur.");
+  if (unknownLegacyCount > 0) limitations.push(`${unknownLegacyCount} legacy annotation assistance provenance bilinmediği için gold/agreement label seti dışındadır.`);
+  if (assistedHumanCount > 0) limitations.push(`${assistedHumanCount} yardım alınmış annotation bağımsız gold/agreement label seti dışındadır.`);
   const includedRecords = state.records.filter((record) => {
     if (recordHasRevocationAction(state, record, "exclude_from_export")) return false;
     if (purpose === "training_candidate") {
@@ -483,19 +555,48 @@ export function createAnnotationExport(
   if (includedRecords.length < state.records.length) limitations.push("Lisans veya revocation nedeniyle bazı kayıtlar export dışında bırakıldı.");
   const includedIds = new Set(includedRecords.map((entry) => entry.record.recordId));
   const annotations = active.filter((entry) => includedIds.has(entry.annotation.recordId));
+  const assistanceEligibleAnnotations = annotations.filter((entry) => (
+    entry.annotation.labelSource === "human_annotation"
+    && entry.annotation.assistanceMode === "independent_human"
+  ));
+  const assistanceRestrictedPurpose = purpose === "training_candidate"
+    || purpose === "evaluation_candidate"
+    || purpose === "adjudicated_labels";
+  if (assistanceRestrictedPurpose && assistanceEligibleAnnotations.length < annotations.length) {
+    limitations.push(`${annotations.length - assistanceEligibleAnnotations.length} annotation assistance provenance nedeniyle ${purpose} label setinden çıkarıldı.`);
+  }
+  if (!assistanceRestrictedPurpose && (unknownLegacyCount > 0 || assistedHumanCount > 0)) {
+    limitations.push("Annotation-only/backup export assistance provenance kayıtlarını audit için korur; gold uygunluğu anlamına gelmez.");
+  }
   const taskByAnnotation = new Map<string, AnnotationTask>();
   for (const task of state.tasks) {
     for (const annotation of activeAnnotationsForTask(state, task)) taskByAnnotation.set(annotation.annotation.annotationId, task);
   }
+  const purposeAnnotations = assistanceRestrictedPurpose ? assistanceEligibleAnnotations : annotations;
   const filteredAnnotations = purpose === "adjudicated_labels" || purpose === "evaluation_candidate"
-    ? annotations.filter((entry) => taskByAnnotation.get(entry.annotation.annotationId)?.status === "adjudicated")
-    : annotations;
+    ? purposeAnnotations.filter((entry) => taskByAnnotation.get(entry.annotation.annotationId)?.status === "adjudicated")
+    : purposeAnnotations;
   const generatedAt = nowIso(now);
+  const exportedTaskAspectIds = [...new Set(state.tasks
+    .filter((task) => task.status !== "excluded" && includedIds.has(task.recordId))
+    .map((task) => task.aspectId))]
+    .sort((left, right) => left.localeCompare(right));
+  const actualAspectIds = exportedTaskAspectIds.length > 0
+    ? exportedTaskAspectIds
+    : deriveTaskAspectIds(state).length > 0 ? deriveTaskAspectIds(state) : [...state.workspace.selectedAspectIds];
+  const workspaceContentHash = computeWorkspaceDatasetContentHash(state);
   const withoutHash = {
     version: 1 as const,
     exportPurpose: purpose,
     releaseStatus: "internal_only" as const,
-    manifest: { ...state.workspace.manifest, releaseStatus: "internal_only" as const, recordCount: includedRecords.length, updatedAt: generatedAt },
+    manifest: {
+      ...state.workspace.manifest,
+      aspectIds: actualAspectIds,
+      contentHash: workspaceContentHash,
+      releaseStatus: "internal_only" as const,
+      recordCount: includedRecords.length,
+      updatedAt: generatedAt,
+    },
     includedRecordIds: includedRecords.map((entry) => entry.record.recordId).sort(),
     records: includedRecords,
     annotations: filteredAnnotations,

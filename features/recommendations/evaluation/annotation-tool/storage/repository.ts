@@ -13,6 +13,7 @@ import type {
 } from "../domain/types";
 import { atomicWriteJson, serializeCanonicalJson, sha256Text, withWorkspaceWriteLock } from "./atomic";
 import { ensureSafeWorkspaceDirectory, isValidWorkspaceId, resolveAnnotationDataRoot } from "./paths";
+import { withWorkspaceDatasetContentHash } from "./workspace-integrity";
 
 const FILES = {
   workspace: "workspace.json",
@@ -94,7 +95,7 @@ export class AnnotationWorkspaceRepository {
       const workspaceFile = path.join(directory, FILES.workspace);
       if (await stat(workspaceFile).then(() => true, () => false)) throw new Error("annotation_workspace_exists");
       const now = input.now ?? new Date().toISOString();
-      const state: AnnotationWorkspaceState = {
+      const state: AnnotationWorkspaceState = withWorkspaceDatasetContentHash({
         workspace: {
           version: 1,
           workspaceId: input.workspaceId,
@@ -111,7 +112,7 @@ export class AnnotationWorkspaceRepository {
         annotations: [],
         adjudications: [],
         revocations: [],
-      };
+      });
       const decoded = decodeAnnotationWorkspaceState(state);
       if (!decoded.ok) throw new Error(`annotation_workspace_invalid:${decoded.issues[0]?.code ?? "unknown"}`);
       await this.writeStateUnlocked(decoded.value, false);
@@ -204,6 +205,64 @@ export class AnnotationWorkspaceRepository {
         occurredAt: new Date().toISOString(),
         metadata: { files: 7 },
       }]);
+    });
+  }
+
+  async reconcileWorkspaceMetadata<T>(input: {
+    workspaceId: string;
+    actorId: string;
+    reconcile: (state: AnnotationWorkspaceState) => { state: AnnotationWorkspaceState; result: T };
+    now?: string;
+  }): Promise<T> {
+    return withWorkspaceWriteLock(input.workspaceId, async () => {
+      const current = await this.readWorkspace(input.workspaceId);
+      const reconciliation = input.reconcile(current);
+      const decoded = decodeAnnotationWorkspaceState({
+        ...current,
+        workspace: reconciliation.state.workspace,
+      });
+      if (!decoded.ok) throw new Error(`annotation_workspace_invalid:${decoded.issues[0]?.code ?? "unknown"}`);
+
+      const directory = await ensureSafeWorkspaceDirectory(this.root, input.workspaceId, false);
+      const backupDirectory = path.join(this.root, "backups", input.workspaceId);
+      const workspaceResult = await atomicWriteJson({
+        root: this.root,
+        workspaceId: input.workspaceId,
+        target: path.join(directory, FILES.workspace),
+        backupDirectory,
+        value: decoded.value.workspace,
+        maxBytes: ANNOTATION_TOOL_LIMITS.workspaceManifestBytes,
+        backupLimit: ANNOTATION_TOOL_LIMITS.maxBackupsPerWorkspace,
+      });
+      if (!workspaceResult.backupCreated) throw new Error("annotation_reconcile_backup_missing");
+
+      const checksumsFile = path.join(directory, FILES.checksums);
+      const checksums = await readJson(checksumsFile, ANNOTATION_TOOL_LIMITS.workspaceManifestBytes) as ChecksumFile;
+      const occurredAt = input.now ?? new Date().toISOString();
+      await atomicWriteJson({
+        root: this.root,
+        workspaceId: input.workspaceId,
+        target: checksumsFile,
+        backupDirectory,
+        value: {
+          ...checksums,
+          files: { ...checksums.files, [FILES.workspace]: workspaceResult.checksum },
+          updatedAt: occurredAt,
+        },
+        maxBytes: ANNOTATION_TOOL_LIMITS.workspaceManifestBytes,
+        backupLimit: ANNOTATION_TOOL_LIMITS.maxBackupsPerWorkspace,
+      });
+      await this.writeAuditUnlocked(input.workspaceId, [{
+        version: 1,
+        eventId: `evt-${randomUUID()}`,
+        workspaceId: input.workspaceId,
+        eventType: "workspace_metadata_reconciled",
+        actorId: input.actorId,
+        targetIds: [input.workspaceId],
+        occurredAt,
+        metadata: { backupCreated: true },
+      }]);
+      return reconciliation.result;
     });
   }
 

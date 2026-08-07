@@ -123,4 +123,8 @@ Deterministic structured-only authoritative baseline'dır. Legacy V1 hybrid yaln
 
 D7-2 başlamadan önce D7-1B pilotunun guideline sorunları çözülmeli; private workspace validation critical issue üretmemeli; double-annotation subset/limitation ve frozen split kararı belgelenmelidir. D7-1A sanitised `training_candidate`/`evaluation_candidate` exportları yalnız contract artifact'tir ve kendi başına gerçek gold veya training yeterliliği kanıtı değildir.
 
+D7-1B calibration mini-pilot gold/training/evaluation datası değildir; assistance provenance'i legacy unknown ve provenance review'ları pending'dir. Sonraki 40–60 work ana human pilot başlangıç kapsamı `romance`, `fantasy`, `political_intrigue`, `power_progression`, `love_triangle`, `character_driven` olmak üzere 6 aspect'tir. `dark`, 5 annotation'da 4 insufficient (%80) nedeniyle input representation tekrar incelenene kadar deferred; `fanservice`, n=1 ve presentation-dependent olduğu için ayrı backlog'dur. `action`, `comedy`, `slow_burn`, `plot_driven` expansion pilotuna açıktır. Bu kapsam final model scope'u değildir.
+
+Training/evaluation runner yalnız `assistanceMode=independent_human` label setini kabul eder. Assisted/unknown legacy exclusion sayısı run manifest/data card'da limitation olarak raporlanır. Aspect-bazlı input sufficiency kapısı `n >= 3` ve insufficient oranı `>= %50`dir.
+
 Her run şu artifact'leri üretmelidir: immutable config, dataset/model hash, split manifest, environment lock, per-slice metrics, calibration plot verisi, confusion matrices, latency/memory ölçümü ve failure listesi. Model/data card olmadan release candidate sayılmaz; model weights normal Git history'ye yazılmaz.

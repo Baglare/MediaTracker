@@ -158,6 +158,10 @@ export type AspectAnnotationLabel =
 export type AnnotationConfidence = "low" | "medium" | "high";
 export type AnnotationAdjudicationStatus = "not_required" | "pending" | "resolved";
 export type AnnotationLabelSource = "human_annotation" | "synthetic_contract";
+export type AnnotationAssistanceMode =
+  | "independent_human"
+  | "assisted_human"
+  | "unknown_legacy";
 
 export interface AnnotationEvidenceSpan {
   field: "shortSummary";
@@ -180,6 +184,7 @@ export interface AspectAnnotationRecord {
   createdAt: string;
   guidelineVersion: string;
   labelSource: AnnotationLabelSource;
+  assistanceMode: AnnotationAssistanceMode;
   adjudicationStatus: AnnotationAdjudicationStatus;
   finalLabel?: AspectAnnotationLabel;
 }
@@ -240,6 +245,11 @@ export const ANNOTATION_LABELS: readonly AspectAnnotationLabel[] = [
   "significant",
   "primary",
   "insufficient_evidence",
+];
+export const ANNOTATION_ASSISTANCE_MODES: readonly AnnotationAssistanceMode[] = [
+  "independent_human",
+  "assisted_human",
+  "unknown_legacy",
 ];
 export const ASPECT_VERIFIER_LEVELS: readonly AspectVerifierLevel[] = [
   "absent",

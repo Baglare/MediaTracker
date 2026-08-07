@@ -72,6 +72,10 @@ Task üretimi mevcut backend modlarını değiştirmez. UI `all_selected` için 
 
 Label ve confidence alanları radio semantics, ilişkili label, screen-reader progress ve alan açıklaması taşır. Yeni task açıldığında hiçbir expected label preselect edilmez. Kısayollar `1..5`, `Shift+1..3`, `Ctrl+S`, `N`, `P` şeklindedir; input/textarea/select/contenteditable odağında tetiklenmez. Sürekli her tuşta autosave yoktur; explicit submit kullanılır.
 
+Annotation assistance seçimi label'dan ayrı radio alanıdır ve default değeri yoktur. Yalnız `independent_human|assisted_human` enum değeri sessionStorage'da tutulabilir; annotation, note veya kimlik local/session storage'a yazılmaz. Server yeni save'de assistance alanını zorunlu kılar; legacy eksik alanı read sırasında `unknown_legacy` normalize eder.
+
+Authoritative dataset hash input'u schema/dataset ID, record ve provenance, active annotation, adjudication ve active revocation koleksiyonlarıdır. Object key canonicalization mevcut `serializeCanonicalJson` ile; array sırası record/annotation/adjudication/revocation stable ID'leriyle yapılır. Hash import, annotation save/update, adjudication ve revocation sonrası yenilenir; status-only değişiklik hash'i etkilemez. Reconcile yalnız workspace metadata dosyasını atomic backup sonrası yazar ve audit event üretir.
+
 ## Fixture ve test sınırı
 
 `tests/fixtures/recommendations-v2/annotation-tool/` altında 10 tamamen kurgusal kısa kayıt ve iki çelişkili sentetik annotation bulunur. Bu artifact yalnız UI demo, contract test ve browser smoke içindir; training/gold dataset değildir.

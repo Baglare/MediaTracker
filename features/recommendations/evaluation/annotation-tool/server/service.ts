@@ -3,7 +3,11 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 
 import { ASPECT_REGISTRY, isAspectId, type AspectId } from "../../../domain/aspect-registry";
-import { decodeAspectAnnotationRecord, decodeDatasetManifest } from "../../dataset";
+import {
+  ANNOTATION_ASSISTANCE_MODES,
+  decodeAspectAnnotationRecord,
+  decodeDatasetManifest,
+} from "../../dataset";
 import { ANNOTATION_TOOL_LIMITS, DEFAULT_MVP_ASPECT_IDS } from "../domain/constants";
 import { isValidAnnotatorId, isValidWorkspaceId } from "../domain/ids";
 import type {
@@ -15,6 +19,11 @@ import type {
   DatasetRevocationRecord,
 } from "../domain/types";
 import { AnnotationWorkspaceRepository } from "../storage/repository";
+import {
+  computeEmptyWorkspaceDatasetContentHash,
+  previewWorkspaceMetadataReconcile,
+  reconcileWorkspaceMetadata,
+} from "../storage/workspace-integrity";
 import {
   AnnotationRevisionConflictError,
   AnnotationWorkflowError,
@@ -132,6 +141,11 @@ export class AnnotationToolService {
     const recordId = text(input.recordId, 120);
     const aspectId = input.aspectId;
     if (!recordId || !isAspectId(aspectId)) throw new AnnotationRequestError(400, "invalid_annotation_target");
+    const assistanceMode = ANNOTATION_ASSISTANCE_MODES.includes(input.assistanceMode as never)
+      && input.assistanceMode !== "unknown_legacy"
+      ? input.assistanceMode as "independent_human" | "assisted_human"
+      : null;
+    if (!assistanceMode) throw new AnnotationRequestError(400, "annotation_assistance_required");
     const now = new Date().toISOString();
     const rawAnnotation = {
       version: 1,
@@ -148,6 +162,7 @@ export class AnnotationToolService {
       createdAt: now,
       guidelineVersion: text(input.guidelineVersion, 120) ?? "d7_annotation_v1",
       labelSource: "human_annotation",
+      assistanceMode,
       adjudicationStatus: "not_required",
     };
     const decoded = decodeAspectAnnotationRecord(rawAnnotation);
@@ -263,6 +278,25 @@ export class AnnotationToolService {
     return { ok: true };
   }
 
+  async previewReconcile(input: Record<string, unknown>) {
+    const state = await this.repository.readWorkspace(workspaceId(input.workspaceId));
+    return previewWorkspaceMetadataReconcile(state);
+  }
+
+  async reconcile(input: Record<string, unknown>): Promise<AnnotationToolReadModel> {
+    const id = workspaceId(input.workspaceId);
+    const actorId = actor(input.actorId);
+    if (input.confirmed !== true) throw new AnnotationRequestError(400, "annotation_reconcile_confirmation_required");
+    const now = new Date().toISOString();
+    await this.repository.reconcileWorkspaceMetadata({
+      workspaceId: id,
+      actorId,
+      now,
+      reconcile: (state) => ({ state: reconcileWorkspaceMetadata(state, now), result: null }),
+    });
+    return this.read(id);
+  }
+
   async changeStatus(input: Record<string, unknown>): Promise<AnnotationToolReadModel> {
     const id = workspaceId(input.workspaceId);
     const actorId = actor(input.actorId);
@@ -325,7 +359,7 @@ function defaultWorkspaceManifest(workspaceId: string) {
     },
     annotationPolicyVersion: "d7_annotation_v1",
     licenseAuditVersion: "d7_license_v1",
-    contentHash: `sha256:${"0".repeat(64)}`,
+    contentHash: computeEmptyWorkspaceDatasetContentHash(`annotation_${workspaceId}`),
     releaseStatus: "draft",
   };
 }

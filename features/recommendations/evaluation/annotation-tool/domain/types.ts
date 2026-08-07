@@ -140,6 +140,7 @@ export interface AnnotationAuditEvent {
     | "revocation_saved"
     | "export_generated"
     | "backup_created"
+    | "workspace_metadata_reconciled"
     | "validation_run";
   actorId: string;
   targetIds: readonly string[];
@@ -185,6 +186,22 @@ export interface AnnotationValidationIssue {
   path: string;
   messageTr: string;
   relatedIds: readonly string[];
+}
+
+export interface AspectInputSufficiencyMetric {
+  aspectId: AspectId;
+  totalActiveAnnotations: number;
+  insufficientCount: number;
+  insufficientRate: number;
+}
+
+export interface WorkspaceMetadataReconcilePreview {
+  currentContentHash: string;
+  computedContentHash: string;
+  currentAspectIds: readonly AspectId[];
+  computedAspectIds: readonly AspectId[];
+  contentHashChanged: boolean;
+  aspectScopeChanged: boolean;
 }
 
 export type AnnotationExportPurpose =
