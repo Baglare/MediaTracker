@@ -1,7 +1,7 @@
 # D7 Research Security Model
 
 Tarih: 8 Ağustos 2026
-Durum: D7-R1 saf URL/content/citation policy contract'ları ve fixture'ları tamamlandı; runtime fetch/sanitizer uygulaması yoktur.
+Durum: D7-R2A pinned DNS/HTTPS, redirect, streaming JSON/plaintext limitleri ve direct Wikimedia codec'leri hazırdır; search/HTML sanitizer yoktur.
 
 ## 1. Güven sınırları
 
@@ -32,7 +32,7 @@ Research katmanı üç ayrı boundary kullanır:
 - DOM, JSON depth, node count, line ve passage boyutu bounded'dır.
 - Passage her zaman immutable `sourceId/revisionId/passageId` envelope'u içinde tutulur; raw HTML extractor'a verilmez.
 
-Başlangıç limitleri: response compressed 1 MB, decoded 2 MB, visible text 120.000 karakter, seçili passage toplamı source başına 12.000 ve aspect task başına 24.000 karakter. D7-R2 ölçümü yalnız daha dar limite gerekçe olabilir.
+D7-R2A direct adapter limitleri: WDQS/Action API decompressed JSON 256 KiB, Wikipedia plaintext 24.000 UTF-8 byte, DNS 1250 ms, Wikidata 3000 ms, Wikipedia 3500 ms ve global direct-source 8000 ms. `Content-Length` güven sınırı değildir; gzip/deflate decompressed stream sayılır. Daha geniş HTML/passage limitleri R2B/R3'te sanitizer ile ayrıca tanımlanacaktır.
 
 ## 4. Prompt injection isolation
 
@@ -93,18 +93,17 @@ Minimum internal reason code'ları:
 
 Log yalnız reason code, source class/domain tokenı, süre, byte bucket, cache state ve request-scoped opaque trace ID taşır. Raw URL query, content, prompt, output, secret veya kişisel kimlik taşımaz.
 
-## 9. D7-R1 sonucu ve D7-R2 güvenlik kapısı
+## 9. D7-R2A sonucu ve D7-R2B güvenlik kapısı
 
-D7-R1'de saf policy seviyesinde HTTPS/exact-host allowlist, user-info/non-default-port/IP-literal/local/punycode reddi, fragment temizleme, redirect URL tekrar doğrulaması, bounded text envelope, unsafe HTML/prompt-injection/source-mismatch flag'leri, citation referential integrity ve no-source→unknown fixture'ları tamamlandı.
+D7-R1 saf URL/content/citation contract'larını tanımladı. D7-R2A gerçek socket hedefini validated A/AAAA sonucuna pinler; mixed public/private DNS'i, retry/redirect üzerindeki yeni private resolve'u ve special-use IPv4/IPv6 aralıklarını fail-closed reddeder. TLS SNI/Host canonical hostname olarak korunur. Manual redirect en çok iki hop ve her hop tam URL/DNS validation alır.
 
-D7-R2'de gerçek I/O açılmadan önce ayrıca şunlar gerekir:
+D7-R2B/search veya HTML I/O açılmadan önce ayrıca şunlar gerekir:
 
-- DNS çözümünde private/reserved adres ve rebinding koruması;
-- redirect sonrası connect-target doğrulaması;
 - gerçek HTML/script/style/hidden-content sanitizer'ı;
-- compressed/decoded byte, DOM ve passage limitlerinin streaming uygulaması;
-- secret/PII redaction, rate-limit, timeout, abort ve provider circuit-breaker testleri.
+- DOM ve passage limitlerinin streaming uygulaması;
+- search-provider secret/PII redaction ve provider circuit-breaker testleri;
+- proxy ortamında pinned connect-target politikasının operasyonel doğrulaması.
 
-Bu kontrollerin D7-R1'de yalnız contract/flag olarak bulunması runtime koruması sayılmaz.
+R2A koruması yalnız internal direct Wikimedia adapter'ı için geçerlidir; henüz Recommendation route güvenlik kanıtı değildir.
 
 İlgili belgeler: [Grounded Research Architecture](D7_GROUNDED_RESEARCH_ARCHITECTURE.md), [Research Source Policy](D7_RESEARCH_SOURCE_POLICY.md).

@@ -1,7 +1,7 @@
 # D7 Grounded Aspect Research Engine Mimarisi
 
 Tarih: 8 Ağustos 2026
-Durum: D7-R1 saf contract/fixture temeli tamamlandı; production entegrasyonu yoktur.
+Durum: D7-R2A secure network ve direct Wikimedia adapter foundation tamamlandı; production entegrasyonu yoktur.
 
 ## 1. Karar ve sınır
 
@@ -199,24 +199,27 @@ Internal telemetry; research requested/completed/coalesced, source/provider unav
 | --- | --- | --- |
 | D7-R0 | Mimari/source/security/acceptance/deferred-ML contract'ları | Davranış değişmez |
 | D7-R1 | Saf domain codec'leri, source registry, research planner, cache port'u, fixture testleri | Production route'a bağlı değil |
-| D7-R2 | Direct Wikimedia ve ephemeral OpenAI/Brave search adapter implementasyonları | Network ve source compliance kapısı; route'a bağlı değil |
+| D7-R2A | Pinned DNS/HTTPS, exact Wikidata identity ve revision-bound Wikipedia direct document | Conditional live; route'a bağlı değil |
+| D7-R2B | Ephemeral OpenAI/Brave discovery adapter'ları | Search source değildir; ayrı compliance kapısı |
 | D7-R3 | Supplied-passage grounded claim extraction | Strict schema/citation; D6 authoritative |
 | D7-R4 | Deterministic evidence integration | Kontrollü opt-in; LLM ranking yok |
 | D7-R5 | Runtime security/cache ve kullanıcı citation görünümü | Feature flag/shadow |
 | D7-R6 | Live source compliance, fail-soft ve final acceptance | D8 research feature gate adayı |
 | D7-ML | Opsiyonel post-release distillation/student shadow | Release blocker değil |
 
-## 13. D7-R1 sonucu ve D7-R2 giriş koşulları
+## 13. D7-R2A sonucu ve D7-R2B giriş koşulları
 
-D7-R1; 43 aspect için versionlı capability matrisi, exact `work|season|installment|edition` scope codec'i, kapalı-varsayılan source registry, citation/no-source domain kararları, deterministic bounded planner, owner-independent cache port'u ve executable fixture'ları teslim eder. Dağılım `structured_only=2`, `research_fallback=16`, `research_required_for_hard_decision=25`, `unsupported=0` şeklindedir.
+D7-R1; 43 aspect için versionlı capability matrisi, exact `work|season|installment|edition` scope codec'i, kapalı-varsayılan source registry, citation/no-source domain kararları, deterministic bounded planner ve owner-independent cache port'unu teslim etti. D7-R2A buna [pinned server HTTP/DNS](D7_RESEARCH_NETWORK_FOUNDATION.md), [exact external-ID Wikidata verification](D7_WIKIDATA_IDENTITY_RESOLUTION.md) ve [revision-bound Wikipedia plaintext/citation](D7_WIKIPEDIA_DIRECT_SOURCE.md) ekledi.
 
-D7-R2 ancak şu açık kapılarla başlar:
+D7-R2A'da DNS/private-address/rebinding, manual redirect, JSON streaming limit, Wikimedia etiquette, exact QID entity revalidation ve transient-document ayrımı fixture seviyesinde kapanmıştır. Conditional live smoke ayrı environment kapısındadır.
 
-- gerçek fetch sınırında DNS/private-address/rebinding ve redirect tekrar doğrulaması;
-- Wikidata/MediaWiki resmî endpoint, terms, attribution ve revision uygulaması;
+D7-R2B ancak şu açık kapılarla başlar:
+
 - raw search payload'ını kalıcı içerikten ayıran ephemeral OpenAI/Brave adapter contract'ı;
-- gerçek HTML sanitizer, compressed/decoded limit, rate-limit, timeout ve secret redaction uygulaması;
-- network test doubles ve compliance fixture'ları.
+- discovery URL'sini R2A exact allowlist/DNS client'ına teslim eden boundary;
+- provider-specific rate/cost ve citation-underlying-source compliance;
+- search response/snippet retention ve log-redaction testleri;
+- OpenAI/Brave unavailable durumunun direct Wikimedia/no-source'dan ayrılması.
 
 Bu kapılar production route entegrasyonu izni değildir. D6 regression fixture'ları ve ranking sabitleri değişmeden kalır.
 

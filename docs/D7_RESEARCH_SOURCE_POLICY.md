@@ -1,7 +1,7 @@
 # D7 Research Source Policy
 
 Tarih: 8 Ağustos 2026
-Durum: D7-R1 versionlı source registry ve storage port'u hazırdır; network çağrısı yapılmamıştır.
+Durum: D7-R2A direct Wikidata/Wikipedia adapter'ları conditional feature gate altında hazırdır; search adapter yoktur.
 
 ## 1. Temel kurallar
 
@@ -16,10 +16,10 @@ Durum: D7-R1 versionlı source registry ve storage port'u hazırdır; network ç
 | Kaynak | D7 rolü | Trust | Runtime kullanım | Persistent storage | Training/distillation |
 | --- | --- | --- | --- | --- | --- |
 | AniList | High-recall retrieval, exact identity, bounded structured taxonomy | T1 (kendi alanlarında) | İzinli bounded runtime-only | Mevcut bounded TTL dışında corpus/bulk yok | Yasak; açık yeni izin olmadan yok |
-| Wikidata | Exact mapping, QID, provider/external ID ve CC0 facts | T1 | İzinli | CC0 facts + entity/revision fingerprint kalıcı olabilir | Post-release ayrı dataset manifest'iyle değerlendirilebilir |
-| Wikipedia / MediaWiki direct | Plot/relationship/theme için revision-bound direct passage | T2 | İzinli allowlist ve attribution ile | CC BY-SA attribution, canonical URL, page/revision ve license notice ile | Bu plan otomatik izin vermez; ShareAlike/data-card audit gerekir |
-| OpenAI Responses `web_search` | Allowlist içinden source discovery ve citation üretimi | T4 search; bulunan direct source kendi trust sınıfını alır | D7-R2'de bounded adapter adayı | Search payload/snippet varsayılan ephemeral; direct licensed source ayrı policy ile | Search output training corpus olmaz |
-| Brave Search | Opsiyonel discovery adapter | T4 | D7-R2 sonrası opsiyonel | Storage-rights açık değilse result/snippet kalıcı saklanmaz | Yasak; ayrı yazılı hak olmadan yok |
+| Wikidata | Exact mapping, QID, provider/external ID ve CC0 facts | T1 | D7-R2A conditional direct adapter | Verified mapping/sitelink + entity revision metadata kalıcı olabilir; raw response yok | Post-release ayrı dataset manifest'iyle değerlendirilebilir |
+| Wikipedia / MediaWiki direct | Plot/relationship/theme için revision-bound direct passage | T2 | D7-R2A conditional direct adapter | Citation/revision/attribution saklanabilir; bounded plaintext `transient_only` | Bu plan otomatik training izni vermez; ShareAlike/data-card audit gerekir |
+| OpenAI Responses `web_search` | Allowlist içinden source discovery ve citation üretimi | T4 search; bulunan direct source kendi trust sınıfını alır | D7-R2B adayı; uygulanmadı | Search payload/snippet varsayılan ephemeral | Search output training corpus olmaz |
+| Brave Search | Opsiyonel discovery adapter | T4 | D7-R2B sonrası opsiyonel; uygulanmadı | Storage-rights açık değilse result/snippet kalıcı saklanmaz | Yasak; ayrı yazılı hak olmadan yok |
 | Gemini Grounding | Bu release hattında kullanılmaz | Yok | Persistent evidence yolu değil | Saklanmaz | Yok |
 | Anime News Network ve diğer domainler | Terms audit backlog'u | blocked | Hard allowlist'e eklenmez | Saklanmaz | Yok |
 | TMDB | Mevcut structured runtime evidence | T1 (kendi alanlarında) | Mevcut contract kadar | Mevcut bounded runtime cache; D7 research corpus yok | Yazılı izin olmadan yasak |
@@ -92,7 +92,7 @@ Search sonucu içinden canonical URL saklamak, snippet veya result body saklama 
 - Policy/allowlist/license değişimi: etkilenen tüm cache keys fail-closed invalid.
 - 404/redirect/domain ownership değişimi: source revalidation ve claim quarantine.
 
-D7-R1 storage port'u `direct_source_long|unknown_short|not_cacheable` sınıflarını uygular. Kesin süreler D7-R2 live gözlemiyle yalnız daha dar yapılabilir; hak audit'i olmadan genişletilemez.
+D7-R1 storage port'u `direct_source_long|unknown_short|not_cacheable` sınıflarını uygular. D7-R2A teknik metadata cache'i verified Wikidata identity için 6 saat, Wikipedia page/revision metadata için 15 dakika process-memory başlangıç politikası kullanır; transient extract'i saklamaz. Bu süreler conditional live gözlemle yalnız daha dar yapılabilir.
 
 ## 8. Yasaklar
 

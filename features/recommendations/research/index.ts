@@ -14,4 +14,10 @@ export * from "./cache/port";
 export * from "./cache/memory-cache";
 export * from "./security/url-policy";
 export * from "./security/content-policy";
-
+export * from "./network/types";
+export * from "./network/ip-policy";
+export * from "./network/retry-policy";
+export * from "./network/telemetry";
+export * from "./adapters/types";
+export * from "./adapters/wikidata/external-id-registry";
+export * from "./adapters/wikidata/query-builder";

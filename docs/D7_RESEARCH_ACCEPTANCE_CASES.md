@@ -1,7 +1,7 @@
 # D7 Grounded Research Acceptance Cases
 
 Tarih: 8 Ağustos 2026
-Durum: D7-R1 sentetik executable fixture kabulü tamamlandı; live/network kabulü değildir.
+Durum: D7-R1 decision fixture'larına ek olarak D7-R2A fake-network direct-document contract kabulü tamamlandı; conditional live varsayılan kapalıdır.
 
 ## Ortak kabul invariant'ları
 
@@ -85,6 +85,8 @@ Kabul: model world knowledge ile boşluğu doldurmaz; unknown açık kalır.
 
 ## 7. Fixture çıktısı
 
-D7-R1'de Steins;Gate, Kakegurui, political intrigue, love triangle avoid, character-driven ve no-source→unknown senaryoları sentetik exact-identity/source-envelope/decision fixture'larına çevrilmiştir. Dört hedefli test dosyasındaki 46 test contract seviyesinde geçer. Gerçek Wikimedia/search passage'ı, network davranışı, extractor modeli ve production deterministic merge D7-R2..R6 kapılarıdır.
+D7-R1'de Steins;Gate, Kakegurui, political intrigue, love triangle avoid, character-driven ve no-source→unknown senaryoları 46 sentetik contract testine çevrilmiştir. D7-R2A ayrıca fake DNS/transport/Action API ile 55 standard test geçirir; üç conditional live test environment kapalıyken skip edilir.
+
+R2A Steins;Gate fixture'ı yalnız AniList exact ID → QID property verification → verified sitelink → page/revision → bounded transient document + citation metadata zincirini doğrular. Romance veya başka aspect claim'i çıkarmak D7-R3 kapsamıdır. Sabit Wikipedia cümlesi, revision ID veya metin uzunluğu acceptance assertion'ı değildir.
 
 İlgili belgeler: [Grounded Research Architecture](D7_GROUNDED_RESEARCH_ARCHITECTURE.md), [Research Source Policy](D7_RESEARCH_SOURCE_POLICY.md), [Research Security Model](D7_RESEARCH_SECURITY_MODEL.md).

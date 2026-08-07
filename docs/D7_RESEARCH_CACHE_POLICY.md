@@ -1,7 +1,7 @@
 # D7-R1 Research Cache Policy
 
 Tarih: 8 Ağustos 2026
-Durum: Owner-independent port/policy ve bounded memory test adapter'ı hazır; DB/localStorage implementasyonu yoktur.
+Durum: Owner-independent evidence port'una ek olarak D7-R2A bounded Wikimedia metadata cache/coalescing hazır; DB/localStorage yoktur.
 
 ## Stable key
 
@@ -37,6 +37,14 @@ Runtime validator nested yasak alanları, invalid citation/claim'i, key-decision
 - `unknown_short`: `no_source_found`, `source_not_allowed`, `passage_insufficient` gibi gerçek unknown; kısa TTL adayı.
 - `not_cacheable`: `adapter_unavailable` ve `budget_exhausted`; upstream hata negative-cache edilmez.
 
+## D7-R2A teknik metadata cache'i
+
+- `WikimediaIdentityCache`: exact scope + property registry version + property/external ID anahtarı; yalnız entity-verified QID/sitelink/revision metadata, başlangıç 6 saat.
+- `WikipediaRevisionMetadataCache`: scope/QID/project anahtarı; page ID, revision ID ve canonical URL, başlangıç 15 dakika.
+- Aynı identity/page/revision HTTP request'i in-flight coalesce edilir.
+- Loader/network/security/adapter hatası cache'e yazılmaz. `identity_not_found|ambiguous` bu aşamada negative-cache edilmez.
+- `TransientResearchDocument`, bounded extract, raw WDQS/Action response ve request header hiçbir evidence/metadata cache'e girmez.
+
 ## Port
 
 `ResearchEvidenceCachePort`: `get`, `set`, `delete`, `invalidateByScope`, `invalidateBySourceRevision`.
@@ -44,4 +52,3 @@ Runtime validator nested yasak alanları, invalid citation/claim'i, key-decision
 D7-R1 `MemoryResearchEvidenceCache` yalnız saf/test kullanımı için max 128 entry bounded LRU-benzeri adapter sağlar. Production route'a singleton olarak bağlanmaz. Scope ve source revision invalidation'ı executable testlidir.
 
 İlgili belgeler: [Domain Contract](D7_RESEARCH_DOMAIN_CONTRACT.md), [Planner](D7_RESEARCH_PLANNER.md), [Source Registry](D7_RESEARCH_SOURCE_REGISTRY.md).
-
