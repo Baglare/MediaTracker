@@ -495,7 +495,7 @@ export function aspectInputSufficiencyMetrics(
       insufficientCount,
       insufficientRate: annotations.length === 0 ? 0 : insufficientCount / annotations.length,
     };
-  });
+  }).filter((metric) => metric.totalActiveAnnotations > 0);
 }
 
 export function changeWorkspaceStatus(

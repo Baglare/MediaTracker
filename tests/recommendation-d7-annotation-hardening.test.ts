@@ -279,6 +279,13 @@ describe("D7-1B.1 sparse scope and input sufficiency", () => {
       .some((entry) => entry.code === "annotation_aspect_input_insufficient")).toBe(false);
   });
 
+  it("annotation yokken input sufficiency metriği veya validation sonucu üretmez", () => {
+    const state = sparseTaskState();
+    expect(aspectInputSufficiencyMetrics(state)).toEqual([]);
+    expect(validateAnnotationWorkspace(state)
+      .some((entry) => entry.code.includes("input_sufficiency"))).toBe(false);
+  });
+
   it("n=3 ve 2 insufficient için warning üretir", () => {
     const state = stateWithDarkLabels(["insufficient_evidence", "insufficient_evidence", "primary"]);
     expect(aspectInputSufficiencyMetrics(state)).toEqual([
