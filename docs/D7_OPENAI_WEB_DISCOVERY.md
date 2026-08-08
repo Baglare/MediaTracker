@@ -1,7 +1,9 @@
 # D7-R2B OpenAI Web Discovery
 
 Tarih: 8 Ağustos 2026  
-Durum: Internal, feature-gated ve ephemeral source discovery adapter hazır; Recommendation V2 route'una bağlı değildir.
+Durum: R2B adapter'ı hazır ve R2C provider-neutral registry altında korunmaktadır; Recommendation V2 route'una bağlı değildir.
+
+R2C, OpenAI wire contract'ını değiştirmedi. Provider seçimi ve ortak URL post-processing [Multi-Provider Discovery](D7_MULTI_PROVIDER_DISCOVERY.md) katmanına taşındı.
 
 ## Resmî API contract denetimi
 
@@ -41,6 +43,7 @@ Tool listesine başka tool, unrestricted search veya custom base URL eklenmez. A
 ## Feature gate ve model
 
 - `D7_OPENAI_WEB_DISCOVERY_ENABLED=1`: internal adapter çağrısını açar.
+- `D7_RESEARCH_DISCOVERY_PROVIDER=openai|auto`: adapter'ın seçilebilmesini sağlar; unset/disabled iken çağrı yoktur.
 - `D7_OPENAI_WEB_DISCOVERY_LIVE_SMOKE=1`: yalnız conditional live testi açar.
 - `OPENAI_API_KEY`: server-only secret.
 - `OPENAI_RESEARCH_MODEL`: tercih edilen explicit web-search-capable model.

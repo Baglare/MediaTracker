@@ -1,7 +1,7 @@
 # D7-R1 Bounded Research Planner
 
 Tarih: 8 Ağustos 2026
-Durum: Saf deterministic plan contract'ı hazır; D7-R2B yalnız search operation rezervasyonu bulunan internal job için bounded discovery çalıştırabilir.
+Durum: Saf deterministic plan contract'ı hazır; D7-R2C yalnız search operation rezervasyonu bulunan internal job için bounded multi-provider discovery çalıştırabilir.
 
 ## Input sınırı
 
@@ -18,7 +18,7 @@ Durum: Saf deterministic plan contract'ı hazır; D7-R2B yalnız search operatio
 | `maxConcurrentOperations` | 2 |
 | `totalTimeoutMs` | 8.000 |
 
-Planner network çalıştırmaz. İlk altı job search operation rezervasyonu alabilir; kalan bounded job'lar cache/direct-source-only planlanabilir. D7-R2B execution bir ResearchJob için en çok bir OpenAI Responses call, en çok iki deterministic query, beş returned source, 5 saniye timeout ve global concurrency=2 uygular. Production Recommendation route bu orchestrator'ı çağırmaz.
+Planner network çalıştırmaz. İlk altı job search operation rezervasyonu alabilir; kalan bounded job'lar cache/direct-source-only planlanabilir. D7-R2C execution bir ResearchJob/provider denemesi için en çok bir call, en çok iki deterministic query, beş returned source, 5 saniye timeout ve global concurrency=2 uygular. Explicit seçim fallback yapmaz; `auto` yalnız enabled/configured provider'larda ve yalnız unavailable sonucunda bounded fallback yapar. `no_source_discovered` yeni provider denemesi açmaz. Production Recommendation route bu orchestrator'ı çağırmaz.
 
 ## Priority
 

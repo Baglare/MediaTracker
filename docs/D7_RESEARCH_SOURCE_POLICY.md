@@ -1,7 +1,7 @@
 # D7 Research Source Policy
 
 Tarih: 8 Ağustos 2026
-Durum: D7-R2A direct Wikimedia ve D7-R2B allowlisted ephemeral OpenAI discovery adapter'ları hazırdır; Brave/Gemini yoktur.
+Durum: D7-R2A direct Wikimedia ve D7-R2C allowlisted ephemeral OpenAI/Groq/OpenRouter discovery adapter'ları hazırdır; Brave/Gemini yoktur.
 
 ## 1. Temel kurallar
 
@@ -19,6 +19,8 @@ Durum: D7-R2A direct Wikimedia ve D7-R2B allowlisted ephemeral OpenAI discovery 
 | Wikidata | Exact mapping, QID, provider/external ID ve CC0 facts | T1 | D7-R2A conditional direct adapter | Verified mapping/sitelink + entity revision metadata kalıcı olabilir; raw response yok | Post-release ayrı dataset manifest'iyle değerlendirilebilir |
 | Wikipedia / MediaWiki direct | Plot/relationship/theme için revision-bound direct passage | T2 | D7-R2A conditional direct adapter | Citation/revision/attribution saklanabilir; bounded plaintext `transient_only` | Bu plan otomatik training izni vermez; ShareAlike/data-card audit gerekir |
 | OpenAI Responses `web_search` | Allowlist içinden source URL discovery | T4 search; bulunan direct source kendi trust sınıfını alır | D7-R2B internal adapter hazır; route'a bağlı değil | Request/response/output/snippet ephemeral; accepted real URL yalnız request handoff'u | Search output training corpus olmaz |
+| Groq Compound `web_search` | Allowlist içinden source URL discovery | T4; Tavily search metadata authority değildir | D7-R2C internal adapter; yalnız web_search + include_domains | Request/response/reasoning/snippet/Tavily metadata ephemeral | Search output training corpus olmaz |
+| OpenRouter `openrouter:web_search` | Allowlist içinden source URL discovery | T4; Exa citation metadata authority değildir | D7-R2C beta internal adapter; yalnız forced Exa hard filter | Request/response/output/highlight/Exa metadata ephemeral | Search output training corpus olmaz |
 | Brave Search | Opsiyonel discovery adapter | T4 | D7-R2B sonrası opsiyonel; uygulanmadı | Storage-rights açık değilse result/snippet kalıcı saklanmaz | Yasak; ayrı yazılı hak olmadan yok |
 | Gemini Grounding | Bu release hattında kullanılmaz | Yok | Persistent evidence yolu değil | Saklanmaz | Yok |
 | Anime News Network ve diğer domainler | Terms audit backlog'u | blocked | Hard allowlist'e eklenmez | Saklanmaz | Yok |
@@ -27,7 +29,7 @@ Durum: D7-R2A direct Wikimedia ve D7-R2B allowlisted ephemeral OpenAI discovery 
 | TVMaze | Structured runtime evidence | T1 alan bazlı | Mevcut contract kadar | Mevcut TTL; geniş snapshot yok | Ayrı CC BY-SA sonucu audit edilmeden yok |
 | Open Library | Book identity/bibliographic facts | T1 alan bazlı | Mevcut contract kadar | Facts/text ayrımı; description için ayrı provenance | Field-level audit olmadan yok |
 
-## 3. OpenAI, Brave ve Gemini kararı
+## 3. Discovery provider ve Gemini kararı
 
 ### OpenAI Responses web_search
 
@@ -39,6 +41,14 @@ Tercih edilen search orchestration adapter'ıdır çünkü tool output'u ile sou
 - yalnız citation URL, title, source locator ve ephemeral snippet'i research session'a verir;
 - persistent evidence için mümkünse direct allowlisted source fetch eder;
 - citation'sız model özeti veya modelin genel bilgisini reddeder.
+
+### Groq Compound web_search
+
+Groq yalnız `groq/compound|groq/compound-mini`, `enabled_tools=[web_search]` ve server-derived `include_domains` ile kullanılır. Search Tavily tarafından sağlanır; Groq/Tavily source değildir. `message.content`, reasoning, result content/snippet, score ve tool metadata'sı ephemeral'dır. Yalnız underlying URL ortak registry validation'a girer.
+
+### OpenRouter web-search server tool
+
+OpenRouter server tool beta olduğundan yalnız Responses endpoint'i, `openrouter:web_search`, code-controlled model ve forced `engine=exa + allowed_domains` ile açılır. Deprecated plugin/`:online`, `auto|native` engine veya `site:` query hard allowlist yerine kullanılamaz. OpenRouter/Exa source değildir; output/highlight/citation metadata'sı ephemeral'dır.
 
 ### Brave Search
 
@@ -56,7 +66,7 @@ Hard allowlist başlangıçta:
 - `*.wikipedia.org` — desteklenen dil listesi ve tanımlı MediaWiki API/content yolları;
 - gerekli Wikimedia static/API hostları — yalnız önceden tanımlı endpoint/path sözleşmesiyle.
 
-Wildcard, DNS sonucu veya kullanıcı/LLM tarafından verilen domain otomatik allowlist değildir. ANN, fandom/wiki mirror, blog, forum, Reddit, sosyal medya, streaming katalogları ve genel haber siteleri terms/trust audit tamamlanmadan blocked kalır.
+Wildcard, DNS sonucu veya kullanıcı/LLM tarafından verilen domain otomatik allowlist değildir. ANN, fandom/wiki mirror, blog, forum, Reddit, sosyal medya, streaming katalogları ve genel haber siteleri terms/trust audit tamamlanmadan blocked kalır. Genişleme kararları [Source Expansion Matrix](D7_RESEARCH_SOURCE_EXPANSION_MATRIX.md) içindedir.
 
 ## 5. Source identity ve attribution
 
@@ -92,7 +102,7 @@ Search sonucu içinden canonical URL saklamak, snippet veya result body saklama 
 - Policy/allowlist/license değişimi: etkilenen tüm cache keys fail-closed invalid.
 - 404/redirect/domain ownership değişimi: source revalidation ve claim quarantine.
 
-D7-R1 storage port'u `direct_source_long|unknown_short|not_cacheable` sınıflarını uygular. D7-R2A teknik metadata cache'i verified Wikidata identity için 6 saat, Wikipedia page/revision metadata için 15 dakika process-memory başlangıç politikası kullanır; transient extract'i saklamaz. D7-R2B OpenAI request/response, output text, query, action ID, snippet ve discovered-source listesi için persistent cache açmaz; yalnız içeriksiz telemetry bırakabilir. Bu süreler conditional live gözlemle yalnız daha dar yapılabilir.
+D7-R1 storage port'u `direct_source_long|unknown_short|not_cacheable` sınıflarını uygular. D7-R2A teknik metadata cache'i verified Wikidata identity için 6 saat, Wikipedia page/revision metadata için 15 dakika process-memory başlangıç politikası kullanır; transient extract'i saklamaz. D7-R2B/R2C OpenAI/Groq/OpenRouter request/response, output/reasoning, query, action/response ID, snippet/highlight, Tavily/Exa metadata ve discovered-source listesi için persistent cache açmaz; yalnız içeriksiz telemetry bırakabilir. Bu süreler conditional live gözlemle yalnız daha dar yapılabilir.
 
 ## 8. Yasaklar
 

@@ -12,6 +12,7 @@ import { cacheEntry } from "./fixtures/recommendations-v2/grounded-research";
 const enabled = () => ({ enabled: true, liveSmokeEnabled: false, apiKey: "test", model: "model", explicitResearchModel: true, valid: true, warnings: [] as string[] });
 
 class FakeDiscoveryPort implements SearchDiscoveryPort {
+  readonly providerId = "openai" as const;
   readonly adapterId = "openai_web_search" as const;
   readonly requests: SearchDiscoveryPortRequest[] = [];
   constructor(private readonly handler: (input: SearchDiscoveryPortRequest) => Promise<SearchDiscoveryPortResult>) {}
@@ -20,8 +21,9 @@ class FakeDiscoveryPort implements SearchDiscoveryPort {
 
 function completed(urls: string[]): SearchDiscoveryPortResult {
   return {
+    providerId: "openai",
     status: "completed",
-    urls: urls.map((url, rank) => ({ url, rank })),
+    rawUrlSignals: urls.map((url, rank) => ({ url, rank })),
     telemetry: { ...emptyResearchDiscoveryTelemetry(), requestCount: 1, webSearchCallCount: 1, rawSourceUrlCount: urls.length },
     warnings: [],
   };
@@ -73,7 +75,7 @@ describe("D7-R2B discovery orchestration", () => {
 
   it("adapter timeout/unavailable durumlarını ayırır", async () => {
     for (const [portStatus, expected] of [["budget_exhausted", "budget_exhausted"], ["unavailable", "adapter_unavailable"], ["response_invalid", "adapter_unavailable"]] as const) {
-      const port = new FakeDiscoveryPort(async () => ({ status: portStatus, urls: [], telemetry: emptyResearchDiscoveryTelemetry(), warnings: [portStatus] }));
+      const port = new FakeDiscoveryPort(async () => ({ providerId: "openai", status: portStatus, rawUrlSignals: [], telemetry: emptyResearchDiscoveryTelemetry(), warnings: [portStatus] }));
       await expect(new ResearchDiscoveryOrchestrator({ port, readEnvironment: enabled }).discover(steinsGateDiscoveryRequest())).resolves.toMatchObject({ status: expected });
     }
   });
@@ -115,6 +117,11 @@ describe("D7-R2B discovery orchestration", () => {
 
   it("raw OpenAI/search payload'u evidence cache policy'sinde kalıcı değildir", () => {
     const invalid = validateResearchEvidenceCacheEntry({ ...cacheEntry(), openaiResponse: { output_text: "not evidence" }, snippet: "not evidence", query: "not persistent" } as never);
+    expect(invalid).toMatchObject({ ok: false, issues: expect.arrayContaining([expect.objectContaining({ code: "research_cache_transient_payload_forbidden" })]) });
+  });
+
+  it.each(["groqResponse", "openrouterResponse", "tavilyMetadata", "exaMetadata", "providerSynthesizedAnswer", "highlight", "responseId"])("%s persistent evidence cache'e giremez", (field) => {
+    const invalid = validateResearchEvidenceCacheEntry({ ...cacheEntry(), [field]: { text: "not evidence" } } as never);
     expect(invalid).toMatchObject({ ok: false, issues: expect.arrayContaining([expect.objectContaining({ code: "research_cache_transient_payload_forbidden" })]) });
   });
 });

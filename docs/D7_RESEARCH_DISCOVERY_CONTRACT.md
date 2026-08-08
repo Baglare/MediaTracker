@@ -1,7 +1,7 @@
-# D7-R2B Research Discovery Contract
+# D7-R2B/R2C Research Discovery Contract
 
 Tarih: 8 Ağustos 2026  
-Durum: Saf request/result, deterministic query, allowlist ve ephemeral handoff contract'ı hazırdır.
+Durum: Saf request/result, deterministic query, provider-neutral port/registry, allowlist ve ephemeral handoff contract'ı hazırdır.
 
 ## Güven sınırı
 
@@ -27,16 +27,16 @@ Query builder yalnız public exact title snapshot, yıl/media type, registry `la
 
 ## `SearchDiscoveryPort`
 
-Port adapter bağımsızdır. `queries`, server-derived domains, max source, request ID ve public candidate/aspect envelope alır. `completed|unavailable|budget_exhausted|response_invalid`, URL/rank listesi, bounded telemetry ve warnings döndürür.
+Port adapter bağımsızdır. `queries`, server-derived domains, max source, request ID ve public candidate/aspect envelope alır. `completed|unavailable|budget_exhausted|response_invalid`, `providerId`, raw URL/rank sinyalleri, bounded telemetry ve warnings döndürür. Ortak orchestrator URL normalization, source-registry resolution, dedupe ve cap işini bütün provider'lar için tek yerde yapar.
 
-OpenAI mevcut implementasyondur. Brave ileride aynı port'u implemente edebilir; bugün code, key, env veya network çağrısı yoktur. Brave Search API de source değil discovery adapter olur ve storage-rights olmayan planda sonuç/snippet request-lifetime kalır.
+OpenAI, Groq Compound ve forced-Exa OpenRouter implementasyonları aynı port'u kullanır. Capability/role/persistence kararı merkezi registry'dedir. Brave ileride aynı port'u implemente edebilir; bugün code, key, env veya network çağrısı yoktur. Brave Search API de source değil discovery adapter olur ve storage-rights olmayan planda sonuç/snippet request-lifetime kalır.
 
 ## `DiscoveredResearchSource` v1
 
 Ephemeral çıktı:
 
 - gerçek `sourceId`, canonical URL ve hostname;
-- `discoveryAdapter=openai_web_search`;
+- `discoveryAdapter=openai_web_search|groq_compound_web_search|openrouter_web_search`;
 - request-local rank ve discovery time;
 - query içeriğini taşımayan SHA-256 fingerprint;
 - source registry version ve bounded warnings.
@@ -57,7 +57,7 @@ Result claim, `AspectResearchDecision`, citation veya ranking handoff'u taşıma
 
 ## Ephemeral/persistent invariant
 
-OpenAI response payload, response/output ID, output text, query, action ID, title/snippet, rank ve raw source array evidence cache/DB/localStorage'a yazılmaz. Yalnız içeriksiz telemetry tutulabilir. `ResearchEvidenceCacheEntry` validator'ı bu discovery/search alanlarını nested olarak reddeder.
+OpenAI/Groq/OpenRouter response payload'u, response/output ID, output text/reasoning, query, action ID, title/snippet/highlight, rank, discovered URL listesi ve Tavily/Exa metadata'sı evidence cache/DB/localStorage'a yazılmaz. Yalnız içeriksiz telemetry tutulabilir. `ResearchEvidenceCacheEntry` validator'ı bu discovery/search alanlarını nested olarak reddeder.
 
 ## D7-R3 handoff
 
@@ -72,4 +72,4 @@ R3 başlamadan önce:
 
 zorunludur. Discovery URL tek başına extraction input'u veya evidence değildir.
 
-İlgili belgeler: [OpenAI Adapter](D7_OPENAI_WEB_DISCOVERY.md), [Planner](D7_RESEARCH_PLANNER.md), [Cache Policy](D7_RESEARCH_CACHE_POLICY.md).
+İlgili belgeler: [Multi-Provider Discovery](D7_MULTI_PROVIDER_DISCOVERY.md), [OpenAI Adapter](D7_OPENAI_WEB_DISCOVERY.md), [Planner](D7_RESEARCH_PLANNER.md), [Cache Policy](D7_RESEARCH_CACHE_POLICY.md).

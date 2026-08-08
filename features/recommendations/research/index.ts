@@ -19,6 +19,7 @@ export * from "./discovery/codec";
 export * from "./discovery/query-builder";
 export * from "./discovery/domain-policy";
 export * from "./discovery/port";
+export * from "./discovery/provider-registry";
 export * from "./network/types";
 export * from "./network/ip-policy";
 export * from "./network/retry-policy";

@@ -94,11 +94,13 @@ Minimum internal reason code'ları:
 
 Log yalnız reason code, source class/domain tokenı, süre, byte bucket, cache state ve request-scoped opaque trace ID taşır. Raw URL query, content, prompt, output, secret veya kişisel kimlik taşımaz.
 
-## 9. D7-R2B sonucu ve D7-R3 güvenlik kapısı
+## 9. D7-R2C sonucu ve D7-R3 güvenlik kapısı
 
 D7-R1 saf URL/content/citation contract'larını tanımladı. D7-R2A.1 gerçek socket hedefini OS resolver'ın döndürdüğü ve tamamı doğrulanmış address setinden deterministik seçilen adrese pinler. c-ares `resolve4/resolve6` hatalarını boş sonuç gibi yutan eski uyumluluk kusuru kaldırılmıştır. Mixed public/private DNS ve special-use IPv4/IPv6 fail-closed kalır. Retry ikinci DNS açmaz; manual redirect en çok iki hop ve her hop tam URL/DNS validation alır. TLS SNI/Host canonical hostname olarak korunur.
 
 D7-R2B yalnız sabit `https://api.openai.com/v1/responses` endpoint'ine server-side POST yapar; endpoint env/user girdisi değildir. API key client'a çıkmaz. Request codec kişisel alanları ve arbitrary query/URL'yi reddeder. Provider filter yalnız server-derived `wikipedia.org` token'ıdır; boş filter ile unrestricted search açılmaz. Dönen URL HTTPS ve exact R1 source registry host policy'sinden tekrar geçer. R2B bu URL'yi fetch etmediği için search-result SSRF bağlantısı açmaz.
+
+D7-R2C aynı sınırı Groq'nun sabit Chat Completions ve OpenRouter'ın sabit Responses endpoint'ine genişletir. Groq request'i `enabled_tools=[web_search]` ile visit/code araçlarını kapatır ve `include_domains` boşken çağrı yapmaz. OpenRouter yalnız forced Exa + `allowed_domains` kullanır; auto/native engine, deprecated plugin, `:online` veya `site:` query hard sınır sayılmaz. Bütün vendor URL sinyalleri ortak HTTPS/source-registry post-filter'ından geçer. Provider response, synthesized text, snippet/highlight ve Tavily/Exa metadata'sı kalıcı değildir.
 
 5 saniye timeout, 256 KiB streaming response cap, bir retry, bounded `Retry-After`, global concurrency=2 ve same-job coalescing uygulanır. Raw response/output text/snippet/query/error body/header loglanmaz; yalnız bounded status/count/byte/duration ve `x-request-id` tutulabilir.
 

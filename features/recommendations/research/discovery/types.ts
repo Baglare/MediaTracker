@@ -5,6 +5,14 @@ import type { ResearchClaimLevel, ResearchVersionScope } from "../domain/types";
 
 export const RESEARCH_DISCOVERY_CONTRACT_VERSION = 1 as const;
 export const OPENAI_WEB_DISCOVERY_ADAPTER_ID = "openai_web_search" as const;
+export const GROQ_WEB_DISCOVERY_ADAPTER_ID = "groq_compound_web_search" as const;
+export const OPENROUTER_WEB_DISCOVERY_ADAPTER_ID = "openrouter_web_search" as const;
+
+export type ResearchDiscoveryProviderId = "openai" | "groq" | "openrouter";
+export type ResearchDiscoveryAdapterId =
+  | typeof OPENAI_WEB_DISCOVERY_ADAPTER_ID
+  | typeof GROQ_WEB_DISCOVERY_ADAPTER_ID
+  | typeof OPENROUTER_WEB_DISCOVERY_ADAPTER_ID;
 
 export interface ResearchDiscoveryRequest {
   version: typeof RESEARCH_DISCOVERY_CONTRACT_VERSION;
@@ -28,7 +36,7 @@ export interface DiscoveredResearchSource {
   sourceId: ResearchSourceId;
   canonicalUrl: string;
   hostname: string;
-  discoveryAdapter: typeof OPENAI_WEB_DISCOVERY_ADAPTER_ID;
+  discoveryAdapter: ResearchDiscoveryAdapterId;
   discoveryRank: number;
   discoveredAt: string;
   queryFingerprint: string;
@@ -54,6 +62,7 @@ export type ResearchDiscoveryStatus =
   | "invalid_request";
 
 export interface ResearchDiscoveryTelemetry {
+  providerId?: ResearchDiscoveryProviderId;
   requestCount: number;
   durationMs: number;
   httpStatusClass?: string;
@@ -75,7 +84,9 @@ export interface ResearchDiscoveryResult {
   status: ResearchDiscoveryStatus;
   sources: readonly DiscoveredResearchSource[];
   attemptedQueries: readonly string[];
-  adapter: typeof OPENAI_WEB_DISCOVERY_ADAPTER_ID;
+  provider: ResearchDiscoveryProviderId | null;
+  adapter: ResearchDiscoveryAdapterId | null;
+  attemptedProviders: readonly ResearchDiscoveryProviderId[];
   telemetry: ResearchDiscoveryTelemetry;
   warnings: readonly string[];
 }

@@ -1,7 +1,7 @@
 # D7 Grounded Aspect Research Engine Mimarisi
 
 Tarih: 8 Ağustos 2026
-Durum: D7-R2B allowlisted ephemeral OpenAI source discovery tamamlandı; production entegrasyonu yoktur.
+Durum: D7-R2C allowlisted ephemeral multi-provider source discovery tamamlandı; production entegrasyonu yoktur.
 
 ## 1. Karar ve sınır
 
@@ -79,8 +79,8 @@ Research bir candidate'ı retrieval havuzuna title benzerliğiyle sokmaz. Candid
 1. Mevcut structured provider evidence.
 2. Wikidata exact identity/mapping ve CC0 facts.
 3. Wikipedia/MediaWiki'den exact page/revision ve direct licensed content.
-4. OpenAI Responses `web_search` ile allowlist içinden discovery/citation.
-5. Opsiyonel Brave Search adapter ile ephemeral discovery.
+4. Provider-neutral port üzerinden OpenAI, Groq Compound veya forced-Exa OpenRouter ile allowlist içinden ephemeral URL discovery.
+5. Opsiyonel Brave Search adapter ancak ayrı audit sonrası aynı port ile.
 
 Search provider sonucu tek başına aspect evidence değildir. Search, izinli direct source URL'sini bulur; mümkünse direct source fetch edilir ve passage bu içerikten üretilir. Source/storage kararları [D7 Research Source Policy](D7_RESEARCH_SOURCE_POLICY.md), tehdit modeli [D7 Research Security Model](D7_RESEARCH_SECURITY_MODEL.md) içindedir.
 
@@ -201,19 +201,23 @@ Internal telemetry; research requested/completed/coalesced, source/provider unav
 | D7-R1 | Saf domain codec'leri, source registry, research planner, cache port'u, fixture testleri | Production route'a bağlı değil |
 | D7-R2A | Pinned DNS/HTTPS, exact Wikidata identity ve revision-bound Wikipedia direct document | Conditional live; route'a bağlı değil |
 | D7-R2B | Ephemeral allowlisted OpenAI discovery; Brave deferred | Search source değildir; route'a bağlı değil |
+| D7-R2C | Provider registry/seçim; Groq Compound + forced-Exa OpenRouter beta | Ortak URL revalidation; ephemeral-only; route'a bağlı değil |
+| D7-R2D | İzin kapılı source expansion/direct community-review adapter'ları | Terms/source trust audit olmadan source eklenmez |
 | D7-R3 | Supplied-passage grounded claim extraction | Strict schema/citation; D6 authoritative |
 | D7-R4 | Deterministic evidence integration | Kontrollü opt-in; LLM ranking yok |
 | D7-R5 | Runtime security/cache ve kullanıcı citation görünümü | Feature flag/shadow |
 | D7-R6 | Live source compliance, fail-soft ve final acceptance | D8 research feature gate adayı |
 | D7-ML | Opsiyonel post-release distillation/student shadow | Release blocker değil |
 
-## 13. D7-R2B sonucu ve D7-R3 giriş koşulları
+## 13. D7-R2C sonucu ve D7-R3 giriş koşulları
 
 D7-R1; 43 aspect için versionlı capability matrisi, exact `work|season|installment|edition` scope codec'i, kapalı-varsayılan source registry, citation/no-source domain kararları, deterministic bounded planner ve owner-independent cache port'unu teslim etti. D7-R2A buna [pinned server HTTP/DNS](D7_RESEARCH_NETWORK_FOUNDATION.md), [exact external-ID Wikidata verification](D7_WIKIDATA_IDENTITY_RESOLUTION.md) ve [revision-bound Wikipedia plaintext/citation](D7_WIKIPEDIA_DIRECT_SOURCE.md) ekledi.
 
 D7-R2A'da DNS/private-address/rebinding, manual redirect, JSON streaming limit, Wikimedia etiquette, exact QID entity revalidation ve transient-document ayrımı fixture seviyesinde kapanmıştır. Conditional live smoke ayrı environment kapısındadır.
 
 D7-R2B; [strict discovery request/result contract'ı](D7_RESEARCH_DISCOVERY_CONTRACT.md), registry-backed deterministic query, server-derived `wikipedia.org` filter'ı, fixed-endpoint [OpenAI Responses `web_search` adapter'ı](D7_OPENAI_WEB_DISCOVERY.md), response item decoder, URL revalidation, 5 saniye/256 KiB/retry/concurrency bütçesi ve in-flight coalescing ekledi. Search output/snippet persistence veya claim üretimi yoktur. Brave gerçek adapter'ı ayrı terms/coverage audit'ine ertelenmiştir; Gemini eklenmemiştir.
+
+D7-R2C; aynı port'u merkezi [provider capability registry ve seçim contract'ı](D7_MULTI_PROVIDER_DISCOVERY.md) ile genişletti. Groq yalnız `web_search` tool'u ve `include_domains` ile; OpenRouter yalnız beta server tool + forced Exa `allowed_domains` ile çalışır. Explicit seçim fallback yapmaz; `auto` yalnız explicit enabled/configured provider'larda unavailable fallback yapar ve `no_source_discovered` provider storm üretmez. Ortak URL/source-registry post-processing değişmez. [Source expansion matrix](D7_RESEARCH_SOURCE_EXPANSION_MATRIX.md) yeni source'ları R2D izin kapısına bağlar.
 
 D7-R3 ancak şu açık kapılarla başlar:
 

@@ -1,6 +1,10 @@
 import type { AspectId, ConstraintRole, RecommendationMediaType } from "../../domain/types";
 import type { ResearchClaimLevel, ResearchVersionScope } from "../domain/types";
-import type { ResearchDiscoveryTelemetry } from "./types";
+import type {
+  ResearchDiscoveryAdapterId,
+  ResearchDiscoveryProviderId,
+  ResearchDiscoveryTelemetry,
+} from "./types";
 
 export interface SearchDiscoveryPortRequest {
   queries: readonly string[];
@@ -30,13 +34,15 @@ export interface SearchDiscoveryUrl {
 export type SearchDiscoveryPortStatus = "completed" | "unavailable" | "budget_exhausted" | "response_invalid";
 
 export interface SearchDiscoveryPortResult {
+  providerId: ResearchDiscoveryProviderId;
   status: SearchDiscoveryPortStatus;
-  urls: readonly SearchDiscoveryUrl[];
+  rawUrlSignals: readonly SearchDiscoveryUrl[];
   telemetry: ResearchDiscoveryTelemetry;
   warnings: readonly string[];
 }
 
 export interface SearchDiscoveryPort {
-  readonly adapterId: "openai_web_search";
+  readonly providerId: ResearchDiscoveryProviderId;
+  readonly adapterId: ResearchDiscoveryAdapterId;
   discover(input: SearchDiscoveryPortRequest): Promise<SearchDiscoveryPortResult>;
 }
