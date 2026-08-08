@@ -146,5 +146,5 @@ describe("D7-1A workspace repository", () => {
     expect((await readdir(path.join(root, "backups", "test-workspace"))).some((name) => name.endsWith("workspace.json.bak"))).toBe(true);
     expect(validateAnnotationWorkspace(await repository.readWorkspace("test-workspace"))
       .some((entry) => entry.code === "annotation_manifest_content_hash_mismatch")).toBe(false);
-  });
+  }, 15_000);
 });

@@ -18,7 +18,7 @@ Durum: Saf deterministic plan contract'ı hazır; D7-R2C yalnız search operatio
 | `maxConcurrentOperations` | 2 |
 | `totalTimeoutMs` | 8.000 |
 
-Planner network çalıştırmaz. İlk altı job search operation rezervasyonu alabilir; kalan bounded job'lar cache/direct-source-only planlanabilir. D7-R2C execution bir ResearchJob/provider denemesi için en çok bir call, en çok iki deterministic query, beş returned source, 5 saniye timeout ve global concurrency=2 uygular. Explicit seçim fallback yapmaz; `auto` yalnız enabled/configured provider'larda ve yalnız unavailable sonucunda bounded fallback yapar. `no_source_discovered` yeni provider denemesi açmaz. Production Recommendation route bu orchestrator'ı çağırmaz.
+Planner network çalıştırmaz. İlk altı job search operation rezervasyonu alabilir; kalan bounded job'lar cache/direct-source-only planlanabilir. D7-R2C execution bir ResearchJob/provider denemesi için en çok bir call, en çok iki deterministic query, beş returned source ve global concurrency=2 uygular. OpenAI/OpenRouter operation timeout'u 5 saniye, canlı Compound latency uyumluluğu için Groq timeout'u 7,5 saniyedir; global `totalTimeoutMs=8.000` tavanı korunur. Explicit seçim fallback yapmaz; `auto` yalnız enabled/configured provider'larda ve yalnız unavailable sonucunda bounded fallback yapar. `no_source_discovered` yeni provider denemesi açmaz. Production Recommendation route bu orchestrator'ı çağırmaz.
 
 ## Priority
 

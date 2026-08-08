@@ -55,6 +55,12 @@ Bu model citation, claim, passage, trust kararı veya persisted evidence değild
 
 Result claim, `AspectResearchDecision`, citation veya ranking handoff'u taşımaz.
 
+## Provider doğrulama durumu
+
+Contract-tested ve live-verified ayrı kapılardır. D7-R2C.1 itibarıyla Groq Compound adapter'ı explicit selector ve strict Wikipedia-only fixture ile live-verified'dır. OpenAI stable adapter'ı ve OpenRouter beta adapter'ı contract-tested olmakla birlikte explicit research model bulunmadığı için live-unverified'dır. Skip veya standard codec testi live verification yerine geçmez.
+
+Canlı kapı `no_source_discovered` sonucunu başarı kabul etmez: en az bir gerçek tool call ve ortak URL/source-registry post-filter'dan geçen source zorunludur. Groq için bounded operation timeout 7,5 saniye, OpenAI/OpenRouter için 5 saniyedir; global 8 saniye tavanı korunur.
+
 ## Ephemeral/persistent invariant
 
 OpenAI/Groq/OpenRouter response payload'u, response/output ID, output text/reasoning, query, action ID, title/snippet/highlight, rank, discovered URL listesi ve Tavily/Exa metadata'sı evidence cache/DB/localStorage'a yazılmaz. Yalnız içeriksiz telemetry tutulabilir. `ResearchEvidenceCacheEntry` validator'ı bu discovery/search alanlarını nested olarak reddeder.
@@ -63,12 +69,13 @@ OpenAI/Groq/OpenRouter response payload'u, response/output ID, output text/reaso
 
 R3 başlamadan önce:
 
-1. accepted discovery URL'sinin R2A secure GET/DNS boundary'sine source-specific acquisition olarak verilmesi;
-2. redirect sonrası identity/version scope'un yeniden doğrulanması;
-3. HTML gerekiyorsa streaming limit, sanitizer ve prompt-injection isolation;
-4. lisans/retention policy'sine uygun transient passage üretimi;
-5. yalnız supplied passage üzerinden citation-required claim extraction;
-6. no document/no citation durumunun `unknown` kalması
+1. en az bir discovery provider'ın strict live smoke ile live-verified olması;
+2. accepted discovery URL'sinin R2A secure GET/DNS boundary'sine source-specific acquisition olarak verilmesi;
+3. redirect sonrası identity/version scope'un yeniden doğrulanması;
+4. HTML gerekiyorsa streaming limit, sanitizer ve prompt-injection isolation;
+5. lisans/retention policy'sine uygun transient passage üretimi;
+6. yalnız supplied passage üzerinden citation-required claim extraction;
+7. no document/no citation durumunun `unknown` kalması
 
 zorunludur. Discovery URL tek başına extraction input'u veya evidence değildir.
 

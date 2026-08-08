@@ -47,3 +47,17 @@ Verbose live sonucu: `3 passed / 0 failed / 0 skipped`.
 - Olmayan bounded AniList ID: `identity_not_found`; fuzzy fallback yok.
 
 İlgili belgeler: [network foundation](D7_RESEARCH_NETWORK_FOUNDATION.md), [Wikidata identity](D7_WIKIDATA_IDENTITY_RESOLUTION.md), [Wikipedia direct source](D7_WIKIPEDIA_DIRECT_SOURCE.md).
+
+## D7-R2C.1 multi-provider discovery sonucu
+
+Provider'lar `auto` ile değil explicit selector ile ayrı değerlendirilir. Live başarı; `sources_discovered`, gerçek search tool çağrısı, en az bir accepted HTTPS/credential-free `wikipedia.org` URL'si, R1 registry'de `sourceId=wikipedia` ve claim/decision yokluğu koşullarının tamamıdır. `no_source_discovered` başarı sayılmaz.
+
+| Provider | Config | Attempted | Sonuç | Durum |
+|---|---|---:|---|---|
+| OpenAI | Key present; explicit research model missing | Hayır | Controlled skip | contract-tested, live-unverified |
+| Groq | Key present; model yalnız child process'te `groq/compound-mini` | Evet | `1 passed / 0 failed / 0 skipped` | contract-tested, live-verified |
+| OpenRouter | Key present; explicit research model missing | Hayır | Controlled skip | beta contract-tested, live-unverified |
+
+Groq ilk canlı denemede provider hatası yerine 5 saniyelik operation timeout nedeniyle `budget_exhausted` olmuştur. Secret ve response içeriği yazdırmayan teşhis geçerli 200/JSON tool response'unun yaklaşık 5,7 saniyede geldiğini doğrulamıştır. Groq timeout'u global 8 saniye tavanının altında 7,5 saniyeye çıkarıldıktan sonra strict kapı geçmiştir. Domain allowlist, ortak URL/source-registry post-filter, ephemeral-only sınır ve no-claim davranışı değişmemiştir.
+
+OpenAI ve OpenRouter için contract test başarısı canlı doğrulama sayılmaz. Gelecekte runtime seçimi yalnız live-verified provider'ları rollout kapısında değerlendirmelidir; D7-R2C.1 production selector/route davranışını açmaz.

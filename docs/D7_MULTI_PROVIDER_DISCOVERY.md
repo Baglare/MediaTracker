@@ -7,11 +7,11 @@ Durum: Provider-neutral internal discovery, Groq Compound ve kontrollü OpenRout
 
 Capability env/model adından tahmin edilmez; `ResearchDiscoveryProviderEntry` registry source-of-truth'tur.
 
-| Provider | Contract | Hard domain filtresi | URL sinyali | Search vendor | Kalıcılık |
-|---|---|---:|---:|---|---|
-| OpenAI | stable Responses `web_search` | Evet, `filters.allowed_domains` | action source + citation URL | OpenAI | `ephemeral_only` |
-| Groq | Compound built-in `web_search` | Evet, `search_settings.include_domains` | `executed_tools[].search_results.results[].url` | Tavily | `ephemeral_only` |
-| OpenRouter | beta Responses server tool | Evet, yalnız `engine=exa` + `allowed_domains` sabitken | `url_citation.url` | Exa | `ephemeral_only` |
+| Provider | Contract | Canlı durum | Hard domain filtresi | URL sinyali | Search vendor | Kalıcılık |
+|---|---|---|---:|---:|---|---|
+| OpenAI | stable Responses `web_search`; contract-tested | live-unverified | Evet, `filters.allowed_domains` | action source + citation URL | OpenAI | `ephemeral_only` |
+| Groq | Compound built-in `web_search`; contract-tested | live-verified | Evet, `search_settings.include_domains` | `executed_tools[].search_results.results[].url` | Tavily | `ephemeral_only` |
+| OpenRouter | beta Responses server tool; contract-tested | live-unverified, beta | Evet, yalnız `engine=exa` + `allowed_domains` sabitken | `url_citation.url` | Exa | `ephemeral_only` |
 
 Üç provider da source/evidence publisher değildir. Claim, provider response'una, response ID'sine, Tavily/Exa metadata'sına veya synthesized answer'a bağlanmaz. Accepted URL aynı ortak R1 registry ve URL policy'den yeniden geçer.
 
@@ -71,12 +71,14 @@ OpenRouter model env'i arbitrary değildir; yalnız code-controlled, resmî cont
 
 ## Bütçe, persistence ve telemetry
 
-Job en fazla iki query, provider başına bir request, beş accepted URL, 256 KiB response, 5 saniye timeout ve bir transient retry kullanır. Global concurrency iki, aynı research key in-flight coalesced'dır.
+Job en fazla iki query, provider başına bir request, beş accepted URL, 256 KiB response ve bir transient retry kullanır. OpenAI/OpenRouter operation timeout'u 5 saniye, gerçek Compound latency uyumluluğu için Groq timeout'u 7,5 saniyedir; ikisi de global 8 saniye tavanının altındadır. Global concurrency iki, aynı research key in-flight coalesced'dır.
 
 Query, discovered URL listesi, response, assistant text, reasoning, snippet/content/highlight, response/action ID ve Tavily/Exa metadata'sı DB/localStorage/evidence cache'e yazılmaz. Cache validator bunları reddeder. Telemetry yalnız provider, status class, bounded request ID, süre/byte/retry/rate-limit/timeout ve source/reject/malformed/coalescing sayıları taşır.
 
 ## Conditional live smoke
 
-Normal suite network açmaz. Her provider live testi yalnız kendi enable/live flag'i, key'i, allowlisted model'i ve `D7_RESEARCH_DISCOVERY_PROVIDER` explicit/auto seçimiyle çalışır. Scenario Steins;Gate + romance + `wikipedia.org` olup exact URL, count, text veya claim beklemez. Live env yoksa controlled skip edilir.
+Normal suite network açmaz. Her provider live testi yalnız kendi enable/live flag'i, key'i, allowlisted model'i ve explicit `D7_RESEARCH_DISCOVERY_PROVIDER` seçimiyle çalışır. Scenario Steins;Gate + romance + `wikipedia.org` olup `sources_discovered`, gerçek tool call, en az bir accepted HTTPS/credential-free Wikipedia URL'si ve `sourceId=wikipedia` bekler; exact path, count, text veya citation sırası beklemez. Claim/decision üretimi yasaktır.
+
+D7-R2C.1 koşusunda Groq `groq/compound-mini` process-local model ayarıyla canlı geçmiştir. İlk koşu 5 saniyelik ortak timeout'ta geçerli provider cevabını kesmiş; sanitize teşhis 200/JSON, bir tool call ve URL sinyalleri döndüğünü göstermiştir. Groq'a özel 7,5 saniyelik bounded timeout sonrası strict live test `1 passed / 0 failed / 0 skipped` olmuştur. OpenAI ve OpenRouter açık research model bulunmadığından çağrılmamış ve live-unverified kalmıştır. R3 discovery giriş kapısı en az bir live-verified provider bulunduğu için açıktır; bu durum production auto-selection'ı etkinleştirmez.
 
 İlgili belgeler: [Discovery Contract](D7_RESEARCH_DISCOVERY_CONTRACT.md), [OpenAI Adapter](D7_OPENAI_WEB_DISCOVERY.md), [Source Expansion Matrix](D7_RESEARCH_SOURCE_EXPANSION_MATRIX.md), [Security Model](D7_RESEARCH_SECURITY_MODEL.md).

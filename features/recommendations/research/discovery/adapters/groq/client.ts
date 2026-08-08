@@ -4,6 +4,7 @@ import { FixedJsonDiscoveryClient, type FixedJsonDiscoveryResponse } from "../sh
 import type { GroqResearchModel } from "./config";
 
 export const GROQ_CHAT_COMPLETIONS_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions" as const;
+export const GROQ_COMPOUND_DISCOVERY_TIMEOUT_MS = 7_500;
 
 export class GroqCompoundDiscoveryClient {
   private readonly http: FixedJsonDiscoveryClient;
@@ -30,6 +31,7 @@ export class GroqCompoundDiscoveryClient {
         search_settings: { include_domains: includeDomains },
       },
       signal: input.signal,
+      timeoutMs: GROQ_COMPOUND_DISCOVERY_TIMEOUT_MS,
     });
   }
 }

@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 
 import { GroqWebSearchDiscoveryAdapter } from "@/features/recommendations/research/discovery/adapters/groq/adapter";
-import { GROQ_CHAT_COMPLETIONS_ENDPOINT, GroqCompoundDiscoveryClient } from "@/features/recommendations/research/discovery/adapters/groq/client";
+import { GROQ_CHAT_COMPLETIONS_ENDPOINT, GROQ_COMPOUND_DISCOVERY_TIMEOUT_MS, GroqCompoundDiscoveryClient } from "@/features/recommendations/research/discovery/adapters/groq/client";
 import { decodeGroqWebSearchResponse } from "@/features/recommendations/research/discovery/adapters/groq/codec";
 import { readGroqWebDiscoveryEnvironment } from "@/features/recommendations/research/discovery/adapters/groq/config";
 import type { SearchDiscoveryPortRequest } from "@/features/recommendations/research/discovery/port";
@@ -44,6 +44,11 @@ describe("D7-R2C Groq contract", () => {
     const client = new GroqCompoundDiscoveryClient(async () => { count += 1; return jsonResponse(responseBody()); });
     await expect(client.request({ apiKey: "k", model: "groq/compound", instruction: "public", allowedDomains: [] })).rejects.toThrow(/no_allowed_domains/);
     expect(count).toBe(0);
+  });
+
+  it("Compound latency için global 8s tavanın altında bounded timeout uygular", () => {
+    expect(GROQ_COMPOUND_DISCOVERY_TIMEOUT_MS).toBe(7_500);
+    expect(GROQ_COMPOUND_DISCOVERY_TIMEOUT_MS).toBeLessThan(8_000);
   });
 
   it("search result URL'lerini decode eder; assistant content/snippet'i tüketmez", () => {

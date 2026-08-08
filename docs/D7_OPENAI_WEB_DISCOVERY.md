@@ -76,6 +76,8 @@ Bu aşama URL'yi fetch etmez, sanitize etmez, passage seçmez, claim/citation ü
 
 ## Conditional live smoke
 
-Normal suite network açmaz. Live test ancak iki D7 flag'i `1`, key ve geçerli explicit model mevcutsa çalışır. Steins;Gate/romance/work-scope isteğinde en az bir `web_search_call` decode edilmesini; accepted URL'lerin HTTPS, `wikipedia.org` altında ve registry'de `wikipedia` olmasını doğrular. Sonuç `sources_discovered` veya kontrollü `no_source_discovered` olabilir. Exact URL, source sayısı, output text veya aspect claim assertion'ı yoktur.
+Normal suite network açmaz. Live test ancak iki D7 flag'i `1`, key ve geçerli explicit research model mevcutsa çalışır. Steins;Gate/romance/work-scope isteğinde `sources_discovered`, en az bir `web_search_call` ve en az bir accepted URL; URL'lerde HTTPS, credentials yokluğu, `wikipedia.org` domain policy ve registry `sourceId=wikipedia` koşullarını doğrular. Exact path, source sayısı, output text veya aspect claim assertion'ı yoktur.
+
+D7-R2C.1 ortamında key mevcut fakat explicit `OPENAI_RESEARCH_MODEL` eksik olduğundan ücretli fallback/model tahmini yapılmamış, live smoke kontrollü olarak çalıştırılmamıştır. Adapter stable contract-tested, ancak bu kapıda live-unverified durumundadır. Bu durum Groq live geçişini veya R3'ün en az bir provider koşulunu geçersiz kılmaz.
 
 İlgili belgeler: [Discovery Contract](D7_RESEARCH_DISCOVERY_CONTRACT.md), [Source Policy](D7_RESEARCH_SOURCE_POLICY.md), [Security Model](D7_RESEARCH_SECURITY_MODEL.md).

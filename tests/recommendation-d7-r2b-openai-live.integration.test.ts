@@ -14,14 +14,18 @@ const liveEnabled = environment.valid && environment.liveSmokeEnabled && environ
 describe.skipIf(!liveEnabled)("D7-R2B conditional OpenAI web discovery live", () => {
   it("Steins;Gate romance için yalnız allowlisted Wikipedia source URL keşfeder", async () => {
     const result = await discoverResearchSources(steinsGateDiscoveryRequest({ requestId: `d7-r2b-live-${Date.now()}` }));
-    expect(["sources_discovered", "no_source_discovered"]).toContain(result.status);
+    expect(result.status).toBe("sources_discovered");
     expect(result.telemetry.webSearchCallCount).toBeGreaterThan(0);
+    expect(result.sources.length).toBeGreaterThan(0);
     for (const source of result.sources) {
+      const sourceUrl = new URL(source.canonicalUrl);
       expect(source.canonicalUrl.startsWith("https://")).toBe(true);
+      expect(sourceUrl.username).toBe("");
+      expect(sourceUrl.password).toBe("");
       expect(source.hostname === "wikipedia.org" || source.hostname.endsWith(".wikipedia.org")).toBe(true);
       expect(source.sourceId).toBe("wikipedia");
     }
     expect(result).not.toHaveProperty("claims");
     expect(result).not.toHaveProperty("decision");
-  });
+  }, 15_000);
 });

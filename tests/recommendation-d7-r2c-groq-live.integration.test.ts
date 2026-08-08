@@ -13,13 +13,19 @@ const liveEnabled = environment.valid && environment.liveSmokeEnabled && (select
 describe.skipIf(!liveEnabled)("D7-R2C conditional Groq web discovery live", () => {
   it("Steins;Gate romance için yalnız allowlisted Wikipedia URL keşfeder", async () => {
     const result = await discoverResearchSources(steinsGateDiscoveryRequest({ requestId: `d7-r2c-groq-live-${Date.now()}` }));
-    expect(["sources_discovered", "no_source_discovered"]).toContain(result.status);
+    expect(result.status).toBe("sources_discovered");
     expect(result.attemptedProviders).toContain("groq");
+    expect(result.telemetry.webSearchCallCount).toBeGreaterThan(0);
+    expect(result.sources.length).toBeGreaterThan(0);
     for (const source of result.sources) {
+      const sourceUrl = new URL(source.canonicalUrl);
       expect(source.canonicalUrl.startsWith("https://")).toBe(true);
+      expect(sourceUrl.username).toBe("");
+      expect(sourceUrl.password).toBe("");
       expect(source.hostname === "wikipedia.org" || source.hostname.endsWith(".wikipedia.org")).toBe(true);
       expect(source.sourceId).toBe("wikipedia");
     }
     expect(result).not.toHaveProperty("claims");
-  });
+    expect(result).not.toHaveProperty("decision");
+  }, 15_000);
 });

@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import { RESEARCH_POLICY_VERSION } from "../cache/key";
 import { RESEARCH_SOURCE_REGISTRY_VERSION } from "../domain/source-registry";
 import { GroqWebSearchDiscoveryAdapter } from "./adapters/groq/adapter";
+import { GROQ_COMPOUND_DISCOVERY_TIMEOUT_MS } from "./adapters/groq/client";
 import { OpenAiWebSearchDiscoveryAdapter } from "./adapters/openai/adapter";
 import type { OpenAiWebDiscoveryEnvironment } from "./adapters/openai/config";
 import { OpenRouterWebSearchDiscoveryAdapter } from "./adapters/openrouter/adapter";
@@ -31,7 +32,11 @@ import {
 } from "./types";
 
 const DISCOVERY_CONCURRENCY = 2;
-const DISCOVERY_OPERATION_TIMEOUT_MS = 5_000;
+const DEFAULT_DISCOVERY_OPERATION_TIMEOUT_MS = 5_000;
+
+function discoveryOperationTimeoutMs(providerId: ResearchDiscoveryProviderId): number {
+  return providerId === "groq" ? GROQ_COMPOUND_DISCOVERY_TIMEOUT_MS : DEFAULT_DISCOVERY_OPERATION_TIMEOUT_MS;
+}
 
 class DiscoverySemaphore {
   private active = 0;
@@ -175,7 +180,7 @@ export class ResearchDiscoveryOrchestrator {
       const port = this.createPort(providerId, providerEnvironment);
       attemptedProviders.push(providerId);
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), DISCOVERY_OPERATION_TIMEOUT_MS);
+      const timeout = setTimeout(() => controller.abort(), discoveryOperationTimeoutMs(providerId));
       let result: Awaited<ReturnType<SearchDiscoveryPort["discover"]>>;
       try {
         result = await port.discover({
