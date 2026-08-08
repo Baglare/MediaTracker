@@ -1,7 +1,7 @@
 # D7 Research Security Model
 
 Tarih: 8 Ağustos 2026
-Durum: D7-R2A.1 OS-compatible all-address DNS validation, pinned HTTPS, redirect, streaming JSON/plaintext limitleri ve direct Wikimedia codec'leri hazırdır; search/HTML sanitizer yoktur.
+Durum: D7-R2A.1 secure direct-source network ve D7-R2B fixed-endpoint allowlisted OpenAI discovery hazırdır; genel web HTML acquisition/sanitizer yoktur.
 
 ## 1. Güven sınırları
 
@@ -94,15 +94,19 @@ Minimum internal reason code'ları:
 
 Log yalnız reason code, source class/domain tokenı, süre, byte bucket, cache state ve request-scoped opaque trace ID taşır. Raw URL query, content, prompt, output, secret veya kişisel kimlik taşımaz.
 
-## 9. D7-R2A sonucu ve D7-R2B güvenlik kapısı
+## 9. D7-R2B sonucu ve D7-R3 güvenlik kapısı
 
 D7-R1 saf URL/content/citation contract'larını tanımladı. D7-R2A.1 gerçek socket hedefini OS resolver'ın döndürdüğü ve tamamı doğrulanmış address setinden deterministik seçilen adrese pinler. c-ares `resolve4/resolve6` hatalarını boş sonuç gibi yutan eski uyumluluk kusuru kaldırılmıştır. Mixed public/private DNS ve special-use IPv4/IPv6 fail-closed kalır. Retry ikinci DNS açmaz; manual redirect en çok iki hop ve her hop tam URL/DNS validation alır. TLS SNI/Host canonical hostname olarak korunur.
 
-D7-R2B/search veya HTML I/O açılmadan önce ayrıca şunlar gerekir:
+D7-R2B yalnız sabit `https://api.openai.com/v1/responses` endpoint'ine server-side POST yapar; endpoint env/user girdisi değildir. API key client'a çıkmaz. Request codec kişisel alanları ve arbitrary query/URL'yi reddeder. Provider filter yalnız server-derived `wikipedia.org` token'ıdır; boş filter ile unrestricted search açılmaz. Dönen URL HTTPS ve exact R1 source registry host policy'sinden tekrar geçer. R2B bu URL'yi fetch etmediği için search-result SSRF bağlantısı açmaz.
+
+5 saniye timeout, 256 KiB streaming response cap, bir retry, bounded `Retry-After`, global concurrency=2 ve same-job coalescing uygulanır. Raw response/output text/snippet/query/error body/header loglanmaz; yalnız bounded status/count/byte/duration ve `x-request-id` tutulabilir.
+
+D7-R3 discovered-source acquisition veya HTML I/O açılmadan önce ayrıca şunlar gerekir:
 
 - gerçek HTML/script/style/hidden-content sanitizer'ı;
 - DOM ve passage limitlerinin streaming uygulaması;
-- search-provider secret/PII redaction ve provider circuit-breaker testleri;
+- discovered URL'nin R2A allowlist/DNS pinning boundary'sinden geçmesi;
 - proxy ortamında pinned connect-target politikasının operasyonel doğrulaması.
 
 R2A koruması yalnız internal direct Wikimedia adapter'ı için geçerlidir; henüz Recommendation route güvenlik kanıtı değildir.

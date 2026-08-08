@@ -1,7 +1,7 @@
 # D7 Grounded Research Acceptance Cases
 
 Tarih: 8 Ağustos 2026
-Durum: D7-R1 decision fixture'larına ek olarak D7-R2A fake-network direct-document contract kabulü tamamlandı; conditional live varsayılan kapalıdır.
+Durum: D7-R1 karar, D7-R2A direct-document ve D7-R2B ephemeral discovery contract kabulü tamamlandı; conditional live varsayılan kapalıdır.
 
 ## Ortak kabul invariant'ları
 
@@ -85,8 +85,10 @@ Kabul: model world knowledge ile boşluğu doldurmaz; unknown açık kalır.
 
 ## 7. Fixture çıktısı
 
-D7-R1'de Steins;Gate, Kakegurui, political intrigue, love triangle avoid, character-driven ve no-source→unknown senaryoları 46 sentetik contract testine çevrilmiştir. D7-R2A ayrıca fake DNS/transport/Action API ile 55 standard test geçirir; üç conditional live test environment kapalıyken skip edilir.
+D7-R1'de Steins;Gate, Kakegurui, political intrigue, love triangle avoid, character-driven ve no-source→unknown senaryoları sentetik contract testlerine çevrilmiştir. D7-R2A fake DNS/transport/Action API direct-document zincirini; D7-R2B ise strict request privacy, deterministic query, OpenAI request/decoder, allowlist revalidation, ephemeral cache sınırı, retry/budget/concurrency/coalescing zincirini test eder. Wikimedia ve OpenAI conditional live testleri ilgili environment kapalıyken skip edilir.
 
 R2A Steins;Gate fixture'ı yalnız AniList exact ID → QID property verification → verified sitelink → page/revision → bounded transient document + citation metadata zincirini doğrular. Romance veya başka aspect claim'i çıkarmak D7-R3 kapsamıdır. Sabit Wikipedia cümlesi, revision ID veya metin uzunluğu acceptance assertion'ı değildir.
+
+R2B Steins;Gate fixture'ı aynı exact identity/work scope ve unresolved romance aspect'inden en fazla iki public deterministic query üretir. OpenAI request yalnız `wikipedia.org` provider filter'ı taşır. Accepted URL'nin `en.wikipedia.org|tr.wikipedia.org` exact registry host'larından gelmesi gerekir. Discovery sonucu romance kararı değildir; no-result `absent` yapmaz. Conditional live test exact URL veya claim değil, gerçek `web_search_call` ve accepted URL policy'sini sınar.
 
 İlgili belgeler: [Grounded Research Architecture](D7_GROUNDED_RESEARCH_ARCHITECTURE.md), [Research Source Policy](D7_RESEARCH_SOURCE_POLICY.md), [Research Security Model](D7_RESEARCH_SECURITY_MODEL.md).

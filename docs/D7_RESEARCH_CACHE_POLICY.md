@@ -1,7 +1,7 @@
 # D7-R1 Research Cache Policy
 
 Tarih: 8 Ağustos 2026
-Durum: Owner-independent evidence port'una ek olarak D7-R2A bounded Wikimedia metadata cache/coalescing hazır; DB/localStorage yoktur.
+Durum: Owner-independent evidence port'u, D7-R2A Wikimedia metadata cache'i ve D7-R2B request-only discovery coalescing hazır; DB/localStorage yoktur.
 
 ## Stable key
 
@@ -26,6 +26,7 @@ Yasak alanlar:
 - transient document ve `boundedText`;
 - search result/snippet;
 - OpenAI/Brave response;
+- search query/output text/action ID/discovered source/result;
 - full Wikipedia text veya raw passage;
 - owner/private kullanıcı alanları.
 
@@ -50,5 +51,9 @@ Runtime validator nested yasak alanları, invalid citation/claim'i, key-decision
 `ResearchEvidenceCachePort`: `get`, `set`, `delete`, `invalidateByScope`, `invalidateBySourceRevision`.
 
 D7-R1 `MemoryResearchEvidenceCache` yalnız saf/test kullanımı için max 128 entry bounded LRU-benzeri adapter sağlar. Production route'a singleton olarak bağlanmaz. Scope ve source revision invalidation'ı executable testlidir.
+
+## D7-R2B ephemeral discovery
+
+OpenAI Responses payload'ı, output item'ları, output text, query, source array, snippet, action/response ID ve `DiscoveredResearchSource` persistent cache'e girmez. Aynı exact scope/aspect/role/domain/query fingerprint yalnız in-flight process promise'i paylaşır; tamamlanınca entry silinir. Network/provider/security/decoder failure negative-cache edilmez. SHA-256 query fingerprint query metnini geri taşımayan request-local dedupe/lineage token'ıdır; persisted citation değildir.
 
 İlgili belgeler: [Domain Contract](D7_RESEARCH_DOMAIN_CONTRACT.md), [Planner](D7_RESEARCH_PLANNER.md), [Source Registry](D7_RESEARCH_SOURCE_REGISTRY.md).

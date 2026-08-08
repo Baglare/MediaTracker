@@ -1,7 +1,7 @@
 # D7 Grounded Aspect Research Engine Mimarisi
 
 Tarih: 8 Ağustos 2026
-Durum: D7-R2A secure network ve direct Wikimedia adapter foundation tamamlandı; production entegrasyonu yoktur.
+Durum: D7-R2B allowlisted ephemeral OpenAI source discovery tamamlandı; production entegrasyonu yoktur.
 
 ## 1. Karar ve sınır
 
@@ -200,26 +200,29 @@ Internal telemetry; research requested/completed/coalesced, source/provider unav
 | D7-R0 | Mimari/source/security/acceptance/deferred-ML contract'ları | Davranış değişmez |
 | D7-R1 | Saf domain codec'leri, source registry, research planner, cache port'u, fixture testleri | Production route'a bağlı değil |
 | D7-R2A | Pinned DNS/HTTPS, exact Wikidata identity ve revision-bound Wikipedia direct document | Conditional live; route'a bağlı değil |
-| D7-R2B | Ephemeral OpenAI/Brave discovery adapter'ları | Search source değildir; ayrı compliance kapısı |
+| D7-R2B | Ephemeral allowlisted OpenAI discovery; Brave deferred | Search source değildir; route'a bağlı değil |
 | D7-R3 | Supplied-passage grounded claim extraction | Strict schema/citation; D6 authoritative |
 | D7-R4 | Deterministic evidence integration | Kontrollü opt-in; LLM ranking yok |
 | D7-R5 | Runtime security/cache ve kullanıcı citation görünümü | Feature flag/shadow |
 | D7-R6 | Live source compliance, fail-soft ve final acceptance | D8 research feature gate adayı |
 | D7-ML | Opsiyonel post-release distillation/student shadow | Release blocker değil |
 
-## 13. D7-R2A sonucu ve D7-R2B giriş koşulları
+## 13. D7-R2B sonucu ve D7-R3 giriş koşulları
 
 D7-R1; 43 aspect için versionlı capability matrisi, exact `work|season|installment|edition` scope codec'i, kapalı-varsayılan source registry, citation/no-source domain kararları, deterministic bounded planner ve owner-independent cache port'unu teslim etti. D7-R2A buna [pinned server HTTP/DNS](D7_RESEARCH_NETWORK_FOUNDATION.md), [exact external-ID Wikidata verification](D7_WIKIDATA_IDENTITY_RESOLUTION.md) ve [revision-bound Wikipedia plaintext/citation](D7_WIKIPEDIA_DIRECT_SOURCE.md) ekledi.
 
 D7-R2A'da DNS/private-address/rebinding, manual redirect, JSON streaming limit, Wikimedia etiquette, exact QID entity revalidation ve transient-document ayrımı fixture seviyesinde kapanmıştır. Conditional live smoke ayrı environment kapısındadır.
 
-D7-R2B ancak şu açık kapılarla başlar:
+D7-R2B; [strict discovery request/result contract'ı](D7_RESEARCH_DISCOVERY_CONTRACT.md), registry-backed deterministic query, server-derived `wikipedia.org` filter'ı, fixed-endpoint [OpenAI Responses `web_search` adapter'ı](D7_OPENAI_WEB_DISCOVERY.md), response item decoder, URL revalidation, 5 saniye/256 KiB/retry/concurrency bütçesi ve in-flight coalescing ekledi. Search output/snippet persistence veya claim üretimi yoktur. Brave gerçek adapter'ı ayrı terms/coverage audit'ine ertelenmiştir; Gemini eklenmemiştir.
 
-- raw search payload'ını kalıcı içerikten ayıran ephemeral OpenAI/Brave adapter contract'ı;
-- discovery URL'sini R2A exact allowlist/DNS client'ına teslim eden boundary;
-- provider-specific rate/cost ve citation-underlying-source compliance;
-- search response/snippet retention ve log-redaction testleri;
-- OpenAI/Brave unavailable durumunun direct Wikimedia/no-source'dan ayrılması.
+D7-R3 ancak şu açık kapılarla başlar:
+
+- discovery URL'sini R2A exact allowlist/DNS client'ına teslim eden source-specific acquisition boundary;
+- redirect sonrası candidate identity/version-scope revalidation;
+- Wikipedia dışı document gerekirse HTML streaming/sanitizer ve prompt-injection isolation;
+- direct publisher license/retention policy'sine bağlı transient passage;
+- supplied-passage-only strict extraction ve citation validation;
+- discovery/provider unavailable ile no-document/no-source unknown ayrımı.
 
 Bu kapılar production route entegrasyonu izni değildir. D6 regression fixture'ları ve ranking sabitleri değişmeden kalır.
 

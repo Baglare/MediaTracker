@@ -17,4 +17,8 @@ export * from "./adapters/wikipedia/page-resolver";
 export * from "./adapters/wikipedia/document-adapter";
 export * from "./orchestration/direct-source-cache";
 export * from "./orchestration/direct-source-research";
-
+export * from "./discovery/adapters/openai/config";
+export * from "./discovery/adapters/openai/client";
+export * from "./discovery/adapters/openai/codec";
+export * from "./discovery/adapters/openai/adapter";
+export * from "./discovery/orchestrator";

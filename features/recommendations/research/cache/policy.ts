@@ -7,7 +7,9 @@ export type ResearchCachePolicyClass = "direct_source_long" | "unknown_short" | 
 
 const FORBIDDEN_PERSISTED_FIELDS = new Set([
   "boundedText", "documentId", "retention", "searchResult", "searchResults", "snippet",
-  "openaiResponse", "braveResponse", "fullWikipediaText", "transientDocument", "rawPassage",
+  "searchQuery", "searchQueries", "query", "outputText", "searchActionId", "discoveredSource",
+  "discoveredSources", "discoveryResult", "openaiResponse", "braveResponse", "fullWikipediaText",
+  "transientDocument", "rawPassage",
 ]);
 
 function issue(code: string, path: string, message: string): RecommendationDomainIssue {
@@ -51,4 +53,3 @@ export function validateResearchEvidenceCacheEntry(entry: ResearchEvidenceCacheE
   if (researchCachePolicyClass(entry) === "not_cacheable") issues.push(issue("research_cache_adapter_error_not_cacheable", "decision.reasonCode", "Adapter/budget failure negative-cache edilmez."));
   return issues.length > 0 ? { ok: false, issues } : { ok: true, value: entry };
 }
-

@@ -1,7 +1,7 @@
 # D7-R1 Bounded Research Planner
 
 Tarih: 8 Ağustos 2026
-Durum: Saf deterministic plan contract'ı ve fixture testleri hazır; hiçbir operation çalıştırılmaz.
+Durum: Saf deterministic plan contract'ı hazır; D7-R2B yalnız search operation rezervasyonu bulunan internal job için bounded discovery çalıştırabilir.
 
 ## Input sınırı
 
@@ -18,7 +18,7 @@ Durum: Saf deterministic plan contract'ı ve fixture testleri hazır; hiçbir op
 | `maxConcurrentOperations` | 2 |
 | `totalTimeoutMs` | 8.000 |
 
-Planner network çalıştırmaz. İlk altı job search operation rezervasyonu alabilir; kalan bounded job'lar cache/direct-source-only planlanabilir. Gerçek execution semantics D7-R2 orchestrator contract'ında netleşir.
+Planner network çalıştırmaz. İlk altı job search operation rezervasyonu alabilir; kalan bounded job'lar cache/direct-source-only planlanabilir. D7-R2B execution bir ResearchJob için en çok bir OpenAI Responses call, en çok iki deterministic query, beş returned source, 5 saniye timeout ve global concurrency=2 uygular. Production Recommendation route bu orchestrator'ı çağırmaz.
 
 ## Priority
 
@@ -49,5 +49,4 @@ Aynı `scopeKey + aspectId` bir kez job olur; duplicate `duplicate_candidate_asp
 
 Her `ResearchJob`; exact candidate scope, aspect/role/minimum level, numeric priority, izinli source class'ları, per-job bounded budget, stable cache key ve research policy version taşır. Kişisel kullanıcı verisi taşımaz.
 
-İlgili belgeler: [Domain Contract](D7_RESEARCH_DOMAIN_CONTRACT.md), [Cache Policy](D7_RESEARCH_CACHE_POLICY.md), [Architecture](D7_GROUNDED_RESEARCH_ARCHITECTURE.md).
-
+İlgili belgeler: [Domain Contract](D7_RESEARCH_DOMAIN_CONTRACT.md), [Discovery Contract](D7_RESEARCH_DISCOVERY_CONTRACT.md), [Cache Policy](D7_RESEARCH_CACHE_POLICY.md), [Architecture](D7_GROUNDED_RESEARCH_ARCHITECTURE.md).
