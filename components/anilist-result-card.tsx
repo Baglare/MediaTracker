@@ -11,6 +11,7 @@ import Image from "next/image";
 import { Plus, Check, Loader2, Tv, BookOpen, Star } from "lucide-react";
 import { AniListNormalizedResult } from "@/lib/anilist-types";
 import { getMediaTypeLabel } from "@/lib/progress";
+import { SearchResultDescription } from "@/components/search-result-description";
 
 interface AniListResultCardProps {
   result: AniListNormalizedResult;
@@ -66,9 +67,9 @@ export default function AniListResultCard({
   const statusLabel = getAniListStatusLabel(result.anilistStatus);
 
   return (
-    <div className="flex gap-4 p-4 bg-zinc-900/50 rounded-xl border border-zinc-800/50 hover:border-zinc-700/50 transition-all">
+    <div className="flex min-w-0 gap-4 overflow-hidden rounded-xl border border-[var(--app-border)] bg-[var(--app-card-bg)] p-4 transition-colors hover:bg-[var(--app-card-hover)]">
       {/* Sol: Kapak */}
-      <div className="relative w-16 h-24 rounded-lg overflow-hidden flex-shrink-0 ring-1 ring-zinc-800 bg-zinc-800">
+      <div className="relative w-16 h-24 rounded-lg overflow-hidden flex-shrink-0 ring-1 ring-[var(--app-border)] bg-[var(--app-surface-2)]">
         {result.coverUrl ? (
           <Image
             src={result.coverUrl}
@@ -91,7 +92,7 @@ export default function AniListResultCard({
       {/* Orta: Bilgiler */}
       <div className="flex-1 min-w-0">
         {/* Başlık */}
-        <h4 className="font-semibold text-sm text-zinc-100 truncate">
+        <h4 className="font-semibold text-sm text-[var(--app-text-primary)] truncate">
           {result.title}
         </h4>
 
@@ -175,13 +176,7 @@ export default function AniListResultCard({
         )}
 
         {/* Kısa açıklama (en fazla 120 karakter) */}
-        {result.overview && (
-          <p className="text-[10px] text-zinc-600 mt-1.5 line-clamp-2">
-            {result.overview.length > 120
-              ? result.overview.slice(0, 120) + "..."
-              : result.overview}
-          </p>
-        )}
+        <SearchResultDescription value={result.overview} className="text-[10px]" />
       </div>
 
       {/* Sağ: Listeme Ekle butonu */}

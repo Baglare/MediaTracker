@@ -86,7 +86,7 @@ function ProductRouteAppShell({
       });
       return;
     }
-    if (pathname === "/profile" || summaryUserId.current === auth.user.id) return;
+    if (summaryUserId.current === auth.user.id) return;
     summaryUserId.current = auth.user.id;
     const ownerId = auth.user.id;
     const cached = readOwnProfileCache<OwnProfileSummary>(ownerId, "summary");
@@ -107,7 +107,7 @@ function ProductRouteAppShell({
       .then((summary) => { if (active) setCloudIdentity(summary); })
       .catch(() => { if (active) summaryUserId.current = null; });
     return () => { active = false; };
-  }, [auth.configured, auth.user, pathname]);
+  }, [auth.configured, auth.user]);
 
   const { progression } = useXpProgression(auth.user?.id ?? null, EMPTY_PROGRESSION);
   const visibleCloudIdentity = auth.user

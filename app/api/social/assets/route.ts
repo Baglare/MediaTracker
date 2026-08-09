@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { validateImageUpload } from "@/lib/social/validation";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { createSignedSocialAssetUrl, invalidateSignedSocialAssetUrl } from "@/lib/social/server";
 
 const EXTENSIONS: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
 
@@ -35,8 +36,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, message: "Profil görseli güncellenemedi; mevcut görsel korunuyor." }, { status: 500 });
   }
   const cleanup = oldPath ? await auth.client.storage.from("profile-assets").remove([oldPath]) : null;
-  const signed = await auth.client.storage.from("profile-assets").createSignedUrl(path, 300);
-  return NextResponse.json({ ok: true, url: signed.error ? undefined : signed.data.signedUrl, cleanupPending: Boolean(cleanup?.error) });
+  invalidateSignedSocialAssetUrl(oldPath);
+  const signedUrl = await createSignedSocialAssetUrl(path, kind, path);
+  return NextResponse.json({ ok: true, url: signedUrl, cleanupPending: Boolean(cleanup?.error) });
 }
 
 export async function DELETE(request: Request) {
@@ -50,5 +52,6 @@ export async function DELETE(request: Request) {
   const { error } = await auth.client.from("profiles").update(kind === "avatar" ? { avatar_path: null } : { banner_path: null }).eq("id", auth.user.id);
   if (error) return NextResponse.json({ ok: false, message: "Görsel kaldırılamadı." }, { status: 500 });
   const cleanup = path ? await auth.client.storage.from("profile-assets").remove([path]) : null;
+  invalidateSignedSocialAssetUrl(path);
   return NextResponse.json({ ok: true, cleanupPending: Boolean(cleanup?.error) });
 }

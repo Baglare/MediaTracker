@@ -11,6 +11,7 @@ import {
   PROFILE_SURFACE_STYLES,
 } from "@/lib/personalization/validation";
 import type { ProfilePresentationPreferences } from "@/lib/personalization/types";
+import { normalizeProfileThemeSharingInput } from "@/lib/personalization/public-profile-theme";
 import {
   CONNECTION_COLORS,
   MODULE_VISIBILITIES,
@@ -101,6 +102,8 @@ export function validateSocialProfileInput(value: unknown): ValidationResult<Soc
     ? { ok: true as const, value: DEFAULT_PROFILE_PRESENTATION_PREFERENCES }
     : validateCloudProfilePresentation(record.presentation);
   if (!presentation.ok) return presentation;
+  const themeSharing = normalizeProfileThemeSharingInput(record.themeSharing ?? { visibility: "hidden" });
+  if (!themeSharing) return { ok: false, error: "Profil tema paylaşımı geçersiz." };
   return {
     ok: true,
     value: {
@@ -114,6 +117,7 @@ export function validateSocialProfileInput(value: unknown): ValidationResult<Soc
       connectionColor: color,
       selectedTitle: selectedTitle || undefined,
       presentation: presentation.value,
+      themeSharing,
     },
   };
 }

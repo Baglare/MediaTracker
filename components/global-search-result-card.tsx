@@ -36,6 +36,7 @@ import { GlobalSearchLibraryStatus, GlobalSearchResult } from "@/lib/global-sear
 import { getMediaTypeLabel } from "@/lib/progress";
 import { ThemeSubBadge } from "@/components/theme-accent";
 import { getGlobalSearchTitleDisplay } from "@/lib/global-search-title-display";
+import { SearchResultDescription } from "@/components/search-result-description";
 
 interface Props {
   result: GlobalSearchResult;
@@ -127,9 +128,9 @@ export default function GlobalSearchResultCard({
     <div
       className="
         group relative flex flex-col sm:flex-row gap-3 sm:gap-4 p-3 sm:p-4
-        bg-zinc-900/40 rounded-2xl ring-1 ring-zinc-800/60 overflow-hidden
+        bg-[var(--app-card-bg)] rounded-2xl ring-1 ring-[var(--app-border)] overflow-hidden
         hover:ring-[color-mix(in_srgb,var(--w-primary)_38%,#3f3f46)]
-        hover:bg-zinc-900/55
+        hover:bg-[var(--app-card-hover)]
         transition-colors min-w-0
       "
     >
@@ -144,7 +145,7 @@ export default function GlobalSearchResultCard({
       />
 
       {/* === Kapak === */}
-      <div className="relative w-16 h-24 sm:w-20 sm:h-28 shrink-0 rounded-xl overflow-hidden ring-1 ring-zinc-800 bg-zinc-900 shadow-sm shadow-black/40">
+      <div className="relative w-16 h-24 sm:w-20 sm:h-28 shrink-0 rounded-xl overflow-hidden ring-1 ring-[var(--app-border)] bg-[var(--app-surface-2)] shadow-sm shadow-[var(--app-shadow)]">
         {result.coverUrl ? (
           <Image
             src={result.coverUrl}
@@ -154,7 +155,7 @@ export default function GlobalSearchResultCard({
             className="object-cover"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-zinc-600">
+          <div className="w-full h-full flex items-center justify-center text-[var(--app-text-muted)]">
             <TypeGlyph type={result.type} className="w-6 h-6" />
           </div>
         )}
@@ -174,28 +175,28 @@ export default function GlobalSearchResultCard({
       {/* === Bilgi === */}
       <div className="flex-1 min-w-0 flex flex-col gap-1.5">
         <div className="flex items-start justify-between gap-2 min-w-0">
-          <h4 className="text-[13.5px] sm:text-sm font-semibold text-zinc-100 leading-tight break-words line-clamp-2 min-w-0">
+          <h4 className="text-[13.5px] sm:text-sm font-semibold text-[var(--app-text-primary)] leading-tight break-words line-clamp-2 min-w-0">
             {result.title}
           </h4>
           {result.releaseYear && (
-            <span className="shrink-0 text-[11px] font-mono tabular-nums text-zinc-500">
+            <span className="shrink-0 text-[11px] font-mono tabular-nums text-[var(--app-text-muted)]">
               {result.releaseYear}
             </span>
           )}
         </div>
 
         {titleDisplay.secondary && (
-          <p className="text-[11.5px] text-zinc-400 truncate">{titleDisplay.secondary}</p>
+          <p className="text-[11.5px] text-[var(--app-text-secondary)] truncate">{titleDisplay.secondary}</p>
         )}
         {titleDisplay.native && (
-          <p className="text-[10.5px] text-zinc-500 truncate">
+          <p className="text-[10.5px] text-[var(--app-text-muted)] truncate">
             {titleDisplay.native}
           </p>
         )}
 
         {/* Badge satırı: tür + Doğu subType + (mobilde kaynak fallback eyebrow) */}
         <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-zinc-800/70 text-zinc-300 ring-1 ring-zinc-700/50">
+          <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-[var(--app-surface-3)] text-[var(--app-text-secondary)] ring-1 ring-[var(--app-border)]">
             <TypeGlyph type={result.type} className="w-3 h-3" />
             {getMediaTypeLabel(result.type)}
           </span>
@@ -208,7 +209,7 @@ export default function GlobalSearchResultCard({
         </div>
 
         {result.authors && result.authors.length > 0 && (
-          <p className="text-[11px] text-zinc-500 truncate">
+          <p className="text-[11px] text-[var(--app-text-muted)] truncate">
             {result.authors.slice(0, 2).join(", ")}
             {result.authors.length > 2 && ` +${result.authors.length - 2}`}
           </p>
@@ -219,7 +220,7 @@ export default function GlobalSearchResultCard({
             {tags.slice(0, 3).map((t) => (
               <span
                 key={t}
-                className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800/50 text-zinc-400 ring-1 ring-zinc-700/30"
+                className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--app-surface-3)] text-[var(--app-text-secondary)] ring-1 ring-[var(--app-border)]"
               >
                 {t}
               </span>
@@ -227,13 +228,7 @@ export default function GlobalSearchResultCard({
           </div>
         )}
 
-        {result.overview && (
-          // Açıklama yalnızca sm+'da görünür — mobilde başlık + badge + tags
-          // zaten dolu, ek satır gürültü yaratıyor. line-clamp-2 ile kontrollü.
-          <p className="hidden sm:block text-[11.5px] text-zinc-500 leading-relaxed line-clamp-2 break-words">
-            {result.overview}
-          </p>
-        )}
+        <SearchResultDescription value={result.overview} className="text-[11.5px]" />
       </div>
 
       {/* === Aksiyonlar ===
@@ -279,7 +274,7 @@ export default function GlobalSearchResultCard({
             type="button"
             onClick={() => onAdd(result)}
             disabled={isAdding}
-            className="inline-flex items-center gap-1 h-8 sm:h-9 px-3 rounded-lg text-[12px] font-semibold ring-1 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed text-zinc-50"
+            className="inline-flex items-center gap-1 h-8 sm:h-9 px-3 rounded-lg text-[12px] font-semibold ring-1 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed text-[var(--app-accent-contrast)]"
             style={{
               background:
                 "linear-gradient(135deg, color-mix(in srgb, var(--w-primary) 28%, transparent), color-mix(in srgb, var(--w-secondary) 20%, transparent))",

@@ -21,10 +21,17 @@ import { socialRecord, validateActivityVisibility, validateSocialMediaSnapshot, 
 import { validateActivityType } from "@/lib/social/interactions-validation";
 import { parsePublicXpSummary } from "@/lib/xp/validation";
 import { normalizeProfilePresentationPreferences } from "@/lib/personalization/validation";
+import { decodePublicProfileThemeSnapshot } from "@/lib/personalization/public-profile-theme";
 import type { OwnProfileHeroData, OwnProfileSummary } from "@/lib/social/profile-summary";
 
 const BUCKET = "profile-assets";
 type SocialServerClient = NonNullable<Awaited<ReturnType<typeof getSupabaseServerClient>>>;
+const SIGNED_URL_TTL_SECONDS = 300;
+const SIGNED_URL_CACHE_TTL_MS = 240_000;
+const SIGNED_URL_CACHE_MAX = 256;
+type AssetKind = "avatar" | "banner";
+const signedUrlCache = new Map<string, { url: string; expiresAt: number }>();
+const signedUrlInFlight = new Map<string, Promise<string | undefined>>();
 
 function objectOf(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
@@ -42,16 +49,45 @@ function followOf(value: unknown): FollowStatus | null {
   return value === "pending" || value === "accepted" ? value : null;
 }
 
-async function createSignedSocialAssetUrlWithClient(client: SocialServerClient, path: unknown): Promise<string | undefined> {
-  const assetPath = stringOf(path);
-  if (!assetPath) return undefined;
-  const { data, error } = await client.storage.from(BUCKET).createSignedUrl(assetPath, 300);
-  return error ? undefined : data.signedUrl;
+function signedUrlKey(path: string, kind: AssetKind, revision: string): string {
+  return `${BUCKET}:${kind}:${path}:${revision}`;
 }
 
-export async function createSignedSocialAssetUrl(path: unknown): Promise<string | undefined> {
+export function invalidateSignedSocialAssetUrl(path: unknown): void {
+  const assetPath = stringOf(path);
+  if (!assetPath) return;
+  for (const cacheKey of signedUrlCache.keys()) if (cacheKey.includes(`:${assetPath}:`)) signedUrlCache.delete(cacheKey);
+}
+
+export function resetSignedSocialAssetUrlCacheForTests(): void {
+  signedUrlCache.clear();
+  signedUrlInFlight.clear();
+}
+
+async function createSignedSocialAssetUrlWithClient(client: SocialServerClient, path: unknown, kind: AssetKind, revision?: unknown): Promise<string | undefined> {
+  const assetPath = stringOf(path);
+  if (!assetPath) return undefined;
+  const assetRevision = stringOf(revision) ?? assetPath;
+  const cacheKey = signedUrlKey(assetPath, kind, assetRevision);
+  const now = Date.now();
+  const cached = signedUrlCache.get(cacheKey);
+  if (cached && cached.expiresAt > now) return cached.url;
+  if (cached) signedUrlCache.delete(cacheKey);
+  const running = signedUrlInFlight.get(cacheKey);
+  if (running) return running;
+  const request = client.storage.from(BUCKET).createSignedUrl(assetPath, SIGNED_URL_TTL_SECONDS).then(({ data, error }) => {
+    if (error || !data.signedUrl) return undefined;
+    if (signedUrlCache.size >= SIGNED_URL_CACHE_MAX) signedUrlCache.delete(signedUrlCache.keys().next().value as string);
+    signedUrlCache.set(cacheKey, { url: data.signedUrl, expiresAt: Date.now() + SIGNED_URL_CACHE_TTL_MS });
+    return data.signedUrl;
+  }).finally(() => signedUrlInFlight.delete(cacheKey));
+  signedUrlInFlight.set(cacheKey, request);
+  return request;
+}
+
+export async function createSignedSocialAssetUrl(path: unknown, kind: AssetKind = "avatar", revision?: unknown): Promise<string | undefined> {
   const client = await getSupabaseServerClient();
-  return client ? createSignedSocialAssetUrlWithClient(client, path) : undefined;
+  return client ? createSignedSocialAssetUrlWithClient(client, path, kind, revision) : undefined;
 }
 
 function relationshipOf(value: unknown, ownerColor: ConnectionColor) {
@@ -87,6 +123,7 @@ function profileOf(value: unknown): Omit<PublicSocialProfile, "avatarUrl" | "ban
     joinedAt: stringOf(record.joinedAt) ?? new Date(0).toISOString(),
     selectedTitle: stringOf(record.selectedTitle),
     presentation: normalizeProfilePresentationPreferences(record.presentation),
+    themeSnapshot: decodePublicProfileThemeSnapshot(record.themeSnapshot),
     followerCount: typeof record.followerCount === "number" ? record.followerCount : undefined,
     followingCount: typeof record.followingCount === "number" ? record.followingCount : undefined,
   };
@@ -138,8 +175,8 @@ export async function loadSocialProfile(username: string): Promise<SocialProfile
   const stats = visibleModules.has("stats") ? validateStatsSnapshot(root.stats) : null;
   const progression = visibleModules.has("progression") ? validateProgressionSnapshot(root.progression) : null;
   const [avatarUrl, bannerUrl, xpResult, activityResult] = await Promise.all([
-    createSignedSocialAssetUrlWithClient(client, rawProfile?.avatarPath),
-    createSignedSocialAssetUrlWithClient(client, rawProfile?.bannerPath),
+    createSignedSocialAssetUrlWithClient(client, rawProfile?.avatarPath, "avatar", rawProfile?.avatarPath),
+    createSignedSocialAssetUrlWithClient(client, rawProfile?.bannerPath, "banner", rawProfile?.bannerPath),
     visibleModules.has("progression") || visibleModules.has("badges")
       ? client.rpc("get_xp_public_summary", { p_user: profile.id })
       : Promise.resolve({ data: null, error: null }),
@@ -216,7 +253,7 @@ export async function loadOwnSocialEditorData(): Promise<SocialProfileEditorData
   const { data: auth } = await client.auth.getUser();
   if (!auth.user) return { configured: true, authenticated: false, modules: [], favorites: [], current: [], sharedNotes: [], blockedAccounts: [] };
   const [profileResult, modulesResult, showcaseResult, notesResult, blocksResult] = await Promise.all([
-    client.from("profiles").select("username,display_name,tagline,bio,location,language,visibility_mode,connection_color,avatar_path,banner_path,selected_title,profile_palette_id,banner_mode,banner_position,overlay_strength,avatar_frame,surface_style,motif_intensity,banner_focal_x,banner_focal_y,banner_zoom,avatar_focal_x,avatar_focal_y,avatar_zoom,username_changed_at").eq("id", auth.user.id).maybeSingle(),
+    client.from("profiles").select("username,display_name,tagline,bio,location,language,visibility_mode,connection_color,avatar_path,banner_path,selected_title,profile_palette_id,banner_mode,banner_position,overlay_strength,avatar_frame,surface_style,motif_intensity,banner_focal_x,banner_focal_y,banner_zoom,avatar_focal_x,avatar_focal_y,avatar_zoom,profile_theme_visibility,public_theme_preset,username_changed_at").eq("id", auth.user.id).maybeSingle(),
     client.from("profile_modules").select("module_key,enabled,visibility,grid_x,grid_y,grid_width,grid_height,mobile_order,config").eq("user_id", auth.user.id).order("mobile_order"),
     client.from("profile_media_showcase").select("showcase_kind,title,media_type,external_source,external_id,cover_url,world,sort_order").eq("user_id", auth.user.id).order("sort_order"),
     client.from("profile_shared_notes").select("id,media_title,media_type,external_source,external_id,content,contains_spoiler,visibility,created_at,updated_at").eq("user_id", auth.user.id).order("created_at", { ascending: false }),
@@ -226,8 +263,8 @@ export async function loadOwnSocialEditorData(): Promise<SocialProfileEditorData
   const showcase = showcaseResult.data ?? [];
   const [avatarUrl, bannerUrl] = row
     ? await Promise.all([
-      createSignedSocialAssetUrlWithClient(client, row.avatar_path),
-      createSignedSocialAssetUrlWithClient(client, row.banner_path),
+      createSignedSocialAssetUrlWithClient(client, row.avatar_path, "avatar", row.avatar_path),
+      createSignedSocialAssetUrlWithClient(client, row.banner_path, "banner", row.banner_path),
     ])
     : [undefined, undefined];
   return {
@@ -255,6 +292,10 @@ export async function loadOwnSocialEditorData(): Promise<SocialProfileEditorData
         bannerTransform: { focalX: row.banner_focal_x, focalY: row.banner_focal_y, zoom: row.banner_zoom },
         avatarTransform: { focalX: row.avatar_focal_x, focalY: row.avatar_focal_y, zoom: row.avatar_zoom },
       }),
+      themeSharing: {
+        visibility: row.profile_theme_visibility,
+        ...(row.public_theme_preset ? { publicPreset: row.public_theme_preset } : {}),
+      },
       avatarUrl,
       bannerUrl,
       usernameChangedAt: row.username_changed_at ?? undefined,
@@ -286,7 +327,7 @@ export async function loadOwnSocialProfileSummary(): Promise<OwnProfileSummary> 
   return {
     displayName: data.display_name ?? undefined,
     tagline: data.tagline ?? undefined,
-    avatarUrl: await createSignedSocialAssetUrlWithClient(client, data.avatar_path),
+    avatarUrl: await createSignedSocialAssetUrlWithClient(client, data.avatar_path, "avatar", data.avatar_path),
     selectedTitle: data.selected_title ?? undefined,
     avatarTransform: normalizeProfilePresentationPreferences({ version: 1, avatarTransform: { focalX: data.avatar_focal_x, focalY: data.avatar_focal_y, zoom: data.avatar_zoom } }).avatarTransform,
   };
@@ -304,8 +345,8 @@ export async function loadOwnProfileHeroData(): Promise<OwnProfileHeroData> {
     .maybeSingle();
   if (!data) return {};
   const [avatarUrl, bannerUrl] = await Promise.all([
-    createSignedSocialAssetUrlWithClient(client, data.avatar_path),
-    createSignedSocialAssetUrlWithClient(client, data.banner_path),
+    createSignedSocialAssetUrlWithClient(client, data.avatar_path, "avatar", data.avatar_path),
+    createSignedSocialAssetUrlWithClient(client, data.banner_path, "banner", data.banner_path),
   ]);
   const presentation = normalizeProfilePresentationPreferences({
     version: 1,

@@ -224,20 +224,20 @@ export default function ProfileSettingsCard({
   };
 
   return (
-    <section className="bg-zinc-900/25 rounded-2xl border border-zinc-800/60 p-4 sm:p-5 min-w-0">
+    <section className="bg-[var(--app-panel-bg)] rounded-2xl border border-[var(--app-border)] p-4 sm:p-5 min-w-0">
       <div className="flex flex-col gap-4">
         <div className="min-w-0 flex-1">
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
             <div className="flex min-w-0 items-center gap-3">
               <ProfileAvatar profileName={profileName} preferences={preferences} socialAvatarUrl={socialAvatarUrl} imageTransform={avatarTransform} size="sm" />
               <div className="min-w-0">
-                <h3 className="text-sm font-semibold text-zinc-100 tracking-tight">Profil fotoğrafı</h3>
-                <p className="mt-1 text-xs text-zinc-500">
+                <h3 className="text-sm font-semibold text-[var(--app-text-primary)] tracking-tight">Profil fotoğrafı</h3>
+                <p className="mt-1 text-xs text-[var(--app-text-muted)]">
                   Sidebar, mobil üst çubuk ve profil alanlarında kullanılan ortak kimlik.
                 </p>
               </div>
             </div>
-            <span className="inline-flex w-fit rounded-full bg-zinc-950/45 px-2.5 py-1 text-[11px] text-zinc-500 ring-1 ring-zinc-800/70">
+            <span className="inline-flex w-fit rounded-full bg-[var(--app-surface-2)] px-2.5 py-1 text-[11px] text-[var(--app-text-muted)] ring-1 ring-[var(--app-border)]">
               {avatarStatus}
             </span>
           </div>

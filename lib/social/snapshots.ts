@@ -49,6 +49,7 @@ export function prefillSocialProfile(preferences: ProfilePreferences, fallbackNa
     connectionColor: preferences.avatarAccent === "zinc" ? "neutral" : preferences.avatarAccent,
     selectedTitle,
     presentation: defaultProfilePresentationPreferences(),
+    themeSharing: { visibility: "hidden" },
   };
 }
 

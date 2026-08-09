@@ -18,6 +18,34 @@ export type ThemeSelection =
   | { kind: "preset"; id: PresetThemeId }
   | { kind: "custom"; id: string };
 
+export type ProfileThemeVisibility = "hidden" | "preset_only" | "current_theme";
+
+export const PUBLIC_PROFILE_THEME_TOKEN_KEYS = [
+  "background", "surface1", "surface2", "surface3", "elevated",
+  "textPrimary", "textSecondary", "textMuted", "border", "borderStrong",
+  "accent", "accentStrong", "accentSoft", "accentContrast", "focus", "hover",
+  "selectedText", "selectedBackground", "selectedBorder", "cardBackground", "panelBackground",
+] as const;
+
+export type PublicProfileThemeTokenKey = (typeof PUBLIC_PROFILE_THEME_TOKEN_KEYS)[number];
+
+export interface PublicProfileThemeSnapshot {
+  version: 1;
+  source: "preset" | "custom";
+  colorScheme: "light" | "dark";
+  tokens: Record<PublicProfileThemeTokenKey, string>;
+  revision: string;
+  updatedAt?: string;
+}
+
+export interface ProfileThemeSharingInput {
+  visibility: ProfileThemeVisibility;
+  publicPreset?: Exclude<PresetThemeId, "system">;
+  currentTheme?:
+    | { kind: "preset"; id: Exclude<PresetThemeId, "system"> }
+    | { kind: "custom"; theme: CustomThemeDefinition };
+}
+
 export type AccentMode = "auto" | "theme" | "east" | "screen" | "arch" | "neutral";
 
 export type EffectsLevel = "off" | "subtle" | "full";
@@ -90,6 +118,10 @@ export interface CustomThemeInputs {
   surface: string;
   accent: string;
   secondaryAccent: string;
+  textColorMode?: "auto" | "custom";
+  textPrimary?: string;
+  textSecondary?: string;
+  textMuted?: string;
 }
 
 export type ThemeTokenCorrectionKey =
@@ -105,7 +137,7 @@ export type CustomThemeCorrections = Partial<
 >;
 
 export interface CustomThemeDefinition {
-  version: 1;
+  version: 1 | 2;
   id: string;
   name: string;
   createdAt: string;

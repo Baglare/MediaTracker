@@ -1,5 +1,5 @@
 import type { MediaType } from "@/lib/types";
-import type { ProfilePresentationPreferences } from "@/lib/personalization/types";
+import type { ProfilePresentationPreferences, ProfileThemeSharingInput, PublicProfileThemeSnapshot } from "@/lib/personalization/types";
 import type { PublicXpSummary } from "@/lib/xp/types";
 
 export const PROFILE_VISIBILITIES = ["public", "protected", "personal"] as const;
@@ -47,6 +47,7 @@ export interface SocialProfileInput {
   connectionColor: ConnectionColor;
   selectedTitle?: string;
   presentation: ProfilePresentationPreferences;
+  themeSharing: ProfileThemeSharingInput;
 }
 
 export interface ProfileModuleLayout {
@@ -143,6 +144,7 @@ export interface PublicSocialProfile {
   joinedAt: string;
   selectedTitle?: string;
   presentation: ProfilePresentationPreferences;
+  themeSnapshot?: PublicProfileThemeSnapshot;
   followerCount?: number;
   followingCount?: number;
 }

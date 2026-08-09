@@ -10,6 +10,7 @@
 import Image from "next/image";
 import { Plus, Check, Film, Tv } from "lucide-react";
 import { TmdbNormalizedResult } from "@/lib/tmdb-types";
+import { SearchResultDescription } from "@/components/search-result-description";
 
 interface TmdbResultCardProps {
   result: TmdbNormalizedResult;     // TMDB sonuç verisi
@@ -23,9 +24,9 @@ export default function TmdbResultCard({
   onAdd,
 }: TmdbResultCardProps) {
   return (
-    <div className="flex gap-4 p-4 bg-zinc-900/50 rounded-xl border border-zinc-800/50 hover:border-zinc-700/50 transition-all">
+    <div className="flex min-w-0 gap-4 overflow-hidden rounded-xl border border-[var(--app-border)] bg-[var(--app-card-bg)] p-4 transition-colors hover:bg-[var(--app-card-hover)]">
       {/* Sol: Poster görseli */}
-      <div className="relative w-16 h-24 rounded-lg overflow-hidden flex-shrink-0 ring-1 ring-zinc-800 bg-zinc-800">
+      <div className="relative w-16 h-24 rounded-lg overflow-hidden flex-shrink-0 ring-1 ring-[var(--app-border)] bg-[var(--app-surface-2)]">
         {result.coverUrl ? (
           <Image
             src={result.coverUrl}
@@ -50,7 +51,7 @@ export default function TmdbResultCard({
       <div className="flex-1 min-w-0 flex flex-col justify-between">
         <div>
           {/* Başlık */}
-          <h4 className="font-semibold text-sm text-zinc-100 truncate">
+          <h4 className="font-semibold text-sm text-[var(--app-text-primary)] truncate">
             {result.title}
           </h4>
 
@@ -67,11 +68,7 @@ export default function TmdbResultCard({
           </div>
 
           {/* Açıklama (varsa, en fazla 2 satır) */}
-          {result.overview && (
-            <p className="text-xs text-zinc-500 mt-1.5 line-clamp-2 leading-relaxed">
-              {result.overview}
-            </p>
-          )}
+          <SearchResultDescription value={result.overview} />
         </div>
       </div>
 

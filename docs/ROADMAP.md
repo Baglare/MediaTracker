@@ -38,6 +38,7 @@
 | D7 ML / Aspect Verifier | Post-release opsiyonel backlog | Human gold/training release blocker değil; yalnız citation'lı evidence sonrası optional distillation/student shadow rolü ([deferred plan](D7_ML_DEFERRED_PLAN.md)) |
 | D8 — Release ve deployment (release candidate) | Planlandı | Persistent cross-instance research cache kararı, rate-limit/maliyet, migration/cutover, security acceptance, production flags ve kontrollü deploy; ayrıca D2C.1 ve Goal Cloud V1 production migration/flag rollout |
 | D8-1 — AI access ve API request boundary | Uygulandı (yerel/test; live smoke bekliyor) | Server-verified `app_metadata` entitlement, fail-closed provider/research gate, public-safe capability read-model, search POST JSON migration, process-local rate limit ve temel security headers ([AI güvenliği](D8_AI_ACCESS_AND_ADMIN_SECURITY.md), [API sınırı](D8_API_REQUEST_BOUNDARY.md)) |
+| D8-2 — Profil tema, asset ve Keşif polish | Uygulandı (yerel/test; migration ve live-fixture smoke bekliyor) | Opt-in profile-only public tema snapshot’ı, custom metin renkleri/kontrast kapısı, owner-safe session/process asset cache ve bounded plain-text sonuç açıklamaları ([sözleşme](D8_PROFILE_THEME_ASSET_AND_DISCOVERY_POLISH.md)) |
 
 ## Opsiyonel backlog
 

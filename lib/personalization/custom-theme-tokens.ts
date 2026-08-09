@@ -21,12 +21,19 @@ export function normalizeCustomThemeInputs(value: unknown): CustomThemeInputs | 
   const accent = normalizeHexColor(input.accent);
   const secondaryAccent = normalizeHexColor(input.secondaryAccent);
   if (!background || !surface || !accent || !secondaryAccent) return null;
+  const textColorMode = input.textColorMode === "custom" ? "custom" : "auto";
+  const textPrimary = textColorMode === "custom" ? normalizeHexColor(input.textPrimary) : undefined;
+  const textSecondary = textColorMode === "custom" ? normalizeHexColor(input.textSecondary) : undefined;
+  const textMuted = textColorMode === "custom" ? normalizeHexColor(input.textMuted) : undefined;
+  if (textColorMode === "custom" && (!textPrimary || !textSecondary || !textMuted)) return null;
   return {
     colorScheme: input.colorScheme,
     background,
     surface,
     accent,
     secondaryAccent,
+    textColorMode,
+    ...(textPrimary && textSecondary && textMuted ? { textPrimary, textSecondary, textMuted } : {}),
   };
 }
 
@@ -57,7 +64,9 @@ export function deriveCustomThemeTokens(
   if (!inputs) throw new Error("invalid_custom_theme_inputs");
 
   const dark = inputs.colorScheme === "dark";
-  const textPrimary = dark ? "#F8FAFC" : "#1C1917";
+  const textPrimary = inputs.textColorMode === "custom"
+    ? inputs.textPrimary!
+    : dark ? "#F8FAFC" : "#1C1917";
   const surface2 = mixHexColors(inputs.surface, textPrimary, dark ? 0.08 : 0.07);
   const surface3 = mixHexColors(inputs.surface, textPrimary, dark ? 0.15 : 0.13);
   const border = mixHexColors(inputs.surface, textPrimary, dark ? 0.20 : 0.16);
@@ -71,8 +80,12 @@ export function deriveCustomThemeTokens(
     surface3,
     elevated: mixHexColors(inputs.surface, dark ? "#FFFFFF" : "#FFFFFF", dark ? 0.05 : 0.32),
     textPrimary,
-    textSecondary: mixHexColors(textPrimary, inputs.background, dark ? 0.23 : 0.20),
-    textMuted: mixHexColors(textPrimary, inputs.background, dark ? 0.48 : 0.43),
+    textSecondary: inputs.textColorMode === "custom"
+      ? inputs.textSecondary!
+      : mixHexColors(textPrimary, inputs.background, dark ? 0.23 : 0.20),
+    textMuted: inputs.textColorMode === "custom"
+      ? inputs.textMuted!
+      : mixHexColors(textPrimary, inputs.background, dark ? 0.48 : 0.43),
     border,
     borderStrong,
     scrollbarThumbHover: mixHexColors(inputs.surface, textPrimary, 0.42),
@@ -129,6 +142,7 @@ export function evaluateThemeContrast(tokens: AppThemeTokens): ThemeContrastRepo
   const mutedSurface = roundedRatio(tokens.textMuted, tokens.surface1);
   const focusSurface = roundedRatio(tokens.focus, tokens.surface1);
   const borderSurface = roundedRatio(tokens.borderStrong, tokens.surface1);
+  const accentText = roundedRatio(tokens.accentContrast, tokens.accent);
 
   if (primaryBackground < 4.5 || primarySurface < 4.5) {
     const corrected = bestContrastingText(
@@ -177,9 +191,20 @@ export function evaluateThemeContrast(tokens: AppThemeTokens): ThemeContrastRepo
       ratio: borderSurface,
     });
   }
+  if (accentText < 4.5) {
+    warnings.push({
+      key: "accent-text",
+      message: "Vurgu üzerindeki metin kontrastı 4.5 seviyesinin altında.",
+      ratio: accentText,
+    });
+  }
 
   const critical = warnings.some((warning) => (
-    warning.key === "text-primary" || warning.key === "text-secondary"
+    warning.key === "text-primary"
+    || warning.key === "text-secondary"
+    || warning.key === "text-muted"
+    || warning.key === "focus"
+    || warning.key === "accent-text"
   ));
   return {
     valid: !critical,

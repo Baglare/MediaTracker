@@ -237,14 +237,14 @@ describe("P6 runtime and first paint contract", () => {
       theme: { kind: "custom", id: "ct_12345678" },
       resolvedTheme: "custom",
       accentMode: "theme",
-      customTheme: { id: "ct_12345678", inputs: DARK_INPUTS },
+      customTheme: { id: "ct_12345678", inputs: { ...DARK_INPUTS, textColorMode: "auto" } },
     });
     expect(raw.length).toBeLessThan(300);
     expect(parseAppearanceCookie(raw)).toEqual({
       theme: { kind: "custom", id: "ct_12345678" },
       resolvedTheme: "custom",
       accentMode: "theme",
-      customTheme: { id: "ct_12345678", inputs: DARK_INPUTS },
+      customTheme: { id: "ct_12345678", inputs: { ...DARK_INPUTS, textColorMode: "auto" } },
     });
   });
 

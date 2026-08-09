@@ -60,6 +60,7 @@ const THEME_KEYS = new Set([
 ]);
 const INPUT_KEYS = new Set([
   "colorScheme", "background", "surface", "accent", "secondaryAccent",
+  "textColorMode", "textPrimary", "textSecondary", "textMuted",
 ]);
 const CORRECTION_KEYS = new Set([
   "textPrimary", "textSecondary", "textMuted", "border", "borderStrong", "focus",

@@ -11,6 +11,8 @@ import {
   validateUserId,
 } from "@/lib/social/validation";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { buildPublicProfileThemeSnapshot } from "@/lib/personalization/public-profile-theme";
+import type { Json } from "@/lib/supabase/types";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -44,6 +46,10 @@ export async function POST(request: Request) {
     const validated = validateSocialProfileInput(input.profile);
     if (!validated.ok) return failure(validated.error);
     const profile = validated.value;
+    const publicThemeSnapshot = buildPublicProfileThemeSnapshot(profile.themeSharing);
+    if (profile.themeSharing.visibility !== "hidden" && !publicThemeSnapshot) {
+      return failure("Tema kritik kontrast veya güvenli snapshot kontrolünü geçemedi.");
+    }
     const { data, error } = await auth.client.rpc("social_save_unified_profile", {
       p_username: profile.username,
       p_display_name: profile.displayName,
@@ -67,6 +73,9 @@ export async function POST(request: Request) {
       p_avatar_focal_x: profile.presentation.avatarTransform.focalX,
       p_avatar_focal_y: profile.presentation.avatarTransform.focalY,
       p_avatar_zoom: profile.presentation.avatarTransform.zoom,
+      p_theme_visibility: profile.themeSharing.visibility,
+      p_public_theme_preset: profile.themeSharing.publicPreset ?? "",
+      p_public_theme_snapshot: (publicThemeSnapshot ?? null) as Json,
     });
     return error ? failure("Profil kaydedilemedi. Kullanıcı adı veya değişiklik süresi kuralını kontrol et.", 409) : NextResponse.json(data);
   }

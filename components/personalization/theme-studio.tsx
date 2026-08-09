@@ -42,7 +42,7 @@ const DEFAULT_DRAFT: ThemeDraft = {
 
 function draftTheme(draft: ThemeDraft): CustomThemeDefinition {
   return {
-    version: 1,
+    version: 2,
     id: draft.id ?? "ct_preview000000",
     name: draft.name,
     createdAt: "1970-01-01T00:00:00.000Z",
@@ -89,7 +89,7 @@ export function ThemeStudio({ onConfirm }: { onConfirm: ConfirmAction }) {
   ) => {
     setDraft((current) => current ? {
       ...current,
-      inputs: { ...current.inputs, [key]: value },
+          inputs: { ...current.inputs, [key]: value },
       corrections: undefined,
     } : current);
   };
@@ -100,7 +100,7 @@ export function ThemeStudio({ onConfirm }: { onConfirm: ConfirmAction }) {
       setMessage("Tema adı 1–40 karakter olmalıdır.");
       return;
     }
-    if (!contrast.valid) {
+    if (apply && !contrast.valid) {
       setMessage("Kritik kontrast uyarılarını otomatik düzeltmeden tema etkinleştirilemez.");
       return;
     }
@@ -234,7 +234,7 @@ export function ThemeStudio({ onConfirm }: { onConfirm: ConfirmAction }) {
             return (
               <article key={theme.id} className={`rounded-xl border p-3 ${selected ? "border-[var(--app-selected-border)] bg-[var(--app-selected-bg)]" : "border-[var(--app-border)] bg-[var(--app-surface-2)]"}`}>
                 <div className="flex h-8 overflow-hidden rounded-lg border border-black/10" aria-hidden="true">
-                  {Object.entries(theme.inputs).filter(([key]) => key !== "colorScheme").map(([key, color]) => (
+                  {Object.entries(theme.inputs).filter(([key, color]) => key !== "colorScheme" && key !== "textColorMode" && typeof color === "string").map(([key, color]) => (
                     <span key={key} className="flex-1" style={{ backgroundColor: color }} />
                   ))}
                 </div>
@@ -288,6 +288,21 @@ export function ThemeStudio({ onConfirm }: { onConfirm: ConfirmAction }) {
               <ColorField label="Ana yüzey" value={draft.inputs.surface} defaultValue={DEFAULT_DRAFT.inputs.surface} onChange={(value) => updateInput("surface", value)} />
               <ColorField label="Ana vurgu" value={draft.inputs.accent} defaultValue={DEFAULT_DRAFT.inputs.accent} onChange={(value) => updateInput("accent", value)} />
               <ColorField label="İkincil vurgu" value={draft.inputs.secondaryAccent} defaultValue={DEFAULT_DRAFT.inputs.secondaryAccent} onChange={(value) => updateInput("secondaryAccent", value)} />
+              <fieldset>
+                <legend className="text-sm font-medium text-[var(--app-text-primary)]">Metin renkleri</legend>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  {(["auto", "custom"] as const).map((mode) => (
+                    <button key={mode} type="button" aria-pressed={(draft.inputs.textColorMode ?? "auto") === mode} onClick={() => setDraft((current) => current ? { ...current, inputs: { ...current.inputs, textColorMode: mode, ...(mode === "custom" ? { textPrimary: tokens.textPrimary, textSecondary: tokens.textSecondary, textMuted: tokens.textMuted } : { textPrimary: undefined, textSecondary: undefined, textMuted: undefined }) }, corrections: undefined } : current)} className={`min-h-11 rounded-lg border px-3 text-sm ${(draft.inputs.textColorMode ?? "auto") === mode ? "border-[var(--app-selected-border)] bg-[var(--app-selected-bg)] text-[var(--app-selected-text)]" : "border-[var(--app-border)]"}`}>
+                      {mode === "auto" ? "Otomatik" : "Özel"}
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
+              {draft.inputs.textColorMode === "custom" && <>
+                <ColorField label="Ana metin" value={draft.inputs.textPrimary!} defaultValue={tokens.textPrimary} onChange={(value) => updateInput("textPrimary", value)} />
+                <ColorField label="İkincil metin" value={draft.inputs.textSecondary!} defaultValue={tokens.textSecondary} onChange={(value) => updateInput("textSecondary", value)} />
+                <ColorField label="Sessiz metin" value={draft.inputs.textMuted!} defaultValue={tokens.textMuted} onChange={(value) => updateInput("textMuted", value)} />
+              </>}
             </div>
             <div className="space-y-4">
               <ThemePreview tokens={tokens} />
@@ -310,7 +325,7 @@ export function ThemeStudio({ onConfirm }: { onConfirm: ConfirmAction }) {
               <div className="flex flex-wrap gap-2">
                 <button type="button" onClick={() => appearance.previewCustomTheme(draftTheme(draft))} className="min-h-11 rounded-lg border border-[var(--app-border-strong)] px-3 text-sm font-medium hover:bg-[var(--app-hover)]">Uygulamada geçici önizle</button>
                 <button type="button" onClick={() => save(false)} className="min-h-11 rounded-lg border border-[var(--app-border-strong)] bg-[var(--app-surface-2)] px-3 text-sm font-medium">Yalnız kaydet</button>
-                <button type="button" onClick={() => save(true)} className="min-h-11 rounded-lg bg-[var(--app-accent)] px-3 text-sm font-semibold text-[var(--app-accent-contrast)]">Kaydet ve uygula</button>
+                <button type="button" onClick={() => save(true)} disabled={!contrast.valid} className="min-h-11 rounded-lg bg-[var(--app-accent)] px-3 text-sm font-semibold text-[var(--app-accent-contrast)] disabled:cursor-not-allowed disabled:opacity-50">Kaydet ve uygula</button>
                 <button type="button" onClick={() => { appearance.clearThemePreview(); setDraft(null); }} className="min-h-11 rounded-lg px-3 text-sm text-[var(--app-text-secondary)] hover:bg-[var(--app-hover)]">Vazgeç</button>
               </div>
             </div>

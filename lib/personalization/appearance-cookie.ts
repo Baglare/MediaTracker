@@ -124,7 +124,7 @@ export function parseAppearanceCookie(value: unknown): AppearanceCookieIdentity 
   if (legacy) return legacy;
 
   const parts = value.split(".");
-  if (parts[0] !== "v3") return { ...DEFAULT_APPEARANCE_COOKIE_IDENTITY };
+  if (parts[0] !== "v3" && parts[0] !== "v4") return { ...DEFAULT_APPEARANCE_COOKIE_IDENTITY };
   if (parts[1] === "p" && parts.length === 5) {
     const [, , presetValue, resolvedValue, accentValue] = parts;
     if (
@@ -141,7 +141,7 @@ export function parseAppearanceCookie(value: unknown): AppearanceCookieIdentity 
       accentMode: accentValue as AccentMode,
     };
   }
-  if (parts[1] === "c" && parts.length === 10) {
+  if (parts[0] === "v3" && parts[1] === "c" && parts.length === 10) {
     const [, , id, colorScheme, background, surface, accent, secondaryAccent, accentMode, corrections] = parts;
     const inputs = normalizeCustomThemeInputs({
       colorScheme,
@@ -163,12 +163,21 @@ export function parseAppearanceCookie(value: unknown): AppearanceCookieIdentity 
       theme: { kind: "custom", id },
       resolvedTheme: "custom",
       accentMode: accentMode as AccentMode,
-      customTheme: {
-        id,
-        inputs,
-        corrections: parsedCorrections.value,
-      },
+      customTheme: { id, inputs, ...(parsedCorrections.value ? { corrections: parsedCorrections.value } : {}) },
     };
+  }
+  if (parts[0] === "v4" && parts[1] === "c" && parts.length === 14) {
+    const [, , id, colorScheme, background, surface, accent, secondaryAccent, accentMode, textColorMode, textPrimary, textSecondary, textMuted, corrections] = parts;
+    const inputs = normalizeCustomThemeInputs({
+      colorScheme,
+      background: expandCompactHex(background), surface: expandCompactHex(surface),
+      accent: expandCompactHex(accent), secondaryAccent: expandCompactHex(secondaryAccent),
+      textColorMode,
+      ...(textColorMode === "custom" ? { textPrimary: expandCompactHex(textPrimary), textSecondary: expandCompactHex(textSecondary), textMuted: expandCompactHex(textMuted) } : {}),
+    });
+    const parsedCorrections = parseCorrections(corrections);
+    if (!/^ct_[a-z0-9_-]{8,80}$/i.test(id) || !inputs || !ACCENT_MODES.has(accentMode as AccentMode) || !parsedCorrections.valid) return { ...DEFAULT_APPEARANCE_COOKIE_IDENTITY };
+    return { theme: { kind: "custom", id }, resolvedTheme: "custom", accentMode: accentMode as AccentMode, customTheme: { id, inputs, ...(parsedCorrections.value ? { corrections: parsedCorrections.value } : {}) } };
   }
   return { ...DEFAULT_APPEARANCE_COOKIE_IDENTITY };
 }
@@ -182,7 +191,7 @@ export function serializeAppearanceCookie(identity: AppearanceCookieIdentity): s
     const inputs = normalizeCustomThemeInputs(identity.customTheme.inputs);
     if (inputs && ACCENT_MODES.has(identity.accentMode)) {
       return [
-        "v3",
+        "v4",
         "c",
         identity.theme.id,
         inputs.colorScheme,
@@ -191,6 +200,10 @@ export function serializeAppearanceCookie(identity: AppearanceCookieIdentity): s
         compactHex(inputs.accent),
         compactHex(inputs.secondaryAccent),
         identity.accentMode,
+        inputs.textColorMode ?? "auto",
+        inputs.textColorMode === "custom" ? compactHex(inputs.textPrimary!) : "-",
+        inputs.textColorMode === "custom" ? compactHex(inputs.textSecondary!) : "-",
+        inputs.textColorMode === "custom" ? compactHex(inputs.textMuted!) : "-",
         serializeCorrections(normalizeThemeCorrections(identity.customTheme.corrections)),
       ].join(".");
     }

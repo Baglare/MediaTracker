@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { PageSection } from "@/components/ui/page-section";
 import { resolveProfileIdentity } from "@/lib/personalization/profile-identity";
 import type { SocialProfilePayload } from "@/lib/social/types";
+import { publicProfileThemeStyle } from "@/lib/personalization/public-profile-theme";
 
 function StateCard({ title, text }: { title: string; text: string }) {
   return <div className="mx-auto grid min-h-[55vh] max-w-3xl place-items-center"><EmptyState title={title} description={text} primaryAction={<Link href="/people" className="app-primary-action rounded-lg px-3 py-2 text-sm font-medium">Kullanıcı aramaya dön</Link>}/></div>;
@@ -35,8 +36,9 @@ export function SocialProfileView({ payload }: { payload: SocialProfilePayload }
     : payload.progression
       ? { level: payload.progression.level, totalXp: payload.progression.totalXp, tier: payload.progression.tier, dominantWorld: payload.progression.dominantWorld }
       : undefined;
+  const scopedThemeStyle = publicProfileThemeStyle(profile.themeSnapshot);
   return (
-    <div data-profile-palette={profile.presentation.paletteId} className="mx-auto w-full max-w-6xl space-y-5">
+    <div data-profile-palette={profile.presentation.paletteId} data-profile-theme-source={profile.themeSnapshot?.source ?? "visitor"} style={scopedThemeStyle} className="mx-auto w-full max-w-6xl space-y-5 rounded-3xl bg-[var(--app-bg)] p-1 text-[var(--app-text-primary)] sm:p-2">
       <ProfileHero variant="public" identity={identity} presentation={profile.presentation} progression={progression} visibilityLabel={profile.visibilityMode === "protected" ? "Korumalı" : "Herkese açık"} location={profile.location} language={profile.language} joinedAt={`Katılım ${new Date(profile.joinedAt).toLocaleDateString("tr-TR")}`} actions={publicActions} />
       {identity.bio && <PageSection title="Hakkında"><p className="whitespace-pre-wrap text-sm text-[var(--app-text-secondary)]">{identity.bio}</p></PageSection>}
       {payload.relationship.self && <YinYangConnection relationship={payload.relationship} following={profile.followingCount} followers={profile.followerCount} />}

@@ -18,6 +18,7 @@ import {
 
 export const CUSTOM_THEMES_STORAGE_KEY = "mediaTracker:customThemes:v1";
 export const CUSTOM_THEMES_VERSION = 1 as const;
+export const CUSTOM_THEME_DEFINITION_VERSION = 2 as const;
 export const MAX_CUSTOM_THEMES = 20;
 
 export interface CustomThemeCollection {
@@ -55,7 +56,7 @@ export function normalizeCustomThemeDefinition(value: unknown): CustomThemeDefin
   const name = normalizeCustomThemeName(theme.name);
   const inputs = normalizeCustomThemeInputs(theme.inputs);
   if (
-    theme.version !== CUSTOM_THEMES_VERSION
+    (theme.version !== 1 && theme.version !== CUSTOM_THEME_DEFINITION_VERSION)
     || typeof theme.id !== "string"
     || !CUSTOM_THEME_ID.test(theme.id)
     || !name
@@ -66,7 +67,7 @@ export function normalizeCustomThemeDefinition(value: unknown): CustomThemeDefin
     return null;
   }
   return {
-    version: CUSTOM_THEMES_VERSION,
+    version: CUSTOM_THEME_DEFINITION_VERSION,
     id: theme.id,
     name,
     createdAt: theme.createdAt,
@@ -171,7 +172,7 @@ export function createCustomThemeDefinition(
   draft: CustomThemeDraftValue,
 ): CustomThemeDefinition {
   const normalized = normalizeCustomThemeDefinition({
-    version: CUSTOM_THEMES_VERSION,
+    version: CUSTOM_THEME_DEFINITION_VERSION,
     id,
     name: draft.name,
     createdAt: now,

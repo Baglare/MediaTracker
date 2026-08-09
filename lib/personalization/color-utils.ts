@@ -88,8 +88,8 @@ export function contrastRatio(foreground: string, background: string): number {
   return (lighter + 0.05) / (darker + 0.05);
 }
 
-export function bestContrastingText(background: string): "#111827" | "#F8FAFC" {
-  return contrastRatio("#111827", background) >= contrastRatio("#F8FAFC", background)
-    ? "#111827"
-    : "#F8FAFC";
+export function bestContrastingText(background: string): "#000000" | "#FFFFFF" {
+  return contrastRatio("#000000", background) >= contrastRatio("#FFFFFF", background)
+    ? "#000000"
+    : "#FFFFFF";
 }

@@ -29,6 +29,11 @@ import type { MediaItem } from "@/lib/types";
 import type { UserProgression } from "@/lib/user-progression";
 import { updateOwnProfileCache } from "@/lib/social/own-profile-cache";
 import { publishOwnProfileSummary } from "@/lib/social/profile-summary";
+import { useAppearanceRuntime } from "@/components/personalization/appearance-runtime";
+import { useCustomThemesRuntime } from "@/components/personalization/custom-themes-runtime";
+import { deriveCustomThemeTokens, evaluateThemeContrast } from "@/lib/personalization/custom-theme-tokens";
+import { BASE_THEME_REGISTRY } from "@/lib/personalization/theme-registry";
+import type { ProfileThemeVisibility, ResolvedBaseThemeId } from "@/lib/personalization/types";
 
 const EMPTY: SocialProfileEditorData = { configured: false, authenticated: false, modules: [], favorites: [], current: [], sharedNotes: [], blockedAccounts: [] };
 const INPUT_CLASS = "app-input mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-focus)]";
@@ -58,6 +63,8 @@ export function UnifiedProfileEditor({ initialData, authConfigured, authenticate
   onProfileChanged: () => Promise<SocialProfileEditorData | undefined>;
 }) {
   const localOnly = !authConfigured || !authenticated;
+  const appearance = useAppearanceRuntime();
+  const customThemes = useCustomThemesRuntime();
   const initialPrefill = useMemo(() => prefillSocialProfile(localPreferences, profileName, selectedTitle), [localPreferences, profileName, selectedTitle]);
   const seed = initialData ?? (localOnly ? EMPTY : { ...EMPTY, configured: authConfigured, authenticated });
   const seedForm = seed.profile ?? initialPrefill;
@@ -67,6 +74,22 @@ export function UnifiedProfileEditor({ initialData, authConfigured, authenticate
   const [modules, setModules] = useState<ProfileModuleLayout[]>(seed.modules.length ? mergeModuleDefaults(seed.modules) : defaultProfileModules());
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const activeCustomTheme = appearance.preferences.theme.kind === "custom"
+    ? customThemes.themes.find((theme) => theme.id === appearance.preferences.theme.id)
+    : undefined;
+  const activeCustomPublishable = activeCustomTheme
+    ? evaluateThemeContrast(deriveCustomThemeTokens(activeCustomTheme.inputs, activeCustomTheme.corrections)).valid
+    : false;
+
+  function themeSharingFor(visibility: ProfileThemeVisibility, preset?: ResolvedBaseThemeId): SocialProfileInput["themeSharing"] {
+    if (visibility === "hidden") return { visibility };
+    if (visibility === "preset_only") return { visibility, publicPreset: preset ?? "obsidian" };
+    if (activeCustomTheme && activeCustomPublishable) return { visibility, currentTheme: { kind: "custom", theme: activeCustomTheme } };
+    const currentPreset = appearance.preferences.theme.kind === "preset" && appearance.preferences.theme.id !== "system"
+      ? appearance.preferences.theme.id
+      : "obsidian";
+    return { visibility, currentTheme: { kind: "preset", id: currentPreset } };
+  }
 
   function applyData(next: SocialProfileEditorData) {
     setData(next);
@@ -92,7 +115,8 @@ export function UnifiedProfileEditor({ initialData, authConfigured, authenticate
       setMessage("Yerel profil bu cihazda kaydedildi.");
       return;
     }
-    const validation = validateSocialProfileInput(form);
+    const preparedForm = { ...form, themeSharing: themeSharingFor(form.themeSharing.visibility, form.themeSharing.publicPreset) };
+    const validation = validateSocialProfileInput(preparedForm);
     if (!validation.ok) { setError(validation.error); return; }
     try {
       await post({ action: "save_profile", profile: validation.value });
@@ -172,7 +196,7 @@ export function UnifiedProfileEditor({ initialData, authConfigured, authenticate
         )}
       </section>}
 
-      {!localOnly && <section className="app-panel rounded-2xl border p-4 sm:p-5"><h2 className="font-semibold">Sosyal ve gizlilik</h2><div className="mt-4 grid gap-4 sm:grid-cols-2"><label className="text-xs text-[var(--app-text-muted)]">Profil görünürlüğü<select value={form.visibilityMode} onChange={(event) => update("visibilityMode", event.target.value as SocialProfileInput["visibilityMode"])} className={INPUT_CLASS}>{PROFILE_VISIBILITIES.map((mode) => <option key={mode} value={mode}>{mode}</option>)}</select></label><label className="text-xs text-[var(--app-text-muted)]">Yin/Yang bağlantı rengi<select value={form.connectionColor} onChange={(event) => update("connectionColor", event.target.value as SocialProfileInput["connectionColor"])} className={INPUT_CLASS}>{CONNECTION_COLORS.map((color) => <option key={color} value={color}>{color}</option>)}</select></label></div><p className="mt-3 text-xs text-[var(--app-text-muted)]">Bağlantı rengi yalnız sosyal ilişki gösteriminde kullanılır; palette, banner veya uygulama accent’i değildir.</p></section>}
+      {!localOnly && <section className="app-panel rounded-2xl border p-4 sm:p-5"><h2 className="font-semibold">Sosyal ve gizlilik</h2><div className="mt-4 grid gap-4 sm:grid-cols-2"><label className="text-xs text-[var(--app-text-muted)]">Profil görünürlüğü<select value={form.visibilityMode} onChange={(event) => update("visibilityMode", event.target.value as SocialProfileInput["visibilityMode"])} className={INPUT_CLASS}>{PROFILE_VISIBILITIES.map((mode) => <option key={mode} value={mode}>{mode}</option>)}</select></label><label className="text-xs text-[var(--app-text-muted)]">Yin/Yang bağlantı rengi<select value={form.connectionColor} onChange={(event) => update("connectionColor", event.target.value as SocialProfileInput["connectionColor"])} className={INPUT_CLASS}>{CONNECTION_COLORS.map((color) => <option key={color} value={color}>{color}</option>)}</select></label><label className="text-xs text-[var(--app-text-muted)] sm:col-span-2">Profil tema paylaşımı<select value={form.themeSharing.visibility} onChange={(event) => update("themeSharing", themeSharingFor(event.target.value as ProfileThemeVisibility, form.themeSharing.publicPreset))} className={INPUT_CLASS}><option value="hidden">Temam gizli</option><option value="preset_only">Yalnız seçtiğim hazır tema</option><option value="current_theme" disabled={Boolean(activeCustomTheme) && !activeCustomPublishable}>Kullandığım temayı profilimde göster</option></select></label>{form.themeSharing.visibility === "preset_only" && <label className="text-xs text-[var(--app-text-muted)] sm:col-span-2">Public hazır tema<select value={form.themeSharing.publicPreset ?? "obsidian"} onChange={(event) => update("themeSharing", themeSharingFor("preset_only", event.target.value as ResolvedBaseThemeId))} className={INPUT_CLASS}>{Object.values(BASE_THEME_REGISTRY).filter((theme) => theme.id !== "system").map((theme) => <option key={theme.id} value={theme.id}>{theme.label}</option>)}</select></label>}</div><p className="mt-3 text-xs text-[var(--app-text-muted)]">Tema varsayılan olarak gizlidir. Hazır tema modu yalnız seçtiğin preset’i; kullandığım tema modu ise aktif temanın doğrulanmış renk snapshot’ını public profile taşır. Özel tema kimliği ve diğer özel veriler paylaşılmaz.</p>{activeCustomTheme && !activeCustomPublishable && <p className="mt-2 text-xs text-[var(--app-danger)]">Aktif özel tema kritik kontrast kontrolünü geçmediği için public yayımlanamaz.</p>}<p className="mt-2 text-xs text-[var(--app-text-muted)]">Bağlantı rengi yalnız sosyal ilişki gösteriminde kullanılır; palette, banner veya uygulama accent’i değildir.</p></section>}
 
       <div className="flex flex-wrap gap-2"><button type="button" onClick={() => void save()} className="app-primary-action rounded-xl px-5 py-2.5 text-sm font-semibold">Değişiklikleri kaydet</button><button type="button" onClick={() => { setForm(savedForm); setMessage("Taslak değişiklikler geri alındı."); setError(""); }} className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-1)] px-5 py-2.5 text-sm">Vazgeç</button></div>
 

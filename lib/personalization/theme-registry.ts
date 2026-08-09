@@ -97,7 +97,7 @@ export const BASE_THEME_REGISTRY: Readonly<Record<BaseThemeId, BaseThemeRegistry
       accent: "#8b5cf6",
       accentStrong: "#a78bfa",
       accentSoft: "rgba(139, 92, 246, 0.30)",
-      accentContrast: "#fafafa",
+      accentContrast: "#000000",
       danger: "#fb7185",
       dangerSoft: "rgba(244, 63, 94, 0.12)",
       success: "#34d399",

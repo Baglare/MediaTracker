@@ -59,6 +59,9 @@ export interface Database {
           connection_color: string;
           avatar_path: string | null;
           banner_path: string | null;
+          profile_theme_visibility: "hidden" | "preset_only" | "current_theme";
+          public_theme_preset: "obsidian" | "porcelain" | "ocean" | "dusty_rose" | "forest" | "lavender" | "polar" | "sepia" | null;
+          public_theme_snapshot: Json | null;
           profile_palette_id: "neutral" | "east" | "screen" | "arch" | "ocean";
           banner_mode: "none" | "gradient" | "world" | "image";
           banner_position: "top" | "center" | "bottom";
@@ -94,6 +97,9 @@ export interface Database {
           connection_color?: string;
           avatar_path?: string | null;
           banner_path?: string | null;
+          profile_theme_visibility?: "hidden" | "preset_only" | "current_theme";
+          public_theme_preset?: "obsidian" | "porcelain" | "ocean" | "dusty_rose" | "forest" | "lavender" | "polar" | "sepia" | null;
+          public_theme_snapshot?: Json | null;
           profile_palette_id?: "neutral" | "east" | "screen" | "arch" | "ocean";
           banner_mode?: "none" | "gradient" | "world" | "image";
           banner_position?: "top" | "center" | "bottom";
@@ -129,6 +135,9 @@ export interface Database {
           connection_color?: string;
           avatar_path?: string | null;
           banner_path?: string | null;
+          profile_theme_visibility?: "hidden" | "preset_only" | "current_theme";
+          public_theme_preset?: "obsidian" | "porcelain" | "ocean" | "dusty_rose" | "forest" | "lavender" | "polar" | "sepia" | null;
+          public_theme_snapshot?: Json | null;
           profile_palette_id?: "neutral" | "east" | "screen" | "arch" | "ocean";
           banner_mode?: "none" | "gradient" | "world" | "image";
           banner_position?: "top" | "center" | "bottom";
@@ -321,7 +330,7 @@ export interface Database {
       search_social_profiles: { Args: { p_query: string; p_offset?: number; p_limit?: number }; Returns: Json };
       list_social_connections: { Args: { p_owner: string; p_kind: string; p_query?: string; p_offset?: number; p_limit?: number }; Returns: Json };
       social_save_profile: { Args: { p_username: string; p_display_name: string; p_bio: string; p_location: string; p_language: string; p_visibility_mode: string; p_connection_color: string; p_selected_title: string }; Returns: Json };
-      social_save_unified_profile: { Args: { p_username: string; p_display_name: string; p_tagline: string; p_bio: string; p_location: string; p_language: string; p_visibility_mode: string; p_connection_color: string; p_selected_title: string; p_profile_palette_id: string; p_banner_mode: string; p_banner_position: string; p_overlay_strength: string; p_avatar_frame: string; p_surface_style: string; p_motif_intensity: string; p_banner_focal_x: number; p_banner_focal_y: number; p_banner_zoom: number; p_avatar_focal_x: number; p_avatar_focal_y: number; p_avatar_zoom: number }; Returns: Json };
+      social_save_unified_profile: { Args: { p_username: string; p_display_name: string; p_tagline: string; p_bio: string; p_location: string; p_language: string; p_visibility_mode: string; p_connection_color: string; p_selected_title: string; p_profile_palette_id: string; p_banner_mode: string; p_banner_position: string; p_overlay_strength: string; p_avatar_frame: string; p_surface_style: string; p_motif_intensity: string; p_banner_focal_x: number; p_banner_focal_y: number; p_banner_zoom: number; p_avatar_focal_x: number; p_avatar_focal_y: number; p_avatar_zoom: number; p_theme_visibility: string; p_public_theme_preset: string; p_public_theme_snapshot: Json | null }; Returns: Json };
       social_follow: { Args: { p_target: string }; Returns: Json };
       social_follow_action: { Args: { p_action: string; p_other: string }; Returns: Json };
       social_block: { Args: { p_target: string }; Returns: Json };
