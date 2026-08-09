@@ -10,7 +10,7 @@ Uygulamanın ana veri kaynağı tarayıcıdaki owner-scoped yerel depolamadır. 
 - Varsayılan kullanım yerel moddur; medya ve ilerleme verisi owner-scoped biçimde tarayıcıda saklanır.
 - Supabase opsiyoneldir: auth, manuel Cloud upload/download/merge, owner-scoped sync queue, revision/idempotency ve conflict akışları vardır.
 - AI Danışman opsiyoneldir: varsayılan mock provider ile çalışır, API anahtarları verilirse gerçek provider kullanılabilir.
-- Python tabanlı ML servisi opsiyoneldir: embedding skoru için kullanılabilir; yoksa yerel mock embedding fallback'i çalışır.
+- Python tabanlı embedding/ML servisi yalnız opsiyonel legacy geliştirme yoludur; Recommendation V2'nin aktif production karar hattı değildir.
 
 ### Geliştirme aşamaları
 
@@ -32,7 +32,7 @@ Ayrıntılı sıra ve sonraki aşamalar: [`docs/ROADMAP.md`](docs/ROADMAP.md).
 - Supabase auth, manuel Cloud aktarım, owner-scoped sync queue, V2 revision/idempotency/tombstone ve conflict akışı.
 - Local-first kütüphaneden ayrılmış cloud sosyal profil, kullanıcı arama ve takip/engel temeli.
 - TMDB, OMDb, TVmaze, AniList ve Open Library entegrasyonları için normalize edilmiş medya modeli.
-- AI destekli öneri pipeline'ı, embedding tabanlı benzerlik skoru, provider fallback sistemi ve feedback-aware recommendation flow.
+- AI Recommendation V2 için structured provider evidence, deterministik eligibility/ranking ve unresolved hard constraint'lerde optional source-grounded research; LLM final sıralama yapmaz.
 - Ana sayfada medya domain durumu, kalıcı kullanıcı tercihleri ve sekme render orkestrasyonu ayrıştırılmış modüler yapı.
 - React/Next.js state yönetimi, TypeScript tip güvenliği ve responsive dashboard tasarımı.
 
@@ -402,7 +402,7 @@ Next.js tarafı `MEDIA_TRACKER_ML_SERVICE_URL` doluysa bu servisi kullanır. Ser
 
 ## Roadmap Özeti
 
-D1–D5 kod, otomatik test ve yerel kabul kapsamı tamamlandı; D6 AI Recommendation V2 de yerel kabul kapsamını kapattı. V2 doğrulanmış provider identity, structured evidence, deterministik hard-filter/ranking, editable constraint UI ve owner-scoped Feedback V2 baseline'ı sunar; bu durum AI doğruluğu veya production-ready garantisi değildir. D7 insan etiketli değerlendirme/kalibrasyon, D8 release/deployment aşamasıdır. D2C.1 production cutover ile Goal Cloud V1 migration/feature rollout D8'de yapılacaktır; bu repository turunda production migration veya deployment uygulanmamıştır. Güncel ayrıntı [`docs/ROADMAP.md`](docs/ROADMAP.md) ve [`docs/AI_RECOMMENDATION_V2_ACCEPTANCE.md`](docs/AI_RECOMMENDATION_V2_ACCEPTANCE.md) içindedir.
+D1–D5 kod, otomatik test ve yerel kabul kapsamı tamamlandı; D6 AI Recommendation V2 deterministik final karar motorunu, D7 ise optional source-grounded research katmanını tamamladı. V2 structured provider evidence kullanır; unresolved hard constraint'ler exact identity/revision-bound Wikimedia ve provider-neutral discovery/extraction ile araştırılabilir. LLM final sıralama yapmaz ve public-safe citation üretilemeyen research kararı sonucu değiştiremez. Research varsayılan kapalıdır; production flag/cost/security/deploy rollout'u D8'dedir. Eski embedding/ML hattı aktif production release yolu değildir. D2C.1 cutover ile Goal Cloud V1 rollout da D8'de yapılacaktır. Güncel ayrıntı [`docs/ROADMAP.md`](docs/ROADMAP.md), [`docs/AI_RECOMMENDATION_V2_ACCEPTANCE.md`](docs/AI_RECOMMENDATION_V2_ACCEPTANCE.md) ve [`docs/D7_FINAL_ACCEPTANCE.md`](docs/D7_FINAL_ACCEPTANCE.md) içindedir.
 
 ## Sorun Giderme
 

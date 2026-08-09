@@ -8,6 +8,8 @@
 
 Active akış iki saf deterministic koşudan oluşur: önce değişmemiş D6 baseline üretilir; ardından yalnız exact identity/version scope taşıyan, objective ve library kapılarından geçmiş, explicit `must`/`avoid` koşulu structured evidence ile `unknown` kalmış en fazla üç aday araştırılır. Validated `ResearchEvidenceHandoff`, mevcut hard-constraint mapper ile immutable evidence/constraint sidecar'a çevrilir ve engine temiz input üzerinde baştan çalıştırılır. Eligibility, near-match ve sıralama yalnız ikinci deterministic koşudan gelir; LLM ranking yapmaz.
 
+Candidate retrieval active modda bounded dual pass kullanabilir. Normal structured pass bütün provider filtrelerini taşır; rescue pass yalnız semantic verification isteyen explicit hard exact-taxonomy constraint'i gevşetir. Objective/library sınırları ile diğer queryable must'lar korunur, verified identity zorunludur ve research kararı olmadan rescue adayı primary listeye giremez. Registry'de query mapping'i olmayan aspect için title/fuzzy veya uydurma tag fallback'i yapılmaz.
+
 ## Budget and failure policy
 
 Active stage en fazla üç aday, aday başına bir aspect, toplam üç job, concurrency 2 ve 12 saniye hard deadline kullanır. Öncelik explicit must, explicit avoid, baseline sıra ve stable identity şeklindedir. Provider/config/cache/acquisition/extraction/grounding/timeout/abort hataları public 500 üretmez; doğrulanmamış veya unknown sonuç merge edilmez ve baseline korunur.
@@ -19,3 +21,5 @@ Internal sidecar candidate identity, aspect, bounded decision/citation kimlikler
 ## Public boundary
 
 Shadow modu `after()` post-response lifecycle'ını korur; active mod shadow schedule etmez ve final deterministic koşuyu response öncesinde await eder. D7-R6A2 ile active mod ayrıca `D7_RESEARCH_PUBLIC_CITATIONS_ENABLED=1` ister. Outcome değiştiren decision revision-bound, registry-verified [public read-model](D7_PUBLIC_RESEARCH_TRANSPARENCY.md) üretemezse baseline döner. Optional `researchEvidence` dışında mevcut Recommendation V2 alanları değişmez.
+
+R6B final kabul ve conditional live miss→hit sonucu [D7 final acceptance](D7_FINAL_ACCEPTANCE.md) belgesindedir. Varsayılan rollout `disabled`, production rollout D8 kapsamındadır.

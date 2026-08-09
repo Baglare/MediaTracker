@@ -5,6 +5,8 @@ import { runGroundedResearchActivePipeline, type ActiveGroundedResearchHandoff }
 import type { GroundedResearchShadowContext } from "../shadow/types";
 import { buildActiveResearchMerge } from "./merge";
 import { buildPublicResearchEvidenceSummary } from "./public-evidence";
+import type { PublicResearchOutcomeNotice } from "@/lib/ai/types";
+import { ASPECT_REGISTRY } from "../../domain/aspect-registry";
 import type { ActiveGroundedRecommendationResult, ActiveResearchProvenanceSidecar, ResearchOutcomeChange } from "./types";
 
 export interface ActiveGroundedRecommendationDependencies {
@@ -45,6 +47,34 @@ function outcome(input: { role: "must" | "avoid"; before: boolean; after: boolea
   return "no_change";
 }
 
+const UNAVAILABLE_RESEARCH_STATUSES = new Set(["adapter_unavailable", "provider_unavailable", "rate_limited", "budget_exhausted", "security_rejected", "identity_not_found", "identity_ambiguous", "identity_unverified", "wikipedia_unavailable"]);
+
+function buildOutcomeNotice(input: {
+  context: GroundedResearchShadowContext;
+  status: PublicResearchOutcomeNotice["status"];
+  affectedCandidateCount?: number;
+  onlyAvoidPresence?: boolean;
+}): PublicResearchOutcomeNotice {
+  const aspects = input.context.candidates.flatMap((candidate) => candidate.researchCandidate.unresolvedConstraints).flatMap((constraint) => {
+    if (input.onlyAvoidPresence && constraint.role !== "avoid") return [];
+    return [{
+      aspectId: constraint.aspectId,
+      label: ASPECT_REGISTRY[constraint.aspectId].labelTr,
+      outcome: input.onlyAvoidPresence
+        ? "verified_avoided_element" as const
+        : constraint.role === "must"
+          ? "could_not_verify_required" as const
+          : "explicit_absence_not_verified" as const,
+    }];
+  });
+  const deduped = [...new Map(aspects.map((item) => [item.aspectId, item])).values()].slice(0, 3);
+  return { version: 1, status: input.status, aspects: deduped, ...(input.affectedCandidateCount ? { affectedCandidateCount: Math.min(3, Math.max(1, input.affectedCandidateCount)) } : {}) };
+}
+
+function withNotice(execution: ActiveGroundedRecommendationResult["execution"], notice: PublicResearchOutcomeNotice): ActiveGroundedRecommendationResult["execution"] {
+  return { ...execution, response: { ...execution.response, researchOutcomeNotice: notice } };
+}
+
 export async function runActiveGroundedRecommendation(input: {
   engineInput: DeterministicRecommendationV2Input;
   requestId: string;
@@ -57,9 +87,13 @@ export async function runActiveGroundedRecommendation(input: {
   if (!context || context.candidates.length === 0 || input.signal?.aborted) return { execution: baseline, baselineResponse: baseline.response, provenance: [], status: "baseline" };
   try {
     const research = await runResearch({ ...context, requestId: input.requestId, ...(input.signal ? { signal: input.signal } : {}) });
-    if (research.handoffs.length === 0) return { execution: baseline, baselineResponse: baseline.response, provenance: [], status: "baseline" };
+    if (research.handoffs.length === 0) {
+      const unavailable = research.result.status === "budget_exhausted" || research.result.status === "aborted" || research.result.results.some((item) => UNAVAILABLE_RESEARCH_STATUSES.has(item.researchStatus));
+      const notice = buildOutcomeNotice({ context, status: unavailable ? "research_unavailable" : "no_verified_match", affectedCandidateCount: context.candidates.length });
+      return { execution: withNotice(baseline, notice), baselineResponse: baseline.response, provenance: [], status: unavailable ? "failed_soft" : "baseline" };
+    }
     const merge = buildActiveResearchMerge({ handoffs: research.handoffs.map((item) => item.handoff), constraints: context.structuredRequest.aspectConstraints });
-    if (merge.constraintDecisionsByCandidateKey.size === 0) return { execution: baseline, baselineResponse: baseline.response, provenance: [], status: "baseline" };
+    if (merge.constraintDecisionsByCandidateKey.size === 0) return { execution: withNotice(baseline, buildOutcomeNotice({ context, status: "no_verified_match", affectedCandidateCount: context.candidates.length })), baselineResponse: baseline.response, provenance: [], status: "baseline" };
     const finalExecution = await runDeterministic({ ...cloneInput(input.engineInput), researchAspectEvidenceByCandidateKey: merge.aspectEvidenceByCandidateKey, researchConstraintDecisionOverridesByCandidateKey: merge.constraintDecisionsByCandidateKey });
     const provenance: ActiveResearchProvenanceSidecar[] = research.handoffs.flatMap((item) => item.handoff.aspectDecisions.flatMap((decision) => {
       const constraint = context.structuredRequest.aspectConstraints.find((candidate) => candidate.aspectId === decision.aspectId && (candidate.role === "must" || candidate.role === "avoid"));
@@ -74,7 +108,7 @@ export async function runActiveGroundedRecommendation(input: {
     for (const provenanceItem of provenance.filter((item) => item.whetherResearchChangedOutcome === "rescued_candidate" || item.whetherResearchChangedOutcome === "cleared_avoid")) {
       const handoff = research.handoffs.find((item) => item.handoff.candidateIdentity.canonicalKey === provenanceItem.candidateIdentity.canonicalKey && item.handoff.aspectDecisions.some((decision) => decision.aspectId === provenanceItem.aspectId))?.handoff;
       const summary = handoff ? buildPublicResearchEvidenceSummary({ handoff, provenance: provenanceItem }) : null;
-      if (!summary) return { execution: baseline, baselineResponse: baseline.response, provenance: [], status: "failed_soft" };
+      if (!summary) return { execution: withNotice(baseline, buildOutcomeNotice({ context, status: "research_unavailable", affectedCandidateCount: context.candidates.length })), baselineResponse: baseline.response, provenance: [], status: "failed_soft" };
       publicEvidenceByCandidateKey.set(provenanceItem.candidateIdentity.canonicalKey, summary);
     }
     const recommendations = finalExecution.response.recommendations.map((recommendation) => {
@@ -82,8 +116,12 @@ export async function runActiveGroundedRecommendation(input: {
       const researchEvidence = key ? publicEvidenceByCandidateKey.get(key) : undefined;
       return researchEvidence ? { ...recommendation, researchEvidence } : recommendation;
     });
-    return { execution: { ...finalExecution, response: { ...finalExecution.response, recommendations } }, baselineResponse: baseline.response, provenance, status: "active_applied" };
+    const excludedByAvoid = provenance.filter((item) => item.whetherResearchChangedOutcome === "rejected_candidate" && context.structuredRequest.aspectConstraints.some((constraint) => constraint.aspectId === item.aspectId && constraint.role === "avoid"));
+    const researchOutcomeNotice = excludedByAvoid.length > 0
+      ? buildOutcomeNotice({ context: { ...context, candidates: context.candidates.filter((candidate) => excludedByAvoid.some((item) => item.candidateIdentity.canonicalKey === candidate.researchCandidate.identity.canonicalKey)) }, status: "candidates_excluded_by_research", affectedCandidateCount: excludedByAvoid.length, onlyAvoidPresence: true })
+      : undefined;
+    return { execution: { ...finalExecution, response: { ...finalExecution.response, recommendations, ...(researchOutcomeNotice ? { researchOutcomeNotice } : {}) } }, baselineResponse: baseline.response, provenance, status: "active_applied" };
   } catch {
-    return { execution: baseline, baselineResponse: baseline.response, provenance: [], status: "failed_soft" };
+    return { execution: withNotice(baseline, buildOutcomeNotice({ context, status: "research_unavailable", affectedCandidateCount: context.candidates.length })), baselineResponse: baseline.response, provenance: [], status: "failed_soft" };
   }
 }

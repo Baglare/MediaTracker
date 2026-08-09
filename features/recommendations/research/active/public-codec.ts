@@ -1,4 +1,4 @@
-import type { PublicResearchAspectEvidence, PublicResearchEvidenceSummary, PublicResearchSource } from "@/lib/ai/types";
+import type { PublicResearchAspectEvidence, PublicResearchEvidenceSummary, PublicResearchOutcomeNotice, PublicResearchSource } from "@/lib/ai/types";
 import { ASPECT_REGISTRY } from "../../domain/aspect-registry";
 import { validateResearchUrl } from "../security/url-policy";
 import { getResearchSource } from "../domain/source-registry";
@@ -51,6 +51,25 @@ export function decodePublicResearchEvidenceSummary(value: unknown): PublicResea
   const uniqueUrls = new Set((sources as PublicResearchSource[]).map((item) => item.url));
   if (uniqueUrls.size !== sources.length) return null;
   return { version: 1, status: "research_verified", affectedAspects: affectedAspects as PublicResearchAspectEvidence[], sources: sources as PublicResearchSource[] };
+}
+
+export function decodePublicResearchOutcomeNotice(value: unknown): PublicResearchOutcomeNotice | null {
+  if (!record(value) || value.version !== 1 || !["no_verified_match", "candidates_excluded_by_research", "research_unavailable"].includes(String(value.status)) || !Array.isArray(value.aspects)) return null;
+  if (value.aspects.length < 1 || value.aspects.length > 3) return null;
+  const aspects = value.aspects.flatMap((item) => {
+    if (!record(item) || typeof item.aspectId !== "string" || !Object.hasOwn(ASPECT_REGISTRY, item.aspectId)) return [];
+    if (!["could_not_verify_required", "verified_avoided_element", "explicit_absence_not_verified"].includes(String(item.outcome))) return [];
+    const aspectId = item.aspectId as keyof typeof ASPECT_REGISTRY;
+    return [{ aspectId, label: ASPECT_REGISTRY[aspectId].labelTr, outcome: item.outcome as PublicResearchOutcomeNotice["aspects"][number]["outcome"] }];
+  });
+  if (aspects.length !== value.aspects.length || new Set(aspects.map((item) => item.aspectId)).size !== aspects.length) return null;
+  const affectedCandidateCount = value.affectedCandidateCount === undefined
+    ? undefined
+    : Number.isInteger(value.affectedCandidateCount) && Number(value.affectedCandidateCount) >= 1 && Number(value.affectedCandidateCount) <= 3
+      ? Number(value.affectedCandidateCount)
+      : null;
+  if (affectedCandidateCount === null) return null;
+  return { version: 1, status: value.status as PublicResearchOutcomeNotice["status"], aspects, ...(affectedCandidateCount ? { affectedCandidateCount } : {}) };
 }
 
 const FORBIDDEN_RESEARCH_FIELDS = ["claim", "claims", "citation", "citations", "packet", "passage", "passages", "unit", "units", "evidenceUnit", "evidenceUnits", "prompt", "modelOutput", "providerResponse", "provenance", "cacheStatus", "hypotheticalEffect"] as const;

@@ -16,6 +16,8 @@ Mapper yalnız validated decision, claim, citation ve changed-outcome provenance
 
 Yalnız final primary listede `rescued_candidate` veya `cleared_avoid` sonucu taşıyan kart “Araştırmayla doğrulandı” badge'i gösterir. “Kaynaklı doğrulama” gerçek button, `aria-expanded`, `aria-controls`, keyboard davranışı, focus-visible stili ve güvenli external link kullanır. UI aspect finding/level/confidence ve attribution gösterir; passage, quote, snippet, claim metni, provider/model, cache, prompt, response veya internal outcome göstermez. Session codec yalnız doğrulanmış public read-modeli saklar ve raw research alanlarını atar.
 
-## R6B backlog
+## Rejected and no-result notice
 
-Rejected/no-result citation açıklamaları, gerçek provider end-to-end active acceptance ve full regression R6B kapsamındadır.
+Optional `researchOutcomeNotice` yalnız active + public citations akışında `no_verified_match`, `candidates_excluded_by_research` veya `research_unavailable` durumunu taşır. En fazla üç registry aspect label'ı ve bounded candidate count bulunabilir. Candidate title/listesi, URL, passage, claim, provider/model/cache, internal enum veya teknik hata taşınmaz. Shadow/disabled sonuçlarında alan yoktur; legacy absence geçerlidir ve malformed notice güvenli biçimde düşürülür.
+
+UI notice'ı erişilebilir `status`/`aria-live` alanında gösterir ve 375 px genişlikte `break-words`/`min-w-0` sınırını korur. Rejected candidate'a item veya citation yayınlanmaz. Gerçek active kabul sonucu [D7 final acceptance](D7_FINAL_ACCEPTANCE.md) belgesindedir.

@@ -931,6 +931,7 @@ async function getCandidates(args: {
   mediaItems: AiRecommendRequest["mediaItems"];
   progressLogs: AiRecommendRequest["progressLogs"];
   structuredRequest?: RecommendationRequestV2;
+  researchRescue?: boolean;
 }): Promise<CandidateSearchResult> {
   return searchCandidatesWithDebug({
     intent: args.intent,
@@ -940,6 +941,7 @@ async function getCandidates(args: {
     mediaItems: args.mediaItems,
     progressLogs: args.progressLogs,
     structuredRequest: args.structuredRequest,
+    researchRescue: args.researchRescue,
   });
 }
 
@@ -1438,6 +1440,7 @@ export async function POST(req: NextRequest) {
   stageLatencyMs.planning = Number((performance.now() - planningStartedAt).toFixed(2));
 
   const debugNotes: string[] = [];
+  const researchRollout = resolveResearchRolloutExecution();
   const retrievalStartedAt = performance.now();
   let searchResult: CandidateSearchResult = await getCandidates({
     intent,
@@ -1447,6 +1450,7 @@ export async function POST(req: NextRequest) {
     mediaItems,
     progressLogs,
     structuredRequest: structuredRequest?.ok ? structuredRequest.value : undefined,
+    researchRescue: researchRollout.activeResearchAllowed,
   });
   searchResult = applySourceTitleExclusion(searchResult, deterministicTaste.excludedSourceTitles, debugNotes);
   if (deterministicFallbackUsed) {
@@ -1472,6 +1476,7 @@ export async function POST(req: NextRequest) {
         mediaItems,
         progressLogs,
         structuredRequest: structuredRequest?.ok ? structuredRequest.value : undefined,
+        researchRescue: researchRollout.activeResearchAllowed,
       });
       searchResult = applySourceTitleExclusion(searchResult, deterministicTaste.excludedSourceTitles, debugNotes);
       deterministicFallbackUsed = true;
@@ -1526,6 +1531,7 @@ export async function POST(req: NextRequest) {
           mediaItems,
           progressLogs,
           structuredRequest: structuredRequest?.ok ? structuredRequest.value : undefined,
+          researchRescue: researchRollout.activeResearchAllowed,
         });
         const refinedResult = applySourceTitleExclusion(
           refinedResultRaw,
@@ -1772,7 +1778,6 @@ export async function POST(req: NextRequest) {
   }
 
   if (DETERMINISTIC_RECOMMENDATION_V2_ENABLED) {
-    const researchRollout = resolveResearchRolloutExecution();
     const deterministicInput: DeterministicRecommendationV2Input = {
       message: providerMessage,
       intent,

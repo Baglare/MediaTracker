@@ -300,6 +300,19 @@ export interface PublicResearchEvidenceSummary {
   sources: PublicResearchSource[];
 }
 
+export interface PublicResearchOutcomeAspect {
+  aspectId: string;
+  label: string;
+  outcome: "could_not_verify_required" | "verified_avoided_element" | "explicit_absence_not_verified";
+}
+
+export interface PublicResearchOutcomeNotice {
+  version: 1;
+  status: "no_verified_match" | "candidates_excluded_by_research" | "research_unavailable";
+  aspects: PublicResearchOutcomeAspect[];
+  affectedCandidateCount?: number;
+}
+
 export interface AiNearMatchRecommendation extends AiRecommendation {
   resultKind: "near_match";
   violatedConstraints: string[];
@@ -380,6 +393,7 @@ export interface AiRecommendResponse {
   recommendations: AiRecommendation[];
   nearMatches?: AiNearMatchRecommendation[];
   rejectedCandidates?: { title: string; reason: string }[];
+  researchOutcomeNotice?: PublicResearchOutcomeNotice;
   transparencySummary: string;
   intent?: AiIntent;
   engineStatus?: AiEngineStatus;

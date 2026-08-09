@@ -71,7 +71,10 @@ describe("D7-R6A1 active research integration", () => {
     const baseline = { response: response(), researchShadowContext: context };
     const engineInput = { intent: {}, retrievalPlan: null, settings: {}, candidates: [], mediaItems: [], feedback: [], dismissed: [], message: "private", baseUrl: "http://local" } as never;
     const failed = await runActiveGroundedRecommendation({ engineInput, requestId: "fail" }, { runDeterministic: vi.fn(async () => baseline) as never, runResearch: vi.fn(async () => { throw new Error("raw provider"); }) as never });
-    expect(failed.status).toBe("failed_soft"); expect(failed.execution.response).toBe(baseline.response);
+    expect(failed.status).toBe("failed_soft");
+    expect(failed.execution.response.recommendations).toEqual(baseline.response.recommendations);
+    expect(failed.execution.response.researchOutcomeNotice).toMatchObject({ status: "research_unavailable" });
+    expect(JSON.stringify(failed.execution.response)).not.toContain("raw provider");
     const controller = new AbortController(); controller.abort();
     const runResearch = vi.fn();
     const aborted = await runActiveGroundedRecommendation({ engineInput, requestId: "abort", signal: controller.signal }, { runDeterministic: vi.fn(async () => baseline) as never, runResearch: runResearch as never });

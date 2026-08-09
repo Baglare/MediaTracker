@@ -43,6 +43,7 @@ import type {
   AiRecommendation,
   AiNearMatchRecommendation,
   AiSettings,
+  PublicResearchOutcomeNotice,
   RecommendationFeedbackAction,
 } from "@/lib/ai/types";
 import type { RecommendationRequestV2 } from "@/features/recommendations/domain/codec";
@@ -57,6 +58,7 @@ import {
   ParsedRequestPanel,
   RecommendationCardHeader,
   ResearchEvidenceDisclosure,
+  ResearchOutcomeNotice,
   RequestComposer,
   appendRecommendationMessage,
   buildInterpretReferencePayload,
@@ -66,7 +68,7 @@ import {
   userFacingNoResultSummary,
   userFacingRejectionReason,
 } from "@/features/recommendations/ui";
-import { decodePublicResearchEvidenceSummary } from "@/features/recommendations/research/active/public-codec";
+import { decodePublicResearchEvidenceSummary, decodePublicResearchOutcomeNotice } from "@/features/recommendations/research/active/public-codec";
 export type { AiSettings } from "@/lib/ai/types";
 import { useAuth } from "@/hooks/use-auth";
 import {
@@ -184,6 +186,7 @@ interface AiSession {
   nearMatches?: AiNearMatchRecommendation[];
   structuredRequestV2?: RecommendationRequestV2;
   rejectedCandidates?: RejectedCandidate[];
+  researchOutcomeNotice?: PublicResearchOutcomeNotice;
   settings: AiSettings;
   debug?: AiDebugInfo;
   engineStatus?: AiEngineStatus;
@@ -681,6 +684,7 @@ export default function AiAdvisor({
   const [recommendationStrictness, setRecommendationStrictness] = useState<RecommendationStrictness>("balanced");
   const [interpretationLoading, setInterpretationLoading] = useState(false);
   const [rejected, setRejected] = useState<RejectedCandidate[]>([]);
+  const [researchOutcomeNotice, setResearchOutcomeNotice] = useState<PublicResearchOutcomeNotice | null>(null);
   const [loadingStep, setLoadingStep] = useState(-1);
   const [sessions, setSessions] = useState<AiSession[]>([]);
   const [viewingSessionId, setViewingSessionId] = useState<string | null>(null);
@@ -739,6 +743,7 @@ export default function AiAdvisor({
       setMessages([]);
       setRecommendations([]);
       setNearMatches([]);
+      setResearchOutcomeNotice(null);
       setStructuredRequest(null);
       setDraftWarnings([]);
       setFeedbackDialogRec(null);
@@ -787,6 +792,7 @@ export default function AiAdvisor({
           nearMatches?: AiNearMatchRecommendation[];
           structuredRequestV2?: RecommendationRequestV2 | null;
           rejected?: RejectedCandidate[];
+          researchOutcomeNotice?: PublicResearchOutcomeNotice;
           addedIds?: Record<string, boolean>;
           pendingClarification?: { originalPrompt: string; question: string } | null;
           debugInfo?: AiDebugInfo | null;
@@ -800,6 +806,7 @@ export default function AiAdvisor({
           if (Array.isArray(snap.nearMatches)) setNearMatches(snap.nearMatches);
           if (snap.structuredRequestV2) setStructuredRequest(snap.structuredRequestV2);
           if (Array.isArray(snap.rejected)) setRejected(snap.rejected);
+          setResearchOutcomeNotice(snap.researchOutcomeNotice ?? null);
           if (snap.addedIds) setAddedIds(snap.addedIds);
           if (snap.pendingClarification) setPendingClarification(snap.pendingClarification);
           if (snap.debugInfo) setDebugInfo(snap.debugInfo);
@@ -849,6 +856,7 @@ export default function AiAdvisor({
         nearMatches,
         structuredRequestV2: structuredRequest,
         rejected,
+        researchOutcomeNotice,
         addedIds,
         pendingClarification,
         debugInfo,
@@ -865,7 +873,7 @@ export default function AiAdvisor({
     } catch {
       // ignore (kotanın dolması ya da JSON cycle gibi nadir durumlar)
     }
-  }, [messages, recommendations, nearMatches, structuredRequest, rejected, addedIds, pendingClarification, debugInfo, engineStatus, planningPolicy, ownerScope, ownerVisible, sessions]);
+  }, [messages, recommendations, nearMatches, structuredRequest, rejected, researchOutcomeNotice, addedIds, pendingClarification, debugInfo, engineStatus, planningPolicy, ownerScope, ownerVisible, sessions]);
 
   useEffect(() => {
     if (!persistenceReadyRef.current || !ownerScope || !ownerVisible) return;
@@ -969,6 +977,7 @@ export default function AiAdvisor({
       setShowDebug(false);
       setPendingClarification(null);
       setLoadingStep(-1);
+      setResearchOutcomeNotice(null);
     }
   }
   useEffect(() => {
@@ -999,6 +1008,7 @@ export default function AiAdvisor({
     status?: AiEngineStatus,
     nearMatchList: AiNearMatchRecommendation[] = [],
     approvedRequest?: RecommendationRequestV2,
+    outcomeNotice?: PublicResearchOutcomeNotice,
   ) {
     if (requestId && inFlightRequestId.current !== requestId) return;
     if (requestId) {
@@ -1011,6 +1021,7 @@ export default function AiAdvisor({
     setNearMatches(nearMatchList);
     if (approvedRequest) setStructuredRequest(approvedRequest);
     setRejected(rejectedList);
+    setResearchOutcomeNotice(outcomeNotice ?? null);
     setDebugInfo(debug || null);
     setEngineStatus(status || null);
     setFeedbackNotice(null);
@@ -1049,6 +1060,7 @@ export default function AiAdvisor({
       nearMatches: nearMatchList,
       structuredRequestV2: approvedRequest,
       rejectedCandidates: rejectedList,
+      researchOutcomeNotice: outcomeNotice,
       settings,
       debug,
       engineStatus: status,
@@ -1066,6 +1078,7 @@ export default function AiAdvisor({
     debug?: AiDebugInfo;
     engineStatus?: AiEngineStatus;
     nearMatches: AiNearMatchRecommendation[];
+    researchOutcomeNotice?: PublicResearchOutcomeNotice;
   } | null> {
     const controller = new AbortController();
     activeRequestController.current?.abort();
@@ -1172,6 +1185,7 @@ export default function AiAdvisor({
         debug: data.debug,
         engineStatus: data.engineStatus,
         nearMatches: Array.isArray(data.nearMatches) ? data.nearMatches.slice(0, 3) : [],
+        researchOutcomeNotice: decodePublicResearchOutcomeNotice(data.researchOutcomeNotice) ?? undefined,
       };
     } catch {
       return null;
@@ -1192,6 +1206,7 @@ export default function AiAdvisor({
       debug?: AiDebugInfo;
       engineStatus?: AiEngineStatus;
       nearMatches: AiNearMatchRecommendation[];
+      researchOutcomeNotice?: PublicResearchOutcomeNotice;
     } | null>
   ) {
     if (inFlightRequestId.current !== requestId) return;
@@ -1216,7 +1231,7 @@ export default function AiAdvisor({
         .then((apiResult) => {
           if (inFlightRequestId.current !== requestId) return;
           if (apiResult) {
-            finishWith(prompt, apiResult.recs, apiResult.text, apiResult.rejected, apiResult.debug, requestId, apiResult.engineStatus, apiResult.nearMatches, structuredRequest ?? undefined);
+            finishWith(prompt, apiResult.recs, apiResult.text, apiResult.rejected, apiResult.debug, requestId, apiResult.engineStatus, apiResult.nearMatches, structuredRequest ?? undefined, apiResult.researchOutcomeNotice);
           } else {
             finishWithClientFallback();
           }
@@ -1374,6 +1389,7 @@ export default function AiAdvisor({
     setInput("");
     setRecommendations([]);
     setRejected([]);
+    setResearchOutcomeNotice(null);
     setDebugInfo(null);
     setEngineStatus(null);
     setFeedbackNotice(null);
@@ -1460,6 +1476,7 @@ export default function AiAdvisor({
     setDraftWarnings([]);
     setFeedbackDialogRec(null);
     setRejected([]);
+    setResearchOutcomeNotice(null);
     setInput("");
     setViewingSessionId(null);
     setAddedIds({});
@@ -1485,6 +1502,7 @@ export default function AiAdvisor({
     setNearMatches(s.nearMatches ?? []);
     setStructuredRequest(s.structuredRequestV2 ?? null);
     setRejected(s.rejectedCandidates || []);
+    setResearchOutcomeNotice(s.researchOutcomeNotice ?? null);
     setDebugInfo(s.debug || null);
     setEngineStatus(s.engineStatus || null);
     setFeedbackNotice(null);
@@ -1957,6 +1975,8 @@ export default function AiAdvisor({
         )}
 
         <EngineTransparency status={engineStatus} settings={{ ...settings, includeRatings: dataToggles.ratings, includeFavorites: dataToggles.favorites, includeProgress: dataToggles.progress }} profileEnabled={structuredRequest?.profileSignalsEnabled ?? settings.useProfile} />
+
+        <ResearchOutcomeNotice notice={researchOutcomeNotice ?? undefined} />
 
         {feedbackNotice && (
           <p role="status" className="px-3 py-2 rounded-xl border border-emerald-500/20 bg-emerald-500/5 text-xs text-emerald-300/90">

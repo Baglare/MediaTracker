@@ -2,7 +2,7 @@
 
 import { useId, useState } from "react";
 import { ChevronRight, ExternalLink, ShieldCheck } from "lucide-react";
-import type { PublicResearchEvidenceSummary } from "@/lib/ai/types";
+import type { PublicResearchEvidenceSummary, PublicResearchOutcomeNotice } from "@/lib/ai/types";
 
 const LEVEL_TEXT = { incidental: "ikincil düzeyde", significant: "belirgin düzeyde", primary: "ana unsur olarak" } as const;
 const CONFIDENCE_TEXT = { low: "Sınırlı güven", medium: "Orta güven" } as const;
@@ -56,5 +56,29 @@ export function ResearchEvidenceDisclosure({ evidence }: { evidence?: PublicRese
         </ul>
       </div>
     </div>
+  );
+}
+
+const NOTICE_TEXT: Record<PublicResearchOutcomeNotice["status"], string> = {
+  no_verified_match: "Kaynak araştırması zorunlu koşulları doğrulayabilen bir eşleşme bulamadı.",
+  candidates_excluded_by_research: "Bazı adaylar kaçınılan bir unsur kaynaklarla doğrulandığı için elendi.",
+  research_unavailable: "Kaynak araştırması tamamlanamadı; sonuçlar yapılandırılmış verilere göre gösterildi.",
+};
+
+const OUTCOME_TEXT: Record<PublicResearchOutcomeNotice["aspects"][number]["outcome"], string> = {
+  could_not_verify_required: "zorunlu koşul doğrulanamadı",
+  verified_avoided_element: "kaçınılan unsur doğrulandı",
+  explicit_absence_not_verified: "açık yokluk kanıtı doğrulanamadı",
+};
+
+export function ResearchOutcomeNotice({ notice }: { notice?: PublicResearchOutcomeNotice }) {
+  if (!notice) return null;
+  return (
+    <section role="status" aria-live="polite" className="min-w-0 rounded-xl border border-amber-500/20 bg-amber-500/5 px-3 py-2.5 text-xs text-zinc-300">
+      <p className="break-words leading-relaxed">{NOTICE_TEXT[notice.status]}</p>
+      <ul className="mt-1 flex min-w-0 flex-wrap gap-x-3 gap-y-1 text-[11px] text-zinc-500">
+        {notice.aspects.map((aspect) => <li key={`${aspect.aspectId}:${aspect.outcome}`} className="max-w-full break-words">{aspect.label}: {OUTCOME_TEXT[aspect.outcome]}.</li>)}
+      </ul>
+    </section>
   );
 }

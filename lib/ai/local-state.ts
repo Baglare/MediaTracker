@@ -16,7 +16,7 @@ import type {
 import { decodeRecommendationFeedbackEventV2, type RecommendationFeedbackEventV2 } from "@/features/recommendations/feedback";
 import { decodeRecommendationRequestV2 } from "@/features/recommendations/domain/codec";
 import type { RecommendationStrictness } from "@/features/recommendations/domain/types";
-import { sanitizeRecommendationResearchEvidence } from "@/features/recommendations/research/active/public-codec";
+import { decodePublicResearchOutcomeNotice, sanitizeRecommendationResearchEvidence } from "@/features/recommendations/research/active/public-codec";
 
 export interface AiSessionLocalState {
   version: 1;
@@ -147,6 +147,7 @@ function normalizeSession(value: unknown): Record<string, unknown> | null {
     assistantMessage,
     recommendations,
     nearMatches,
+    ...(decodePublicResearchOutcomeNotice(value.researchOutcomeNotice) ? { researchOutcomeNotice: decodePublicResearchOutcomeNotice(value.researchOutcomeNotice) } : {}),
     ...(structuredRequest.ok ? { structuredRequestV2: structuredRequest.value } : {}),
     ...(Array.isArray(value.rejectedCandidates)
       ? { rejectedCandidates: value.rejectedCandidates.slice(0, 50) }
@@ -190,6 +191,7 @@ function normalizeActiveSession(value: unknown): Record<string, unknown> | undef
     messages,
     recommendations,
     nearMatches,
+    ...(decodePublicResearchOutcomeNotice(value.researchOutcomeNotice) ? { researchOutcomeNotice: decodePublicResearchOutcomeNotice(value.researchOutcomeNotice) } : {}),
     ...(structuredRequest.ok ? { structuredRequestV2: structuredRequest.value } : {}),
     rejected: Array.isArray(value.rejected) ? value.rejected.slice(0, 50) : [],
     addedIds: boundedRecord(value.addedIds, 20_000) ?? {},

@@ -29,6 +29,7 @@ import type { AdvisorScopeMode } from "./types";
 import { expandTargetFamily } from "./target-family";
 import type { RecommendationRequestV2 } from "@/features/recommendations/domain/codec";
 import {
+  ASPECT_REGISTRY,
   evidenceStrategyForProvider,
   providerRetrievalMappingsFor,
   type AspectId,
@@ -53,6 +54,7 @@ const MAX_WEB_HITS_PER_QUERY = 5;
 const MAX_WEB_HITS_TOTAL = 12;
 const MAX_WEB_VERIFICATION_QUERIES = 4;
 const MAX_WEB_VERIFICATION_QUERIES_PER_SOURCE = 3;
+const MAX_RESEARCH_RESCUE_CANDIDATES = 8;
 
 interface SearchContext {
   baseUrl: string;
@@ -781,6 +783,36 @@ async function searchAniListDiscover(
   }
 }
 
+export function buildResearchRescueRequest(request: RecommendationRequestV2): {
+  request: RecommendationRequestV2;
+  relaxedAspectIds: readonly AspectId[];
+} | null {
+  const relaxedAspectIds = request.aspectConstraints.flatMap((constraint) => {
+    if (
+      constraint.source !== "explicit"
+      || constraint.role !== "must"
+      || (constraint.minimumLevel !== "significant" && constraint.minimumLevel !== "primary")
+    ) return [];
+    const entry = ASPECT_REGISTRY[constraint.aspectId];
+    const researchableExactTaxonomy = entry.semanticVerifier !== "not_required"
+      && providerRetrievalMappingsFor(constraint.aspectId, "anilist").some((mapping) => (
+        mapping.queryable
+        && mapping.strategy === "exact_taxonomy"
+        && request.targetMediaTypes.some((mediaType) => mapping.supportedMediaTypes.includes(mediaType))
+      ));
+    return researchableExactTaxonomy ? [constraint.aspectId] : [];
+  });
+  if (relaxedAspectIds.length === 0) return null;
+  const relaxed = new Set(relaxedAspectIds);
+  return {
+    request: {
+      ...request,
+      aspectConstraints: request.aspectConstraints.filter((constraint) => !relaxed.has(constraint.aspectId)),
+    },
+    relaxedAspectIds,
+  };
+}
+
 const MAX_RANKED_TAG_CONSTRAINT_QUERIES = 4;
 const STRICT_TAG_SUFFICIENT_CANDIDATES = 3;
 
@@ -968,6 +1000,31 @@ async function searchHardRankedTagCandidates(
   }
   if (combined.length === 0 && !telemetry.noResultReason) telemetry.noResultReason = "provider_tag_no_candidates";
   return { candidates: combined.slice(0, MAX_TOTAL), telemetry, traceByCandidateKey: traces };
+}
+
+async function searchStructuredResearchRescueCandidates(
+  ctx: SearchContext,
+  request: RecommendationRequestV2,
+): Promise<AiCandidate[]> {
+  const categories = [...new Set(request.targetMediaTypes.map(aniListCategoryFor).filter((value): value is AniListCategory => value !== null))];
+  const structured = extractAniListStructuredFilters({
+    kind: "general_recommendation", references: [], targetTypes: [...request.targetMediaTypes], sourceTypes: [], mood: [], avoid: [],
+    needsLibraryProfile: false, needsCandidateSearch: true, needsWebResearch: false,
+  }, request.queryText, request);
+  if (categories.length === 0 || !structured.strict) return [];
+  const settled = await Promise.allSettled(categories.map((category) => searchAniListDiscover(ctx, category, {
+    ...structured.strict,
+    sort: ["POPULARITY_DESC", "SCORE_DESC", "ID"],
+    reason: `${structured.strict?.reason ?? "structured"}:research_rescue`,
+  })));
+  return dedupeCandidates(settled.flatMap((item) => item.status === "fulfilled" ? item.value.candidates : [])).slice(0, MAX_RESEARCH_RESCUE_CANDIDATES);
+}
+
+function mergeRankedTagTraces(
+  primary: ReadonlyMap<string, CandidateRankedTagTrace>,
+  rescue: ReadonlyMap<string, CandidateRankedTagTrace>,
+): ReadonlyMap<string, CandidateRankedTagTrace> {
+  return new Map([...primary, ...rescue]);
 }
 
 function snapshotHasRequestedRankedTag(
@@ -1586,6 +1643,7 @@ export async function searchCandidates(args: {
   mediaItems: MediaItem[];
   progressLogs: ProgressLog[];
   structuredRequest?: RecommendationRequestV2;
+  researchRescue?: boolean;
 }): Promise<AiCandidate[]> {
   const result = await searchCandidatesWithDebug(args);
   return result.candidates;
@@ -1662,8 +1720,9 @@ export async function searchCandidatesWithDebug(args: {
   mediaItems: MediaItem[];
   progressLogs: ProgressLog[];
   structuredRequest?: RecommendationRequestV2;
+  researchRescue?: boolean;
 }): Promise<CandidateSearchResult> {
-  const { intent, retrievalPlan, profile, message, mediaItems, progressLogs, structuredRequest } = args;
+  const { intent, retrievalPlan, profile, message, mediaItems, progressLogs, structuredRequest, researchRescue } = args;
   const debug = createSearchDebug();
   const notes: string[] = [];
   let rankedTagRetrieval: RankedTagRetrievalTelemetry | undefined;
@@ -1704,13 +1763,40 @@ export async function searchCandidatesWithDebug(args: {
       rankedTagTraceByCandidateKey = rankedTagResult.traceByCandidateKey;
       notes.push(`ranked_tag_retrieval:strict=${rankedTagRetrieval.strict_tag_candidate_count} relaxed=${rankedTagRetrieval.relaxed_tag_candidate_count}`);
       if (rankedTagRetrieval.noResultReason) notes.push(`ranked_tag_no_result:${rankedTagRetrieval.noResultReason}`);
+      let rankedCandidates = researchRescue && !rankedTagRetrieval.structuredTagRetrievalUsed
+        ? await searchStructuredResearchRescueCandidates(ctx, structuredRequest)
+        : rankedTagResult.candidates;
+      if (researchRescue) {
+          const rescueRequest = buildResearchRescueRequest(structuredRequest);
+          if (rescueRequest) {
+            const rescueRanked = await searchHardRankedTagCandidates(ctx, rescueRequest.request);
+          const useRankedRescue = rescueRanked?.telemetry.structuredTagRetrievalUsed === true;
+          const rescueCandidates = useRankedRescue
+            ? rescueRanked.candidates.slice(0, MAX_RESEARCH_RESCUE_CANDIDATES)
+            : await searchStructuredResearchRescueCandidates(ctx, rescueRequest.request);
+          rankedCandidates = dedupeCandidates([...rankedCandidates, ...rescueCandidates]).slice(0, MAX_TOTAL);
+          if (useRankedRescue && rescueRanked) rankedTagTraceByCandidateKey = mergeRankedTagTraces(rankedTagTraceByCandidateKey, rescueRanked.traceByCandidateKey);
+          notes.push(`research_rescue:relaxed=${rescueRequest.relaxedAspectIds.join(",")} candidates=${rescueCandidates.length}`);
+        }
+      }
       const targetFamily = [...expandTargetFamily([...structuredRequest.targetMediaTypes], message)];
       return finish(hygieneFilterCandidates(
-        rankedTagResult.candidates,
+        rankedCandidates,
         targetFamily,
         intent.references,
         debug,
       ).slice(0, MAX_TOTAL));
+    }
+    if (researchRescue) {
+      const rescueRequest = buildResearchRescueRequest(structuredRequest);
+      if (rescueRequest) {
+        const structuredCandidates = await searchStructuredResearchRescueCandidates(ctx, structuredRequest);
+        const rescueCandidates = await searchStructuredResearchRescueCandidates(ctx, rescueRequest.request);
+        const candidates = dedupeCandidates([...structuredCandidates, ...rescueCandidates]).slice(0, MAX_TOTAL);
+        notes.push(`research_rescue:relaxed=${rescueRequest.relaxedAspectIds.join(",")} candidates=${rescueCandidates.length}`);
+        const targetFamily = [...expandTargetFamily([...structuredRequest.targetMediaTypes], message)];
+        return finish(hygieneFilterCandidates(candidates, targetFamily, intent.references, debug).slice(0, MAX_TOTAL));
+      }
     }
   }
 
