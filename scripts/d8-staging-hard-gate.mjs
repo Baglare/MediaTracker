@@ -1,10 +1,11 @@
-import { loadEnvFile } from "node:process";
+import { loadD8Environment } from "./d8-staging-env.mjs";
 import { resolveSafeStagingTarget } from "./d8-staging-target.mjs";
 
 try {
-  loadEnvFile(".env.local");
-} catch {
-  // CI/ops may inject the same contract directly into process.env.
+  loadD8Environment();
+} catch (error) {
+  console.error(error instanceof Error ? error.message : "D8 environment could not be loaded");
+  process.exit(1);
 }
 
 const env = process.env;

@@ -1,9 +1,9 @@
 import { spawn } from "node:child_process";
-import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { applicationRoot } from "./d8-staging-env.mjs";
 
 const PROJECT_REF = /^[a-z0-9-]{6,64}$/;
-export const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+export const repositoryRoot = applicationRoot;
 
 function required(env, name) {
   const value = env[name]?.trim();

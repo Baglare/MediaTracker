@@ -1,4 +1,12 @@
+import { loadD8Environment } from "./d8-staging-env.mjs";
 import { runReadOnlySql } from "./d8-staging-target.mjs";
+
+try {
+  loadD8Environment();
+} catch (error) {
+  console.error(error instanceof Error ? error.message : "D8 environment could not be loaded");
+  process.exit(1);
+}
 
 const checks = Object.freeze({
   d2c1: "supabase/d2c1_owner_scoped_pk_post_migration.sql",

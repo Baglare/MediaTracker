@@ -11,7 +11,7 @@ Her sonuç pass/fail/skip ve timestamp ile kaydedilir; secret veya tam project r
 - [ ] Media/Progress owner A/B cross-read ve cross-mutation DB/RLS tarafından reddedilir.
 - [ ] Goal Cloud CRUD/revision/idempotency/tombstone ve owner isolation geçer.
 - [ ] Public profile hidden/preset/custom projection private alan sızdırmaz.
-- [ ] Avatar/banner upload/delete revision ve signed URL invalidation geçer; account switch eski asset göstermez.
+- [ ] Avatar/banner upload/delete revision ve signed URL invalidation geçer; unreferenced/cleared owner path non-owner için reddedilir ve account switch eski asset göstermez.
 - [ ] TMDB/AniList/TVMaze/Open Library ve lisans kararı uygunsa OMDb POST search fail-soft çalışır; URL'de query yoktur.
 - [ ] 320/375/390/1366/1536 viewport'larda horizontal overflow, hydration veya console error yoktur.
 - [ ] Cloud status/maintenance/epoch ve schema feature flag'leri post-check ile uyumludur.

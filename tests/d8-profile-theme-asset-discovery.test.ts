@@ -165,4 +165,12 @@ describe("D8-2 migration contract", () => {
     expect(sql).toContain("preset_theme_snapshot_mismatch");
     expect(sql).not.toMatch(/drop table|truncate/i);
   });
+
+  it("allows public signed assets only when the exact path is currently published", () => {
+    const sql = readFileSync("supabase/migrations/20260810120000_d8_profile_asset_visibility_hardening.sql", "utf8");
+    expect(sql).toContain("p_asset_name is distinct from v_avatar_path");
+    expect(sql).toContain("p_asset_name is distinct from v_banner_path");
+    expect(sql).toContain("social_profile_asset_visible(name,(storage.foldername(name))[1],auth.uid())");
+    expect(sql).not.toContain("bucket_id='profile-assets' and true");
+  });
 });

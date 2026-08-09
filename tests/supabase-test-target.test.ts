@@ -27,4 +27,24 @@ describe("Supabase live-test target guard", () => {
       ["https://production.supabase.co"],
     )).toThrow(/marked/i);
   });
+
+  it("accepts an unlabelled Supabase ref only under the explicit D8 staging contract", () => {
+    const environment = {
+      D8_STAGING_CUTOVER_ENABLED: "1",
+      D8_STAGING_MIGRATION_ALLOWED: "1",
+      D8_STAGING_PROJECT_REF: "abcdefghijklmnopqrst",
+      D8_PRODUCTION_PROJECT_REF: "zyxwvutsrqponmlkjihg",
+      NEXT_PUBLIC_SUPABASE_URL: "https://abcdefghijklmnopqrst.supabase.co",
+    } as NodeJS.ProcessEnv;
+    expect(() => assertSafeSupabaseTestTarget(
+      "https://abcdefghijklmnopqrst.supabase.co",
+      undefined,
+      environment,
+    )).not.toThrow();
+    expect(() => assertSafeSupabaseTestTarget(
+      "https://zyxwvutsrqponmlkjihg.supabase.co",
+      undefined,
+      environment,
+    )).toThrow(/marked/i);
+  });
 });
