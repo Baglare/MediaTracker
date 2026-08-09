@@ -1,5 +1,5 @@
 import type { RecommendationDecodeResult, RecommendationDomainIssue } from "../../../domain/types";
-import type { GroundedEvidenceUnit, GroundedExtractionModelOutput, GroundedPassageAssessment } from "./types";
+import type { GroundedEvidenceUnit, GroundedExtractionModelOutput, GroundedPassageAssessment, GroundingFailureCode } from "./types";
 import type { GroundedResearchPacket } from "../../passages/types";
 
 const FINDINGS = ["supports_presence", "supports_explicit_absence", "irrelevant", "insufficient"] as const;
@@ -24,7 +24,8 @@ export function decodeGroundedExtractionModelOutput(value: unknown, maxAssessmen
     const confidence = CONFIDENCES.includes(item.confidence as never) ? item.confidence as GroundedPassageAssessment["confidence"] : null;
     const basis = BASES.includes(item.basis as never) ? item.basis as GroundedPassageAssessment["basis"] : null;
     const ids = Array.isArray(item.evidenceUnitIds) && item.evidenceUnitIds.every((id) => typeof id === "string") ? item.evidenceUnitIds as string[] : null;
-    if (typeof item.passageId !== "string" || !finding || level === undefined || !confidence || !basis || !ids || new Set(ids).size !== ids.length) { issues.push(issue("extraction_output_invalid", path, "Assessment field types/enums/IDs geçersiz.")); continue; }
+    if (typeof item.passageId !== "string" || !finding || level === undefined || !confidence || !basis || !ids) { issues.push(issue("extraction_output_invalid", path, "Assessment field types/enums/IDs geçersiz.")); continue; }
+    if (new Set(ids).size !== ids.length) issues.push(issue("extraction_duplicate_unit", `${path}.evidenceUnitIds`, "Evidence unit IDs duplicate olamaz."));
     const support = finding === "supports_presence";
     const absence = finding === "supports_explicit_absence";
     const noClaim = finding === "irrelevant" || finding === "insufficient";
@@ -33,7 +34,7 @@ export function decodeGroundedExtractionModelOutput(value: unknown, maxAssessmen
       || (noClaim && (level !== null || ids.length !== 0 || basis !== (finding === "irrelevant" ? "unrelated_context" : "context_insufficient")))) issues.push(issue("extraction_invalid_combination", path, "Finding/level/basis/evidence unit kombinasyonu geçersiz."));
     assessments.push({ passageId: item.passageId, finding, level, confidence, evidenceUnitIds: ids, basis });
   }
-  if (new Set(assessments.map((item) => item.passageId)).size !== assessments.length) issues.push(issue("extraction_output_invalid", "assessments", "Her passage en fazla bir assessment taşıyabilir."));
+  if (new Set(assessments.map((item) => item.passageId)).size !== assessments.length) issues.push(issue("extraction_duplicate_assessment", "assessments", "Her passage en fazla bir assessment taşıyabilir."));
   return issues.length > 0 ? { ok: false, issues } : { ok: true, value: { version: 1, assessments } };
 }
 
@@ -44,14 +45,47 @@ export function validateGroundedExtractionGrounding(input: { output: GroundedExt
   const excluded = new Set(input.excludedUnitIds ?? []);
   for (const [index, assessment] of input.output.assessments.entries()) {
     const passage = passages.get(assessment.passageId);
-    if (!passage) issues.push(issue("extraction_grounding_invalid", `assessments.${index}.passageId`, "Unknown packet passage ID."));
+    if (!passage) issues.push(issue("extraction_grounding_wrong_passage", `assessments.${index}.passageId`, "Unknown packet passage ID."));
     for (const unitId of assessment.evidenceUnitIds) {
       const unit = units.get(unitId);
-      if (!unit) { issues.push(issue("extraction_unknown_unit", `assessments.${index}.evidenceUnitIds`, "Unknown evidence unit ID.")); continue; }
-      if (unit.passageId !== assessment.passageId || unit.citationId !== passage?.citationId) issues.push(issue("extraction_grounding_invalid", `assessments.${index}.evidenceUnitIds`, "Unit passage/citation ilişkisi geçersiz."));
-      if (excluded.has(unitId) || unit.securityFlags.length > 0) issues.push(issue("extraction_grounding_invalid", `assessments.${index}.evidenceUnitIds`, "Security-flagged unit grounding için kullanılamaz."));
+      if (!unit) { issues.push(issue("extraction_grounding_unknown_unit", `assessments.${index}.evidenceUnitIds`, "Unknown evidence unit ID.")); continue; }
+      if (unit.passageId !== assessment.passageId) issues.push(issue("extraction_grounding_wrong_passage", `assessments.${index}.evidenceUnitIds`, "Unit passage ilişkisi geçersiz."));
+      if (passage && unit.citationId !== passage.citationId) issues.push(issue("extraction_grounding_citation_mismatch", `assessments.${index}.evidenceUnitIds`, "Unit citation ilişkisi geçersiz."));
+      if (excluded.has(unitId) || unit.securityFlags.length > 0) issues.push(issue("extraction_grounding_excluded_security_unit", `assessments.${index}.evidenceUnitIds`, "Security-flagged unit grounding için kullanılamaz."));
     }
   }
   return issues.length > 0 ? { ok: false, issues } : { ok: true, value: input.output };
 }
 
+export function deriveGroundedAssessmentPassages(input: { output: GroundedExtractionModelOutput; units: readonly GroundedEvidenceUnit[] }): GroundedExtractionModelOutput {
+  const units = new Map(input.units.map((unit) => [unit.unitId, unit]));
+  return {
+    version: 1,
+    assessments: input.output.assessments.map((assessment) => {
+      if (assessment.evidenceUnitIds.length === 0) return assessment;
+      const cited = assessment.evidenceUnitIds.map((unitId) => units.get(unitId)).filter((unit): unit is GroundedEvidenceUnit => Boolean(unit));
+      const passageIds = new Set(cited.map((unit) => unit.passageId));
+      return cited.length === assessment.evidenceUnitIds.length && passageIds.size === 1
+        ? { ...assessment, passageId: cited[0].passageId }
+        : assessment;
+    }),
+  };
+}
+
+const GROUNDING_CODE_BY_ISSUE: Readonly<Record<string, GroundingFailureCode>> = {
+  extraction_grounding_unknown_unit: "unknown_unit",
+  extraction_grounding_wrong_passage: "wrong_passage",
+  extraction_duplicate_unit: "duplicate_unit",
+  extraction_grounding_excluded_security_unit: "excluded_security_unit",
+  extraction_grounding_citation_mismatch: "citation_mismatch",
+  extraction_duplicate_assessment: "duplicate_assessment",
+  extraction_invalid_combination: "invalid_finding_combination",
+};
+
+export function summarizeGroundingFailure(input: { issues: readonly RecommendationDomainIssue[]; output: GroundedExtractionModelOutput }): { failureCode: GroundingFailureCode; assessmentCount: number; referencedUnitCount: number } {
+  return {
+    failureCode: input.issues.map((item) => GROUNDING_CODE_BY_ISSUE[item.code]).find(Boolean) ?? "other_grounding_invalid",
+    assessmentCount: input.output.assessments.length,
+    referencedUnitCount: input.output.assessments.reduce((total, assessment) => total + assessment.evidenceUnitIds.length, 0),
+  };
+}

@@ -28,3 +28,31 @@ export const GROUNDED_EXTRACTION_RESPONSE_FORMAT = {
   json_schema: { name: "grounded_aspect_observations", strict: true, schema: GROUNDED_EXTRACTION_JSON_SCHEMA },
 } as const;
 
+export function buildGroundedExtractionResponseFormat(input: { evidenceUnits: readonly { unitId: string; passageId: string }[] }) {
+  const unitIds = [...new Set(input.evidenceUnits.map((unit) => unit.unitId))];
+  const passageIds = [...new Set(input.evidenceUnits.map((unit) => unit.passageId))];
+  return {
+    type: "json_schema",
+    json_schema: {
+      name: "grounded_aspect_observations",
+      strict: true,
+      schema: {
+        ...GROUNDED_EXTRACTION_JSON_SCHEMA,
+        properties: {
+          ...GROUNDED_EXTRACTION_JSON_SCHEMA.properties,
+          assessments: {
+            ...GROUNDED_EXTRACTION_JSON_SCHEMA.properties.assessments,
+            items: {
+              ...GROUNDED_EXTRACTION_JSON_SCHEMA.properties.assessments.items,
+              properties: {
+                ...GROUNDED_EXTRACTION_JSON_SCHEMA.properties.assessments.items.properties,
+                passageId: { type: "string", enum: passageIds },
+                evidenceUnitIds: { type: "array", maxItems: unitIds.length, items: { type: "string", enum: unitIds } },
+              },
+            },
+          },
+        },
+      },
+    },
+  } as const;
+}

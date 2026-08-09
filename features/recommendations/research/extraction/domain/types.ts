@@ -5,10 +5,12 @@ import type { GroundedResearchPacket, ResearchPassageSecurityFlag } from "../../
 
 export const GROUNDED_EXTRACTION_CONTRACT_VERSION = 1 as const;
 export const GROUNDED_EXTRACTION_SCHEMA_VERSION = "d7-r3b.schema.1" as const;
-export const GROUNDED_EXTRACTION_POLICY_VERSION = "d7-r3b.extract.1" as const;
+export const GROUNDED_EXTRACTION_POLICY_VERSION = "d7-r5b1.extract.1" as const;
 export const GROUNDED_EVIDENCE_UNIT_POLICY_VERSION = "d7-r3b.unit.1" as const;
 export const GROUNDED_DECISION_POLICY_VERSION = "d7-r3b.decision.1" as const;
 export const GROUNDED_EXTRACTION_MAX_EVIDENCE_UNITS = 64;
+export const GROUNDED_EXTRACTION_WORKING_SET_MAX_UNITS = 16;
+export const GROUNDED_EXTRACTION_WORKING_SET_MAX_CHARACTERS = 6_000;
 export const GROUNDED_EXTRACTION_MAX_ASSESSMENTS = 8;
 export const GROUNDED_EVIDENCE_UNIT_TARGET_MIN_CHARACTERS = 80;
 export const GROUNDED_EVIDENCE_UNIT_TARGET_MAX_CHARACTERS = 500;
@@ -120,10 +122,37 @@ export interface GroundedExtractionTelemetry {
   responseBytes: number;
   durationMs: number;
   evidenceUnitCount: number;
+  sentEvidenceUnitCount: number;
+  packetEvidenceCharacters: number;
+  sentEvidenceCharacters: number;
+  lexicalUnitsRetained: number;
+  contextUnitsRetained: number;
   assessmentCount: number;
   claimCount: number;
   coalescedCount: number;
   requestId?: string;
+  groundingFailureCode?: GroundingFailureCode;
+  groundingAssessmentCount?: number;
+  groundingReferencedUnitCount?: number;
+  rateLimit?: GroundedExtractionRateLimitTelemetry;
+}
+
+export type GroundingFailureCode =
+  | "unknown_unit"
+  | "wrong_passage"
+  | "duplicate_unit"
+  | "excluded_security_unit"
+  | "citation_mismatch"
+  | "duplicate_assessment"
+  | "invalid_finding_combination"
+  | "other_grounding_invalid";
+
+export interface GroundedExtractionRateLimitTelemetry {
+  retryAfterMs?: number;
+  remainingRequests?: number;
+  remainingTokens?: number;
+  resetRequests?: string;
+  resetTokens?: string;
 }
 
 export type GroundedExtractionStatus =
@@ -131,6 +160,7 @@ export type GroundedExtractionStatus =
   | "no_claims_extracted"
   | "disabled"
   | "provider_unavailable"
+  | "rate_limited"
   | "model_unsupported"
   | "budget_exhausted"
   | "output_invalid"
@@ -148,4 +178,3 @@ export interface GroundedExtractionResult {
   telemetry: GroundedExtractionTelemetry;
   warnings: readonly string[];
 }
-

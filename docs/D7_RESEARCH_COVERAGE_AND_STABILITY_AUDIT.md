@@ -15,7 +15,7 @@ R5A terminolojisi `lead_only_document` olarak düzeltildi: `exintro=1` yalnız l
 
 Synthetic koşuları bir saniyenin altındaki duration bucket'ındaydı. İzole Steins;Gate koşusunda ilk çağrı 1–3 saniye bucket'ında grounding-invalid, sonraki iki çağrı bir saniyenin altında HTTP 429 olarak sınıflandı. Schema/grounding contract'ı gevşetilmedi ve invalid output onarılmaya çalışılmadı.
 
-Bu veri `source_contains_evidence_but_extractor_varies` sınıfındadır. Steins;Gate packet'i 5 passage ve 28 eligible evidence unit taşıdı; kaynak/passage hazırlama başarılıydı.
+Bu eski aggregate tek bir semantik sınıf değildi: bounded tekrar ilk invalid'in `wrong_passage`, diğer iki denemenin HTTP 429 `rate_limited` olduğunu gösterdi. R5B.1 deterministic passage derivation, input compaction ve capacity-aware runner ile aynı packet'te üç grounding-valid sonuç elde etti ([R5B.1 audit](D7_EXTRACTION_STABILITY_AND_CAPACITY.md)).
 
 ## Wikimedia document coverage
 
@@ -45,4 +45,4 @@ Coverage kararı `insufficient_evidence_to_decide` olarak kalır. Mevcut veri ye
 
 Tracked IMDb identity 24 KB sınırının gerçek blocker olabildiğini gösterdi. Bununla birlikte exact QID/revision koruyan ve HTML/wikitext parser gerektirmeyen güvenli MediaWiki section yolu bu audit kapsamında doğrulanmadı. İkinci uygulama koşulu kapanmadığı için section-aware acquisition yazılmadı.
 
-R5C öncesinde iki blocker vardır: real packet için Groq grounding-invalid/rate-limit kararlılığı ve oversized exact-revision sayfaları için güvenli bounded acquisition contract'ı. D6 authoritative kalır; active research kapalıdır.
+R5B.1 aynı real packet için grounding/capacity acceptance'ını kapattı. R5B.2 backlog'unda oversized exact-revision sayfaları için güvenli bounded acquisition contract'ı kalır. D6 authoritative kalır; active research kapalıdır.

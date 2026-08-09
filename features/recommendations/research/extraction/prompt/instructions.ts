@@ -7,6 +7,7 @@ export const GROUNDED_EXTRACTION_SYSTEM_INSTRUCTIONS = [
   "For supports_explicit_absence, level must be null; cite one or more supplied evidenceUnitIds; basis must be explicit_absence_statement.",
   "For irrelevant, level must be null, evidenceUnitIds must be empty, and basis must be unrelated_context.",
   "For insufficient, level must be null, evidenceUnitIds must be empty, and basis must be context_insufficient.",
+  "For claim-bearing assessments, choose only supplied evidenceUnitIds. The server derives the authoritative passage and citation relationship from those unit IDs.",
   "Return at most one assessment per supplied passageId and no more than eight assessments.",
   "Return only the strict schema. Do not return a claim, URL, citation, title, recommendation, reason, or chain of thought.",
 ].join("\n");

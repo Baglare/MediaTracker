@@ -43,7 +43,7 @@ function runSummary(results: readonly ExtractionRun[]) {
     support: results.filter((result) => result.status === "claims_extracted" && result.decision?.status === "supported").length,
     invalid: results.filter((result) => result.status === "output_invalid" || result.status === "grounding_invalid").length,
     providerUnavailable: results.filter((result) => result.status === "provider_unavailable").length,
-    rateLimits: results.reduce((total, result) => total + result.telemetry.rateLimitCount, 0),
+    rateLimits: results.filter((result) => result.status === "rate_limited").length,
     warnings: [...new Set(results.flatMap((result) => result.warnings))].join(",") || "none",
     statuses: results.map((result) => result.status).join(","),
     levels: results.map((result) => result.decision?.level ?? "none").join(","),
