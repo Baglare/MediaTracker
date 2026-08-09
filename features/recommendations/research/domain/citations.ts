@@ -2,7 +2,7 @@ import type { RecommendationDecodeResult, RecommendationDomainIssue } from "../.
 import { getResearchSource, isSearchDiscoveryAdapter } from "./source-registry";
 import type { PersistedResearchCitation, PersistedResearchClaim, TransientResearchDocument } from "./types";
 import { validateResearchUrl } from "../security/url-policy";
-import { RESEARCH_DOCUMENT_MAX_TEXT_LENGTH, RESEARCH_DOCUMENT_MAX_TITLE_LENGTH } from "../security/content-policy";
+import { RESEARCH_DOCUMENT_MAX_TITLE_LENGTH, researchDocumentTextWithinLimit } from "../security/content-policy";
 
 export const RESEARCH_PARAPHRASED_CLAIM_MAX_LENGTH = 280;
 const HASH_PATTERN = /^sha256:[a-f0-9]{64}$/;
@@ -24,7 +24,7 @@ export function validateTransientResearchDocument(value: TransientResearchDocume
   if (source?.requiresRevisionId && !value.revisionId?.trim()) issues.push(issue("research_document_revision_required", "revisionId", "Source revision ID zorunludur."));
   if (!iso(value.fetchedAt)) issues.push(issue("research_document_fetched_at_invalid", "fetchedAt", "Canonical timestamp zorunludur."));
   if (!value.title.trim() || value.title.length > RESEARCH_DOCUMENT_MAX_TITLE_LENGTH) issues.push(issue("research_document_title_invalid", "title", "Title bounded olmalıdır."));
-  if (!value.boundedText.trim() || value.boundedText.length > RESEARCH_DOCUMENT_MAX_TEXT_LENGTH) issues.push(issue("research_document_text_invalid", "boundedText", "Transient text bounded olmalıdır."));
+  if (!value.boundedText.trim() || !researchDocumentTextWithinLimit(value.boundedText)) issues.push(issue("research_document_text_invalid", "boundedText", "Transient text bounded olmalıdır."));
   if (!HASH_PATTERN.test(value.contentHash)) issues.push(issue("research_document_hash_invalid", "contentHash", "SHA-256 content hash zorunludur."));
   if (value.retention !== "transient_only") issues.push(issue("research_document_retention_invalid", "retention", "Raw passage yalnız transient olabilir."));
   return issues.length > 0 ? { ok: false, issues } : { ok: true, value };
@@ -64,4 +64,3 @@ export function validatePersistedResearchClaim(input: {
   }
   return issues.length > 0 ? { ok: false, issues } : { ok: true, value: claim };
 }
-

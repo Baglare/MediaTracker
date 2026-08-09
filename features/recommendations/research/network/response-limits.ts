@@ -6,7 +6,8 @@ import { SecureResearchHttpError } from "./types";
 
 export const WIKIDATA_JSON_MAX_BYTES = 256 * 1024;
 export const WIKIPEDIA_API_JSON_MAX_BYTES = 256 * 1024;
-export const WIKIPEDIA_PLAINTEXT_MAX_BYTES = 24_000;
+export const WIKIPEDIA_EXTRACT_RESPONSE_MAX_BYTES = 96 * 1024;
+export const WIKIPEDIA_EXTRACT_TEXT_MAX_BYTES = 64 * 1024;
 
 export async function readBoundedResearchBody(input: {
   stream: Readable;

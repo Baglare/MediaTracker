@@ -86,7 +86,9 @@ export function decodeWikidataEntityResponse(input: { bytes: Uint8Array; entityI
     if (typeof title === "string" && title.trim() && title.length <= 240) sitelinks[project] = title.trim();
     else if (raw !== undefined) warnings.push(`wikidata_sitelink_shape_drift:${project}`);
   }
-  const otherSitelinkKeys = Object.keys(sitelinksObject).filter((key) => key !== "enwiki" && key !== "trwiki").sort();
+  const allOtherSitelinkKeys = Object.keys(sitelinksObject).filter((key) => key !== "enwiki" && key !== "trwiki").sort();
+  const otherSitelinkKeys = allOtherSitelinkKeys.slice(0, 32);
+  if (allOtherSitelinkKeys.length > otherSitelinkKeys.length) warnings.push("wikidata_other_sitelinks_truncated");
   const lastrevid = object.lastrevid;
   const modified = object.modified;
   return {
@@ -99,4 +101,3 @@ export function decodeWikidataEntityResponse(input: { bytes: Uint8Array; entityI
     warnings: [...new Set(warnings)],
   };
 }
-

@@ -1,4 +1,4 @@
-import { RESEARCH_DOCUMENT_MAX_TEXT_LENGTH } from "../security/content-policy";
+import { researchDocumentTextWithinLimit } from "../security/content-policy";
 import { researchSha256 } from "./hash";
 import { documentSecurityRejected, inspectResearchPassageSecurity } from "./security-policy";
 import type { ResearchPassageSecurityFlag } from "./types";
@@ -39,9 +39,8 @@ export async function normalizeResearchDocument(input: { text: string; title: st
   }
   const text = collapseBlankLines(lines).join("\n").trim();
   if (!text) throw new Error("research_document_empty_after_normalization");
-  if (text.length > RESEARCH_DOCUMENT_MAX_TEXT_LENGTH) throw new Error("research_document_oversized_after_normalization");
+  if (!researchDocumentTextWithinLimit(text)) throw new Error("research_document_oversized_after_normalization");
   const securityFlags = inspectResearchPassageSecurity(text);
   if (documentSecurityRejected(securityFlags)) throw new Error(`research_document_security_rejected:${securityFlags.join(",")}`);
   return { text, contentHash: await researchSha256(text), securityFlags };
 }
-

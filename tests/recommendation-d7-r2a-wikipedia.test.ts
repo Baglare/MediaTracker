@@ -95,7 +95,7 @@ describe("D7-R2A revision-bound direct document", () => {
   it("revision race, oversized text, control char ve non-string extract'i reddeder", async () => {
     const cases = [
       pageBody({ revid: 778, extract: "changed" }),
-      pageBody({ extract: "x".repeat(24_001) }),
+      pageBody({ extract: "x".repeat((64 * 1024) + 1) }),
       pageBody({ extract: "unsafe\u0000text" }),
       pageBody({ extract: 7 }),
     ];

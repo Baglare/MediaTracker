@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { validatePersistedResearchCitation, validateTransientResearchDocument } from "../../domain/citations";
 import type { PersistedResearchCitation, TransientResearchDocument } from "../../domain/types";
 import { inspectResearchContent } from "../../security/content-policy";
-import { WIKIPEDIA_API_JSON_MAX_BYTES, WIKIPEDIA_PLAINTEXT_MAX_BYTES } from "../../network/response-limits";
+import { WIKIPEDIA_EXTRACT_RESPONSE_MAX_BYTES, WIKIPEDIA_EXTRACT_TEXT_MAX_BYTES } from "../../network/response-limits";
 import type { SecureResearchHttpClient } from "../../network/types";
 import type { ResolvedWikipediaPage } from "../types";
 import { decodeWikipediaExtractResponse } from "./codec";
@@ -28,7 +28,7 @@ export function buildWikipediaExtractQueryUrl(page: ResolvedWikipediaPage): stri
 function validatePlaintext(text: string): string {
   const normalized = text.normalize("NFC").replace(/\r\n?/g, "\n");
   if (/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(normalized)) throw new Error("wikipedia_extract_control_character");
-  if (Buffer.byteLength(normalized, "utf8") > WIKIPEDIA_PLAINTEXT_MAX_BYTES) throw new Error("wikipedia_extract_oversized");
+  if (Buffer.byteLength(normalized, "utf8") > WIKIPEDIA_EXTRACT_TEXT_MAX_BYTES) throw new Error("wikipedia_extract_oversized");
   return normalized;
 }
 
@@ -42,7 +42,7 @@ export async function fetchWikipediaDirectDocument(input: {
   const response = await input.httpClient.request({
     sourceId: "wikipedia", url: buildWikipediaExtractQueryUrl(input.page), method: "GET",
     headers: { userAgent: input.userAgent, apiUserAgent: input.userAgent, accept: "application/json", acceptEncoding: "gzip, deflate" },
-    timeoutMs: 3_500, maxResponseBytes: WIKIPEDIA_API_JSON_MAX_BYTES, acceptedContentTypes: ["application/json"],
+    timeoutMs: 3_500, maxResponseBytes: WIKIPEDIA_EXTRACT_RESPONSE_MAX_BYTES, acceptedContentTypes: ["application/json"],
     redirectPolicy: { mode: "manual", maxRedirects: 2 }, requestId: `wikipedia-document-${input.page.pageId}-${input.page.revisionId}`, maxAttempts: 2, signal: input.signal,
   });
   if (response.status !== 200) throw new Error(`wikipedia_extract_http_${response.status}`);
