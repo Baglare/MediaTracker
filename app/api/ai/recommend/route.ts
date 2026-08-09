@@ -68,6 +68,7 @@ import { decodeRecommendationFeedbackEventV2 } from "@/features/recommendations/
 import { applyStructuredRequestToRetrievalPlan } from "@/features/recommendations/intent/retrieval-guardrails";
 import { ASPECT_REGISTRY } from "@/features/recommendations/domain/aspect-registry";
 import { userFacingRankedTagNoResult } from "@/features/recommendations/ui/user-facing-text";
+import { isGroundedResearchShadowEnabled, runGroundedResearchShadow } from "@/features/recommendations/research/server";
 
 export const runtime = "nodejs";
 
@@ -1769,6 +1770,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (DETERMINISTIC_RECOMMENDATION_V2_ENABLED) {
+    const researchShadowEnabled = isGroundedResearchShadowEnabled();
     const response = await runDeterministicRecommendationV2({
       message: providerMessage,
       intent,
@@ -1782,6 +1784,15 @@ export async function POST(req: NextRequest) {
       structuredRequest: structuredRequest?.ok ? structuredRequest.value : undefined,
       baseUrl: req.nextUrl.origin,
       providerPipeline: providerPipelineResult,
+      onResearchShadowContext: researchShadowEnabled
+        ? async (context) => {
+            await runGroundedResearchShadow({
+              ...context,
+              requestId: `d7-r4a:${crypto.randomUUID()}`,
+              signal: req.signal,
+            });
+          }
+        : undefined,
     });
     if (response.engineStatus) {
       response.engineStatus = { ...response.engineStatus, ...enginePlanningFields(providerState) };

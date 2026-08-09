@@ -9,6 +9,8 @@ import { rerankForDiversity, scoreEligibleCandidates } from "../ranking";
 import type { SemanticVerifierMode } from "../domain/types";
 import type { RecommendationRequestV2 } from "../domain/codec";
 import type { RecommendationFeedbackEventV2 } from "../feedback";
+import { buildGroundedResearchShadowContext } from "../research/shadow/context";
+import type { GroundedResearchShadowContext } from "../research/shadow/types";
 
 export const DETERMINISTIC_RECOMMENDATION_V2_ENABLED = true;
 
@@ -42,6 +44,7 @@ export async function runDeterministicRecommendationV2(input: {
   fetchImpl?: typeof fetch;
   providerPipeline?: ProviderEvidencePipelineResult;
   structuredRequest?: RecommendationRequestV2;
+  onResearchShadowContext?: (context: GroundedResearchShadowContext) => void | Promise<void>;
 }): Promise<AiRecommendResponse> {
   const engineStartedAt = performance.now();
   const pipelineStartedAt = performance.now();
@@ -119,7 +122,7 @@ export async function runDeterministicRecommendationV2(input: {
   const recommendations = selected.map((item, index) => buildGroundedRecommendation(item, adapted.request as NonNullable<typeof adapted.request>, index));
   const groundedNearMatches = nearMatches.map((item, index) => buildGroundedNearMatchRecommendation(item, adapted.request as NonNullable<typeof adapted.request>, index));
   const explanationMs = performance.now() - explanationStartedAt;
-  return {
+  const response: AiRecommendResponse = {
     assistantMessage,
     recommendations,
     nearMatches: groundedNearMatches,
@@ -181,4 +184,12 @@ export async function runDeterministicRecommendationV2(input: {
       },
     },
   };
+  if (input.onResearchShadowContext) {
+    try {
+      await input.onResearchShadowContext(buildGroundedResearchShadowContext({ request: adapted.request, candidates: rankable, mediaItems: input.mediaItems }));
+    } catch {
+      // Shadow failure cannot affect the authoritative D6 response.
+    }
+  }
+  return response;
 }

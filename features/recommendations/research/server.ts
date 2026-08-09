@@ -49,3 +49,5 @@ export * from "./extraction/providers/openrouter/client";
 export * from "./extraction/providers/openrouter/codec";
 export * from "./extraction/providers/openrouter/adapter";
 export * from "./extraction/orchestration/service";
+export * from "./shadow/config";
+export * from "./shadow/orchestrator";
