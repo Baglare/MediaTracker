@@ -19,8 +19,6 @@ export function buildWikipediaExtractQueryUrl(page: ResolvedWikipediaPage): stri
   url.searchParams.set("rvprop", "ids|timestamp");
   url.searchParams.set("rvlimit", "1");
   url.searchParams.set("explaintext", "1");
-  url.searchParams.set("exintro", "1");
-  url.searchParams.set("exchars", String(WIKIPEDIA_PLAINTEXT_MAX_BYTES));
   url.searchParams.set("pageids", String(page.pageId));
   url.searchParams.set("format", "json");
   url.searchParams.set("formatversion", "2");

@@ -87,6 +87,8 @@ describe("D7-R2A revision-bound direct document", () => {
     const url = buildWikipediaExtractQueryUrl(resolvedPage());
     expect(url).toContain("explaintext=1");
     expect(url).toContain("pageids=42");
+    expect(url).not.toContain("exintro");
+    expect(url).not.toContain("exchars");
     expect(url).not.toContain("opensearch");
   });
 
