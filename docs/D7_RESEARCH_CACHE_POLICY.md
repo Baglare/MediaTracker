@@ -1,7 +1,7 @@
 # D7-R1 Research Cache Policy
 
 Tarih: 8 Ağustos 2026
-Durum: Owner-independent evidence port'u, Wikimedia/discovery/R3A transient sınırları ve R3B final-evidence/provenance codec'i hazır; DB/localStorage yoktur.
+Durum: Owner-independent evidence port'u, Wikimedia/discovery/R3A transient sınırları, R3B final-evidence/provenance codec'i ve R5C bounded process adapter'ı hazır; DB/localStorage yoktur.
 
 ## Stable key
 
@@ -36,9 +36,9 @@ Runtime validator nested yasak alanları, invalid citation/claim'i, key-decision
 
 ## Policy class
 
-- `direct_source_long`: supported/contradicted direct-source decision; exact TTL D7-R2'de source revision davranışıyla belirlenecek.
-- `unknown_short`: `no_source_found`, `source_not_allowed`, `passage_insufficient` gibi gerçek unknown; kısa TTL adayı.
-- `not_cacheable`: `adapter_unavailable` ve `budget_exhausted`; upstream hata negative-cache edilmez.
+- `direct_source_long`: validated claim/citation/provenance taşıyan supported veya explicit-absence contradicted direct-source decision; 6 saat.
+- `unknown_short`: yalnız claim taşımayan `passage_insufficient`; 15 dakika.
+- `not_cacheable`: diğer unknown ile provider/network/capacity/security/identity/policy failure; negative-cache edilmez.
 
 ## D7-R2A teknik metadata cache'i
 
@@ -50,9 +50,9 @@ Runtime validator nested yasak alanları, invalid citation/claim'i, key-decision
 
 ## Port
 
-`ResearchEvidenceCachePort`: `get`, `set`, `delete`, `invalidateByScope`, `invalidateBySourceRevision`.
+`ResearchEvidenceCachePort`: `get`, geriye uyumlu status-aware `lookup`, `set`, `delete`, `invalidateByScope`, `invalidateBySourceRevision`.
 
-D7-R1 `MemoryResearchEvidenceCache` yalnız saf/test kullanımı için max 128 entry bounded LRU-benzeri adapter sağlar. Production route'a singleton olarak bağlanmaz. Scope ve source revision invalidation'ı executable testlidir.
+R5C `MemoryResearchEvidenceCache` en fazla 256 entry deterministic LRU sağlar; injectable clock ile expiry read sırasında silinir. Server-only singleton yalnız feature-flagged post-response shadow composition'da kullanılır. Process restart/cold start cache'i boşaltır; cross-instance paylaşım garantisi yoktur. Scope ve source revision invalidation'ı executable testlidir.
 
 ## D7-R2B/R2C ephemeral discovery
 
@@ -73,3 +73,5 @@ OpenAI Responses, Groq Compound ve OpenRouter Responses payload'ları; output it
 Validated `PersistedResearchClaim`, existing citation metadata, deterministic `AspectResearchDecision` ve bounded `GroundedExtractionProvenance` persist edilebilir. Provenance yalnız provider/model/schema/extractor policy, packet hash, bounded timestamps/counts, response status ve warning taşır. Raw provider request ID public/cache surface'ine girmez.
 
 Cache codec; `packet`, `passages`, `evidenceUnits`, model input/output/raw response, prompt/instruction, reasoning/chain-of-thought ve nested raw text alanlarını reddeder. Provider/config/network/budget/refusal/schema/grounding failure final evidence değildir ve negative-cache edilmez. R3B in-flight coalescing yalnız process lifetime içindir; tamamlanan model response'u cache olmaz.
+
+R5C shadow integration, hit halinde discovery/acquisition/extraction'ı atlar ve aynı decision'ı existing deterministic handoff mapper'a yalnız hypothetical karşılaştırma için verir. Miss yalnız cacheable validated result'ta write yapar. Ayrıntılar: [Evidence Cache ve Transparency](D7_RESEARCH_EVIDENCE_CACHE_AND_TRANSPARENCY.md).

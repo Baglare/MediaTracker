@@ -104,7 +104,7 @@ describe("D7-R1 research evidence cache", () => {
   });
 
   it("unknown kısa policy class alır; adapter error cache'lenmez", async () => {
-    const unknown = cacheEntry({ decision: researchDecision({ status: "unknown", reasonCode: "no_source_found" }), claims: [], citations: [] });
+    const unknown = cacheEntry({ decision: researchDecision({ status: "unknown", reasonCode: "passage_insufficient" }), claims: [], citations: [] });
     expect(researchCachePolicyClass(unknown)).toBe("unknown_short");
     const unavailable = cacheEntry({ decision: researchDecision({ status: "unknown", reasonCode: "adapter_unavailable" }), claims: [], citations: [] });
     expect(researchCachePolicyClass(unavailable)).toBe("not_cacheable");

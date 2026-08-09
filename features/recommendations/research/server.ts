@@ -53,3 +53,5 @@ export * from "./shadow/config";
 export * from "./shadow/orchestrator";
 export * from "./shadow/lifecycle";
 export * from "./shadow/next-scheduler";
+export * from "./cache/process-cache";
+export * from "./cache/revision-fingerprint";

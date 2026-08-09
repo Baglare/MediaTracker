@@ -7,6 +7,10 @@ import type { ResearchEvidenceCacheEntry } from "../domain/types";
 
 export type ResearchCachePolicyClass = "direct_source_long" | "unknown_short" | "not_cacheable";
 
+export const RESEARCH_EVIDENCE_CACHE_MAX_ENTRIES = 256;
+export const RESEARCH_EVIDENCE_CACHE_DIRECT_TTL_MS = 6 * 60 * 60 * 1_000;
+export const RESEARCH_EVIDENCE_CACHE_UNKNOWN_TTL_MS = 15 * 60 * 1_000;
+
 const FORBIDDEN_PERSISTED_FIELDS = new Set([
   "boundedText", "documentId", "retention", "searchResult", "searchResults", "snippet",
   "searchQuery", "searchQueries", "query", "outputText", "searchActionId", "discoveredSource",
@@ -16,6 +20,7 @@ const FORBIDDEN_PERSISTED_FIELDS = new Set([
   "packet", "passages", "passageText", "groundedResearchPacket", "normalizedText",
   "normalizedDocument", "researchPassagePacket", "evidenceUnit", "evidenceUnits", "modelInput",
   "modelOutput", "rawModelResponse", "rawPrompt", "systemInstruction", "reasoning", "chainOfThought",
+  "rawResponse", "rawNetworkError", "providerError",
 ]);
 
 function issue(code: string, path: string, message: string): RecommendationDomainIssue {
@@ -29,9 +34,13 @@ function containsTransientPayload(value: unknown): boolean {
 }
 
 export function researchCachePolicyClass(entry: ResearchEvidenceCacheEntry): ResearchCachePolicyClass {
-  if (entry.decision.status === "unknown" && ["adapter_unavailable", "budget_exhausted"].includes(entry.decision.reasonCode)) return "not_cacheable";
+  if (entry.decision.status === "unknown" && entry.decision.reasonCode !== "passage_insufficient") return "not_cacheable";
   if (entry.decision.status === "unknown") return "unknown_short";
   return "direct_source_long";
+}
+
+export function researchCacheTtlMs(policyClass: Exclude<ResearchCachePolicyClass, "not_cacheable">): number {
+  return policyClass === "unknown_short" ? RESEARCH_EVIDENCE_CACHE_UNKNOWN_TTL_MS : RESEARCH_EVIDENCE_CACHE_DIRECT_TTL_MS;
 }
 
 export function validateResearchEvidenceCacheEntry(entry: ResearchEvidenceCacheEntry & { extractionProvenance?: GroundedExtractionProvenance }): RecommendationDecodeResult<ResearchEvidenceCacheEntry & { extractionProvenance?: GroundedExtractionProvenance }> {
@@ -59,6 +68,15 @@ export function validateResearchEvidenceCacheEntry(entry: ResearchEvidenceCacheE
   if (entry.extractionProvenance) {
     const provenance = validateGroundedExtractionProvenance(entry.extractionProvenance);
     if (!provenance.ok) issues.push(...provenance.issues);
+  }
+  if ((entry.decision.status === "supported" || entry.decision.status === "contradicted") && (entry.claims.length === 0 || entry.citations.length === 0 || !entry.extractionProvenance)) {
+    issues.push(issue("research_cache_validated_evidence_required", "$", "Supported/contradicted cache entry claim, citation ve extraction provenance ister."));
+  }
+  if (entry.decision.status === "contradicted" && !entry.claims.some((claim) => claim.polarity === "contradict")) {
+    issues.push(issue("research_cache_explicit_absence_required", "claims", "Contradicted cache entry explicit-absence contradiction claim ister."));
+  }
+  if (entry.decision.status === "unknown" && entry.claims.length > 0) {
+    issues.push(issue("research_cache_unknown_claim_forbidden", "claims", "Unknown cache entry claim taşıyamaz."));
   }
   if (researchCachePolicyClass(entry) === "not_cacheable") issues.push(issue("research_cache_adapter_error_not_cacheable", "decision.reasonCode", "Adapter/budget failure negative-cache edilmez."));
   return issues.length > 0 ? { ok: false, issues } : { ok: true, value: entry };

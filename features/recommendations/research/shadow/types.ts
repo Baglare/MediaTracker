@@ -58,6 +58,31 @@ export interface ResearchShadowCandidateResult {
   warnings: readonly string[];
 }
 
+export type ResearchShadowCacheStatus = "disabled" | "miss" | "hit" | "expired" | "bypassed";
+export type ResearchShadowStageStatus = "planned" | "direct_source" | "discovery" | "acquisition" | "extraction" | "completed" | "failed_soft";
+
+export interface ResearchShadowTransparencySummary {
+  candidateReference: string;
+  aspectId: AspectId;
+  cacheStatus: ResearchShadowCacheStatus;
+  stageStatus: ResearchShadowStageStatus;
+  decisionStatus: "supported" | "contradicted" | "unknown" | "unavailable";
+  decisionLevel: ResearchClaimLevel;
+  confidence: "low" | "medium" | "high" | "none";
+  sourceCount: number;
+  citationCount: number;
+  hypotheticalEffect: ResearchShadowHypotheticalEffect;
+  providerId?: string;
+  durationBuckets: {
+    directSource: ResearchShadowDurationBucket;
+    discovery: ResearchShadowDurationBucket;
+    acquisition: ResearchShadowDurationBucket;
+    extraction: ResearchShadowDurationBucket;
+    total: ResearchShadowDurationBucket;
+  };
+  warnings: readonly string[];
+}
+
 export interface GroundedResearchShadowTelemetry {
   plannerRan: boolean;
   plannedCandidateCount: number;
@@ -85,6 +110,7 @@ export type GroundedResearchShadowStatus = "disabled" | "complete" | "partial" |
 export interface GroundedResearchShadowResult {
   status: GroundedResearchShadowStatus;
   results: readonly ResearchShadowCandidateResult[];
+  transparency: readonly ResearchShadowTransparencySummary[];
   telemetry: GroundedResearchShadowTelemetry;
   warnings: readonly string[];
   policyVersion: typeof GROUNDED_RESEARCH_SHADOW_POLICY_VERSION;

@@ -1,6 +1,6 @@
 import "server-only";
 import { decodeGroundedExtractionModelOutput } from "../../domain/model-output";
-import type { GroundedExtractionProviderPort } from "../port";
+import type { GroundedExtractionAdapterTelemetry, GroundedExtractionProviderPort } from "../port";
 import { ExtractionHttpError } from "../shared/fixed-json-client";
 import { decodeGroqGroundedExtractionEnvelope } from "./codec";
 import { GroqGroundedExtractionClient } from "./client";
@@ -8,7 +8,7 @@ export class GroqGroundedExtractionAdapter implements GroundedExtractionProvider
   readonly providerId = "groq" as const;
   constructor(private readonly client = new GroqGroundedExtractionClient()) {}
   async extract(input: Parameters<GroundedExtractionProviderPort["extract"]>[0]) {
-    try { const response = await this.client.request(input); const envelope = decodeGroqGroundedExtractionEnvelope(response.body); const telemetry = { durationMs: response.durationMs, retryCount: response.retryCount, rateLimitCount: response.rateLimitCount, responseBytes: response.bytesRead, ...(response.requestId ? { requestId: response.requestId } : {}) };
+    try { const response = await this.client.request(input); const envelope = decodeGroqGroundedExtractionEnvelope(response.body); const telemetry: GroundedExtractionAdapterTelemetry = { durationMs: response.durationMs, retryCount: response.retryCount, rateLimitCount: response.rateLimitCount, responseBytes: response.bytesRead, ...(response.requestId ? { requestId: response.requestId } : {}) };
       if (response.rateLimit) telemetry.rateLimit = response.rateLimit;
       if (envelope.status === "refusal") return { status: "refusal" as const, providerId: this.providerId, modelId: envelope.model ?? input.model, telemetry, warnings: envelope.warnings };
       if (envelope.status !== "content") return { status: "output_invalid" as const, providerId: this.providerId, modelId: envelope.model ?? input.model, telemetry, warnings: envelope.warnings };

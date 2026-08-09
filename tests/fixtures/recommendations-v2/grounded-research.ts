@@ -5,6 +5,7 @@ import {
   type AspectResearchDecision,
   type PersistedResearchCitation,
   type PersistedResearchClaim,
+  type GroundedExtractionProvenance,
   type ResearchCandidateInput,
   type ResearchConstraintRequest,
   type ResearchVersionScope,
@@ -145,6 +146,7 @@ export function cacheEntry(input: {
   decision?: AspectResearchDecision;
   claims?: readonly PersistedResearchClaim[];
   citations?: readonly PersistedResearchCitation[];
+  extractionProvenance?: GroundedExtractionProvenance;
 } = {}) {
   const decision = input.decision ?? researchDecision();
   return {
@@ -157,6 +159,12 @@ export function cacheEntry(input: {
     sourceRevisionFingerprint: "wikipedia:12345",
     cacheStatus: "fresh" as const,
     warnings: [],
+    extractionProvenance: input.extractionProvenance ?? {
+      providerId: "groq", modelId: "openai/gpt-oss-20b", schemaVersion: "d7-r3b.schema.1",
+      extractorPolicyVersion: "d7-r1.extract.1", packetContentHash: TEST_HASH,
+      extractionStartedAt: TEST_NOW, extractionCompletedAt: TEST_NOW,
+      assessmentCount: decision.status === "unknown" ? 0 : 1, validEvidenceUnitCount: decision.status === "unknown" ? 0 : 1,
+      responseStatus: decision.status === "unknown" ? "no_claims" : "validated", warnings: [],
+    },
   };
 }
-

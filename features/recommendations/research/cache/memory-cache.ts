@@ -1,9 +1,9 @@
-import type { ResearchEvidenceCacheEntry, ResearchEvidenceCacheKey } from "../domain/types";
+import type { ResearchEvidenceCacheKey } from "../domain/types";
 import { researchCachePolicyClass, validateResearchEvidenceCacheEntry } from "./policy";
-import type { ResearchEvidenceCachePort } from "./port";
+import type { ResearchEvidenceCacheLookupResult, ResearchEvidenceCachePort, ResearchEvidenceCacheValue } from "./port";
 
 interface MemoryRecord {
-  entry: ResearchEvidenceCacheEntry;
+  entry: ResearchEvidenceCacheValue;
   expiresAtMs: number;
 }
 
@@ -11,26 +11,30 @@ export class MemoryResearchEvidenceCache implements ResearchEvidenceCachePort {
   private readonly entries = new Map<string, MemoryRecord>();
 
   constructor(
-    private readonly maxEntries = 128,
+    private readonly maxEntries = 256,
     private readonly now: () => number = Date.now,
   ) {}
 
-  async get(key: ResearchEvidenceCacheKey): Promise<ResearchEvidenceCacheEntry | null> {
+  async lookup(key: ResearchEvidenceCacheKey): Promise<ResearchEvidenceCacheLookupResult> {
     const record = this.entries.get(key.key);
-    if (!record) return null;
+    if (!record) return { status: "miss", entry: null };
     if (record.expiresAtMs <= this.now()) {
       this.entries.delete(key.key);
-      return null;
+      return { status: "expired", entry: null };
     }
     this.entries.delete(key.key);
     this.entries.set(key.key, record);
-    return { ...record.entry, cacheStatus: "fresh" };
+    return { status: "hit", entry: structuredClone({ ...record.entry, cacheStatus: "fresh" }) };
   }
 
-  async set(entry: ResearchEvidenceCacheEntry): Promise<boolean> {
+  async get(key: ResearchEvidenceCacheKey): Promise<ResearchEvidenceCacheValue | null> {
+    return (await this.lookup(key)).entry;
+  }
+
+  async set(entry: ResearchEvidenceCacheValue): Promise<boolean> {
     if (!validateResearchEvidenceCacheEntry(entry).ok || researchCachePolicyClass(entry) === "not_cacheable") return false;
     this.entries.delete(entry.key.key);
-    this.entries.set(entry.key.key, { entry: { ...entry, cacheStatus: "refreshed" }, expiresAtMs: Date.parse(entry.expiresAt) });
+    this.entries.set(entry.key.key, { entry: structuredClone({ ...entry, cacheStatus: "refreshed" }), expiresAtMs: Date.parse(entry.expiresAt) });
     while (this.entries.size > this.maxEntries) this.entries.delete(this.entries.keys().next().value as string);
     return true;
   }
@@ -66,4 +70,3 @@ export class MemoryResearchEvidenceCache implements ResearchEvidenceCachePort {
     return this.entries.size;
   }
 }
-
