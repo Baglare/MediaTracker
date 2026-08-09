@@ -11,3 +11,4 @@ export * from "./feedback-reason-dialog";
 export * from "./engine-transparency";
 export * from "./recommendation-card-header";
 export * from "./message-history";
+export * from "./research-evidence-disclosure";

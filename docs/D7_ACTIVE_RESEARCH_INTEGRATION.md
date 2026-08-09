@@ -18,4 +18,4 @@ Internal sidecar candidate identity, aspect, bounded decision/citation kimlikler
 
 ## Public boundary
 
-Shadow modu `after()` post-response lifecycle'ını korur; active mod shadow schedule etmez ve final deterministic koşuyu response öncesinde await eder. Public Recommendation V2 şeması bu aşamada değişmez. Citation read-model ve UI D7-R6A2 kapsamındadır.
+Shadow modu `after()` post-response lifecycle'ını korur; active mod shadow schedule etmez ve final deterministic koşuyu response öncesinde await eder. D7-R6A2 ile active mod ayrıca `D7_RESEARCH_PUBLIC_CITATIONS_ENABLED=1` ister. Outcome değiştiren decision revision-bound, registry-verified [public read-model](D7_PUBLIC_RESEARCH_TRANSPARENCY.md) üretemezse baseline döner. Optional `researchEvidence` dışında mevcut Recommendation V2 alanları değişmez.

@@ -69,7 +69,7 @@ import { decodeRecommendationFeedbackEventV2 } from "@/features/recommendations/
 import { applyStructuredRequestToRetrievalPlan } from "@/features/recommendations/intent/retrieval-guardrails";
 import { ASPECT_REGISTRY } from "@/features/recommendations/domain/aspect-registry";
 import { userFacingRankedTagNoResult } from "@/features/recommendations/ui/user-facing-text";
-import { nextPostResponseTaskScheduler, resolveResearchRolloutConfig, scheduleGroundedResearchShadow } from "@/features/recommendations/research/server";
+import { nextPostResponseTaskScheduler, resolveResearchRolloutExecution, scheduleGroundedResearchShadow } from "@/features/recommendations/research/server";
 import { runActiveGroundedRecommendation } from "@/features/recommendations/research/active/service";
 
 export const runtime = "nodejs";
@@ -1772,7 +1772,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (DETERMINISTIC_RECOMMENDATION_V2_ENABLED) {
-    const researchRollout = resolveResearchRolloutConfig();
+    const researchRollout = resolveResearchRolloutExecution();
     const deterministicInput: DeterministicRecommendationV2Input = {
       message: providerMessage,
       intent,
@@ -1790,7 +1790,7 @@ export async function POST(req: NextRequest) {
         ? process.env.AI_RECOMMENDATION_SEMANTIC_MODE
         : "structured_only",
     };
-    const execution = researchRollout.mode === "active"
+    const execution = researchRollout.activeResearchAllowed
       ? (await runActiveGroundedRecommendation({ engineInput: deterministicInput, requestId: `d7-r6a1:${crypto.randomUUID()}`, signal: req.signal })).execution
       : await runDeterministicRecommendationV2WithShadowSeed(deterministicInput);
     const response = execution.response;

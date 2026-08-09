@@ -4,6 +4,7 @@ import { runDeterministicRecommendationV2WithShadowSeed, type DeterministicRecom
 import { runGroundedResearchActivePipeline, type ActiveGroundedResearchHandoff } from "../shadow/orchestrator";
 import type { GroundedResearchShadowContext } from "../shadow/types";
 import { buildActiveResearchMerge } from "./merge";
+import { buildPublicResearchEvidenceSummary } from "./public-evidence";
 import type { ActiveGroundedRecommendationResult, ActiveResearchProvenanceSidecar, ResearchOutcomeChange } from "./types";
 
 export interface ActiveGroundedRecommendationDependencies {
@@ -38,6 +39,7 @@ function responseHasCandidate(response: ActiveGroundedRecommendationResult["base
 }
 
 function outcome(input: { role: "must" | "avoid"; before: boolean; after: boolean; effect: string }): ResearchOutcomeChange {
+  if (input.role === "avoid" && input.after && input.effect === "would_clear_avoid") return "cleared_avoid";
   if (!input.before && input.after) return input.role === "avoid" && input.effect === "would_clear_avoid" ? "cleared_avoid" : "rescued_candidate";
   if (input.before && !input.after) return "rejected_candidate";
   return "no_change";
@@ -68,7 +70,19 @@ export async function runActiveGroundedRecommendation(input: {
       const role: "must" | "avoid" = constraint.role === "must" ? "must" : "avoid";
       return [{ candidateIdentity: item.handoff.candidateIdentity, aspectId: decision.aspectId, decisionStatus: decision.status, decisionLevel: decision.level, citationIds: item.handoff.citations.map((citation) => citation.citationId).slice(0, 16), sourceCount: decision.sourceCount, cacheStatus: item.cacheStatus, whetherResearchChangedOutcome: outcome({ role, before, after, effect }) }];
     }));
-    return { execution: finalExecution, baselineResponse: baseline.response, provenance, status: "active_applied" };
+    const publicEvidenceByCandidateKey = new Map<string, ReturnType<typeof buildPublicResearchEvidenceSummary>>();
+    for (const provenanceItem of provenance.filter((item) => item.whetherResearchChangedOutcome === "rescued_candidate" || item.whetherResearchChangedOutcome === "cleared_avoid")) {
+      const handoff = research.handoffs.find((item) => item.handoff.candidateIdentity.canonicalKey === provenanceItem.candidateIdentity.canonicalKey && item.handoff.aspectDecisions.some((decision) => decision.aspectId === provenanceItem.aspectId))?.handoff;
+      const summary = handoff ? buildPublicResearchEvidenceSummary({ handoff, provenance: provenanceItem }) : null;
+      if (!summary) return { execution: baseline, baselineResponse: baseline.response, provenance: [], status: "failed_soft" };
+      publicEvidenceByCandidateKey.set(provenanceItem.candidateIdentity.canonicalKey, summary);
+    }
+    const recommendations = finalExecution.response.recommendations.map((recommendation) => {
+      const key = provenance.find((item) => item.candidateIdentity.primaryProvider === recommendation.externalSource && item.candidateIdentity.primaryExternalId === recommendation.externalId)?.candidateIdentity.canonicalKey;
+      const researchEvidence = key ? publicEvidenceByCandidateKey.get(key) : undefined;
+      return researchEvidence ? { ...recommendation, researchEvidence } : recommendation;
+    });
+    return { execution: { ...finalExecution, response: { ...finalExecution.response, recommendations } }, baselineResponse: baseline.response, provenance, status: "active_applied" };
   } catch {
     return { execution: baseline, baselineResponse: baseline.response, provenance: [], status: "failed_soft" };
   }

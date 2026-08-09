@@ -41,7 +41,7 @@ export function wikipediaCitation(overrides: Partial<PersistedResearchCitation> 
   return {
     citationId: "citation-wikipedia-1",
     sourceId: "wikipedia",
-    canonicalUrl: "https://en.wikipedia.org/wiki/Example",
+    canonicalUrl: "https://en.wikipedia.org/w/index.php?title=Example&oldid=12345",
     revisionId: "12345",
     accessedAt: TEST_NOW,
     sectionOrLocator: "Plot",

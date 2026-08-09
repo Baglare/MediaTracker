@@ -16,6 +16,7 @@ import type {
 import { decodeRecommendationFeedbackEventV2, type RecommendationFeedbackEventV2 } from "@/features/recommendations/feedback";
 import { decodeRecommendationRequestV2 } from "@/features/recommendations/domain/codec";
 import type { RecommendationStrictness } from "@/features/recommendations/domain/types";
+import { sanitizeRecommendationResearchEvidence } from "@/features/recommendations/research/active/public-codec";
 
 export interface AiSessionLocalState {
   version: 1;
@@ -129,13 +130,13 @@ function normalizeSession(value: unknown): Record<string, unknown> | null {
   const recommendations = Array.isArray(value.recommendations)
     ? value.recommendations.slice(0, 50).flatMap((item) => {
         const record = boundedRecord(item, 20_000);
-        return record ? [record] : [];
+        return record ? [sanitizeRecommendationResearchEvidence(record)] : [];
       })
     : [];
   const nearMatches = Array.isArray(value.nearMatches)
     ? value.nearMatches.slice(0, 3).flatMap((item) => {
         const record = boundedRecord(item, 20_000);
-        return record ? [record] : [];
+        return record ? [sanitizeRecommendationResearchEvidence(record)] : [];
       })
     : [];
   const structuredRequest = decodeRecommendationRequestV2(value.structuredRequestV2);
@@ -174,13 +175,13 @@ function normalizeActiveSession(value: unknown): Record<string, unknown> | undef
   const recommendations = Array.isArray(value.recommendations)
     ? value.recommendations.slice(0, 50).flatMap((item) => {
         const record = boundedRecord(item, 20_000);
-        return record ? [record] : [];
+        return record ? [sanitizeRecommendationResearchEvidence(record)] : [];
       })
     : [];
   const nearMatches = Array.isArray(value.nearMatches)
     ? value.nearMatches.slice(0, 3).flatMap((item) => {
         const record = boundedRecord(item, 20_000);
-        return record ? [record] : [];
+        return record ? [sanitizeRecommendationResearchEvidence(record)] : [];
       })
     : [];
   const structuredRequest = decodeRecommendationRequestV2(value.structuredRequestV2);

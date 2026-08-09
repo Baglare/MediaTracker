@@ -48,7 +48,7 @@ describe("D7-R6A1 active research integration", () => {
     expect(buildActiveResearchMerge({ handoffs: [unknown], constraints: [constraint] }).constraintDecisionsByCandidateKey.size).toBe(0);
   });
 
-  it("baseline -> research -> immutable final pass çalışır ve public response sidecar içermez", async () => {
+  it("baseline -> research -> immutable final pass çalışır ve yalnız public-safe evidence taşır", async () => {
     const candidate = researchCandidate();
     const context = { version: 1 as const, structuredRequest: { version: 1 as const, targetMediaTypes: ["anime" as const], aspectConstraints: [constraint], objectiveConstraints: [], strictness: "strict" as const }, candidates: [{ researchCandidate: candidate, titleSnapshot: "Public title" }] };
     const baseline = { response: response(), researchShadowContext: context };
@@ -60,7 +60,8 @@ describe("D7-R6A1 active research integration", () => {
     const result = await runActiveGroundedRecommendation({ engineInput, requestId: "r6a1" }, { runDeterministic: runDeterministic as never, runResearch });
     expect(runDeterministic).toHaveBeenCalledTimes(2); expect(runResearch).toHaveBeenCalledTimes(1);
     expect(result.status).toBe("active_applied"); expect(result.provenance[0].whetherResearchChangedOutcome).toBe("rescued_candidate");
-    expect(result.execution.response).toBe(final.response); expect(JSON.stringify(result.execution.response)).not.toMatch(/citation|research|provenance|passage/i);
+    expect(result.execution.response.recommendations[0].researchEvidence).toMatchObject({ status: "research_verified", affectedAspects: [{ aspectId: "romance", finding: "supported" }] });
+    expect(JSON.stringify(result.execution.response)).not.toMatch(/citationId|provenance|passage|paraphrasedClaim|providerResponse|cacheStatus/i);
     expect(originalCandidates).toEqual([]);
   });
 

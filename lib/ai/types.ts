@@ -273,6 +273,31 @@ export interface AiRecommendation {
   candidate?: AiCandidate;    // Quick Add akışı için
   resultKind?: "primary" | "near_match";
   evidenceSummary?: { label: string; value: string; confidenceLabel?: string }[];
+  researchEvidence?: PublicResearchEvidenceSummary;
+}
+
+export interface PublicResearchAspectEvidence {
+  aspectId: string;
+  label: string;
+  finding: "supported" | "explicit_absence";
+  level: "incidental" | "significant" | "primary" | null;
+  confidence: "low" | "medium";
+  sourceCount: number;
+}
+
+export interface PublicResearchSource {
+  sourceId: string;
+  label: string;
+  url: string;
+  attribution: string;
+  accessedAt?: string;
+}
+
+export interface PublicResearchEvidenceSummary {
+  version: 1;
+  status: "research_verified";
+  affectedAspects: PublicResearchAspectEvidence[];
+  sources: PublicResearchSource[];
 }
 
 export interface AiNearMatchRecommendation extends AiRecommendation {

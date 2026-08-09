@@ -56,6 +56,7 @@ import {
   NearMatchSection,
   ParsedRequestPanel,
   RecommendationCardHeader,
+  ResearchEvidenceDisclosure,
   RequestComposer,
   appendRecommendationMessage,
   buildInterpretReferencePayload,
@@ -65,6 +66,7 @@ import {
   userFacingNoResultSummary,
   userFacingRejectionReason,
 } from "@/features/recommendations/ui";
+import { decodePublicResearchEvidenceSummary } from "@/features/recommendations/research/active/public-codec";
 export type { AiSettings } from "@/lib/ai/types";
 import { useAuth } from "@/hooks/use-auth";
 import {
@@ -1160,6 +1162,7 @@ export default function AiAdvisor({
           candidate: r.candidate,
           resultKind: r.resultKind,
           evidenceSummary: r.evidenceSummary,
+          researchEvidence: decodePublicResearchEvidenceSummary(r.researchEvidence) ?? undefined,
         })
       );
       return {
@@ -2019,6 +2022,7 @@ export default function AiAdvisor({
                 )}
 
                 <EvidenceSummary items={rec.evidenceSummary} />
+                <ResearchEvidenceDisclosure evidence={rec.researchEvidence} />
 
                 {(rec.risk || rec.communitySignal) && (
                   <div className="mt-2 space-y-1">
