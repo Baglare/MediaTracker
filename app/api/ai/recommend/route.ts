@@ -59,7 +59,7 @@ import { prepareProviderEvidencePipeline, type ProviderEvidencePipelineResult } 
 import { emptyProviderRequestTelemetry, mergeProviderRequestTelemetry } from "@/features/recommendations/providers/request-policy";
 import {
   DETERMINISTIC_RECOMMENDATION_V2_ENABLED,
-  runDeterministicRecommendationV2,
+  runDeterministicRecommendationV2WithShadowSeed,
 } from "@/features/recommendations/orchestration";
 import { decodeRecommendationRequestV2, type RecommendationRequestV2 } from "@/features/recommendations/domain/codec";
 import { evaluateRequestEvidenceCapabilities } from "@/features/recommendations/domain/evidence-capability";
@@ -68,7 +68,7 @@ import { decodeRecommendationFeedbackEventV2 } from "@/features/recommendations/
 import { applyStructuredRequestToRetrievalPlan } from "@/features/recommendations/intent/retrieval-guardrails";
 import { ASPECT_REGISTRY } from "@/features/recommendations/domain/aspect-registry";
 import { userFacingRankedTagNoResult } from "@/features/recommendations/ui/user-facing-text";
-import { isGroundedResearchShadowEnabled, runGroundedResearchShadow } from "@/features/recommendations/research/server";
+import { isGroundedResearchShadowEnabled, nextPostResponseTaskScheduler, scheduleGroundedResearchShadow } from "@/features/recommendations/research/server";
 
 export const runtime = "nodejs";
 
@@ -1771,7 +1771,7 @@ export async function POST(req: NextRequest) {
 
   if (DETERMINISTIC_RECOMMENDATION_V2_ENABLED) {
     const researchShadowEnabled = isGroundedResearchShadowEnabled();
-    const response = await runDeterministicRecommendationV2({
+    const execution = await runDeterministicRecommendationV2WithShadowSeed({
       message: providerMessage,
       intent,
       retrievalPlan,
@@ -1784,16 +1784,11 @@ export async function POST(req: NextRequest) {
       structuredRequest: structuredRequest?.ok ? structuredRequest.value : undefined,
       baseUrl: req.nextUrl.origin,
       providerPipeline: providerPipelineResult,
-      onResearchShadowContext: researchShadowEnabled
-        ? async (context) => {
-            await runGroundedResearchShadow({
-              ...context,
-              requestId: `d7-r4a:${crypto.randomUUID()}`,
-              signal: req.signal,
-            });
-          }
-        : undefined,
+      semanticVerifierMode: process.env.AI_RECOMMENDATION_SEMANTIC_MODE === "local_enhanced" || process.env.AI_RECOMMENDATION_SEMANTIC_MODE === "remote_enhanced"
+        ? process.env.AI_RECOMMENDATION_SEMANTIC_MODE
+        : "structured_only",
     });
+    const response = execution.response;
     if (response.engineStatus) {
       response.engineStatus = { ...response.engineStatus, ...enginePlanningFields(providerState) };
     }
@@ -1847,6 +1842,12 @@ export async function POST(req: NextRequest) {
         notes: [...(response.debug.retrieval.notes ?? []), ...debugNotes, "d6_3_deterministic_final_ranking"],
       } : undefined,
     };
+    scheduleGroundedResearchShadow({
+      enabled: researchShadowEnabled,
+      scheduler: nextPostResponseTaskScheduler,
+      context: execution.researchShadowContext,
+      requestId: `d7-r4b:${crypto.randomUUID()}`,
+    });
     return NextResponse.json(response satisfies AiRecommendResponse);
   }
 

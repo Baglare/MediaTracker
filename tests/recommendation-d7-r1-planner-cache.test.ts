@@ -112,7 +112,7 @@ describe("D7-R1 research evidence cache", () => {
   });
 
   it("bounded memory adapter get/delete ve scope/source revision invalidation uygular", async () => {
-    const cache = new MemoryResearchEvidenceCache();
+    const cache = new MemoryResearchEvidenceCache(128, () => Date.parse("2026-08-08T10:00:00.000Z"));
     const entry = cacheEntry();
     expect(await cache.set(entry)).toBe(true);
     expect(await cache.get(entry.key)).toMatchObject({ cacheStatus: "fresh" });

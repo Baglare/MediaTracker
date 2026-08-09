@@ -4,11 +4,17 @@
 
 D7-R4A, structured evidence sonrasında hâlâ çözülemeyen açık `must` ve `avoid` koşullarını Grounded Research zincirine server-only shadow iş olarak verir. D6 deterministic V2 authoritative kalır: shadow sonucu candidate eligibility, score, sıralama, near-match veya public recommendation response'una uygulanmaz.
 
-## Feature flag ve akış
+## Feature flag ve post-response akış
 
-`D7_RESEARCH_SHADOW_ENABLED=1` yalnız server process'inde shadow çağrısını açar. Varsayılan `0` iken shadow context oluşturulmaz; planner, provider ve network çağrısı yapılmaz. Açık akış existing planner → exact Wikimedia direct source → gerekirse tek allowlist'li discovery → secure acquisition/passage packet → grounded extraction → deterministic decision/handoff sırasını yeniden kullanır.
+`D7_RESEARCH_SHADOW_ENABLED=1` yalnız server process'inde shadow çağrısını açar. Varsayılan `0` iken task schedule edilmez; planner, provider ve network çağrısı yapılmaz. Route başarılı deterministic response yolunda tek top-level işi Next.js `after()` ile kaydeder. Promise sahipsiz bırakılmaz ve task rejection scheduler sınırında fail-soft tutulur; kullanıcı response'u shadow tamamlanmasını beklemez.
 
-Shadow girdisi yalnız doğrulanmış candidate identity/version scope, public title/year snapshot, structured constraint ve evidence özetini içerir. Owner/user kimliği, library içeriği, rating, favorite, progress, note, feedback, raw kullanıcı mesajı, konuşma ve profil özeti research servisine taşınmaz.
+Açık akış existing planner → exact Wikimedia direct source → gerekirse tek allowlist'li discovery → secure acquisition/passage packet → grounded extraction → deterministic decision/handoff sırasını yeniden kullanır.
+
+## Engine/composition ayrımı
+
+Deterministic engine framework, environment, provider/network, shadow orchestrator veya scheduler import etmez. Aynı hesaplamada authoritative public response ile bounded shadow seed üretir. Feature flag, provider config ve `after()` scheduling yalnız route/server composition katmanındadır. Clarification, validation ve error early-return yolları shadow task üretmez.
+
+Schedule öncesinde seed `structuredClone` ile request yaşam döngüsünden koparılır ve recursively freeze edilir. Snapshot yalnız doğrulanmış candidate identity/version scope, public title/year snapshot, structured constraint/evidence özeti, internal request ID, 16 saniye deadline ve policy version içerir. Request/Response, body stream, headers, cookies, AbortSignal, owner/user kimliği, library içeriği, rating, favorite, progress, note, feedback, raw kullanıcı mesajı, konuşma, profil özeti ve secret closure'a taşınmaz.
 
 ## Uygunluk sınırı
 
@@ -24,6 +30,8 @@ Existing deterministic research handoff policy, shadow decision'ı `would_satisf
 
 Disabled/config-unavailable, provider veya source failure, invalid grounding, no-claim, unknown, timeout, parent abort ve budget exhaustion baseline recommendation'ı değiştirmez ve route'u 500 yapmaz. Provider/network hata ayrıntıları public response'a aktarılmaz.
 
-## R4B
+## R4B canlı kabul ve latency gözlemi
 
-R4B; explicit feature flags ile live provider acceptance, full regression/build, stage latency/budget ölçümü ve internal telemetry sink kararını tamamlayacaktır. Shadow sonuçlarının authoritative eligibility/ranking'e uygulanması R4A kapsamında değildir.
+`D7_R4_SHADOW_LIVE_SMOKE=1` normal suite dışında explicit canlı kapıdır. 2026-08-09 son Steins;Gate örneğinde exact AniList identity → direct Wikimedia → acquisition → Groq extraction zinciri `complete` oldu: `n=1`, planning `1 ms`, direct source `1967 ms`, discovery `0 ms`, acquisition `13 ms`, extraction `678 ms`, total `2660 ms`; timeout oluşmadı ve 16 saniye bütçe içinde kaldı. Extraction `no_claims_extracted`, deterministic decision `unknown` ve hypothetical effect `would_remain_unknown` oldu; bu geçerli fail-soft sonuçtur. Bu tek örnek performans garantisi değildir.
+
+Canlı sonuç internal stage status ve bounded telemetry üretti; passage, citation, evidence unit veya provider response public yüzeye çıkmadı. Research kararı authoritative eligibility/ranking'e uygulanmadı. Active integration R5/R6 güvenlik, kalite ve source acceptance kapılarından önce kapalı kalır.

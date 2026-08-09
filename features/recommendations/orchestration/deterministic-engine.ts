@@ -14,11 +14,6 @@ import type { GroundedResearchShadowContext } from "../research/shadow/types";
 
 export const DETERMINISTIC_RECOMMENDATION_V2_ENABLED = true;
 
-function configuredVerifierMode(): SemanticVerifierMode {
-  const value = process.env.AI_RECOMMENDATION_SEMANTIC_MODE;
-  return value === "local_enhanced" || value === "remote_enhanced" ? value : "structured_only";
-}
-
 function findSnapshot(candidate: AiCandidate, snapshots: ReadonlyMap<string, CandidateProviderEvidenceSnapshot>): CandidateProviderEvidenceSnapshot | null {
   for (const snapshot of snapshots.values()) {
     if (snapshot.candidateIdentity.primaryProvider === candidate.source && snapshot.candidateIdentity.primaryExternalId === candidate.externalId) return snapshot;
@@ -30,7 +25,12 @@ function isExactlyDismissed(candidate: AiCandidate, dismissed: AiRecommendReques
   return Boolean(dismissed?.some((item) => item.externalSource === candidate.source && item.externalId === candidate.externalId));
 }
 
-export async function runDeterministicRecommendationV2(input: {
+export interface DeterministicRecommendationV2Execution {
+  response: AiRecommendResponse;
+  researchShadowContext?: GroundedResearchShadowContext;
+}
+
+export async function runDeterministicRecommendationV2WithShadowSeed(input: {
   message: string;
   intent: AiIntent;
   retrievalPlan: AiRetrievalPlan | null;
@@ -44,8 +44,8 @@ export async function runDeterministicRecommendationV2(input: {
   fetchImpl?: typeof fetch;
   providerPipeline?: ProviderEvidencePipelineResult;
   structuredRequest?: RecommendationRequestV2;
-  onResearchShadowContext?: (context: GroundedResearchShadowContext) => void | Promise<void>;
-}): Promise<AiRecommendResponse> {
+  semanticVerifierMode?: SemanticVerifierMode;
+}): Promise<DeterministicRecommendationV2Execution> {
   const engineStartedAt = performance.now();
   const pipelineStartedAt = performance.now();
   const pipeline = input.providerPipeline ?? await prepareProviderEvidencePipeline({ candidates: input.candidates, baseUrl: input.baseUrl, fetchImpl: input.fetchImpl });
@@ -53,7 +53,7 @@ export async function runDeterministicRecommendationV2(input: {
   const identityVerified = input.candidates.filter((candidate) => candidate.source !== "library" && findSnapshot(candidate, pipeline.evidenceByCandidateKey));
   const dismissedRejected = identityVerified.filter((candidate) => isExactlyDismissed(candidate, input.dismissed)).map((candidate) => ({ title: candidate.title, reason: "dismissed_exact_identity" }));
   const candidates = identityVerified.filter((candidate) => !isExactlyDismissed(candidate, input.dismissed));
-  const verifierMode = configuredVerifierMode();
+  const verifierMode = input.semanticVerifierMode ?? "structured_only";
   const adapted = input.structuredRequest ? {
     request: input.structuredRequest,
     needsClarification: false,
@@ -77,7 +77,7 @@ export async function runDeterministicRecommendationV2(input: {
     semanticVerifierMode: verifierMode,
   });
   if (!adapted.request || adapted.needsClarification) {
-    return {
+    return { response: {
       assistantMessage: adapted.issues.length > 0
         ? "İstekte birbiriyle çelişen veya doğrulanamayan koşullar var. Medya türünü ve zorunlu tercihlerini biraz daha açık yazar mısın?"
         : "Hangi medya türünde öneri istediğini netleştirir misin?",
@@ -97,7 +97,7 @@ export async function runDeterministicRecommendationV2(input: {
         semanticVerifierMode: "structured_only",
       },
       debug: { provider: "deterministic_v2", note: `clarification:${adapted.issues.join(",")}` },
-    };
+    } };
   }
   const evidenceStartedAt = performance.now();
   const verifier = await runSemanticVerifier({ mode: adapted.request.semanticVerifierMode, snapshots: pipeline.evidenceByCandidateKey, fetchImpl: input.fetchImpl });
@@ -184,12 +184,12 @@ export async function runDeterministicRecommendationV2(input: {
       },
     },
   };
-  if (input.onResearchShadowContext) {
-    try {
-      await input.onResearchShadowContext(buildGroundedResearchShadowContext({ request: adapted.request, candidates: rankable, mediaItems: input.mediaItems }));
-    } catch {
-      // Shadow failure cannot affect the authoritative D6 response.
-    }
-  }
-  return response;
+  return {
+    response,
+    researchShadowContext: buildGroundedResearchShadowContext({ request: adapted.request, candidates: rankable, mediaItems: input.mediaItems }),
+  };
+}
+
+export async function runDeterministicRecommendationV2(input: Parameters<typeof runDeterministicRecommendationV2WithShadowSeed>[0]): Promise<AiRecommendResponse> {
+  return (await runDeterministicRecommendationV2WithShadowSeed(input)).response;
 }

@@ -108,4 +108,12 @@ describe("D7-R4A grounded research shadow", () => {
     expect(result.status).toBe("aborted");
     expect(directResearch).not.toHaveBeenCalled();
   });
+
+  it("provider/direct failure kontrollü partial döner ve public exception üretmez", async () => {
+    const directResearch = vi.fn(async () => { throw new Error("raw provider detail"); });
+    const result = await runGroundedResearchShadow(input(), { environment: { D7_RESEARCH_SHADOW_ENABLED: "1" }, directResearch: directResearch as never });
+    expect(result.status).toBe("partial");
+    expect(result.results[0]).toMatchObject({ researchStatus: "adapter_unavailable", hypotheticalEffect: "would_remain_unknown" });
+    expect(JSON.stringify(result)).not.toContain("raw provider detail");
+  });
 });

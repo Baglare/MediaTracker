@@ -51,3 +51,5 @@ export * from "./extraction/providers/openrouter/adapter";
 export * from "./extraction/orchestration/service";
 export * from "./shadow/config";
 export * from "./shadow/orchestrator";
+export * from "./shadow/lifecycle";
+export * from "./shadow/next-scheduler";

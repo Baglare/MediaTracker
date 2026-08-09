@@ -36,6 +36,7 @@ export * from "./extraction";
 export * from "./shadow/types";
 export * from "./shadow/context";
 export * from "./shadow/codec";
+export * from "./shadow/scheduler";
 export * from "./network/types";
 export * from "./network/ip-policy";
 export * from "./network/retry-policy";

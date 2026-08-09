@@ -55,8 +55,10 @@ export interface GroundedResearchShadowDependencies {
 }
 
 function emptyTelemetry(): GroundedResearchShadowTelemetry {
-  return { plannerRan: false, plannedCandidateCount: 0, plannedJobCount: 0, attemptedJobCount: 0, completedJobCount: 0, skippedJobCount: 0, coalescedJobCount: 0, discoveryOperationCount: 0, timeoutCount: 0, durationBucket: "lt_1s" };
+  return { plannerRan: false, plannedCandidateCount: 0, plannedJobCount: 0, attemptedJobCount: 0, completedJobCount: 0, skippedJobCount: 0, coalescedJobCount: 0, discoveryOperationCount: 0, timeoutCount: 0, sampleCount: 0, stageDurationsMs: { planning: 0, directSource: 0, discovery: 0, acquisition: 0, extraction: 0, total: 0 }, durationBucket: "lt_1s" };
 }
+
+function boundedDuration(ms: number): number { return Math.min(GROUNDED_RESEARCH_SHADOW_TIMEOUT_MS, Math.max(0, Math.round(ms))); }
 
 function durationBucket(ms: number): ResearchShadowDurationBucket {
   return ms < 1_000 ? "lt_1s" : ms < 4_000 ? "1_4s" : ms < 8_000 ? "4_8s" : ms < 16_000 ? "8_16s" : "gte_16s";
@@ -98,8 +100,9 @@ function stageStatus(input: { direct: string; discovery?: string; acquisition?: 
   return [`direct=${input.direct}`, input.discovery ? `discovery=${input.discovery}` : null, input.acquisition ? `acquisition=${input.acquisition}` : null, input.extraction ? `extraction=${input.extraction}` : null, input.provider ? `provider=${input.provider}` : null].filter(Boolean).join(";").slice(0, 240);
 }
 
-async function runJob(input: { job: ResearchJob; context: GroundedResearchShadowInput["candidates"][number]; requestId: string; signal: AbortSignal }, dependencies: GroundedResearchShadowDependencies): Promise<{ result: ResearchShadowCandidateResult; discoveryUsed: boolean; completed: boolean }> {
+async function runJob(input: { job: ResearchJob; context: GroundedResearchShadowInput["candidates"][number]; requestId: string; signal: AbortSignal }, dependencies: GroundedResearchShadowDependencies): Promise<{ result: ResearchShadowCandidateResult; discoveryUsed: boolean; completed: boolean; stages: { directSource: number; discovery: number; acquisition: number; extraction: number } }> {
   const startedAt = (dependencies.monotonicNow ?? Date.now)();
+  const stages = { directSource: 0, discovery: 0, acquisition: 0, extraction: 0 };
   const warnings: string[] = [];
   const constraint = input.context.researchCandidate.unresolvedConstraints.find((item) => item.aspectId === input.job.aspectId && item.role === input.job.role) as ResearchConstraintRequest;
   const httpClient = dependencies.httpClient ?? new SecureResearchHttpClientImpl();
@@ -110,7 +113,9 @@ async function runJob(input: { job: ResearchJob; context: GroundedResearchShadow
   let directStatus = "not_attempted"; let discoveryStatus: string | undefined; let acquisitionStatus: string | undefined; let extractionStatus: string | undefined; let provider: string | undefined;
   try {
     if (input.signal.aborted) throw new Error("research_shadow_aborted");
+    const directStartedAt = (dependencies.monotonicNow ?? Date.now)();
     const direct = await directResearch({ identity: input.context.researchCandidate.identity, versionScope: input.context.researchCandidate.versionScope, httpClient, environment: dependencies.environment, now: dependencies.now });
+    stages.directSource = boundedDuration((dependencies.monotonicNow ?? Date.now)() - directStartedAt);
     directStatus = direct.status; warnings.push(...direct.warnings);
     if (input.signal.aborted) throw new Error("research_shadow_aborted");
     const directDocuments = direct.status === "document_ready"
@@ -120,6 +125,7 @@ async function runJob(input: { job: ResearchJob; context: GroundedResearchShadow
     let discoveryUsed = false;
     if (directDocuments.length === 0 && direct.wikimediaIdentity && input.job.budget.maxExternalSearchOperations > 0) {
       discoveryUsed = true;
+      const discoveryStartedAt = (dependencies.monotonicNow ?? Date.now)();
       const discovery = await discover({
         version: 1, candidateIdentity: input.context.researchCandidate.identity, versionScope: input.context.researchCandidate.versionScope,
         titleSnapshot: input.context.titleSnapshot, ...(input.context.releaseYear ? { releaseYear: input.context.releaseYear } : {}),
@@ -127,13 +133,15 @@ async function runJob(input: { job: ResearchJob; context: GroundedResearchShadow
         ...(input.job.minimumLevel ? { minimumLevel: input.job.minimumLevel } : {}), allowedSourceIds: ["wikipedia"], allowedDomains: ["wikipedia.org"],
         maxSources: 5, requestId: `${input.requestId}:discovery`, researchPolicyVersion: RESEARCH_POLICY_VERSION,
       });
+      stages.discovery = boundedDuration((dependencies.monotonicNow ?? Date.now)() - discoveryStartedAt);
       discoveryStatus = discovery.status; warnings.push(...discovery.warnings); discoveredSources = discovery.sources;
       if (input.signal.aborted) throw new Error("research_shadow_aborted");
     }
     if (!direct.wikimediaIdentity || (directDocuments.length === 0 && discoveredSources.length === 0)) {
       const duration = Math.max(0, (dependencies.monotonicNow ?? Date.now)() - startedAt);
-      return { discoveryUsed, completed: false, result: { candidateIdentity: input.context.researchCandidate.identity, aspectId: input.job.aspectId, structuredStatusBeforeResearch: constraint.currentStructuredDecision as "partial" | "unknown", researchStatus: discoveryStatus ?? directStatus, researchDecisionStatus: "unavailable", researchLevel: null, hypotheticalEffect: "would_remain_unknown", durationBucket: durationBucket(duration), providerAdapterStatus: stageStatus({ direct: directStatus, discovery: discoveryStatus }), warnings: safeWarnings(warnings) } };
+      return { discoveryUsed, completed: false, stages, result: { candidateIdentity: input.context.researchCandidate.identity, aspectId: input.job.aspectId, structuredStatusBeforeResearch: constraint.currentStructuredDecision as "partial" | "unknown", researchStatus: discoveryStatus ?? directStatus, researchDecisionStatus: "unavailable", researchLevel: null, hypotheticalEffect: "would_remain_unknown", durationBucket: durationBucket(duration), providerAdapterStatus: stageStatus({ direct: directStatus, discovery: discoveryStatus }), warnings: safeWarnings(warnings) } };
     }
+    const acquisitionStartedAt = (dependencies.monotonicNow ?? Date.now)();
     const acquisition = await acquire({
       version: 1, candidateIdentity: input.context.researchCandidate.identity, versionScope: input.context.researchCandidate.versionScope,
       wikimediaIdentity: direct.wikimediaIdentity, aspectId: input.job.aspectId, role: input.job.role,
@@ -142,23 +150,26 @@ async function runJob(input: { job: ResearchJob; context: GroundedResearchShadow
       researchPolicyVersion: RESEARCH_POLICY_VERSION, sourceRegistryVersion: RESEARCH_SOURCE_REGISTRY_VERSION,
       acquisitionPolicyVersion: RESEARCH_ACQUISITION_POLICY_VERSION,
     }, { httpClient, environment: dependencies.environment, now: dependencies.now, monotonicNow: dependencies.monotonicNow });
+    stages.acquisition = boundedDuration((dependencies.monotonicNow ?? Date.now)() - acquisitionStartedAt);
     acquisitionStatus = acquisition.status; warnings.push(...acquisition.warnings);
     if (input.signal.aborted) throw new Error("research_shadow_aborted");
     if (acquisition.status !== "packet_ready" || !acquisition.packet) {
       const duration = Math.max(0, (dependencies.monotonicNow ?? Date.now)() - startedAt);
-      return { discoveryUsed, completed: false, result: { candidateIdentity: input.context.researchCandidate.identity, aspectId: input.job.aspectId, structuredStatusBeforeResearch: constraint.currentStructuredDecision as "partial" | "unknown", researchStatus: acquisition.status, researchDecisionStatus: "unavailable", researchLevel: null, hypotheticalEffect: "would_remain_unknown", durationBucket: durationBucket(duration), providerAdapterStatus: stageStatus({ direct: directStatus, discovery: discoveryStatus, acquisition: acquisitionStatus }), warnings: safeWarnings(warnings) } };
+      return { discoveryUsed, completed: false, stages, result: { candidateIdentity: input.context.researchCandidate.identity, aspectId: input.job.aspectId, structuredStatusBeforeResearch: constraint.currentStructuredDecision as "partial" | "unknown", researchStatus: acquisition.status, researchDecisionStatus: "unavailable", researchLevel: null, hypotheticalEffect: "would_remain_unknown", durationBucket: durationBucket(duration), providerAdapterStatus: stageStatus({ direct: directStatus, discovery: discoveryStatus, acquisition: acquisitionStatus }), warnings: safeWarnings(warnings) } };
     }
+    const extractionStartedAt = (dependencies.monotonicNow ?? Date.now)();
     const extraction = await extract({ version: 1, packet: acquisition.packet, aspectDefinition: buildGroundedAspectDefinition(input.job.aspectId), extractorPolicyVersion: GROUNDED_EXTRACTION_POLICY_VERSION, schemaVersion: GROUNDED_EXTRACTION_SCHEMA_VERSION, requestId: `${input.requestId}:extraction`, maxEvidenceUnits: GROUNDED_EXTRACTION_MAX_EVIDENCE_UNITS, maxOutputAssessments: GROUNDED_EXTRACTION_MAX_ASSESSMENTS }, { environment: dependencies.environment, now: dependencies.now, signal: input.signal });
+    stages.extraction = boundedDuration((dependencies.monotonicNow ?? Date.now)() - extractionStartedAt);
     extractionStatus = extraction.status; provider = extraction.providerId; warnings.push(...extraction.warnings);
     const handoff = extraction.decision
       ? buildResearchEvidenceHandoff({ candidateIdentity: input.context.researchCandidate.identity, versionScope: input.context.researchCandidate.versionScope, decisions: [extraction.decision], claims: extraction.claims, citations: acquisition.packet.citations, researchStatus: "complete" })
       : undefined;
     const duration = Math.max(0, (dependencies.monotonicNow ?? Date.now)() - startedAt);
-    return { discoveryUsed, completed: Boolean(handoff), result: { candidateIdentity: input.context.researchCandidate.identity, aspectId: input.job.aspectId, structuredStatusBeforeResearch: constraint.currentStructuredDecision as "partial" | "unknown", researchStatus: extraction.status, researchDecisionStatus: handoff?.aspectDecisions[0]?.status ?? "unavailable", researchLevel: handoff?.aspectDecisions[0]?.level ?? null, hypotheticalEffect: mapShadowHypotheticalEffect(handoff?.aspectDecisions[0], constraint, handoff?.claims ?? [], handoff?.citations ?? []), durationBucket: durationBucket(duration), providerAdapterStatus: stageStatus({ direct: directStatus, discovery: discoveryStatus, acquisition: acquisitionStatus, extraction: extractionStatus, provider }), warnings: safeWarnings(warnings) } };
+    return { discoveryUsed, completed: Boolean(handoff), stages, result: { candidateIdentity: input.context.researchCandidate.identity, aspectId: input.job.aspectId, structuredStatusBeforeResearch: constraint.currentStructuredDecision as "partial" | "unknown", researchStatus: extraction.status, researchDecisionStatus: handoff?.aspectDecisions[0]?.status ?? "unavailable", researchLevel: handoff?.aspectDecisions[0]?.level ?? null, hypotheticalEffect: mapShadowHypotheticalEffect(handoff?.aspectDecisions[0], constraint, handoff?.claims ?? [], handoff?.citations ?? []), durationBucket: durationBucket(duration), providerAdapterStatus: stageStatus({ direct: directStatus, discovery: discoveryStatus, acquisition: acquisitionStatus, extraction: extractionStatus, provider }), warnings: safeWarnings(warnings) } };
   } catch (error) {
     warnings.push(error instanceof Error ? error.message : "research_shadow_job_failed");
     const duration = Math.max(0, (dependencies.monotonicNow ?? Date.now)() - startedAt);
-    return { discoveryUsed: Boolean(discoveryStatus), completed: false, result: { candidateIdentity: input.context.researchCandidate.identity, aspectId: input.job.aspectId, structuredStatusBeforeResearch: constraint.currentStructuredDecision as "partial" | "unknown", researchStatus: input.signal.aborted ? "budget_exhausted" : "adapter_unavailable", researchDecisionStatus: "unavailable", researchLevel: null, hypotheticalEffect: "would_remain_unknown", durationBucket: durationBucket(duration), providerAdapterStatus: stageStatus({ direct: directStatus, discovery: discoveryStatus, acquisition: acquisitionStatus, extraction: extractionStatus, provider }), warnings: safeWarnings(warnings) } };
+    return { discoveryUsed: Boolean(discoveryStatus), completed: false, stages, result: { candidateIdentity: input.context.researchCandidate.identity, aspectId: input.job.aspectId, structuredStatusBeforeResearch: constraint.currentStructuredDecision as "partial" | "unknown", researchStatus: input.signal.aborted ? "budget_exhausted" : "adapter_unavailable", researchDecisionStatus: "unavailable", researchLevel: null, hypotheticalEffect: "would_remain_unknown", durationBucket: durationBucket(duration), providerAdapterStatus: stageStatus({ direct: directStatus, discovery: discoveryStatus, acquisition: acquisitionStatus, extraction: extractionStatus, provider }), warnings: safeWarnings(warnings) } };
   }
 }
 
@@ -171,7 +182,9 @@ export async function runGroundedResearchShadow(value: unknown, dependencies: Gr
   const input = decoded.value;
   const eligibleCandidates = input.candidates.map((item) => ({ ...item, researchCandidate: { ...item.researchCandidate, unresolvedConstraints: item.researchCandidate.unresolvedConstraints.filter(eligibleConstraint) } })).filter((item) => item.researchCandidate.unresolvedConstraints.length > 0);
   const planner = dependencies.plan ?? planResearch; telemetry.plannerRan = true;
+  const planningStartedAt = (dependencies.monotonicNow ?? Date.now)();
   const plan: ResearchPlan = planner({ candidates: eligibleCandidates.map((item) => item.researchCandidate), budget: SHADOW_PLANNER_BUDGET });
+  telemetry.stageDurationsMs.planning = boundedDuration((dependencies.monotonicNow ?? Date.now)() - planningStartedAt);
   telemetry.plannedCandidateCount = new Set(plan.jobs.map((job) => job.candidateScope.scopeKey)).size; telemetry.plannedJobCount = plan.jobs.length; telemetry.coalescedJobCount = plan.skipped.filter((item) => item.reason === "duplicate_candidate_aspect").length;
   if (plan.jobs.length === 0) { telemetry.durationBucket = durationBucket(Math.max(0, (dependencies.monotonicNow ?? Date.now)() - startedAt)); return result("no_jobs", telemetry, [], plan.warnings); }
   const contexts = new Map(eligibleCandidates.map((item) => [item.researchCandidate.versionScope.scopeKey, item]));
@@ -185,6 +198,12 @@ export async function runGroundedResearchShadow(value: unknown, dependencies: Gr
   const jobResults = [...completed.entries()].sort(([a], [b]) => a - b).map(([, item]) => item);
   telemetry.completedJobCount = jobResults.filter((item) => item.completed).length; telemetry.skippedJobCount = telemetry.plannedJobCount - telemetry.completedJobCount; telemetry.discoveryOperationCount = jobResults.filter((item) => item.discoveryUsed).length;
   const elapsed = Math.max(0, (dependencies.monotonicNow ?? Date.now)() - startedAt); telemetry.durationBucket = durationBucket(elapsed);
+  telemetry.sampleCount = jobResults.length;
+  telemetry.stageDurationsMs.directSource = Math.max(0, ...jobResults.map((item) => item.stages.directSource));
+  telemetry.stageDurationsMs.discovery = Math.max(0, ...jobResults.map((item) => item.stages.discovery));
+  telemetry.stageDurationsMs.acquisition = Math.max(0, ...jobResults.map((item) => item.stages.acquisition));
+  telemetry.stageDurationsMs.extraction = Math.max(0, ...jobResults.map((item) => item.stages.extraction));
+  telemetry.stageDurationsMs.total = boundedDuration(elapsed);
   if (completion === "aborted") { telemetry.timeoutCount = deadline.timedOut() ? 1 : 0; return result(deadline.timedOut() ? "budget_exhausted" : "aborted", telemetry, jobResults.map((item) => item.result), [deadline.timedOut() ? "research_shadow_deadline" : "research_shadow_parent_aborted"]); }
   return result(telemetry.completedJobCount === telemetry.plannedJobCount ? "complete" : "partial", telemetry, jobResults.map((item) => item.result), plan.warnings);
 }

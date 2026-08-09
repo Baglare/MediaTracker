@@ -30,9 +30,8 @@ export function decodeGroundedResearchShadowInput(value: unknown): { ok: true; v
     const decoded = decodeResearchCandidateInput(candidate.researchCandidate);
     if (!decoded.ok) issues.push(...decoded.issues.map((item) => ({ ...item, path: `candidates.${index}.researchCandidate.${item.path}` })));
     if (typeof candidate.titleSnapshot !== "string" || !candidate.titleSnapshot.trim() || candidate.titleSnapshot.length > 300 || /[\0\r\n]/.test(candidate.titleSnapshot)) issues.push(issue("research_shadow_title_invalid", `candidates.${index}.titleSnapshot`, "Public bounded title snapshot zorunludur."));
-    if (candidate.releaseYear !== undefined && (!Number.isInteger(candidate.releaseYear) || candidate.releaseYear < 1800 || candidate.releaseYear > 2200)) issues.push(issue("research_shadow_year_invalid", `candidates.${index}.releaseYear`, "Release year bounded olmalıdır."));
+    if (candidate.releaseYear !== undefined && (typeof candidate.releaseYear !== "number" || !Number.isInteger(candidate.releaseYear) || candidate.releaseYear < 1800 || candidate.releaseYear > 2200)) issues.push(issue("research_shadow_year_invalid", `candidates.${index}.releaseYear`, "Release year bounded olmalıdır."));
   });
   if (value.signal !== undefined && !(value.signal instanceof AbortSignal)) issues.push(issue("research_shadow_signal_invalid", "signal", "AbortSignal geçersiz."));
   return issues.length > 0 ? { ok: false, issues } : { ok: true, value: value as unknown as GroundedResearchShadowInput };
 }
-

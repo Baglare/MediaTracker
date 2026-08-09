@@ -68,6 +68,15 @@ export interface GroundedResearchShadowTelemetry {
   coalescedJobCount: number;
   discoveryOperationCount: number;
   timeoutCount: number;
+  sampleCount: number;
+  stageDurationsMs: {
+    planning: number;
+    directSource: number;
+    discovery: number;
+    acquisition: number;
+    extraction: number;
+    total: number;
+  };
   durationBucket: ResearchShadowDurationBucket;
 }
 
@@ -80,4 +89,3 @@ export interface GroundedResearchShadowResult {
   warnings: readonly string[];
   policyVersion: typeof GROUNDED_RESEARCH_SHADOW_POLICY_VERSION;
 }
-
