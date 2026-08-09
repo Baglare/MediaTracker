@@ -55,12 +55,16 @@ export function buildGroundedResearchShadowContext(input: {
     });
     const unresolvedConstraints = constraintStates
       .filter(({ constraint, structured }) => constraint.source === "explicit" && (constraint.role === "must" || constraint.role === "avoid") && (structured === "unknown" || structured === "partial"))
-      .map(({ constraint, structured }) => ({
-        aspectId: constraint.aspectId, role: constraint.role,
-        ...(constraint.minimumLevel ? { minimumLevel: constraint.minimumLevel === "absent" ? "incidental" as const : constraint.minimumLevel } : {}),
-        source: "explicit" as const, currentStructuredDecision: structured,
-        unresolvedReason: structured === "unknown" ? "structured_evidence_unknown" : "structured_evidence_partial",
-      }));
+      .map(({ constraint, structured }) => {
+        const configuredLevel = constraint.role === "avoid" ? constraint.rejectAtLevel : constraint.minimumLevel;
+        const minimumLevel = configuredLevel === "absent" ? "incidental" : configuredLevel;
+        return {
+          aspectId: constraint.aspectId, role: constraint.role,
+          ...(minimumLevel ? { minimumLevel } : {}),
+          source: "explicit" as const, currentStructuredDecision: structured,
+          unresolvedReason: structured === "unknown" ? "structured_evidence_unknown" : "structured_evidence_partial",
+        };
+      });
     if (unresolvedConstraints.length === 0) return;
     seen.add(identity.canonicalKey);
     candidates.push({
@@ -83,4 +87,3 @@ export function buildGroundedResearchShadowContext(input: {
     candidates,
   };
 }
-

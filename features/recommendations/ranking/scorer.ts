@@ -8,6 +8,7 @@ import type { CandidateProviderEvidenceSnapshot } from "../providers/types";
 import { evaluateObjectiveConstraint, objectiveDecisionsAllowPrimary } from "./objective-filters";
 import { buildPersonalPreferenceProfile, calculatePersonalFit, hasExactLibraryIdentity } from "./personal-profile";
 import type { ScoredRecommendationCandidate } from "./types";
+import type { ConstraintDecision } from "../domain/policies";
 import type { RecommendationFeedbackEventV2 } from "../feedback";
 import { evaluateExplicitRequestCoverage } from "./request-relevance";
 
@@ -88,6 +89,7 @@ export function scoreEligibleCandidates(input: {
   mediaItems: readonly MediaItem[];
   feedback: readonly RecommendationFeedbackEvent[];
   feedbackV2?: readonly RecommendationFeedbackEventV2[];
+  constraintDecisionOverridesByCandidateKey?: ReadonlyMap<string, ReadonlyMap<string, ConstraintDecision>>;
 }): { scored: ScoredRecommendationCandidate[]; nearMatches: ScoredRecommendationCandidate[]; rejected: { title: string; reason: string }[] } {
   const profile = buildPersonalPreferenceProfile(input.mediaItems);
   const scored: ScoredRecommendationCandidate[] = [];
@@ -97,7 +99,9 @@ export function scoreEligibleCandidates(input: {
     .filter((constraint) => constraint.role === "avoid")
     .map((constraint) => constraint.aspectId));
   for (const item of input.candidates) {
-    const aspectDecisions = input.request.aspectConstraints.map((constraint) => evaluateConstraintEligibility({ constraint, evidence: item.aspectEvidence.get(constraint.aspectId) ?? null, strictness: input.request.strictness }));
+    const decisionOverrides = input.constraintDecisionOverridesByCandidateKey?.get(item.snapshot.candidateIdentity.canonicalKey);
+    const aspectDecisions = input.request.aspectConstraints.map((constraint) => decisionOverrides?.get(constraint.id)
+      ?? evaluateConstraintEligibility({ constraint, evidence: item.aspectEvidence.get(constraint.aspectId) ?? null, strictness: input.request.strictness }));
     const objectiveDecisions = input.request.objectiveConstraints.map((constraint) => evaluateObjectiveConstraint({ constraint, snapshot: item.snapshot }));
     const aspectEligibility = buildCandidateEligibility(input.request.strictness, aspectDecisions);
     const objectiveEligible = objectiveDecisionsAllowPrimary(objectiveDecisions);

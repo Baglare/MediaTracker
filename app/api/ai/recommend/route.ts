@@ -60,6 +60,7 @@ import { emptyProviderRequestTelemetry, mergeProviderRequestTelemetry } from "@/
 import {
   DETERMINISTIC_RECOMMENDATION_V2_ENABLED,
   runDeterministicRecommendationV2WithShadowSeed,
+  type DeterministicRecommendationV2Input,
 } from "@/features/recommendations/orchestration";
 import { decodeRecommendationRequestV2, type RecommendationRequestV2 } from "@/features/recommendations/domain/codec";
 import { evaluateRequestEvidenceCapabilities } from "@/features/recommendations/domain/evidence-capability";
@@ -68,7 +69,8 @@ import { decodeRecommendationFeedbackEventV2 } from "@/features/recommendations/
 import { applyStructuredRequestToRetrievalPlan } from "@/features/recommendations/intent/retrieval-guardrails";
 import { ASPECT_REGISTRY } from "@/features/recommendations/domain/aspect-registry";
 import { userFacingRankedTagNoResult } from "@/features/recommendations/ui/user-facing-text";
-import { isGroundedResearchShadowEnabled, nextPostResponseTaskScheduler, scheduleGroundedResearchShadow } from "@/features/recommendations/research/server";
+import { nextPostResponseTaskScheduler, resolveResearchRolloutConfig, scheduleGroundedResearchShadow } from "@/features/recommendations/research/server";
+import { runActiveGroundedRecommendation } from "@/features/recommendations/research/active/service";
 
 export const runtime = "nodejs";
 
@@ -1770,8 +1772,8 @@ export async function POST(req: NextRequest) {
   }
 
   if (DETERMINISTIC_RECOMMENDATION_V2_ENABLED) {
-    const researchShadowEnabled = isGroundedResearchShadowEnabled();
-    const execution = await runDeterministicRecommendationV2WithShadowSeed({
+    const researchRollout = resolveResearchRolloutConfig();
+    const deterministicInput: DeterministicRecommendationV2Input = {
       message: providerMessage,
       intent,
       retrievalPlan,
@@ -1787,7 +1789,10 @@ export async function POST(req: NextRequest) {
       semanticVerifierMode: process.env.AI_RECOMMENDATION_SEMANTIC_MODE === "local_enhanced" || process.env.AI_RECOMMENDATION_SEMANTIC_MODE === "remote_enhanced"
         ? process.env.AI_RECOMMENDATION_SEMANTIC_MODE
         : "structured_only",
-    });
+    };
+    const execution = researchRollout.mode === "active"
+      ? (await runActiveGroundedRecommendation({ engineInput: deterministicInput, requestId: `d7-r6a1:${crypto.randomUUID()}`, signal: req.signal })).execution
+      : await runDeterministicRecommendationV2WithShadowSeed(deterministicInput);
     const response = execution.response;
     if (response.engineStatus) {
       response.engineStatus = { ...response.engineStatus, ...enginePlanningFields(providerState) };
@@ -1843,7 +1848,7 @@ export async function POST(req: NextRequest) {
       } : undefined,
     };
     scheduleGroundedResearchShadow({
-      enabled: researchShadowEnabled,
+      enabled: researchRollout.mode === "shadow",
       scheduler: nextPostResponseTaskScheduler,
       context: execution.researchShadowContext,
       requestId: `d7-r4b:${crypto.randomUUID()}`,

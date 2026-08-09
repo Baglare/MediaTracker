@@ -11,7 +11,7 @@ import { buildGroundedAspectDefinition } from "../extraction/domain/provenance";
 import { GROUNDED_EXTRACTION_MAX_ASSESSMENTS, GROUNDED_EXTRACTION_MAX_EVIDENCE_UNITS, GROUNDED_EXTRACTION_POLICY_VERSION, GROUNDED_EXTRACTION_SCHEMA_VERSION } from "../extraction/domain/types";
 import { buildResearchEvidenceHandoff, canResearchDecisionDriveHardConstraint, mapResearchDecisionToDeterministicSignal, validateAspectResearchDecision } from "../domain/decisions";
 import { RESEARCH_SOURCE_REGISTRY_VERSION } from "../domain/source-registry";
-import type { AspectResearchDecision, PersistedResearchCitation, PersistedResearchClaim, ResearchConstraintRequest, ResearchEvidenceCacheEntry } from "../domain/types";
+import type { AspectResearchDecision, PersistedResearchCitation, PersistedResearchClaim, ResearchConstraintRequest, ResearchEvidenceCacheEntry, ResearchEvidenceHandoff } from "../domain/types";
 import { buildResearchEvidenceCacheKey, RESEARCH_POLICY_VERSION } from "../cache/key";
 import { processResearchEvidenceCache } from "../cache/process-cache";
 import { buildSourceRevisionFingerprint } from "../cache/revision-fingerprint";
@@ -22,6 +22,9 @@ import type { ResearchBudget, ResearchJob, ResearchPlan } from "../domain/types"
 import { decodeGroundedResearchShadowInput } from "./codec";
 import { isGroundedResearchShadowEnabled, isResearchEvidenceCacheEnabled } from "./config";
 import {
+  GROUNDED_RESEARCH_ACTIVE_MAX_CANDIDATES,
+  GROUNDED_RESEARCH_ACTIVE_MAX_JOBS,
+  GROUNDED_RESEARCH_ACTIVE_TIMEOUT_MS,
   GROUNDED_RESEARCH_SHADOW_MAX_ASPECTS_PER_CANDIDATE,
   GROUNDED_RESEARCH_SHADOW_MAX_CANDIDATES,
   GROUNDED_RESEARCH_SHADOW_MAX_CONCURRENCY,
@@ -46,6 +49,21 @@ const SHADOW_PLANNER_BUDGET: Readonly<ResearchBudget> = Object.freeze({
   totalTimeoutMs: 8_000,
 });
 
+const ACTIVE_PLANNER_BUDGET: Readonly<ResearchBudget> = Object.freeze({
+  maxCandidates: GROUNDED_RESEARCH_ACTIVE_MAX_CANDIDATES,
+  maxAspectsPerCandidate: 1,
+  maxResearchJobs: GROUNDED_RESEARCH_ACTIVE_MAX_JOBS,
+  maxExternalSearchOperations: GROUNDED_RESEARCH_ACTIVE_MAX_JOBS,
+  maxConcurrentOperations: GROUNDED_RESEARCH_SHADOW_MAX_CONCURRENCY,
+  totalTimeoutMs: 8_000,
+});
+
+export interface ActiveGroundedResearchHandoff {
+  handoff: ResearchEvidenceHandoff;
+  cacheStatus: ResearchShadowTransparencySummary["cacheStatus"];
+  providerId?: string;
+}
+
 export interface GroundedResearchShadowDependencies {
   environment?: NodeJS.ProcessEnv;
   plan?: typeof planResearch;
@@ -58,6 +76,8 @@ export interface GroundedResearchShadowDependencies {
   monotonicNow?: () => number;
   overallTimeoutMs?: number;
   evidenceCache?: ResearchEvidenceCachePort;
+  runMode?: "shadow" | "active";
+  onValidatedHandoff?: (value: ActiveGroundedResearchHandoff) => void;
 }
 
 function emptyTelemetry(): GroundedResearchShadowTelemetry {
@@ -189,6 +209,7 @@ async function runJob(input: { job: ResearchJob; context: GroundedResearchShadow
           researchStatus: "complete", cacheEntries: [cached.entry],
         });
         const decision = handoff.aspectDecisions[0];
+        dependencies.onValidatedHandoff?.({ handoff, cacheStatus: "hit", ...(cached.entry.extractionProvenance?.providerId ? { providerId: cached.entry.extractionProvenance.providerId } : {}) });
         const effect = mapShadowHypotheticalEffect(decision, constraint, handoff.claims, handoff.citations);
         const duration = Math.max(0, (dependencies.monotonicNow ?? Date.now)() - startedAt);
         const candidateResult: ResearchShadowCandidateResult = {
@@ -258,6 +279,9 @@ async function runJob(input: { job: ResearchJob; context: GroundedResearchShadow
     const handoff = extraction.decision
       ? buildResearchEvidenceHandoff({ candidateIdentity: input.context.researchCandidate.identity, versionScope: input.context.researchCandidate.versionScope, decisions: [extraction.decision], claims: extraction.claims, citations: acquisition.packet.citations, researchStatus: "complete" })
       : undefined;
+    const handoffValidated = handoff
+      ? validateAspectResearchDecision({ decision: handoff.aspectDecisions[0], claims: handoff.claims, citations: handoff.citations, identity: input.context.researchCandidate.identity }).ok
+      : false;
     if (cacheEnabled && handoff && extraction.provenance && (extraction.status === "claims_extracted" || extraction.status === "no_claims_extracted")) {
       const baseEntry: ResearchEvidenceCacheEntry = {
         key: cacheKey, decision: handoff.aspectDecisions[0], claims: handoff.claims, citations: handoff.citations,
@@ -276,9 +300,10 @@ async function runJob(input: { job: ResearchJob; context: GroundedResearchShadow
       } else cacheStatus = "bypassed";
     } else if (cacheEnabled) cacheStatus = "bypassed";
     const duration = Math.max(0, (dependencies.monotonicNow ?? Date.now)() - startedAt);
-    const decision = handoff?.aspectDecisions[0];
+    if (handoff && handoffValidated) dependencies.onValidatedHandoff?.({ handoff, cacheStatus, ...(provider ? { providerId: provider } : {}) });
+    const decision = handoffValidated ? handoff?.aspectDecisions[0] : undefined;
     const effect = mapShadowHypotheticalEffect(decision, constraint, handoff?.claims ?? [], handoff?.citations ?? []);
-    return { discoveryUsed, completed: Boolean(handoff), stages, result: { candidateIdentity: input.context.researchCandidate.identity, aspectId: input.job.aspectId, structuredStatusBeforeResearch: constraint.currentStructuredDecision as "partial" | "unknown", researchStatus: extraction.status, researchDecisionStatus: decision?.status ?? "unavailable", researchLevel: decision?.level ?? null, hypotheticalEffect: effect, durationBucket: durationBucket(duration), providerAdapterStatus: stageStatus({ direct: directStatus, discovery: discoveryStatus, acquisition: acquisitionStatus, extraction: extractionStatus, provider }), warnings: safeWarnings(warnings) }, transparency: transparency({ context: input.context, job: input.job, cacheStatus, stageStatus: handoff ? "completed" : "failed_soft", decision, citationCount: handoff?.citations.length ?? 0, effect, providerId: provider, stages, totalMs: duration, warnings }) };
+    return { discoveryUsed, completed: handoffValidated, stages, result: { candidateIdentity: input.context.researchCandidate.identity, aspectId: input.job.aspectId, structuredStatusBeforeResearch: constraint.currentStructuredDecision as "partial" | "unknown", researchStatus: extraction.status, researchDecisionStatus: decision?.status ?? "unavailable", researchLevel: decision?.level ?? null, hypotheticalEffect: effect, durationBucket: durationBucket(duration), providerAdapterStatus: stageStatus({ direct: directStatus, discovery: discoveryStatus, acquisition: acquisitionStatus, extraction: extractionStatus, provider }), warnings: safeWarnings(warnings) }, transparency: transparency({ context: input.context, job: input.job, cacheStatus, stageStatus: handoffValidated ? "completed" : "failed_soft", decision, citationCount: handoffValidated ? handoff?.citations.length ?? 0 : 0, effect, providerId: provider, stages, totalMs: duration, warnings }) };
   } catch (error) {
     warnings.push(error instanceof Error ? error.message : "research_shadow_job_failed");
     const duration = Math.max(0, (dependencies.monotonicNow ?? Date.now)() - startedAt);
@@ -304,22 +329,29 @@ async function runJobCoalesced(
 
 export async function runGroundedResearchShadow(value: unknown, dependencies: GroundedResearchShadowDependencies = {}): Promise<GroundedResearchShadowResult> {
   const telemetry = emptyTelemetry(); const startedAt = (dependencies.monotonicNow ?? Date.now)();
-  if (!isGroundedResearchShadowEnabled(dependencies.environment)) return result("disabled", telemetry);
+  const activeMode = dependencies.runMode === "active";
+  if (!activeMode && !isGroundedResearchShadowEnabled(dependencies.environment)) return result("disabled", telemetry);
   if (value && typeof value === "object" && (value as { signal?: AbortSignal }).signal?.aborted) return result("aborted", telemetry, [], ["research_shadow_parent_aborted"]);
   const decoded = decodeGroundedResearchShadowInput(value);
   if (!decoded.ok) return result("invalid_input", telemetry, [], decoded.issues.map((item) => item.code));
   const input = decoded.value;
-  const eligibleCandidates = input.candidates.map((item) => ({ ...item, researchCandidate: { ...item.researchCandidate, unresolvedConstraints: item.researchCandidate.unresolvedConstraints.filter(eligibleConstraint) } })).filter((item) => item.researchCandidate.unresolvedConstraints.length > 0);
+  const eligibleCandidates = input.candidates.map((item) => ({ ...item, researchCandidate: { ...item.researchCandidate, unresolvedConstraints: item.researchCandidate.unresolvedConstraints.filter((constraint) => eligibleConstraint(constraint) && (!activeMode || constraint.currentStructuredDecision === "unknown")) } })).filter((item) => item.researchCandidate.unresolvedConstraints.length > 0);
   const planner = dependencies.plan ?? planResearch; telemetry.plannerRan = true;
   const planningStartedAt = (dependencies.monotonicNow ?? Date.now)();
-  const plan: ResearchPlan = planner({ candidates: eligibleCandidates.map((item) => item.researchCandidate), budget: SHADOW_PLANNER_BUDGET });
+  const plan: ResearchPlan = planner({ candidates: eligibleCandidates.map((item) => item.researchCandidate), budget: activeMode ? ACTIVE_PLANNER_BUDGET : SHADOW_PLANNER_BUDGET });
   telemetry.stageDurationsMs.planning = boundedDuration((dependencies.monotonicNow ?? Date.now)() - planningStartedAt);
   telemetry.plannedCandidateCount = new Set(plan.jobs.map((job) => job.candidateScope.scopeKey)).size; telemetry.plannedJobCount = plan.jobs.length; telemetry.coalescedJobCount = plan.skipped.filter((item) => item.reason === "duplicate_candidate_aspect").length;
   if (plan.jobs.length === 0) { telemetry.durationBucket = durationBucket(Math.max(0, (dependencies.monotonicNow ?? Date.now)() - startedAt)); return result("no_jobs", telemetry, [], plan.warnings); }
   const contexts = new Map(eligibleCandidates.map((item) => [item.researchCandidate.versionScope.scopeKey, item]));
-  const deadline = createDeadline(input.signal, Math.min(GROUNDED_RESEARCH_SHADOW_TIMEOUT_MS, dependencies.overallTimeoutMs ?? GROUNDED_RESEARCH_SHADOW_TIMEOUT_MS));
+  const modeTimeoutMs = activeMode ? GROUNDED_RESEARCH_ACTIVE_TIMEOUT_MS : GROUNDED_RESEARCH_SHADOW_TIMEOUT_MS;
+  const deadline = createDeadline(input.signal, Math.min(modeTimeoutMs, dependencies.overallTimeoutMs ?? modeTimeoutMs));
   const completed = new Map<number, Awaited<ReturnType<typeof runJob>>>();
-  const operations = plan.jobs.map(async (job, index) => { const context = contexts.get(job.candidateScope.scopeKey); if (!context) return; telemetry.attemptedJobCount += 1; const { jobResult, coalesced } = await runJobCoalesced({ job, context, requestId: `${input.requestId}:${index}`, signal: deadline.signal }, dependencies); if (coalesced) telemetry.coalescedJobCount += 1; completed.set(index, jobResult); });
+  const executeJob = async (job: ResearchJob, index: number) => { const context = contexts.get(job.candidateScope.scopeKey); if (!context) return; telemetry.attemptedJobCount += 1; const { jobResult, coalesced } = await runJobCoalesced({ job, context, requestId: `${input.requestId}:${index}`, signal: deadline.signal }, dependencies); if (coalesced) telemetry.coalescedJobCount += 1; completed.set(index, jobResult); };
+  const operations = activeMode
+    ? Array.from({ length: Math.min(GROUNDED_RESEARCH_SHADOW_MAX_CONCURRENCY, plan.jobs.length) }, async (_, workerIndex) => {
+      for (let index = workerIndex; index < plan.jobs.length; index += GROUNDED_RESEARCH_SHADOW_MAX_CONCURRENCY) await executeJob(plan.jobs[index], index);
+    })
+    : plan.jobs.map(executeJob);
   const all = Promise.all(operations); void all.catch(() => undefined);
   const aborted = new Promise<"aborted">((resolve) => deadline.signal.addEventListener("abort", () => resolve("aborted"), { once: true }));
   const completion = await Promise.race([all.then(() => "complete" as const), aborted]);
@@ -335,4 +367,18 @@ export async function runGroundedResearchShadow(value: unknown, dependencies: Gr
   telemetry.stageDurationsMs.total = boundedDuration(elapsed);
   if (completion === "aborted") { telemetry.timeoutCount = deadline.timedOut() ? 1 : 0; return result(deadline.timedOut() ? "budget_exhausted" : "aborted", telemetry, jobResults.map((item) => item.result), [deadline.timedOut() ? "research_shadow_deadline" : "research_shadow_parent_aborted"], jobResults.map((item) => item.transparency)); }
   return result(telemetry.completedJobCount === telemetry.plannedJobCount ? "complete" : "partial", telemetry, jobResults.map((item) => item.result), plan.warnings, jobResults.map((item) => item.transparency));
+}
+
+export async function runGroundedResearchActivePipeline(
+  value: unknown,
+  dependencies: Omit<GroundedResearchShadowDependencies, "runMode" | "onValidatedHandoff"> = {},
+): Promise<{ result: GroundedResearchShadowResult; handoffs: readonly ActiveGroundedResearchHandoff[] }> {
+  const handoffs: ActiveGroundedResearchHandoff[] = [];
+  const resultValue = await runGroundedResearchShadow(value, {
+    ...dependencies,
+    runMode: "active",
+    overallTimeoutMs: Math.min(GROUNDED_RESEARCH_ACTIVE_TIMEOUT_MS, dependencies.overallTimeoutMs ?? GROUNDED_RESEARCH_ACTIVE_TIMEOUT_MS),
+    onValidatedHandoff: (value) => { handoffs.push(value); },
+  });
+  return { result: resultValue, handoffs };
 }

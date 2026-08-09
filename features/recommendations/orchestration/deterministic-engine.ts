@@ -11,6 +11,9 @@ import type { RecommendationRequestV2 } from "../domain/codec";
 import type { RecommendationFeedbackEventV2 } from "../feedback";
 import { buildGroundedResearchShadowContext } from "../research/shadow/context";
 import type { GroundedResearchShadowContext } from "../research/shadow/types";
+import type { AspectEvidence } from "../domain/evidence";
+import type { AspectId } from "../domain/aspect-registry";
+import type { ConstraintDecision } from "../domain/policies";
 
 export const DETERMINISTIC_RECOMMENDATION_V2_ENABLED = true;
 
@@ -30,7 +33,7 @@ export interface DeterministicRecommendationV2Execution {
   researchShadowContext?: GroundedResearchShadowContext;
 }
 
-export async function runDeterministicRecommendationV2WithShadowSeed(input: {
+export interface DeterministicRecommendationV2Input {
   message: string;
   intent: AiIntent;
   retrievalPlan: AiRetrievalPlan | null;
@@ -45,7 +48,11 @@ export async function runDeterministicRecommendationV2WithShadowSeed(input: {
   providerPipeline?: ProviderEvidencePipelineResult;
   structuredRequest?: RecommendationRequestV2;
   semanticVerifierMode?: SemanticVerifierMode;
-}): Promise<DeterministicRecommendationV2Execution> {
+  researchAspectEvidenceByCandidateKey?: ReadonlyMap<string, ReadonlyMap<AspectId, AspectEvidence>>;
+  researchConstraintDecisionOverridesByCandidateKey?: ReadonlyMap<string, ReadonlyMap<string, ConstraintDecision>>;
+}
+
+export async function runDeterministicRecommendationV2WithShadowSeed(input: DeterministicRecommendationV2Input): Promise<DeterministicRecommendationV2Execution> {
   const engineStartedAt = performance.now();
   const pipelineStartedAt = performance.now();
   const pipeline = input.providerPipeline ?? await prepareProviderEvidencePipeline({ candidates: input.candidates, baseUrl: input.baseUrl, fetchImpl: input.fetchImpl });
@@ -101,7 +108,13 @@ export async function runDeterministicRecommendationV2WithShadowSeed(input: {
   }
   const evidenceStartedAt = performance.now();
   const verifier = await runSemanticVerifier({ mode: adapted.request.semanticVerifierMode, snapshots: pipeline.evidenceByCandidateKey, fetchImpl: input.fetchImpl });
-  const evidence = aggregateEvidenceSnapshots({ snapshots: pipeline.evidenceByCandidateKey, semanticByCandidateKey: verifier.evidenceByCandidateKey });
+  const aggregatedEvidence = aggregateEvidenceSnapshots({ snapshots: pipeline.evidenceByCandidateKey, semanticByCandidateKey: verifier.evidenceByCandidateKey });
+  const evidence = new Map([...aggregatedEvidence].map(([candidateKey, values]) => [candidateKey, new Map(values)]));
+  for (const [candidateKey, overrides] of input.researchAspectEvidenceByCandidateKey ?? []) {
+    const merged = evidence.get(candidateKey) ?? new Map<AspectId, AspectEvidence>();
+    for (const [aspectId, override] of overrides) merged.set(aspectId, override);
+    evidence.set(candidateKey, merged);
+  }
   const evidenceMs = performance.now() - evidenceStartedAt;
   const rankable = candidates.flatMap((candidate) => {
     const snapshot = findSnapshot(candidate, pipeline.evidenceByCandidateKey);
@@ -109,7 +122,7 @@ export async function runDeterministicRecommendationV2WithShadowSeed(input: {
     return [{ candidate, snapshot, aspectEvidence: evidence.get(snapshot.candidateIdentity.canonicalKey) ?? new Map() }];
   });
   const rankingStartedAt = performance.now();
-  const ranking = scoreEligibleCandidates({ request: adapted.request, candidates: rankable, mediaItems: input.mediaItems, feedback: input.feedback, feedbackV2: input.feedbackV2 });
+  const ranking = scoreEligibleCandidates({ request: adapted.request, candidates: rankable, mediaItems: input.mediaItems, feedback: input.feedback, feedbackV2: input.feedbackV2, constraintDecisionOverridesByCandidateKey: input.researchConstraintDecisionOverridesByCandidateKey });
   const selected = rerankForDiversity(ranking.scored, 5);
   const averageCoverage = selected.length > 0
     ? selected.reduce((sum, item) => sum + item.explicitRequestCoverage.coverage, 0) / selected.length
