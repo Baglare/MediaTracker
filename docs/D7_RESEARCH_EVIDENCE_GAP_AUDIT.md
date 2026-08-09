@@ -2,9 +2,9 @@
 
 ## Kök neden
 
-Birincil sınıf `document_truncated_before_evidence` olarak doğrulandı. AniList `9253`, Wikidata `Q20590069`, `enwiki` sitelink'i, `Steins;Gate (TV series)` sayfası, page ID `31089414`, revision ID `1362674487` ve `work` scope zinciri doğruydu. Ancak MediaWiki extract isteği hem `exintro=1` hem `exchars=24000` gönderdiği için adapter yalnız yaklaşık 1.200 karakterlik lead metni alıyordu.
+Birincil sınıf `lead_only_document` olarak doğrulandı. AniList `9253`, Wikidata `Q20590069`, `enwiki` sitelink'i, `Steins;Gate (TV series)` sayfası, page ID `31089414`, revision ID `1362674487` ve `work` scope zinciri doğruydu. MediaWiki isteğindeki `exintro=1`, adapter'ın yalnız yaklaşık 1.200 karakterlik lead extract almasına neden oluyordu; kanıt lead dışındaydı.
 
-Exact revision için bu iki provider-side sınır kaldırıldığında bounded plaintext 11.660 karakter oldu; kontrollü audit terimleriyle ilgili kanıtın belgede bulunduğu, segmentlendiği ve lexical passage olarak seçildiği doğrulandı. Normalization, segmentation, packet budget ve evidence-unit katmanları kanıtı kaybetmiyordu.
+Exact revision için lead-only parametresi kaldırıldığında bounded plaintext 11.660 karakter oldu; 24 KB local fail-closed limitine takılmadı. Kontrollü audit terimleriyle ilgili kanıtın belgede bulunduğu, segmentlendiği ve lexical passage olarak seçildiği doğrulandı. Normalization, segmentation, packet budget ve evidence-unit katmanları kanıtı kaybetmiyordu.
 
 ## Minimal düzeltme
 
