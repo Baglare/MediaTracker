@@ -24,9 +24,11 @@ export async function fetchAniListGlobalSearch(input: {
 }): Promise<AniListSearchOutcome> {
   const fetcher = input.fetcher ?? fetch;
   try {
-    const response = await fetcher(
-      `/api/anilist/search?q=${encodeURIComponent(input.query)}&category=${input.category}`,
-    );
+    const response = await fetcher("/api/anilist/search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query: input.query, category: input.category }),
+    });
     const payload = await response.json().catch(() => ({})) as AniListSearchPayload;
     if (response.status === 429) {
       return {

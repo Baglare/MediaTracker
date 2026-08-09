@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
-import { GET as searchAniListRoute } from "@/app/api/anilist/search/route";
+import { POST as searchAniListRoute } from "@/app/api/anilist/search/route";
 import {
   ASPECT_IDS,
   ASPECT_REGISTRY,
@@ -104,6 +104,18 @@ function rawMedia(rank: number): AniListRawMedia {
   };
 }
 
+function postAniList(body: Record<string, unknown>) {
+  return searchAniListRoute(new NextRequest("http://localhost/api/anilist/search", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  }));
+}
+
+function requestBody(init?: RequestInit) {
+  return JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+}
+
 describe("D6.6-1R provider retrieval mapping and route", () => {
   afterEach(() => vi.unstubAllGlobals());
 
@@ -136,7 +148,7 @@ describe("D6.6-1R provider retrieval mapping and route", () => {
   it("route canonical tag ve minimumTagRank'i GraphQL variables'a taşır", async () => {
     const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: { Page: { media: [rawMedia(86)] } } }), { status: 200 }));
     vi.stubGlobal("fetch", fetcher);
-    const response = await searchAniListRoute(new NextRequest("http://localhost/api/anilist/search?category=anime&tag=Politics&minimumTagRank=40&sort=POPULARITY_DESC,SCORE_DESC,ID"));
+    const response = await postAniList({ category: "anime", tags: ["Politics"], minimumTagRank: 40, sort: ["POPULARITY_DESC", "SCORE_DESC", "ID"] });
     expect(response.status).toBe(200);
     const body = JSON.parse(fetcher.mock.calls[0][1].body as string);
     expect(body.variables).toMatchObject({ type: "ANIME", tagIn: ["Politics"], minimumTagRank: 40 });
@@ -144,13 +156,13 @@ describe("D6.6-1R provider retrieval mapping and route", () => {
   });
 
   it.each([
-    ["tag=Political%20Intrigue&minimumTagRank=40", 400],
-    ["tag=Politics&minimumTagRank=101", 400],
-    ["tag=Politics&minimumTagRank=20.5", 400],
-  ])("unsupported veya güvensiz structured parametreyi kontrollü reddeder: %s", async (query, status) => {
+    [{ tags: ["Political Intrigue"], minimumTagRank: 40 }, 400],
+    [{ tags: ["Politics"], minimumTagRank: 101 }, 400],
+    [{ tags: ["Politics"], minimumTagRank: 20.5 }, 400],
+  ])("unsupported veya güvensiz structured parametreyi kontrollü reddeder: %o", async (filters, status) => {
     const fetcher = vi.fn();
     vi.stubGlobal("fetch", fetcher);
-    const response = await searchAniListRoute(new NextRequest(`http://localhost/api/anilist/search?category=anime&${query}`));
+    const response = await postAniList({ category: "anime", ...filters });
     expect(response.status).toBe(status);
     expect(fetcher).not.toHaveBeenCalled();
   });
@@ -168,11 +180,11 @@ describe("D6.6-1R strict/relaxed ranked-tag candidate discovery", () => {
 
   it("strict Politics pass'i title planından önce çalıştırır ve yeterliyse title fallback yapmaz", async () => {
     const items = [normalized("1", "One", 86), normalized("2", "Two", 63), normalized("3", "Three", 45)];
-    const fetcher = vi.fn(async (input: string | URL | Request) => {
-      const url = new URL(String(input));
-      expect(url.searchParams.get("q")).toBeNull();
-      expect(url.searchParams.get("tags")).toBe("Politics");
-      expect(url.searchParams.get("minimumTagRank")).toBe("40");
+    const fetcher = vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
+      const body = requestBody(init);
+      expect(body.query).toBeUndefined();
+      expect(body.tags).toEqual(["Politics"]);
+      expect(body.minimumTagRank).toBe(40);
       return new Response(JSON.stringify({ results: items }), { status: 200 });
     });
     vi.stubGlobal("fetch", fetcher);
@@ -184,15 +196,15 @@ describe("D6.6-1R strict/relaxed ranked-tag candidate discovery", () => {
   });
 
   it("strict boşsa canonical tag'i koruyarak rank 20 relaxed pass çalıştırır", async () => {
-    const fetcher = vi.fn(async (input: string | URL | Request) => {
-      const rank = new URL(String(input)).searchParams.get("minimumTagRank");
-      return new Response(JSON.stringify({ results: rank === "40" ? [] : [normalized("28", "Low Politics", 28)] }), { status: 200 });
+    const fetcher = vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
+      const rank = requestBody(init).minimumTagRank;
+      return new Response(JSON.stringify({ results: rank === 40 ? [] : [normalized("28", "Low Politics", 28)] }), { status: 200 });
     });
     vi.stubGlobal("fetch", fetcher);
     const result = await searchCandidatesWithDebug({ intent, retrievalPlan: providerPlan, profile: null, message: request("exploratory").queryText, mediaItems: [], progressLogs: [], structuredRequest: request("exploratory") });
     expect(fetcher).toHaveBeenCalledTimes(2);
-    expect(fetcher.mock.calls.map((call) => new URL(String(call[0])).searchParams.get("tags"))).toEqual(["Politics", "Politics"]);
-    expect(fetcher.mock.calls.map((call) => new URL(String(call[0])).searchParams.get("minimumTagRank"))).toEqual(["40", "20"]);
+    expect(fetcher.mock.calls.map((call) => requestBody(call[1]).tags)).toEqual([["Politics"], ["Politics"]]);
+    expect(fetcher.mock.calls.map((call) => requestBody(call[1]).minimumTagRank)).toEqual([40, 20]);
     expect(result.internal?.rankedTagTraceByCandidateKey.get("anilist:anime:28")).toMatchObject({ retrievalPass: "relaxed_tag", rankBand: "20-39" });
   });
 
@@ -202,7 +214,7 @@ describe("D6.6-1R strict/relaxed ranked-tag candidate discovery", () => {
     const result = await searchCandidatesWithDebug({ intent, retrievalPlan: providerPlan, profile: null, message: request().queryText, mediaItems: [], progressLogs: [], structuredRequest: request() });
     expect(result.candidates).toEqual([]);
     expect(result.debug.rankedTagRetrieval?.noResultReason).toBe("provider_tag_no_candidates");
-    expect(fetcher.mock.calls.every((call) => !new URL(String(call[0])).searchParams.has("q"))).toBe(true);
+    expect(fetcher.mock.calls.every((call) => requestBody(call[1]).query === undefined)).toBe(true);
   });
 
   it("tag provider hatasını constraint failure yerine unavailable olarak ayırır", async () => {
@@ -231,9 +243,9 @@ describe("D6.6-1R strict/relaxed ranked-tag candidate discovery", () => {
   });
 
   it("strict pass geçerli aday bulduysa relaxed provider hatasında bu adayı kaybetmez", async () => {
-    const fetcher = vi.fn(async (input: string | URL | Request) => {
-      const rank = new URL(String(input)).searchParams.get("minimumTagRank");
-      return rank === "40"
+    const fetcher = vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
+      const rank = requestBody(init).minimumTagRank;
+      return rank === 40
         ? new Response(JSON.stringify({ results: [normalized("strict-one", "Strict one", 63)] }), { status: 200 })
         : new Response(JSON.stringify({ error: "hidden" }), { status: 503 });
     });
@@ -272,8 +284,8 @@ describe("D6.6-1R strict/relaxed ranked-tag candidate discovery", () => {
         { id: "revenge:must", kind: "aspect", aspectId: "revenge", role: "must", source: "explicit", minimumLevel: "significant" },
       ],
     };
-    const fetcher = vi.fn(async (input: string | URL | Request) => {
-      const tag = new URL(String(input)).searchParams.get("tags");
+    const fetcher = vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
+      const tag = (requestBody(init).tags as string[] | undefined)?.[0];
       const item = tag === "Revenge"
         ? { ...normalized("revenge", "Revenge only", undefined), tags: [{ name: "Revenge", rank: 86 }] }
         : normalized("politics", "Politics only", 86);
@@ -282,7 +294,7 @@ describe("D6.6-1R strict/relaxed ranked-tag candidate discovery", () => {
     vi.stubGlobal("fetch", fetcher);
     const result = await searchCandidatesWithDebug({ intent, retrievalPlan: providerPlan, profile: null, message: multiRequest.queryText, mediaItems: [], progressLogs: [], structuredRequest: multiRequest });
     expect(fetcher.mock.calls.length).toBeLessThanOrEqual(4);
-    expect(new Set(fetcher.mock.calls.map((call) => new URL(String(call[0])).searchParams.get("tags")))).toEqual(new Set(["Politics", "Revenge"]));
+    expect(new Set(fetcher.mock.calls.map((call) => (requestBody(call[1]).tags as string[])[0]))).toEqual(new Set(["Politics", "Revenge"]));
     expect(result.candidates.map((item) => item.title).sort()).toEqual(["Politics only", "Revenge only"]);
     expect(scoreEligibleCandidates({ request: multiRequest, candidates: [rankable(normalized("politics", "Politics only", 86))], mediaItems: [], feedback: [] }).scored).toHaveLength(0);
   });

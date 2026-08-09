@@ -4,7 +4,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
-import { GET as searchAniList } from "@/app/api/anilist/search/route";
+import { POST as searchAniList } from "@/app/api/anilist/search/route";
 import {
   anilistDiagnosticMessage,
   collectFulfilledSearchResults,
@@ -29,6 +29,14 @@ const normalized: AniListNormalizedResult = {
 
 function response(body: unknown, status = 200, headers?: HeadersInit): Response {
   return new Response(JSON.stringify(body), { status, headers });
+}
+
+function postAniList(body: Record<string, unknown>) {
+  return searchAniList(new NextRequest("http://localhost/api/anilist/search", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  }));
 }
 
 function rawMedia(overrides: Partial<AniListRawMedia> = {}): AniListRawMedia {
@@ -114,9 +122,7 @@ describe("global AniList search diagnostics", () => {
         synonyms: ["De Wa"],
       })] } } }));
     vi.stubGlobal("fetch", fetcher);
-    const result = await searchAniList(new NextRequest(
-      "http://localhost/api/anilist/search?q=de%20wa&category=anime",
-    ));
+    const result = await postAniList({ query: "de wa", category: "anime" });
     expect(result.status).toBe(200);
     expect((await result.json()).meta.fallbackUsed).toBe(true);
     expect(fetcher).toHaveBeenCalledTimes(2);
@@ -128,9 +134,7 @@ describe("global AniList search diagnostics", () => {
   it("does not use aggressive fallback for a short query", async () => {
     const fetcher = vi.fn().mockResolvedValue(response({ data: { Page: { media: [] } } }));
     vi.stubGlobal("fetch", fetcher);
-    const result = await searchAniList(new NextRequest(
-      "http://localhost/api/anilist/search?q=go&category=anime",
-    ));
+    const result = await postAniList({ query: "go", category: "anime" });
     expect((await result.json()).meta.fallbackUsed).toBe(false);
     expect(fetcher).toHaveBeenCalledTimes(1);
     expect(buildAniListSearchFallback("go")).toBeNull();
@@ -231,18 +235,14 @@ describe("global AniList search diagnostics", () => {
       429,
       { "Retry-After": "15" },
     )));
-    const limited = await searchAniList(new NextRequest(
-      "http://localhost/api/anilist/search?q=frieren&category=anime",
-    ));
+    const limited = await postAniList({ query: "frieren", category: "anime" });
     expect(limited.status).toBe(429);
     expect(limited.headers.get("retry-after")).toBe("15");
 
     vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(response({
       errors: [{ message: "raw GraphQL detail" }],
     })));
-    const graphql = await searchAniList(new NextRequest(
-      "http://localhost/api/anilist/search?q=frieren&category=anime",
-    ));
+    const graphql = await postAniList({ query: "frieren", category: "anime" });
     expect(graphql.status).toBe(502);
     const payload = await graphql.json();
     expect(payload.meta.reason).toBe("graphql_error");

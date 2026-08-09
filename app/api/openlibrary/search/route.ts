@@ -1,18 +1,19 @@
 // ============================================
 // Open Library Kitap Arama API Route'u
 // ============================================
-// GET /api/openlibrary/search?q=mistborn
+// POST /api/openlibrary/search { query: "mistborn" }
 //
 // Open Library API'sine sunucu tarafında istek atar.
 // Token gerektirmez (Open Library ücretsiz API).
 // Sonuçları normalize edip JSON olarak döndürür.
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import {
   OpenLibrarySearchResponse,
   OpenLibraryRawDoc,
   OpenLibraryNormalizedResult,
 } from "@/lib/openlibrary-types";
+import { SEARCH_REQUEST_MAX_BYTES, apiError, enforceRateLimit, fetchWithTimeout, noStoreJson, parseSearchQuery, readStrictJsonObject, resolveRateLimitIdentity } from "@/lib/api/request-security";
 
 /**
  * Tek bir Open Library doc'unu normalize eder.
@@ -58,24 +59,20 @@ export function normalizeDoc(doc: OpenLibraryRawDoc): OpenLibraryNormalizedResul
 }
 
 /**
- * GET /api/openlibrary/search?q=mistborn
+ * POST /api/openlibrary/search { query: "mistborn" }
  */
-export async function GET(request: NextRequest) {
-  // 1) Arama metnini al
-  const searchParams = request.nextUrl.searchParams;
-  const query = searchParams.get("q");
-
-  if (!query || query.trim().length === 0) {
-    return NextResponse.json(
-      { error: "Arama metni (q) gerekli." },
-      { status: 400 }
-    );
-  }
+export async function POST(request: NextRequest) {
+  const parsed = await readStrictJsonObject(request, new Set(["query"]), SEARCH_REQUEST_MAX_BYTES);
+  if (!parsed.ok) return parsed.response;
+  const query = parseSearchQuery(parsed.value.query);
+  if (!query.ok) return apiError("search_query_invalid", 400);
+  const rateLimit = enforceRateLimit("search:openlibrary", await resolveRateLimitIdentity(request), 60, 60_000);
+  if (rateLimit) return rateLimit;
 
   // 2) Open Library API'sine istek at
   try {
     const params = new URLSearchParams({
-      q: query.trim(),
+      q: query.value,
       limit: "12",
       fields:
         "key,title,author_name,first_publish_year,cover_i,edition_count,edition_key,isbn,language,number_of_pages_median,subject",
@@ -83,15 +80,12 @@ export async function GET(request: NextRequest) {
 
     const url = `https://openlibrary.org/search.json?${params.toString()}`;
 
-    const olResponse = await fetch(url, {
+    const olResponse = await fetchWithTimeout(url, {
       headers: { accept: "application/json" },
     });
 
     if (!olResponse.ok) {
-      return NextResponse.json(
-        { error: `Open Library API hatası: ${olResponse.status}` },
-        { status: 502 }
-      );
+      return noStoreJson({ code: "upstream_error" }, { status: 502 });
     }
 
     const data = (await olResponse.json()) as OpenLibrarySearchResponse;
@@ -99,15 +93,11 @@ export async function GET(request: NextRequest) {
     // 3) Sonuçları normalize et
     const results = data.docs.map(normalizeDoc);
 
-    return NextResponse.json({
+    return noStoreJson({
       results,
       totalFound: data.numFound,
     });
-  } catch (err) {
-    console.error("Open Library arama hatası:", err);
-    return NextResponse.json(
-      { error: "Open Library'e bağlanırken bir hata oluştu." },
-      { status: 502 }
-    );
+  } catch {
+    return noStoreJson({ code: "upstream_error" }, { status: 502 });
   }
 }

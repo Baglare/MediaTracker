@@ -53,7 +53,13 @@ export function RecommendationComposer({ userId, initialRecipientId, onSent, onC
     if (query.trim().length < 2 || recipient) return;
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
-      fetch(`/api/social/people?q=${encodeURIComponent(query.trim())}`, { signal: controller.signal, cache: "no-store" })
+      fetch("/api/social/people", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: query.trim() }),
+        signal: controller.signal,
+        cache: "no-store",
+      })
         .then((response) => response.json())
         .then((data: unknown) => { if (data && typeof data === "object" && "results" in data && Array.isArray(data.results)) setPeople(data.results as SocialPersonSummary[]); })
         .catch(() => undefined);

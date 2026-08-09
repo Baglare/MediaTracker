@@ -49,6 +49,7 @@ import type {
 import type { RecommendationRequestV2 } from "@/features/recommendations/domain/codec";
 import type { RecommendationStrictness, SemanticVerifierMode } from "@/features/recommendations/domain/types";
 import type { RecommendationFeedbackEventV2, RecommendationFeedbackReasonCode } from "@/features/recommendations/feedback";
+import type { AiEntitlement } from "@/lib/ai/entitlement";
 import { ASPECT_REGISTRY } from "@/features/recommendations/domain/aspect-registry";
 import {
   EngineTransparency,
@@ -700,6 +701,7 @@ export default function AiAdvisor({
   const [debugInfo, setDebugInfo] = useState<AiDebugInfo | null>(null);
   const [engineStatus, setEngineStatus] = useState<AiEngineStatus | null>(null);
   const [planningPolicy, setPlanningPolicy] = useState<AiPlanningProviderPolicyStatus | null>(null);
+  const [aiEntitlement, setAiEntitlement] = useState<AiEntitlement | null>(null);
   const [feedbackNotice, setFeedbackNotice] = useState<string | null>(null);
   const [aiStorageError, setAiStorageError] = useState<string | null>(null);
   const [showDebug, setShowDebug] = useState(false);
@@ -722,6 +724,19 @@ export default function AiAdvisor({
   const feedbackLoadedRef = useRef(false);
   const persistenceReadyRef = useRef(false);
   const ownerVisible = isHydratedOwnerVisible(ownerScopeKey, hydratedOwnerKey);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetch("/api/ai/capabilities", { cache: "no-store" })
+      .then(async (response) => response.ok ? response.json() as Promise<AiEntitlement> : null)
+      .then((capability) => {
+        if (!cancelled) setAiEntitlement(capability);
+      })
+      .catch(() => {
+        if (!cancelled) setAiEntitlement(null);
+      });
+    return () => { cancelled = true; };
+  }, [auth.user?.id]);
 
   useEffect(() => {
     persistenceReadyRef.current = false;
@@ -1089,6 +1104,7 @@ export default function AiAdvisor({
     // zaten useRecentActivity / usePersonalNotes'a saygı duyuyor).
     const effectiveSettings: AiSettings = {
       ...settings,
+      useOpenAIProvider: settings.useOpenAIProvider && aiEntitlement?.canUseOpenAi === true,
       useRecentActivity: settings.useRecentActivity && dataToggles.recentActivity,
       usePersonalNotes: settings.usePersonalNotes && dataToggles.notes,
       includeRatings: dataToggles.ratings,
@@ -1705,8 +1721,8 @@ export default function AiAdvisor({
   const visibleProviderPolicyMode = engineStatus?.providerPolicyMode ?? planningPolicy?.providerPolicyMode;
   const configuredPlanningProvider = engineStatus?.configuredPlanningProvider
     ?? planningPolicy?.configuredPlanningProvider;
-  const openAiPreferenceLocked = visibleProviderPolicyMode !== undefined
-    && visibleProviderPolicyMode !== "auto";
+  const openAiPreferenceLocked = aiEntitlement?.canUseOpenAi !== true
+    || (visibleProviderPolicyMode !== undefined && visibleProviderPolicyMode !== "auto");
 
   if (!ownerVisible) {
     return (
@@ -1815,15 +1831,18 @@ export default function AiAdvisor({
             {RESEARCH_OPTIONS.map((opt) => {
               const Icon = opt.icon;
               const active = researchMode === opt.key;
+              const disabled = opt.key !== "library-only" && aiEntitlement?.canUseServerProviders !== true;
               return (
                 <button
                   key={opt.key}
-                  onClick={() => setResearchMode(opt.key)}
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => { if (!disabled) setResearchMode(opt.key); }}
                   className={`flex items-start gap-2 px-3 py-2 rounded-xl border text-left transition-colors cursor-pointer min-w-0 ${
                     active
                       ? "bg-violet-500/15 border-violet-500/40"
                       : "bg-zinc-900/40 border-zinc-800 hover:border-zinc-700"
-                  }`}
+                  } disabled:cursor-not-allowed disabled:opacity-50`}
                 >
                   <Icon className={`w-3.5 h-3.5 mt-0.5 shrink-0 ${active ? "text-violet-300" : "text-zinc-500"}`} />
                   <div className="min-w-0">
@@ -2128,7 +2147,7 @@ export default function AiAdvisor({
               {structuredRequest?.aspectConstraints.some((constraint) => constraint.role === "must" && constraint.minimumLevel === "primary") && <button type="button" onClick={() => setStructuredRequest((current) => current ? { ...current, aspectConstraints: current.aspectConstraints.map((constraint) => constraint.role === "must" && constraint.minimumLevel === "primary" ? { ...constraint, minimumLevel: "significant", source: "explicit" } : constraint) } : current)} className="text-xs text-violet-300">{userFacingConstraintLabel(structuredRequest.aspectConstraints.find((constraint) => constraint.role === "must" && constraint.minimumLevel === "primary")!)} için “Belirgin veya ana unsur” seç</button>}
               {structuredRequest?.aspectConstraints.some((constraint) => constraint.role === "must") && <button type="button" onClick={() => setStructuredRequest((current) => current ? { ...current, aspectConstraints: current.aspectConstraints.map((constraint, index) => index === current.aspectConstraints.findIndex((item) => item.role === "must") ? { ...constraint, role: "prefer", source: "explicit", rejectAtLevel: undefined } : constraint) as RecommendationRequestV2["aspectConstraints"] } : current)} className="text-xs text-violet-300">{userFacingConstraintLabel(structuredRequest.aspectConstraints.find((constraint) => constraint.role === "must")!)} koşulunu tercihe çevir</button>}
               {structuredRequest?.objectiveConstraints.some((constraint) => constraint.field === "length" || constraint.field === "release_status") && <button type="button" onClick={() => setStructuredRequest((current) => current ? { ...current, objectiveConstraints: current.objectiveConstraints.filter((constraint) => constraint.field !== "length" && constraint.field !== "release_status") } : current)} className="text-xs text-violet-300">Süre/yayın filtresini kaldır</button>}
-              {researchMode === "library-only" && <button type="button" onClick={() => setResearchMode("source-apis")} className="text-xs text-violet-300">Provider kapsamını genişlet</button>}
+              {researchMode === "library-only" && aiEntitlement?.canUseServerProviders === true && <button type="button" onClick={() => setResearchMode("source-apis")} className="text-xs text-violet-300">Provider kapsamını genişlet</button>}
             </div>
           </section>
         )}
@@ -2215,13 +2234,15 @@ export default function AiAdvisor({
                         ? `Sağlayıcı modu sabit: ${configuredPlanningProvider ? providerLabel(configuredPlanningProvider) : "yapılandırılmış provider"}. OpenAI tercihi uygulanmaz.`
                         : visibleProviderPolicyMode === "mock"
                           ? "Sağlayıcı modu mock. OpenAI tercihi uygulanmaz."
-                          : "Otomatik modda OpenAI arama planında ilk denenir; final sıralama değişmez."}
+                          : aiEntitlement?.canUseOpenAi !== true
+                            ? "Server provider erişimi bu hesap için kapalı."
+                            : "Otomatik modda OpenAI arama planında ilk denenir; final sıralama değişmez."}
                     </span>
                   ) : null}
                 </span>
                 <input
                   type="checkbox"
-                  checked={settings[key]}
+                  checked={key === "useOpenAIProvider" ? settings[key] && aiEntitlement?.canUseOpenAi === true : settings[key]}
                   disabled={key === "useOpenAIProvider" && openAiPreferenceLocked}
                   onChange={(e) =>
                     setSettings((prev) => ({ ...prev, [key]: e.target.checked }))

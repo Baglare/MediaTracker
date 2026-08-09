@@ -13,8 +13,18 @@
 //     fallback davranışı korunur.
 // API token asla tarayıcıya sızmaz; tüm istek server-side.
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { TmdbRawResult, TmdbNormalizedResult } from "@/lib/tmdb-types";
+import {
+  SEARCH_REQUEST_MAX_BYTES,
+  apiError,
+  enforceRateLimit,
+  fetchWithTimeout,
+  noStoreJson,
+  parseSearchQuery,
+  readStrictJsonObject,
+  resolveRateLimitIdentity,
+} from "@/lib/api/request-security";
 
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/w500";
 
@@ -78,33 +88,35 @@ interface TmdbSearchMovieResponse {
 }
 
 /**
- * GET /api/tmdb/search?q=...
+ * POST /api/tmdb/search { query, mediaType? }
  * Film araması yapar; sonuç dizisini normalize edip döner.
  */
-export async function GET(request: NextRequest) {
-  const query = request.nextUrl.searchParams.get("q");
-  const requestedMediaType = request.nextUrl.searchParams.get("mediaType") === "tv" ? "tv" : "movie";
-  if (!query || query.trim().length === 0) {
-    return NextResponse.json({ error: "Arama metni (q) gerekli." }, { status: 400 });
+export async function POST(request: NextRequest) {
+  const parsed = await readStrictJsonObject(request, new Set(["query", "mediaType"]), SEARCH_REQUEST_MAX_BYTES);
+  if (!parsed.ok) return parsed.response;
+  const query = parseSearchQuery(parsed.value.query);
+  if (!query.ok) return apiError("search_query_invalid", 400);
+  if (parsed.value.mediaType !== undefined && parsed.value.mediaType !== "movie" && parsed.value.mediaType !== "tv") {
+    return apiError("search_filter_invalid", 400);
   }
+  const requestedMediaType = parsed.value.mediaType === "tv" ? "tv" : "movie";
+  const rateLimit = enforceRateLimit("search:tmdb", await resolveRateLimitIdentity(request), 60, 60_000);
+  if (rateLimit) return rateLimit;
 
   const token = process.env.TMDB_READ_ACCESS_TOKEN;
   if (!token) {
     // R21.2: 503 + boş results → client OMDb fallback'ine düşer; app çökmez.
-    return NextResponse.json(
-      { results: [], error: "TMDB yapılandırılmadı." },
-      { status: 503 },
-    );
+    return noStoreJson({ results: [], code: "provider_unavailable" }, { status: 503 });
   }
 
   try {
     const url = new URL(`https://api.themoviedb.org/3/search/${requestedMediaType}`);
-    url.searchParams.set("query", query.trim());
+    url.searchParams.set("query", query.value);
     url.searchParams.set("include_adult", "false");
     url.searchParams.set("language", "tr-TR");
     url.searchParams.set("page", "1");
 
-    const tmdbResponse = await fetch(url.toString(), {
+    const tmdbResponse = await fetchWithTimeout(url, {
       headers: {
         Authorization: `Bearer ${token}`,
         accept: "application/json",
@@ -113,11 +125,7 @@ export async function GET(request: NextRequest) {
     });
 
     if (!tmdbResponse.ok) {
-      const statusText = tmdbResponse.statusText || "Bilinmeyen hata";
-      return NextResponse.json(
-        { results: [], error: `TMDB API hatası: ${tmdbResponse.status} ${statusText}` },
-        { status: 502 },
-      );
+      return noStoreJson({ results: [], code: "upstream_error" }, { status: 502 });
     }
 
     const data = (await tmdbResponse.json()) as TmdbSearchMovieResponse;
@@ -125,12 +133,8 @@ export async function GET(request: NextRequest) {
       .map(requestedMediaType === "tv" ? normalizeTvResult : normalizeMovieResult)
       .filter((item): item is TmdbNormalizedResult => item !== null);
 
-    return NextResponse.json({ results: normalized });
-  } catch (err) {
-    console.error("TMDB arama hatası:", err);
-    return NextResponse.json(
-      { results: [], error: "TMDB'ye bağlanırken bir hata oluştu." },
-      { status: 502 },
-    );
+    return noStoreJson({ results: normalized });
+  } catch {
+    return noStoreJson({ results: [], code: "upstream_error" }, { status: 502 });
   }
 }

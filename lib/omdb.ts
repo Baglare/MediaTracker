@@ -1,4 +1,5 @@
 import { OmdbDetailResponse, OmdbNormalizedResult, OmdbSearchResponse } from "./omdb-types";
+import { fetchWithTimeout } from "./api/request-security";
 
 function buildOmdbUrl(params: Record<string, string>) {
   const key = process.env.OMDB_API_KEY;
@@ -70,7 +71,8 @@ export async function fetchOmdbSearch(query: string): Promise<OmdbSearchResponse
   if (!url) {
     return { Response: "False", Error: "OMDb yapılandırılmadı." };
   }
-  const res = await fetch(url.toString(), { cache: "no-store" });
+  const res = await fetchWithTimeout(url, { cache: "no-store" });
+  if (!res.ok) throw new Error("omdb_upstream_error");
   return res.json() as Promise<OmdbSearchResponse>;
 }
 
@@ -79,6 +81,7 @@ export async function fetchOmdbDetail(imdbId: string): Promise<OmdbDetailRespons
   if (!url) {
     return { Response: "False", Error: "OMDb yapılandırılmadı." };
   }
-  const res = await fetch(url.toString(), { cache: "no-store" });
+  const res = await fetchWithTimeout(url, { cache: "no-store" });
+  if (!res.ok) throw new Error("omdb_upstream_error");
   return res.json() as Promise<OmdbDetailResponse>;
 }

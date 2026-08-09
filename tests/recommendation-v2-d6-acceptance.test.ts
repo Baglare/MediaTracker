@@ -37,7 +37,7 @@ describe("D6-5 request security and interpretation acceptance", () => {
   });
 
   it("handles malformed JSON, unknown fields and invalid strictness without provider work", async () => {
-    const malformed = await interpretPost(new Request("http://localhost/api/ai/interpret", { method: "POST", body: "{" }));
+    const malformed = await interpretPost(new Request("http://localhost/api/ai/interpret", { method: "POST", headers: { "content-type": "application/json" }, body: "{" }));
     expect(malformed.status).toBe(400);
     const unknown = await interpretPost(new Request("http://localhost/api/ai/interpret", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ message: "anime öner", __proto_marker__: true }) }));
     expect(unknown.status).toBe(400);

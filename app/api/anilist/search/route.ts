@@ -1,7 +1,7 @@
 // ============================================
 // AniList Arama API Route'u
 // ============================================
-// GET /api/anilist/search?q=naruto&category=anime
+// POST /api/anilist/search { query: "naruto", category: "anime" }
 //
 // AniList GraphQL API'sine sunucu tarafında istek atar.
 // Token gerektirmez (AniList public API).
@@ -14,7 +14,7 @@
 //   - manhua → AniList type MANGA, countryOfOrigin CN veya TW
 //   - all → ANIME + MANGA birlikte
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import {
   AniListRawMedia,
   AniListSearchResponse,
@@ -26,6 +26,7 @@ import {
   rankAniListSearchResults,
 } from "@/lib/anilist";
 import { providerRetrievalAllowlist } from "@/features/recommendations/domain/aspect-registry";
+import { SEARCH_REQUEST_MAX_BYTES, apiError, enforceRateLimit, fetchWithTimeout, noStoreJson, parseSearchQuery, readStrictJsonObject, resolveRateLimitIdentity } from "@/lib/api/request-security";
 
 // ---- GraphQL Sorgu Metinleri ----
 // `media(...)` alanı altında MEDIA_FIELDS aynı kalır; sadece dış argümanlar/sort
@@ -124,7 +125,7 @@ async function queryAniList(
     variables.type = type;
   }
 
-  const response = await fetch(ANILIST_URL, {
+  const response = await fetchWithTimeout(ANILIST_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -207,7 +208,7 @@ async function discoverAniList(args: {
     variables.episodesLesser = args.episodesLesser;
   }
 
-  const response = await fetch(ANILIST_URL, {
+  const response = await fetchWithTimeout(ANILIST_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -233,16 +234,6 @@ async function discoverAniList(args: {
   return json.data?.Page?.media || [];
 }
 
-function parseCsv(value: string | null): string[] | undefined {
-  if (!value) return undefined;
-  const parts = value
-    .split(",")
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0)
-    .slice(0, 6);
-  return parts.length > 0 ? parts : undefined;
-}
-
 const RETRIEVAL_ALLOWLIST = providerRetrievalAllowlist("anilist");
 const ANILIST_DISCOVER_GENRES = new Set([...RETRIEVAL_ALLOWLIST.genres, "Thriller"]);
 const ANILIST_DISCOVER_TAGS = new Set([
@@ -254,78 +245,81 @@ const ANILIST_DISCOVER_TAGS = new Set([
 const ANILIST_DISCOVER_SORTS = new Set(["POPULARITY_DESC", "SCORE_DESC", "ID"]);
 
 function parseStructuredValues(
-  params: URLSearchParams,
-  singular: string,
-  plural: string,
+  value: unknown,
 ): { ok: true; values?: string[] } | { ok: false } {
-  const raw = [params.get(singular), params.get(plural)].filter((value): value is string => Boolean(value));
-  if (raw.length === 0) return { ok: true };
-  const values = raw.flatMap((value) => value.split(",")).map((value) => value.trim()).filter(Boolean);
+  if (value === undefined) return { ok: true };
+  if (!Array.isArray(value) || value.some((entry) => typeof entry !== "string")) return { ok: false };
+  const values = value.map((entry) => entry.trim()).filter(Boolean);
   if (values.length === 0 || values.length > 6 || values.some((value) => value.length > 60)) return { ok: false };
   return { ok: true, values: [...new Set(values)] };
 }
 
 /**
- * GET /api/anilist/search?q=naruto&category=anime
- * R37.1 ek paramlar (q opsiyonel olur):
- *   &genres=Slice of Life,Comedy
- *   &tags=Iyashikei
- *   &episodesLte=13
- *   &sort=POPULARITY_DESC,SCORE_DESC
+ * POST /api/anilist/search. `query` structured discover isteklerinde opsiyoneldir.
  */
-export async function GET(request: NextRequest) {
-  // 1) Query parametrelerini al
-  const params = request.nextUrl.searchParams;
-  const query = params.get("q");
-  const categoryValue = params.get("category") || "all";
-  if (!["anime", "manga", "manhwa", "manhua", "all"].includes(categoryValue)) {
-    return NextResponse.json({ error: "Medya kategorisi geçersiz." }, { status: 400 });
+export async function POST(request: NextRequest) {
+  const parsed = await readStrictJsonObject(
+    request,
+    new Set(["query", "category", "genres", "tags", "episodesLte", "minimumTagRank", "sort"]),
+    SEARCH_REQUEST_MAX_BYTES,
+  );
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.value;
+  const queryResult = parseSearchQuery(body.query, false);
+  if (!queryResult.ok) return apiError("search_query_invalid", 400);
+  const query = queryResult.value;
+  const categoryValue = body.category === undefined ? "all" : body.category;
+  if (typeof categoryValue !== "string" || !["anime", "manga", "manhwa", "manhua", "all"].includes(categoryValue)) {
+    return apiError("search_filter_invalid", 400);
   }
   const category = categoryValue as AniListCategory;
 
   // R37.1 — Structured discover parametreleri
-  const parsedGenres = parseStructuredValues(params, "genre", "genres");
-  const parsedTags = parseStructuredValues(params, "tag", "tags");
+  const parsedGenres = parseStructuredValues(body.genres);
+  const parsedTags = parseStructuredValues(body.tags);
   if (!parsedGenres.ok || !parsedTags.ok) {
-    return NextResponse.json({ error: "Structured filtre sınırları geçersiz." }, { status: 400 });
+    return apiError("search_filter_invalid", 400);
   }
   const genres = parsedGenres.values;
   const tags = parsedTags.values;
   if (genres?.some((genre) => !ANILIST_DISCOVER_GENRES.has(genre))) {
-    return NextResponse.json({ error: "Desteklenmeyen AniList tür filtresi." }, { status: 400 });
+    return apiError("search_filter_invalid", 400);
   }
   if (tags?.some((tag) => !ANILIST_DISCOVER_TAGS.has(tag))) {
-    return NextResponse.json({ error: "Desteklenmeyen AniList etiket filtresi." }, { status: 400 });
+    return apiError("search_filter_invalid", 400);
   }
-  const episodesLteRaw = params.get("episodesLte");
-  const episodesLesser =
-    episodesLteRaw && /^\d+$/.test(episodesLteRaw) ? Math.min(parseInt(episodesLteRaw, 10), 1000) : undefined;
-  const minimumTagRankRaw = params.get("minimumTagRank");
-  const minimumTagRank = minimumTagRankRaw === null
+  const episodesLesser = body.episodesLte === undefined
     ? undefined
-    : /^\d{1,3}$/.test(minimumTagRankRaw)
-      ? Number(minimumTagRankRaw)
+    : typeof body.episodesLte === "number" && Number.isInteger(body.episodesLte) && body.episodesLte > 0 && body.episodesLte <= 1000
+      ? body.episodesLte
+      : Number.NaN;
+  if (episodesLesser !== undefined && !Number.isFinite(episodesLesser)) return apiError("search_filter_invalid", 400);
+  const minimumTagRank = body.minimumTagRank === undefined
+    ? undefined
+    : typeof body.minimumTagRank === "number"
+      ? body.minimumTagRank
       : Number.NaN;
   if (minimumTagRank !== undefined && (!Number.isInteger(minimumTagRank) || minimumTagRank < 0 || minimumTagRank > 100 || !tags?.length)) {
-    return NextResponse.json({ error: "Etiket rank filtresi geçersiz." }, { status: 400 });
+    return apiError("search_filter_invalid", 400);
   }
-  const sortParam = parseCsv(params.get("sort"));
-  if (sortParam?.some((sort) => !ANILIST_DISCOVER_SORTS.has(sort))) {
-    return NextResponse.json({ error: "AniList sıralama filtresi geçersiz." }, { status: 400 });
+  const sortParam = parseStructuredValues(body.sort);
+  if (!sortParam.ok) return apiError("search_filter_invalid", 400);
+  const sort = sortParam.values;
+  if (sort?.some((value) => !ANILIST_DISCOVER_SORTS.has(value))) {
+    return apiError("search_filter_invalid", 400);
   }
 
   const hasStructuredFilter =
     (genres && genres.length > 0) ||
     (tags && tags.length > 0) ||
     typeof episodesLesser === "number";
-  const trimmedQuery = query?.trim() || "";
+  const trimmedQuery = query;
 
   if (!trimmedQuery && !hasStructuredFilter) {
-    return NextResponse.json(
-      { error: "Arama metni (q) veya en az bir structured filter (genres/tags/episodesLte) gerekli." },
-      { status: 400 }
-    );
+    return apiError("search_query_or_filter_required", 400);
   }
+  const rateLimit = enforceRateLimit("search:anilist", await resolveRateLimitIdentity(request), 60, 60_000);
+  if (rateLimit) return rateLimit;
 
   try {
     let results: AniListRawMedia[] = [];
@@ -343,7 +337,7 @@ export async function GET(request: NextRequest) {
         tags,
         minimumTagRank,
         episodesLesser,
-        sort: sortParam,
+        sort,
       });
       if (category !== "all" && category !== "anime") {
         results = filterByCountry(results, category);
@@ -383,14 +377,10 @@ export async function GET(request: NextRequest) {
     // Üst-akım AniList outage'larında veya search index degradasyonunda burada
     // q="frieren" gibi sorgular için bile 0 dönebiliyor (deneylerle gözlendi).
     if (normalized.length === 0) {
-      console.warn(
-        `[anilist:search] 0 sonuç: q="${trimmedQuery}" category="${category}" discover=${
-          !trimmedQuery && hasStructuredFilter
-        } — AniList bu sorgu için boş döndü.`,
-      );
+      console.warn("[anilist:search] upstream returned no results");
     }
 
-    return NextResponse.json({
+    return noStoreJson({
       results: normalized,
       // Client tarafında görünür empty/error state için meta. Mevcut tüketiciler
       // (sadece `results` okuyan) etkilenmez — ekstra alan göz ardı edilir.
@@ -401,11 +391,10 @@ export async function GET(request: NextRequest) {
         category,
         mode: !trimmedQuery && hasStructuredFilter ? "discover" : "search",
         fallbackUsed,
-        filters: hasStructuredFilter ? { genres, tags, minimumTagRank, episodesLesser, sort: sortParam } : undefined,
+        filters: hasStructuredFilter ? { genres, tags, minimumTagRank, episodesLesser, sort } : undefined,
       },
     });
   } catch (err) {
-    console.error("AniList arama hatası:", err);
     const status = err instanceof AniListHttpError
       ? err.status === 429 || err.status === 403
         ? err.status
@@ -420,9 +409,9 @@ export async function GET(request: NextRequest) {
       : err instanceof AniListGraphqlError
         ? "graphql_error"
         : "network_error";
-    return NextResponse.json(
+    return noStoreJson(
       {
-        error: "AniList'e bağlanırken bir hata oluştu.",
+        code: "upstream_error",
         meta: {
           source: "anilist",
           failed: true,

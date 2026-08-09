@@ -51,9 +51,11 @@ export default function OpenLibrarySearch({
     setHasSearched(true);
 
     try {
-      const response = await fetch(
-        `/api/openlibrary/search?q=${encodeURIComponent(trimmed)}`
-      );
+      const response = await fetch("/api/openlibrary/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: trimmed }),
+      });
 
       if (!response.ok) {
         const data = await response.json().catch(() => null);

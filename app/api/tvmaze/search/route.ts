@@ -1,17 +1,18 @@
 // ============================================
 // TVmaze Dizi Arama API Route'u
 // ============================================
-// GET /api/tvmaze/search?q=breaking+bad
+// POST /api/tvmaze/search { query: "breaking bad" }
 //
 // TVmaze API'sine sunucu tarafında istek atar.
 // Token gerektirmez (TVmaze ücretsiz API).
 // Sonuçları normalize edip JSON olarak döndürür.
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import {
   TvmazeSearchItem,
   TvmazeNormalizedResult,
 } from "@/lib/tvmaze-types";
+import { SEARCH_REQUEST_MAX_BYTES, apiError, enforceRateLimit, fetchWithTimeout, noStoreJson, parseSearchQuery, readStrictJsonObject, resolveRateLimitIdentity } from "@/lib/api/request-security";
 
 /**
  * HTML etiketlerini kaldırıp düz metin döndüren basit fonksiyon.
@@ -77,35 +78,26 @@ export function normalizeSearchResult(
 }
 
 /**
- * GET /api/tvmaze/search?q=breaking+bad
+ * POST /api/tvmaze/search { query }
  */
-export async function GET(request: NextRequest) {
-  // 1) Arama metnini al
-  const searchParams = request.nextUrl.searchParams;
-  const query = searchParams.get("q");
-
-  if (!query || query.trim().length === 0) {
-    return NextResponse.json(
-      { error: "Arama metni (q) gerekli." },
-      { status: 400 }
-    );
-  }
+export async function POST(request: NextRequest) {
+  const parsed = await readStrictJsonObject(request, new Set(["query"]), SEARCH_REQUEST_MAX_BYTES);
+  if (!parsed.ok) return parsed.response;
+  const query = parseSearchQuery(parsed.value.query);
+  if (!query.ok) return apiError("search_query_invalid", 400);
+  const rateLimit = enforceRateLimit("search:tvmaze", await resolveRateLimitIdentity(request), 60, 60_000);
+  if (rateLimit) return rateLimit;
 
   // 2) TVmaze API'sine istek at
   try {
-    const url = `https://api.tvmaze.com/search/shows?q=${encodeURIComponent(
-      query.trim()
-    )}`;
+    const url = `https://api.tvmaze.com/search/shows?q=${encodeURIComponent(query.value)}`;
 
-    const tvmazeResponse = await fetch(url, {
+    const tvmazeResponse = await fetchWithTimeout(url, {
       headers: { accept: "application/json" },
     });
 
     if (!tvmazeResponse.ok) {
-      return NextResponse.json(
-        { error: `TVmaze API hatası: ${tvmazeResponse.status}` },
-        { status: 502 }
-      );
+      return noStoreJson({ code: "upstream_error" }, { status: 502 });
     }
 
     const data = (await tvmazeResponse.json()) as TvmazeSearchItem[];
@@ -113,12 +105,8 @@ export async function GET(request: NextRequest) {
     // 3) Sonuçları normalize et
     const normalized = data.map(normalizeSearchResult);
 
-    return NextResponse.json({ results: normalized });
-  } catch (err) {
-    console.error("TVmaze arama hatası:", err);
-    return NextResponse.json(
-      { error: "TVmaze'e bağlanırken bir hata oluştu." },
-      { status: 502 }
-    );
+    return noStoreJson({ results: normalized });
+  } catch {
+    return noStoreJson({ code: "upstream_error" }, { status: 502 });
   }
 }

@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import { analyzeIntent } from "@/lib/ai/intent-analyzer";
 import { DEFAULT_AI_SETTINGS } from "@/lib/ai/local-state";
 import type { AiSettings } from "@/lib/ai/types";
@@ -7,6 +6,14 @@ import type { ReferenceMediaItem } from "@/features/recommendations/intent/refer
 import { RECOMMENDATION_REQUEST_LIMITS } from "@/features/recommendations/domain/codec";
 import { getPlanningProviderPolicy } from "@/lib/ai/provider";
 import { availableSemanticVerifierModes } from "@/features/recommendations/evidence";
+import { resolveAiEntitlement } from "@/lib/ai/entitlement";
+import {
+  AI_REQUEST_MAX_BYTES,
+  enforceRateLimit,
+  readStrictJsonObject,
+  apiError,
+  noStoreJson,
+} from "@/lib/api/request-security";
 
 const ALLOWED_FIELDS = new Set(["message", "mediaItems", "settings", "previousStructuredRequestV2", "strictness"]);
 const REFERENCE_MEDIA_LIMIT = 500;
@@ -31,29 +38,28 @@ function sanitizeReferenceItems(value: unknown): ReferenceMediaItem[] {
 }
 
 export async function POST(request: Request) {
-  let parsed: unknown;
-  try { parsed = await request.json(); } catch { return NextResponse.json({ code: "interpret_invalid_json" }, { status: 400 }); }
-  if (!isRecord(parsed)) return NextResponse.json({ code: "interpret_payload_invalid" }, { status: 400 });
-  const body = parsed;
-  if (Object.keys(body).some((key) => !ALLOWED_FIELDS.has(key))) {
-    return NextResponse.json({ code: "interpret_unknown_field" }, { status: 400 });
-  }
+  const parsed = await readStrictJsonObject(request, ALLOWED_FIELDS, AI_REQUEST_MAX_BYTES);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.value;
+  const entitlement = await resolveAiEntitlement(request);
+  const rateLimit = enforceRateLimit("ai:interpret", entitlement.rateLimitIdentity, 30, 60_000);
+  if (rateLimit) return rateLimit;
   const message = typeof body.message === "string" ? body.message.trim() : "";
-  if (!message || message.length > RECOMMENDATION_REQUEST_LIMITS.queryText) return NextResponse.json({ code: "interpret_message_invalid" }, { status: 400 });
+  if (!message || message.length > RECOMMENDATION_REQUEST_LIMITS.queryText) return apiError("interpret_message_invalid", 400);
   const mediaItems = sanitizeReferenceItems(body.mediaItems);
   const rawSettings = isRecord(body.settings) ? body.settings : {};
   const settings: AiSettings = {
     ...DEFAULT_AI_SETTINGS,
     useProfile: rawSettings.useProfile !== false,
-    useOpenAIProvider: rawSettings.useOpenAIProvider === true,
+    useOpenAIProvider: entitlement.canUseOpenAi && rawSettings.useOpenAIProvider === true,
   };
   const strictness = body.strictness === undefined ? "balanced" : body.strictness;
   if (strictness !== "strict" && strictness !== "balanced" && strictness !== "exploratory") {
-    return NextResponse.json({ code: "interpret_strictness_invalid" }, { status: 400 });
+    return apiError("interpret_strictness_invalid", 400);
   }
   const result = interpretRecommendationRequest({ message, intent: analyzeIntent(message), settings, mediaItems, previousRequest: body.previousStructuredRequestV2, strictness, availableVerifierModes: availableSemanticVerifierModes() });
-  return NextResponse.json({
+  return noStoreJson({
     ...result,
-    planningPolicy: getPlanningProviderPolicy(settings),
+    planningPolicy: getPlanningProviderPolicy(settings, entitlement.canUseServerProviders ? undefined : "mock"),
   }, { status: result.request || result.needsClarification || "resetRequested" in result ? 200 : 422 });
 }

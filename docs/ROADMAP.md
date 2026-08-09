@@ -37,6 +37,7 @@
 | D7 annotation/calibration araçları | Arşivlendi; artifact'lar korunuyor | Development/evaluation tooling; aktif release yolu değil, private workspaces korunur ve yeni annotation beklenmez ([tool](D7_ANNOTATION_TOOL_ARCHITECTURE.md)) |
 | D7 ML / Aspect Verifier | Post-release opsiyonel backlog | Human gold/training release blocker değil; yalnız citation'lı evidence sonrası optional distillation/student shadow rolü ([deferred plan](D7_ML_DEFERRED_PLAN.md)) |
 | D8 — Release ve deployment (release candidate) | Planlandı | Persistent cross-instance research cache kararı, rate-limit/maliyet, migration/cutover, security acceptance, production flags ve kontrollü deploy; ayrıca D2C.1 ve Goal Cloud V1 production migration/flag rollout |
+| D8-1 — AI access ve API request boundary | Uygulandı (yerel/test; live smoke bekliyor) | Server-verified `app_metadata` entitlement, fail-closed provider/research gate, public-safe capability read-model, search POST JSON migration, process-local rate limit ve temel security headers ([AI güvenliği](D8_AI_ACCESS_AND_ADMIN_SECURITY.md), [API sınırı](D8_API_REQUEST_BOUNDARY.md)) |
 
 ## Opsiyonel backlog
 

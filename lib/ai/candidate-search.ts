@@ -714,15 +714,15 @@ async function searchAniListDiscover(
   cat: AniListCategory,
   filters: AniListStructuredQuery
 ): Promise<{ candidates: AiCandidate[]; unavailable: boolean }> {
-  const url = new URL(`${ctx.baseUrl}/api/anilist/search`);
-  url.searchParams.set("category", cat);
-  if (filters.genres && filters.genres.length > 0) url.searchParams.set("genres", filters.genres.join(","));
-  if (filters.tags && filters.tags.length > 0) url.searchParams.set("tags", filters.tags.join(","));
-  if (typeof filters.minimumTagRank === "number") url.searchParams.set("minimumTagRank", String(filters.minimumTagRank));
-  if (typeof filters.episodesLesser === "number") {
-    url.searchParams.set("episodesLte", String(filters.episodesLesser));
-  }
-  if (filters.sort && filters.sort.length > 0) url.searchParams.set("sort", filters.sort.join(","));
+  const url = `${ctx.baseUrl}/api/anilist/search`;
+  const requestBody = {
+    category: cat,
+    ...(filters.genres?.length ? { genres: filters.genres } : {}),
+    ...(filters.tags?.length ? { tags: filters.tags } : {}),
+    ...(typeof filters.minimumTagRank === "number" ? { minimumTagRank: filters.minimumTagRank } : {}),
+    ...(typeof filters.episodesLesser === "number" ? { episodesLte: filters.episodesLesser } : {}),
+    ...(filters.sort?.length ? { sort: filters.sort } : {}),
+  };
 
   // mediaType debug satırı için temsili tür — gerçek sonuçlar normalize'da
   // doğru MediaType ile gelir.
@@ -731,7 +731,9 @@ async function searchAniListDiscover(
   const queryLabel = `[discover:${filters.reason || "structured"}]`;
 
   try {
-    const res = await providerFetch(ctx, "anilist", url.toString(), { cache: "no-store" });
+    const res = await providerFetch(ctx, "anilist", url, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(requestBody), cache: "no-store",
+    });
     if (!res.ok) {
       recordQuery(ctx.debug, "anilist", debugType, queryLabel, 0);
       return { candidates: [], unavailable: true };
@@ -1077,8 +1079,10 @@ async function searchAniList(
     type === "manhua" ? "manhua" :
     "anime";
   try {
-    const url = `${ctx.baseUrl}/api/anilist/search?q=${encodeURIComponent(q)}&category=${cat}`;
-    const res = await providerFetch(ctx, "anilist", url, { cache: "no-store" });
+    const url = `${ctx.baseUrl}/api/anilist/search`;
+    const res = await providerFetch(ctx, "anilist", url, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: q, category: cat }), cache: "no-store",
+    });
     if (!res.ok) return [];
     const data = (await res.json()) as { results?: unknown };
     const results = decodeProviderResults<AniListNormalizedResult>(
@@ -1126,8 +1130,10 @@ async function searchAniList(
 async function searchTvmaze(ctx: SearchContext, q: string): Promise<AiCandidate[]> {
   if (!q.trim()) return [];
   try {
-    const url = `${ctx.baseUrl}/api/tvmaze/search?q=${encodeURIComponent(q)}`;
-    const res = await providerFetch(ctx, "tvmaze", url, { cache: "no-store" });
+    const url = `${ctx.baseUrl}/api/tvmaze/search`;
+    const res = await providerFetch(ctx, "tvmaze", url, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: q }), cache: "no-store",
+    });
     if (!res.ok) return [];
     const data = (await res.json()) as { results?: unknown };
     const results = decodeProviderResults<TvmazeNormalizedResult>(data.results, ctx.debug, ["tv"]);
@@ -1166,8 +1172,10 @@ async function searchTvmaze(ctx: SearchContext, q: string): Promise<AiCandidate[
 async function searchOpenLibrary(ctx: SearchContext, q: string): Promise<AiCandidate[]> {
   if (!q.trim()) return [];
   try {
-    const url = `${ctx.baseUrl}/api/openlibrary/search?q=${encodeURIComponent(q)}`;
-    const res = await providerFetch(ctx, "openlibrary", url, { cache: "no-store" });
+    const url = `${ctx.baseUrl}/api/openlibrary/search`;
+    const res = await providerFetch(ctx, "openlibrary", url, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: q }), cache: "no-store",
+    });
     if (!res.ok) return [];
     const data = (await res.json()) as { results?: unknown };
     const results = decodeProviderResults<OpenLibraryNormalizedResult>(data.results, ctx.debug, ["book"]);
@@ -1539,8 +1547,10 @@ async function searchForIdea(ctx: SearchContext, idea: AiCandidateIdea): Promise
 async function searchTmdb(ctx: SearchContext, q: string, mediaType: "movie" | "tv" = "movie"): Promise<AiCandidate[]> {
   if (!q.trim()) return [];
   try {
-    const url = `${ctx.baseUrl}/api/tmdb/search?q=${encodeURIComponent(q)}&mediaType=${mediaType}`;
-    const res = await providerFetch(ctx, "tmdb", url, { cache: "no-store" });
+    const url = `${ctx.baseUrl}/api/tmdb/search`;
+    const res = await providerFetch(ctx, "tmdb", url, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: q, mediaType }), cache: "no-store",
+    });
     if (!res.ok) {
       recordQuery(ctx.debug, "tmdb", mediaType, q, 0);
       return [];
@@ -1581,8 +1591,10 @@ async function searchTmdb(ctx: SearchContext, q: string, mediaType: "movie" | "t
 async function searchOmdb(ctx: SearchContext, q: string): Promise<AiCandidate[]> {
   if (!q.trim()) return [];
   try {
-    const url = `${ctx.baseUrl}/api/omdb/search?q=${encodeURIComponent(q)}`;
-    const res = await providerFetch(ctx, "omdb", url, { cache: "no-store" });
+    const url = `${ctx.baseUrl}/api/omdb/search`;
+    const res = await providerFetch(ctx, "omdb", url, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: q }), cache: "no-store",
+    });
     if (!res.ok) return [];
     const data = (await res.json()) as { results?: unknown };
     const results = decodeProviderResults<OmdbNormalizedResult>(data.results, ctx.debug, ["movie"]);

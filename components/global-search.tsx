@@ -148,7 +148,11 @@ export default function GlobalSearch({ getLibraryStatus, onAddToLibrary, prefill
           let tmdbResults: GlobalSearchResult[] = [];
           let tmdbOk = false;
           try {
-            const res = await fetch(`/api/tmdb/search?q=${encodeURIComponent(query)}`);
+            const res = await fetch("/api/tmdb/search", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ query }),
+            });
             const data = (await res.json().catch(() => ({ results: [] }))) as {
               results?: TmdbNormalizedResult[];
               error?: string;
@@ -185,7 +189,11 @@ export default function GlobalSearch({ getLibraryStatus, onAddToLibrary, prefill
 
           // --- 2) OMDb fallback ---
           try {
-            const res = await fetch(`/api/omdb/search?q=${encodeURIComponent(query)}`);
+            const res = await fetch("/api/omdb/search", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ query }),
+            });
             const data = (await res.json().catch(() => ({ results: [] }))) as {
               results?: OmdbNormalizedResult[];
               error?: string;
@@ -222,7 +230,11 @@ export default function GlobalSearch({ getLibraryStatus, onAddToLibrary, prefill
 
       if (activeCategory === "all" || activeCategory === "tv") {
         fetchPromises.push(
-          fetch(`/api/tvmaze/search?q=${encodeURIComponent(query)}`)
+          fetch("/api/tvmaze/search", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ query }),
+          })
             .then((res) => (res.ok ? res.json() : { results: [] }))
             .then((data: { results: TvmazeNormalizedResult[] }) => {
               const resArray = data.results || [];
@@ -280,7 +292,11 @@ export default function GlobalSearch({ getLibraryStatus, onAddToLibrary, prefill
 
       if (activeCategory === "all" || activeCategory === "book") {
         fetchPromises.push(
-          fetch(`/api/openlibrary/search?q=${encodeURIComponent(query)}`)
+          fetch("/api/openlibrary/search", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ query }),
+          })
             .then((res) => (res.ok ? res.json() : { results: [] }))
             .then((data: { results: OpenLibraryNormalizedResult[] }) => {
               const resArray = data.results || [];

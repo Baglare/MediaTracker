@@ -39,7 +39,12 @@ export function PeopleSearch() {
     const timer = window.setTimeout(async () => {
       setLoading(true);
       try {
-        const response = await fetch(`/api/social/people?q=${encodeURIComponent(query.trim())}&offset=${offset}`, { signal: controller.signal });
+        const response = await fetch("/api/social/people", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query: query.trim(), offset }),
+          signal: controller.signal,
+        });
         const data = await response.json() as { results?: SocialPersonSummary[]; message?: string };
         const next = data.results ?? [];
         setResults((current) => offset === 0 ? next : [...current, ...next]);

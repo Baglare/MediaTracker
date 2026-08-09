@@ -62,7 +62,7 @@ import {
   runDeterministicRecommendationV2WithShadowSeed,
   type DeterministicRecommendationV2Input,
 } from "@/features/recommendations/orchestration";
-import { decodeRecommendationRequestV2, type RecommendationRequestV2 } from "@/features/recommendations/domain/codec";
+import { decodeRecommendationRequestV2, RECOMMENDATION_REQUEST_LIMITS, type RecommendationRequestV2 } from "@/features/recommendations/domain/codec";
 import { evaluateRequestEvidenceCapabilities } from "@/features/recommendations/domain/evidence-capability";
 import { availableSemanticVerifierModes } from "@/features/recommendations/evidence";
 import { decodeRecommendationFeedbackEventV2 } from "@/features/recommendations/feedback";
@@ -71,6 +71,13 @@ import { ASPECT_REGISTRY } from "@/features/recommendations/domain/aspect-regist
 import { userFacingRankedTagNoResult } from "@/features/recommendations/ui/user-facing-text";
 import { nextPostResponseTaskScheduler, resolveResearchRolloutExecution, scheduleGroundedResearchShadow } from "@/features/recommendations/research/server";
 import { runActiveGroundedRecommendation } from "@/features/recommendations/research/active/service";
+import { resolveAiEntitlement } from "@/lib/ai/entitlement";
+import {
+  AI_REQUEST_MAX_BYTES,
+  apiError,
+  enforceRateLimit,
+  readStrictJsonObject,
+} from "@/lib/api/request-security";
 
 export const runtime = "nodejs";
 
@@ -100,6 +107,11 @@ function resolveRankedTagNoResultReason(
 // fallback yolunda kullanılıyordu, akış değişince çağrı düştü. Davranış
 // etkisi yok; ölü kod kaldırıldı.
 const PROVIDER_TIMEOUT_MS = 25000;
+const AI_RECOMMEND_ALLOWED_FIELDS = new Set([
+  "message", "mediaItems", "progressLogs", "settings", "recentContext", "activeContext",
+  "researchMode", "scopeMode", "dismissed", "recommendationFeedback",
+  "recommendationFeedbackV2", "structuredRequestV2",
+]);
 
 type ProviderErrorCode =
   | GeminiProviderErrorCode
@@ -1165,16 +1177,16 @@ function applySourceTitleExclusion(
 export async function POST(req: NextRequest) {
   const requestStartedAt = performance.now();
   const stageLatencyMs: NonNullable<AiRetrievalDebug["latencyMs"]> = {};
-  let body: AiRecommendRequest;
-  try {
-    body = (await req.json()) as AiRecommendRequest;
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-  }
+  const parsed = await readStrictJsonObject(req, AI_RECOMMEND_ALLOWED_FIELDS, AI_REQUEST_MAX_BYTES);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.value as unknown as AiRecommendRequest;
+  const entitlement = await resolveAiEntitlement(req);
+  const rateLimit = enforceRateLimit("ai:recommend", entitlement.rateLimitIdentity, 20, 60_000);
+  if (rateLimit) return rateLimit;
 
   const message = (body.message || "").trim();
-  if (!message) {
-    return NextResponse.json({ error: "message is required" }, { status: 400 });
+  if (!message || message.length > RECOMMENDATION_REQUEST_LIMITS.queryText) {
+    return apiError("recommend_message_invalid", 400);
   }
   const activeContext = body.activeContext;
   const followUpMerged = Boolean(activeContext?.followUpMerged);
@@ -1210,7 +1222,10 @@ export async function POST(req: NextRequest) {
       }).slice(-1000)
     : [];
 
-  const settings = body.settings;
+  const settings: AiSettings = {
+    ...(body.settings || {}),
+    useOpenAIProvider: entitlement.canUseOpenAi && body.settings?.useOpenAIProvider === true,
+  } as AiSettings;
   const mediaItems = Array.isArray(body.mediaItems) ? body.mediaItems : [];
   const progressLogs = Array.isArray(body.progressLogs) ? body.progressLogs : [];
   const interpretationStartedAt = performance.now();
@@ -1225,6 +1240,9 @@ export async function POST(req: NextRequest) {
   }
   stageLatencyMs.interpretation = Number((performance.now() - interpretationStartedAt).toFixed(2));
   const researchMode = (body as { researchMode?: string }).researchMode || "library-only";
+  if (researchMode !== "library-only" && !entitlement.canUseServerProviders) {
+    return apiError("ai_server_provider_forbidden", 403);
+  }
   const scopeMode = (body as { scopeMode?: string }).scopeMode as
     | "mixed"
     | "east"

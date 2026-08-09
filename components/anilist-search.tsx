@@ -71,11 +71,11 @@ export default function AniListSearch({
     setHasSearched(true);
 
     try {
-      const url = `/api/anilist/search?q=${encodeURIComponent(
-        trimmed
-      )}&category=${category}`;
-
-      const response = await fetch(url);
+      const response = await fetch("/api/anilist/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: trimmed, category }),
+      });
 
       if (!response.ok) {
         const data = await response.json().catch(() => null);
