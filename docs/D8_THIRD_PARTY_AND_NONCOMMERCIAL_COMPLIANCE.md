@@ -1,6 +1,6 @@
 # D8 third-party ve non-commercial compliance envanteri
 
-Doğrulama tarihi: 2026-08-09. Bu belge hukuk görüşü değildir; release öncesi ürün/operasyon kontrol listesidir. Yalnız resmi kaynaklar kullanılmıştır.
+Doğrulama tarihi: 2026-08-10. Bu belge hukuk görüşü değildir; release öncesi ürün/operasyon kontrol listesidir. Yalnız resmi kaynaklar kullanılmıştır. D8-4A yeniden kontrolünde TMDB logo/notice, OMDb non-commercial, TVMaze CC BY-SA/User-Agent ve Open Library identified-client koşulları değişmeden doğrulandı.
 
 | Servis | Rol ve release contract'ı | Attribution / retention / AI sınırı | Durum |
 | --- | --- | --- | --- |

@@ -63,19 +63,20 @@ describe("D7-R6B retrieval rescue and final transparency", () => {
   });
 
   it("dual pass normal havuz boşken Romance filtresini kaldırır, Sci-Fi query filtresini korur ve evidence-only Time Travel'ı uydurmaz", async () => {
-    const fetcher = vi.fn(async (input: string | URL | Request) => {
-      const url = new URL(String(input));
-      const genres = url.searchParams.get("genres") ?? "";
-      const tags = url.searchParams.get("tags") ?? "";
-      const rescued = genres.includes("Sci-Fi") && !genres.includes("Romance") && tags === "";
+    const fetcher = vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body ?? "{}")) as { genres?: string[]; tags?: string[] };
+      const genres = body.genres ?? [];
+      const tags = body.tags ?? [];
+      const rescued = genres.includes("Sci-Fi") && !genres.includes("Romance") && tags.length === 0;
       return new Response(JSON.stringify({ results: rescued ? [{ externalSource: "anilist", externalId: "9253", type: "anime", title: "Steins;Gate", genres: ["Sci-Fi"], tags: [{ name: "Time Travel", rank: 90 }], totalProgress: 24, popularity: 500000, averageScore: 90 }] : [] }), { status: 200 });
     });
     vi.stubGlobal("fetch", fetcher);
     const result = await searchCandidatesWithDebug({ intent, retrievalPlan: plan, profile: null, message: steinsRequest().queryText, mediaItems: [], progressLogs: [], structuredRequest: steinsRequest(), researchRescue: true });
-    expect(fetcher.mock.calls.map((call) => ({ genres: new URL(String(call[0])).searchParams.get("genres"), tags: new URL(String(call[0])).searchParams.get("tags") }))).toEqual(expect.arrayContaining([{ genres: "Sci-Fi", tags: null }]));
+    const payloads = fetcher.mock.calls.map((call) => JSON.parse(String(call[1]?.body ?? "{}")) as { genres?: string[]; tags?: string[] });
+    expect(payloads).toEqual(expect.arrayContaining([expect.objectContaining({ category: "anime", genres: ["Sci-Fi"] })]));
     expect(result.candidates.map((item) => item.externalId)).toContain("9253");
-    expect(fetcher.mock.calls.some((call) => new URL(String(call[0])).searchParams.get("genres")?.includes("Romance"))).toBe(true);
-    expect(fetcher.mock.calls.some((call) => new URL(String(call[0])).searchParams.get("genres") === "Sci-Fi" && !new URL(String(call[0])).searchParams.has("tags"))).toBe(true);
+    expect(payloads.some((body) => body.genres?.includes("Romance"))).toBe(true);
+    expect(payloads.some((body) => body.genres?.length === 1 && body.genres[0] === "Sci-Fi" && !body.tags)).toBe(true);
     expect(result.debug.notes).toContain("research_rescue:relaxed=romance candidates=1");
     vi.unstubAllGlobals();
   });

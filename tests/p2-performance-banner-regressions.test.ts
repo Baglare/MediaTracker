@@ -86,8 +86,10 @@ describe("P2 banner regression contracts", () => {
   });
 
   it("returns a signed preview URL without persisting it", () => {
-    expect(assetRoute).toContain("createSignedUrl(path, 300)");
-    expect(assetRoute).toContain("url: signed.error ? undefined : signed.data.signedUrl");
+    expect(assetRoute).toContain("createSignedSocialAssetUrl(path, kind, path)");
+    expect(assetRoute).toContain("url: signedUrl");
+    expect(socialServer).toContain("createSignedUrl(assetPath, SIGNED_URL_TTL_SECONDS)");
+    expect(assetRoute).not.toMatch(/avatar_path:\s*signed|banner_path:\s*signed/);
   });
 
   it("updates the preview URL and image mode immediately after upload", () => {

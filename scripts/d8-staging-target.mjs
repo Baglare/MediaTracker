@@ -32,7 +32,10 @@ export function resolveSafeStagingTarget(env = process.env, { requireMigrationPe
   if (!["postgres:", "postgresql:"].includes(databaseUrl.protocol)) {
     throw new Error("D8 staging database URL must use PostgreSQL");
   }
-  if (!databaseUrl.hostname.includes(stagingRef) || databaseUrl.hostname.includes(productionRef)) {
+  const databaseIdentity = `${databaseUrl.hostname}:${decodeURIComponent(databaseUrl.username)}`.toLowerCase();
+  const stagingBound = databaseUrl.hostname.toLowerCase().includes(stagingRef)
+    || decodeURIComponent(databaseUrl.username).toLowerCase().split(".").includes(stagingRef);
+  if (!stagingBound || databaseIdentity.includes(productionRef)) {
     throw new Error("D8 staging database host is not bound to the explicit staging ref");
   }
 

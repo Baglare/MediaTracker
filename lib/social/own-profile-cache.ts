@@ -39,17 +39,24 @@ function writeSession(ownerId: string, resource: Resource, entry: Entry): void {
   } catch { /* Session cache is an optional performance layer. */ }
 }
 
-export function readOwnProfileCache<T extends CachedValue>(
+function readOwnProfileCacheAt<T extends CachedValue>(
   ownerId: string,
   resource: Resource,
+  now: number,
 ): T | undefined {
-  const now = Date.now();
   const cacheKey = key(ownerId, resource);
   let entry = cache.get(cacheKey);
   if (entry && entry.expiresAt <= now) { cache.delete(cacheKey); entry = undefined; }
   entry ??= readSession(ownerId, resource, now);
   if (entry) cache.set(cacheKey, entry);
   return entry?.value as T | undefined;
+}
+
+export function readOwnProfileCache<T extends CachedValue>(
+  ownerId: string,
+  resource: Resource,
+): T | undefined {
+  return readOwnProfileCacheAt<T>(ownerId, resource, Date.now());
 }
 
 export async function loadOwnProfileCache<T extends CachedValue>(args: {
@@ -61,7 +68,7 @@ export async function loadOwnProfileCache<T extends CachedValue>(args: {
 }): Promise<T> {
   const cacheKey = key(args.ownerId, args.resource);
   const now = args.now ?? Date.now();
-  const cachedValue = readOwnProfileCache<T>(args.ownerId, args.resource);
+  const cachedValue = readOwnProfileCacheAt<T>(args.ownerId, args.resource, now);
   const cached = cache.get(cacheKey);
   if (!args.force && cachedValue && cached && cached.expiresAt > now) {
     return cached.value as T;

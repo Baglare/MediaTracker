@@ -22,6 +22,14 @@ describe("D8 staging target safety", () => {
       D8_PRODUCTION_PROJECT_REF: "prod-project",
       D8_STAGING_DATABASE_URL: "postgresql://user:secret@prod-project.example.test/db",
     })).toThrow("not bound");
+
+    expect(resolveSafeStagingTarget({
+      D8_STAGING_CUTOVER_ENABLED: "1",
+      D8_STAGING_MIGRATION_ALLOWED: "1",
+      D8_STAGING_PROJECT_REF: "stage-project",
+      D8_PRODUCTION_PROJECT_REF: "prod-project",
+      D8_STAGING_DATABASE_URL: "postgresql://postgres.stage-project:secret@pooler.example.test/db",
+    }, { requireMigrationPermission: true }).databaseUrl.hostname).toBe("pooler.example.test");
   });
 });
 
