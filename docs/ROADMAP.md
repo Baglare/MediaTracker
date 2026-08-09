@@ -39,6 +39,7 @@
 | D8 — Release ve deployment (release candidate) | Planlandı | Persistent cross-instance research cache kararı, rate-limit/maliyet, migration/cutover, security acceptance, production flags ve kontrollü deploy; ayrıca D2C.1 ve Goal Cloud V1 production migration/flag rollout |
 | D8-1 — AI access ve API request boundary | Uygulandı (yerel/test; live smoke bekliyor) | Server-verified `app_metadata` entitlement, fail-closed provider/research gate, public-safe capability read-model, search POST JSON migration, process-local rate limit ve temel security headers ([AI güvenliği](D8_AI_ACCESS_AND_ADMIN_SECURITY.md), [API sınırı](D8_API_REQUEST_BOUNDARY.md)) |
 | D8-2 — Profil tema, asset ve Keşif polish | Uygulandı (yerel/test; migration ve live-fixture smoke bekliyor) | Opt-in profile-only public tema snapshot’ı, custom metin renkleri/kontrast kapısı, owner-safe session/process asset cache ve bounded plain-text sonuç açıklamaları ([sözleşme](D8_PROFILE_THEME_ASSET_AND_DISCOVERY_POLISH.md)) |
+| D8-3 — Staging rehearsal ve release operations | Hazırlandı (live staging kapıları bekliyor) | Fail-closed staging pre/post-check araçları, dependency tabanlı cutover sırası, mobil public header, provider identity/disclosure, AI/research başlangıç politikası ve env/compliance matrisleri ([operasyon](D8_STAGING_CUTOVER_AND_OPERATIONS.md), [env](D8_RELEASE_ENV_MATRIX.md), [compliance](D8_THIRD_PARTY_AND_NONCOMMERCIAL_COMPLIANCE.md)) |
 
 ## Opsiyonel backlog
 

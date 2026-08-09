@@ -175,11 +175,17 @@ export default function SettingsFeature({
                 </a>.
               </li>
               <li>
-                Bu ürün{" "}
+                Film fallback verileri{" "}
+                <a href="https://www.omdbapi.com/" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-[var(--app-accent)]">
+                  OMDb API
+                </a>.
+              </li>
+              <li>
+                <span lang="en">This product uses the{" "}</span>
                 <a href="https://www.themoviedb.org/" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-[var(--app-accent)]">
                   TMDB API
                 </a>{" "}
-                hizmetini kullanır; TMDB tarafından desteklenmez veya onaylanmaz.
+                <span lang="en">but is not endorsed or certified by TMDB.</span>
               </li>
             </ul>
           </div>

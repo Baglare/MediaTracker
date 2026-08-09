@@ -14,6 +14,7 @@ import {
   OpenLibraryNormalizedResult,
 } from "@/lib/openlibrary-types";
 import { SEARCH_REQUEST_MAX_BYTES, apiError, enforceRateLimit, fetchWithTimeout, noStoreJson, parseSearchQuery, readStrictJsonObject, resolveRateLimitIdentity } from "@/lib/api/request-security";
+import { providerUserAgent } from "@/lib/api/provider-identity";
 
 /**
  * Tek bir Open Library doc'unu normalize eder.
@@ -80,8 +81,12 @@ export async function POST(request: NextRequest) {
 
     const url = `https://openlibrary.org/search.json?${params.toString()}`;
 
+    const userAgent = providerUserAgent();
     const olResponse = await fetchWithTimeout(url, {
-      headers: { accept: "application/json" },
+      headers: {
+        accept: "application/json",
+        ...(userAgent ? { "user-agent": userAgent } : {}),
+      },
     });
 
     if (!olResponse.ok) {

@@ -13,6 +13,7 @@ import {
   TvmazeNormalizedResult,
 } from "@/lib/tvmaze-types";
 import { SEARCH_REQUEST_MAX_BYTES, apiError, enforceRateLimit, fetchWithTimeout, noStoreJson, parseSearchQuery, readStrictJsonObject, resolveRateLimitIdentity } from "@/lib/api/request-security";
+import { providerUserAgent } from "@/lib/api/provider-identity";
 
 /**
  * HTML etiketlerini kaldırıp düz metin döndüren basit fonksiyon.
@@ -92,8 +93,12 @@ export async function POST(request: NextRequest) {
   try {
     const url = `https://api.tvmaze.com/search/shows?q=${encodeURIComponent(query.value)}`;
 
+    const userAgent = providerUserAgent();
     const tvmazeResponse = await fetchWithTimeout(url, {
-      headers: { accept: "application/json" },
+      headers: {
+        accept: "application/json",
+        ...(userAgent ? { "user-agent": userAgent } : {}),
+      },
     });
 
     if (!tvmazeResponse.ok) {
