@@ -81,4 +81,8 @@ Normal suite network açmaz. Her provider live testi yalnız kendi enable/live f
 
 D7-R2C.1 koşusunda Groq `groq/compound-mini` process-local model ayarıyla canlı geçmiştir. İlk koşu 5 saniyelik ortak timeout'ta geçerli provider cevabını kesmiş; sanitize teşhis 200/JSON, bir tool call ve URL sinyalleri döndüğünü göstermiştir. Groq'a özel 7,5 saniyelik bounded timeout sonrası strict live test `1 passed / 0 failed / 0 skipped` olmuştur. OpenAI ve OpenRouter açık research model bulunmadığından çağrılmamış ve live-unverified kalmıştır. R3 discovery giriş kapısı en az bir live-verified provider bulunduğu için açıktır; bu durum production auto-selection'ı etkinleştirmez.
 
-İlgili belgeler: [Discovery Contract](D7_RESEARCH_DISCOVERY_CONTRACT.md), [OpenAI Adapter](D7_OPENAI_WEB_DISCOVERY.md), [Source Expansion Matrix](D7_RESEARCH_SOURCE_EXPANSION_MATRIX.md), [Security Model](D7_RESEARCH_SECURITY_MODEL.md).
+## D7-R3A handoff sınırı
+
+Discovery sonucu evidence değildir ve kendi başına persist edilmez. R3A yalnız supplied `DiscoveredResearchSource` içindeki enabled Wikipedia URL'sini ortak URL/registry policy'sinden tekrar geçirir; sonra normal HTML'i değil MediaWiki Action API'yi kullanır. Son page `pageprops.wikibase_item` exact candidate QID'sine eşleşmeden, revision-bound citation ve bounded plaintext alınmadan passage üretilemez. Search provider request/response/snippet/output'u R3A packet'ına taşınmaz ve R3A hiçbir discovery network çağrısı yapmaz.
+
+İlgili belgeler: [Discovery Contract](D7_RESEARCH_DISCOVERY_CONTRACT.md), [OpenAI Adapter](D7_OPENAI_WEB_DISCOVERY.md), [Source Expansion Matrix](D7_RESEARCH_SOURCE_EXPANSION_MATRIX.md), [Source Acquisition](D7_RESEARCH_SOURCE_ACQUISITION.md), [Security Model](D7_RESEARCH_SECURITY_MODEL.md).

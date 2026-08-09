@@ -1,7 +1,7 @@
 # D7 Grounded Research Acceptance Cases
 
 Tarih: 8 Ağustos 2026
-Durum: D7-R1 karar, D7-R2A direct-document ve D7-R2B ephemeral discovery contract kabulü tamamlandı; conditional live varsayılan kapalıdır.
+Durum: D7-R3A exact-QID acquisition ve transient passage packet contract kabulü tamamlandı; conditional live varsayılan kapalıdır.
 
 ## Ortak kabul invariant'ları
 
@@ -14,7 +14,7 @@ Her senaryoda candidate exact provider identity ve doğru version/season scope i
 1. AniList high-recall retrieval exact Steins;Gate identity'sini ve doğru seri/season scope'unu döndürür.
 2. Structured evidence sci-fi/time travel koşullarını destekler; romance alanı eksik veya merkezilik için yetersizdir.
 3. Candidate elenmez; yalnız `romance must` için `research_pending` olur.
-4. Wikidata identity mapping doğru Wikipedia/MediaWiki sayfasına bağlanır. Allowlisted direct revision'dan ilişki gelişiminin olay kararlarını etkilediğini gösteren bounded pasaj seçilir.
+4. Wikidata identity mapping doğru Wikipedia/MediaWiki sayfasına bağlanır. R3A exact QID/page/revision zincirini doğrular; bounded lead+lexical+distributed passage packet üretir. Bu packet'ta `romance` kelimesi bulunması veya bir claim çıkması R3A kabul koşulu değildir.
 5. Extractor `romance=supported`, `level=significant` veya `primary`, yeterli confidence ve passage citation döndürür.
 6. Citation candidate/season/revision ile doğrulanır; grounded evidence structured aggregation'a eklenir.
 7. D6 hard filter romance must'u geçirir. Candidate normal sonuç listesine girebilir; sırası LLM değil mevcut deterministic sort key ile belirlenir.
@@ -82,6 +82,9 @@ Kabul: model world knowledge ile boşluğu doldurmaz; unknown açık kalır.
 | Research provider rate-limited | `provider_unavailable/rate_limited`; absent değil |
 | Aynı research task eşzamanlı iki request'te | Tek upstream iş; ikinci request coalesced telemetry alır |
 | Cache policy/revision değişmiş | Stale entry serving'de kullanılmaz; revalidation gerekir |
+| Discovered Wikipedia URL farklı QID'ye çözülüyor | `source_identity_mismatch`; title/link benzerliği fallback değildir |
+| Exact document'ta lexical aspect hit yok | Lead/distributed coverage korunabilir; absent/claim üretilmez |
+| Passage instruction/tool pattern taşıyor | Segment packet'tan çıkarılır; raw fragment persistent olmaz |
 
 ## 7. Fixture çıktısı
 
@@ -90,5 +93,7 @@ D7-R1'de Steins;Gate, Kakegurui, political intrigue, love triangle avoid, charac
 R2A Steins;Gate fixture'ı yalnız AniList exact ID → QID property verification → verified sitelink → page/revision → bounded transient document + citation metadata zincirini doğrular. Romance veya başka aspect claim'i çıkarmak D7-R3 kapsamıdır. Sabit Wikipedia cümlesi, revision ID veya metin uzunluğu acceptance assertion'ı değildir.
 
 R2B Steins;Gate fixture'ı aynı exact identity/work scope ve unresolved romance aspect'inden en fazla iki public deterministic query üretir. OpenAI request yalnız `wikipedia.org` provider filter'ı taşır. Accepted URL'nin `en.wikipedia.org|tr.wikipedia.org` exact registry host'larından gelmesi gerekir. Discovery sonucu romance kararı değildir; no-result `absent` yapmaz. Conditional live test exact URL veya claim değil, gerçek `web_search_call` ve accepted URL policy'sini sınar.
+
+R3A Steins;Gate fixture'ı R2A exact direct document+citation envelope'ını alır, normalizes/segments eder ve revision-bound `transient_only` packet üretir. Sentetik discovered-source fixture'ları aynı page/revision dedupe, out-of-domain policy reject ve different-QID reject'i doğrular. Conditional R3A Wikimedia live smoke yalnız existing Wikimedia flag/User-Agent ile direct acquisition + packet hazırlamayı sınar; search provider/model çağrısı yapmaz ve sabit metin/revision/passage sayısı beklemez.
 
 İlgili belgeler: [Grounded Research Architecture](D7_GROUNDED_RESEARCH_ARCHITECTURE.md), [Research Source Policy](D7_RESEARCH_SOURCE_POLICY.md), [Research Security Model](D7_RESEARCH_SECURITY_MODEL.md).

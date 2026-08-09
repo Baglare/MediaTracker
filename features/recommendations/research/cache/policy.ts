@@ -11,6 +11,8 @@ const FORBIDDEN_PERSISTED_FIELDS = new Set([
   "discoveredSources", "discoveryResult", "openaiResponse", "braveResponse", "fullWikipediaText",
   "transientDocument", "rawPassage", "groqResponse", "openrouterResponse", "providerResponse",
   "tavilyMetadata", "exaMetadata", "providerSynthesizedAnswer", "highlight", "responseId",
+  "packet", "passages", "passageText", "groundedResearchPacket", "normalizedText",
+  "normalizedDocument", "packetContentHash", "researchPassagePacket",
 ]);
 
 function issue(code: string, path: string, message: string): RecommendationDomainIssue {

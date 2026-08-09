@@ -48,10 +48,21 @@ export async function resolveWikipediaPage(input: {
 }): Promise<{ status: "resolved"; page: ResolvedWikipediaPage } | { status: "unavailable" | "security_rejected" | "budget_exhausted"; warnings: readonly string[] }> {
   const sitelink = selectVerifiedWikipediaSitelink({ identity: input.identity, policy: input.languagePolicy });
   if (!sitelink) return { status: "unavailable", warnings: ["wikipedia_sitelink_unavailable"] };
-  const project = PROJECTS[sitelink.project];
+  return resolveWikipediaPageByTitle({ ...input, project: sitelink.project, title: sitelink.title });
+}
+
+export async function resolveWikipediaPageByTitle(input: {
+  identity: ResolvedWikimediaIdentity;
+  project: "enwiki" | "trwiki";
+  title: string;
+  httpClient: SecureResearchHttpClient;
+  userAgent: string;
+  signal?: AbortSignal;
+}): Promise<{ status: "resolved"; page: ResolvedWikipediaPage } | { status: "unavailable" | "security_rejected" | "budget_exhausted"; warnings: readonly string[] }> {
+  const project = PROJECTS[input.project];
   try {
     const response = await input.httpClient.request({
-      sourceId: "wikipedia", url: buildWikipediaPageQueryUrl(sitelink.project, sitelink.title), method: "GET",
+      sourceId: "wikipedia", url: buildWikipediaPageQueryUrl(input.project, input.title), method: "GET",
       headers: { userAgent: input.userAgent, apiUserAgent: input.userAgent, accept: "application/json", acceptEncoding: "gzip, deflate" },
       timeoutMs: 3_500, maxResponseBytes: WIKIPEDIA_API_JSON_MAX_BYTES, acceptedContentTypes: ["application/json"],
       redirectPolicy: { mode: "manual", maxRedirects: 2 }, requestId: `wikipedia-page-${input.identity.wikidataEntityId}`, maxAttempts: 2, signal: input.signal,
@@ -69,7 +80,7 @@ export async function resolveWikipediaPage(input: {
     return {
       status: "resolved",
       page: {
-        sourceId: "wikipedia", wikiProject: sitelink.project, language: project.language,
+        sourceId: "wikipedia", wikiProject: input.project, language: project.language,
         wikidataEntityId: input.identity.wikidataEntityId, canonicalTitle: decoded.title,
         pageId: decoded.pageId, revisionId: decoded.revisionId, revisionTimestamp: decoded.revisionTimestamp,
         canonicalUrl: canonical.canonicalUrl, revisionUrl: revision.canonicalUrl, warnings: decoded.warnings,

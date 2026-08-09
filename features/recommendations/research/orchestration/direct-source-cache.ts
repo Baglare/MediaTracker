@@ -47,5 +47,9 @@ export function wikipediaPageMetadataCacheKey(identity: ResolvedWikimediaIdentit
   return `wikipedia-page:v1:${identity.versionScopeKey}:${identity.wikidataEntityId}:${project}`;
 }
 
+export function wikipediaDiscoveredPageMetadataCacheKey(identity: ResolvedWikimediaIdentity, project: string, title: string): string {
+  return `wikipedia-page:v1:discovered:${identity.versionScopeKey}:${identity.wikidataEntityId}:${project}:${encodeURIComponent(title.normalize("NFKC"))}`;
+}
+
 export const wikimediaIdentityCache = new BoundedMetadataCache<ResolvedWikimediaIdentity>();
 export const wikipediaPageMetadataCache = new BoundedMetadataCache<ResolvedWikipediaPage>();

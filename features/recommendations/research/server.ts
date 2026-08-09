@@ -32,3 +32,6 @@ export * from "./discovery/adapters/openrouter/adapter";
 export * from "./discovery/provider-registry";
 export * from "./discovery/selection";
 export * from "./discovery/orchestrator";
+export * from "./acquisition/wikipedia-acquirer";
+export * from "./acquisition/orchestrator";
+export * from "./acquisition/telemetry";

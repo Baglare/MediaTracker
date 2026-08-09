@@ -1,7 +1,7 @@
 # D7 Research Source Policy
 
 Tarih: 8 Ağustos 2026
-Durum: D7-R2A direct Wikimedia ve D7-R2C allowlisted ephemeral OpenAI/Groq/OpenRouter discovery adapter'ları hazırdır; Brave/Gemini yoktur.
+Durum: D7-R3A exact-QID direct Wikipedia acquisition ve transient passage packet hazırdır; Brave/Gemini ve yeni source domain yoktur.
 
 ## 1. Temel kurallar
 
@@ -85,7 +85,7 @@ taşır. Wikipedia evidence kullanıcıya gösterildiğinde attribution ve sourc
 
 ## 6. Storage sınıfları
 
-- `persistent_direct`: Lisansı açık direct source content ve revision metadata'sı.
+- `persistent_direct`: R3A'da yalnız lisansı açık citation/revision/hash/attribution metadata'sı; full document veya passage değil.
 - `persistent_derived`: Persistent direct source'a bağlı bounded claim/extraction; lineage zorunlu.
 - `ephemeral_search`: Query, result/snippet ve search-provider tool output'u; request sonunda silinir veya yalnız içeriksiz metrik bırakılır.
 - `runtime_structured_ttl`: Mevcut provider evidence cache contract'ı.
@@ -96,13 +96,13 @@ Search sonucu içinden canonical URL saklamak, snippet veya result body saklama 
 ## 7. TTL ve invalidation
 
 - Wikidata identity/fact: en çok 30 gün; revision/fingerprint değişimi erken invalidation.
-- Wikipedia direct passage: en çok 7 gün; revision değişimi anında stale.
+- Wikipedia derived claim (R3B sonrası): en çok 7 gün; revision değişimi anında stale. R3A passage text persistent değildir.
 - Derived aspect claim: bağlı olduğu en kısa source TTL'sini aşamaz.
 - Ephemeral search: request lifetime; debug log'da raw query/result yok.
 - Policy/allowlist/license değişimi: etkilenen tüm cache keys fail-closed invalid.
 - 404/redirect/domain ownership değişimi: source revalidation ve claim quarantine.
 
-D7-R1 storage port'u `direct_source_long|unknown_short|not_cacheable` sınıflarını uygular. D7-R2A teknik metadata cache'i verified Wikidata identity için 6 saat, Wikipedia page/revision metadata için 15 dakika process-memory başlangıç politikası kullanır; transient extract'i saklamaz. D7-R2B/R2C OpenAI/Groq/OpenRouter request/response, output/reasoning, query, action/response ID, snippet/highlight, Tavily/Exa metadata ve discovered-source listesi için persistent cache açmaz; yalnız içeriksiz telemetry bırakabilir. Bu süreler conditional live gözlemle yalnız daha dar yapılabilir.
+D7-R1 storage port'u `direct_source_long|unknown_short|not_cacheable` sınıflarını uygular. D7-R2A/R3A teknik metadata cache'i verified Wikidata identity için 6 saat, exact QID/project/title Wikipedia page/revision metadata için 15 dakika process-memory başlangıç politikası kullanır; transient extract, normalized document, passage veya packet saklamaz. D7-R2B/R2C OpenAI/Groq/OpenRouter request/response, output/reasoning, query, action/response ID, snippet/highlight, Tavily/Exa metadata ve discovered-source listesi için persistent cache açmaz; yalnız içeriksiz telemetry bırakabilir. Bu süreler conditional live gözlemle yalnız daha dar yapılabilir.
 
 ## 8. Yasaklar
 

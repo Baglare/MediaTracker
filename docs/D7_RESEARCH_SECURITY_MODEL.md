@@ -1,7 +1,7 @@
 # D7 Research Security Model
 
 Tarih: 8 Ağustos 2026
-Durum: D7-R2A.1 secure direct-source network ve D7-R2B fixed-endpoint allowlisted OpenAI discovery hazırdır; genel web HTML acquisition/sanitizer yoktur.
+Durum: D7-R3A exact-QID Wikimedia acquisition ve transient passage security policy hazırdır; genel web HTML acquisition/sanitizer yoktur.
 
 ## 1. Güven sınırları
 
@@ -26,14 +26,14 @@ Research katmanı üç ayrı boundary kullanır:
 
 ## 3. Content sanitization
 
-- MIME allowlist: beklenen JSON veya text/html; binary, archive, PDF ve media D7-R1 scope dışıdır.
+- MIME allowlist: aktif R3A yolunda MediaWiki JSON/plaintext; binary, archive, PDF, media ve genel HTML scope dışıdır.
 - Compressed ve decompressed byte limitleri ayrı uygulanır; zip bomb/çoklu encoding reddedilir.
 - HTML parser yalnız görünür metni alır. `script`, `style`, `template`, `noscript`, iframe, form, SVG, event handler, comment ve hidden content çıkarılır.
 - Entity decode/Unicode normalization sonrası control character ve bidi spoofing denetlenir.
 - DOM, JSON depth, node count, line ve passage boyutu bounded'dır.
 - Passage her zaman immutable `sourceId/revisionId/passageId` envelope'u içinde tutulur; raw HTML extractor'a verilmez.
 
-D7-R2A direct adapter limitleri: WDQS/Action API decompressed JSON 256 KiB, Wikipedia plaintext 24.000 UTF-8 byte, DNS 1250 ms, Wikidata 3000 ms, Wikipedia 3500 ms ve global direct-source 8000 ms. `Content-Length` güven sınırı değildir; gzip/deflate decompressed stream sayılır. Daha geniş HTML/passage limitleri R2B/R3'te sanitizer ile ayrıca tanımlanacaktır.
+D7-R2A direct adapter limitleri: WDQS/Action API decompressed JSON 256 KiB, Wikipedia plaintext 24.000 UTF-8 byte, DNS 1250 ms, Wikidata 3000 ms, Wikipedia 3500 ms ve global direct-source 8000 ms. `Content-Length` güven sınırı değildir; gzip/deflate decompressed stream sayılır. R3A genel HTML açmaz; plaintext'i NFKC/line/control/script denetiminden geçirir ve 1.500 karakter passage, 12.000 karakter packet hard limitini uygular.
 
 ## 4. Prompt injection isolation
 
@@ -94,7 +94,7 @@ Minimum internal reason code'ları:
 
 Log yalnız reason code, source class/domain tokenı, süre, byte bucket, cache state ve request-scoped opaque trace ID taşır. Raw URL query, content, prompt, output, secret veya kişisel kimlik taşımaz.
 
-## 9. D7-R2C sonucu ve D7-R3 güvenlik kapısı
+## 9. D7-R3A sonucu ve D7-R3B güvenlik kapısı
 
 D7-R1 saf URL/content/citation contract'larını tanımladı. D7-R2A.1 gerçek socket hedefini OS resolver'ın döndürdüğü ve tamamı doğrulanmış address setinden deterministik seçilen adrese pinler. c-ares `resolve4/resolve6` hatalarını boş sonuç gibi yutan eski uyumluluk kusuru kaldırılmıştır. Mixed public/private DNS ve special-use IPv4/IPv6 fail-closed kalır. Retry ikinci DNS açmaz; manual redirect en çok iki hop ve her hop tam URL/DNS validation alır. TLS SNI/Host canonical hostname olarak korunur.
 
@@ -104,13 +104,10 @@ D7-R2C aynı sınırı Groq'nun sabit Chat Completions ve OpenRouter'ın sabit R
 
 5 saniye timeout, 256 KiB streaming response cap, bir retry, bounded `Retry-After`, global concurrency=2 ve same-job coalescing uygulanır. Raw response/output text/snippet/query/error body/header loglanmaz; yalnız bounded status/count/byte/duration ve `x-request-id` tutulabilir.
 
-D7-R3 discovered-source acquisition veya HTML I/O açılmadan önce ayrıca şunlar gerekir:
+R3A discovered Wikipedia URL'sini yeniden R1 URL/registry policy'sinden geçirir ve yalnız MediaWiki Action API'ye server-chosen endpoint ile bağlanır. Article title yalnız exact `titles=` lookup girdisidir; `pageprops.wikibase_item` candidate QID'siyle eşleşmeden document üretilmez. Query, arbitrary host/path, title search, related-page ve parent-scope fallback reddedilir. Direct/discovered input aynı page/revision'da dedupe edilir.
 
-- gerçek HTML/script/style/hidden-content sanitizer'ı;
-- DOM ve passage limitlerinin streaming uygulaması;
-- discovered URL'nin R2A allowlist/DNS pinning boundary'sinden geçmesi;
-- proxy ortamında pinned connect-target politikasının operasyonel doğrulaması.
+Normalized plaintext içindeki script/HTML veya malformed Unicode document'i reddeder. Bounded prompt-injection/instruction/role/tool/encoded pattern'leri claim sayılmaz; riskli segment packet'tan çıkarılır. Packet, full document ve passage text `transient_only`dır; persistent cache validator'ı bunları reddeder. R3B extractor yalnız kalan passage envelope'larını açık untrusted-data sınırında görmelidir.
 
-R2A koruması yalnız internal direct Wikimedia adapter'ı için geçerlidir; henüz Recommendation route güvenlik kanıtı değildir.
+Genel web HTML source desteği hâlâ kapalıdır. Gelecekte açılmadan önce streaming HTML sanitizer, DOM/content limitleri, license/source-specific identity relation ve pinned target operasyonel kanıtı ayrıca gerekir. R3A yalnız internal service/test'tir; Recommendation route güvenlik kanıtı değildir.
 
 İlgili belgeler: [Grounded Research Architecture](D7_GROUNDED_RESEARCH_ARCHITECTURE.md), [Research Source Policy](D7_RESEARCH_SOURCE_POLICY.md).

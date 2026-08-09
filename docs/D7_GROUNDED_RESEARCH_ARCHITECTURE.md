@@ -1,7 +1,7 @@
 # D7 Grounded Aspect Research Engine Mimarisi
 
 Tarih: 8 Ağustos 2026
-Durum: D7-R2C allowlisted ephemeral multi-provider source discovery tamamlandı; production entegrasyonu yoktur.
+Durum: D7-R3A secure Wikimedia acquisition ve transient passage packet tamamlandı; production entegrasyonu yoktur.
 
 ## 1. Karar ve sınır
 
@@ -44,7 +44,7 @@ Structured request
   -> structured evidence aggregation
   -> unresolved explicit must/avoid/prefer queue
   -> bounded top-N targeted research
-  -> source fetch + sanitize + passage selection
+  -> exact-QID source acquisition + deterministic passage preparation
   -> citation-bound structured extraction
   -> contradiction-aware evidence merge
   -> deterministic hard filters
@@ -203,13 +203,14 @@ Internal telemetry; research requested/completed/coalesced, source/provider unav
 | D7-R2B | Ephemeral allowlisted OpenAI discovery; Brave deferred | Search source değildir; route'a bağlı değil |
 | D7-R2C | Provider registry/seçim; Groq Compound + forced-Exa OpenRouter beta | Ortak URL revalidation; ephemeral-only; route'a bağlı değil |
 | D7-R2D | İzin kapılı source expansion/direct community-review adapter'ları | Terms/source trust audit olmadan source eklenmez |
-| D7-R3 | Supplied-passage grounded claim extraction | Strict schema/citation; D6 authoritative |
+| D7-R3A | Exact-QID Wikimedia acquisition + transient passage packet | Claim/model yok; route'a bağlı değil |
+| D7-R3B | Supplied-passage provider-neutral grounded extraction | Strict schema/citation; D6 authoritative |
 | D7-R4 | Deterministic evidence integration | Kontrollü opt-in; LLM ranking yok |
 | D7-R5 | Runtime security/cache ve kullanıcı citation görünümü | Feature flag/shadow |
 | D7-R6 | Live source compliance, fail-soft ve final acceptance | D8 research feature gate adayı |
 | D7-ML | Opsiyonel post-release distillation/student shadow | Release blocker değil |
 
-## 13. D7-R2C sonucu ve D7-R3 giriş koşulları
+## 13. D7-R3A sonucu ve D7-R3B giriş koşulları
 
 D7-R1; 43 aspect için versionlı capability matrisi, exact `work|season|installment|edition` scope codec'i, kapalı-varsayılan source registry, citation/no-source domain kararları, deterministic bounded planner ve owner-independent cache port'unu teslim etti. D7-R2A buna [pinned server HTTP/DNS](D7_RESEARCH_NETWORK_FOUNDATION.md), [exact external-ID Wikidata verification](D7_WIKIDATA_IDENTITY_RESOLUTION.md) ve [revision-bound Wikipedia plaintext/citation](D7_WIKIPEDIA_DIRECT_SOURCE.md) ekledi.
 
@@ -219,14 +220,17 @@ D7-R2B; [strict discovery request/result contract'ı](D7_RESEARCH_DISCOVERY_CONT
 
 D7-R2C; aynı port'u merkezi [provider capability registry ve seçim contract'ı](D7_MULTI_PROVIDER_DISCOVERY.md) ile genişletti. Groq yalnız `web_search` tool'u ve `include_domains` ile; OpenRouter yalnız beta server tool + forced Exa `allowed_domains` ile çalışır. Explicit seçim fallback yapmaz; `auto` yalnız explicit enabled/configured provider'larda unavailable fallback yapar ve `no_source_discovered` provider storm üretmez. Ortak URL/source-registry post-processing değişmez. [Source expansion matrix](D7_RESEARCH_SOURCE_EXPANSION_MATRIX.md) yeni source'ları R2D izin kapısına bağlar.
 
-D7-R3 ancak şu açık kapılarla başlar:
+D7-R3A; [source acquisition contract'ı](D7_RESEARCH_SOURCE_ACQUISITION.md) ile direct R2A document ve supplied discovery URL'sini tek server-only boundary'de toplar. Discovered Wikipedia article normal HTML'den okunmaz; MediaWiki Action API ile exact title çözülür, `pageprops.wikibase_item` candidate QID'sine yeniden bağlanır ve latest revision/citation alınır. Farklı QID, disambiguation, missing ve work-to-season/installment/edition fallback fail-closed'dur.
 
-- discovery URL'sini R2A exact allowlist/DNS client'ına teslim eden source-specific acquisition boundary;
-- redirect sonrası candidate identity/version-scope revalidation;
-- Wikipedia dışı document gerekirse HTML streaming/sanitizer ve prompt-injection isolation;
-- direct publisher license/retention policy'sine bağlı transient passage;
-- supplied-passage-only strict extraction ve citation validation;
-- discovery/provider unavailable ile no-document/no-source unknown ayrımı.
+[Passage packet](D7_RESEARCH_PASSAGE_PACKET.md) NFKC/plaintext normalization, stable paragraph/sentence offsets, registry lexicon sinyali, lead+lexical+distributed coverage ve prompt-injection quarantine uygular. Packet, document ve passage `transient_only`dır; yalnız revision-bound citation/hash metadata'sı persistence için uygundur. R3A model, claim, level, confidence veya decision üretmez.
+
+D7-R3B giriş kapıları:
+
+- extractor yalnız bu packet'taki supplied passages'ı untrusted-data delimiter'ları içinde görür;
+- strict provider-neutral JSON codec ve passage/citation referential-integrity kontrolü;
+- no-source/no-passage/provider-unavailable ayrımını `absent`e çevirmeyen unknown politikası;
+- model network/tool erişimi, candidate/ranking yetkisi ve personal context olmaması;
+- exact scope ve acquisition/passage policy version'larının extraction lineage'ında korunması.
 
 Bu kapılar production route entegrasyonu izni değildir. D6 regression fixture'ları ve ranking sabitleri değişmeden kalır.
 

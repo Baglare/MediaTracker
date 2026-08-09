@@ -1,7 +1,7 @@
 # D7-R1 Research Cache Policy
 
 Tarih: 8 Ağustos 2026
-Durum: Owner-independent evidence port'u, D7-R2A Wikimedia metadata cache'i ve D7-R2C request-only multi-provider discovery coalescing hazır; DB/localStorage yoktur.
+Durum: Owner-independent evidence port'u, Wikimedia metadata cache'i, request-only discovery coalescing ve R3A transient packet sınırı hazır; DB/localStorage yoktur.
 
 ## Stable key
 
@@ -29,6 +29,7 @@ Yasak alanlar:
 - search query/output text/reasoning/action/response ID/discovered source/result;
 - Tavily/Exa metadata, snippet/highlight veya provider synthesized answer;
 - full Wikipedia text veya raw passage;
+- normalized document, `GroundedResearchPacket`, passage text/offset veya injection fragment'i;
 - owner/private kullanıcı alanları.
 
 Runtime validator nested yasak alanları, invalid citation/claim'i, key-decision scope/aspect mismatch'ini ve timestamp/fingerprint sorunlarını fail-closed reddeder.
@@ -57,4 +58,12 @@ D7-R1 `MemoryResearchEvidenceCache` yalnız saf/test kullanımı için max 128 e
 
 OpenAI Responses, Groq Compound ve OpenRouter Responses payload'ları; output item/text/reasoning, query, source array, snippet/highlight, Tavily/Exa metadata, action/response ID ve `DiscoveredResearchSource` persistent cache'e girmez. Aynı exact scope/aspect/role/provider-policy/domain/query fingerprint yalnız in-flight process promise'i paylaşır; tamamlanınca entry silinir. Network/provider/security/decoder failure negative-cache edilmez. SHA-256 query fingerprint query metnini geri taşımayan request-local dedupe/lineage token'ıdır; persisted citation değildir.
 
-İlgili belgeler: [Domain Contract](D7_RESEARCH_DOMAIN_CONTRACT.md), [Planner](D7_RESEARCH_PLANNER.md), [Source Registry](D7_RESEARCH_SOURCE_REGISTRY.md).
+## D7-R3A acquisition ve passage packet
+
+- Direct/discovered acquisition aynı exact scope, QID, page/title/revision ve policy anahtarında in-flight coalesce edilir.
+- Wikipedia revision metadata kısa process-memory TTL alabilir; source text bu cache'e girmez.
+- Full/normalized document, selected passage, packet ve prompt-injection fragment'i yalnız request lifetime'dır. Runtime validator bunların evidence cache payload'una gömülmesini nested seviyede reddeder.
+- Persistent olabilen tek R3A çıktısı canonical revision URL, page/revision ID, attribution/license, accessedAt, source content hash ve policy version taşıyan citation metadata'sıdır.
+- `adapter_unavailable`, security/network failure ve budget exhaustion negative-cache edilmez. Exact document/revision dedupe persistence değildir.
+
+İlgili belgeler: [Domain Contract](D7_RESEARCH_DOMAIN_CONTRACT.md), [Planner](D7_RESEARCH_PLANNER.md), [Source Registry](D7_RESEARCH_SOURCE_REGISTRY.md), [Source Acquisition](D7_RESEARCH_SOURCE_ACQUISITION.md), [Passage Packet](D7_RESEARCH_PASSAGE_PACKET.md).
