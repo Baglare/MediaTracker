@@ -1,7 +1,7 @@
 # D7 Grounded Aspect Research Engine Mimarisi
 
 Tarih: 8 Ağustos 2026
-Durum: D7-R3A secure Wikimedia acquisition ve transient passage packet tamamlandı; production entegrasyonu yoktur.
+Durum: D7-R3B provider-neutral grounded extraction ve deterministic research decision tamamlandı; production entegrasyonu yoktur.
 
 ## 1. Karar ve sınır
 
@@ -204,7 +204,7 @@ Internal telemetry; research requested/completed/coalesced, source/provider unav
 | D7-R2C | Provider registry/seçim; Groq Compound + forced-Exa OpenRouter beta | Ortak URL revalidation; ephemeral-only; route'a bağlı değil |
 | D7-R2D | İzin kapılı source expansion/direct community-review adapter'ları | Terms/source trust audit olmadan source eklenmez |
 | D7-R3A | Exact-QID Wikimedia acquisition + transient passage packet | Claim/model yok; route'a bağlı değil |
-| D7-R3B | Supplied-passage provider-neutral grounded extraction | Strict schema/citation; D6 authoritative |
+| D7-R3B | Supplied-passage provider-neutral grounded extraction | Tamamlandı; strict schema/citation, deterministic claim/decision, D6 authoritative |
 | D7-R4 | Deterministic evidence integration | Kontrollü opt-in; LLM ranking yok |
 | D7-R5 | Runtime security/cache ve kullanıcı citation görünümü | Feature flag/shadow |
 | D7-R6 | Live source compliance, fail-soft ve final acceptance | D8 research feature gate adayı |
@@ -231,6 +231,14 @@ D7-R3B giriş kapıları:
 - no-source/no-passage/provider-unavailable ayrımını `absent`e çevirmeyen unknown politikası;
 - model network/tool erişimi, candidate/ranking yetkisi ve personal context olmaması;
 - exact scope ve acquisition/passage policy version'larının extraction lineage'ında korunması.
+
+## 14. D7-R3B sonucu ve R4 sınırı
+
+R3B, packet passage'larını stable citation-linked evidence unit'lere böler ve modele yalnız anonim candidate reference, registry aspect definition ve supplied unit text verir. Candidate title/ID/QID/URL ile kullanıcı `role`/`minimumLevel` modelden saklanır. Provider yalnız strict assessment üretir; exact unit/passage grounding'i tutmayan tek item bütün output'u reddeder.
+
+Validated observation'dan claim metni, citation bağları, confidence cap ve `supported|contradicted|unknown` decision yalnız deterministic kodla çıkar. Model eligibility veya ranking üretmez. Groq/OpenAI/OpenRouter adapter ayrıntıları [Multi-Provider Extraction](D7_MULTI_PROVIDER_EXTRACTION.md), wire/grounding şeması [Grounded Extraction Contract](D7_GROUNDED_EXTRACTION_CONTRACT.md), aggregation ise [Decision Aggregation](D7_RESEARCH_DECISION_AGGREGATION.md) belgesindedir.
+
+R4 girişinde production feature gate hâlâ kapalıdır. R4; yalnız validated claim/citation/decision handoff'unu D6 `must|prefer|avoid|unknown|near-match` policy'sine bağlayabilir, model sıralaması ekleyemez ve missing mention'ı absent sayamaz.
 
 Bu kapılar production route entegrasyonu izni değildir. D6 regression fixture'ları ve ranking sabitleri değişmeden kalır.
 

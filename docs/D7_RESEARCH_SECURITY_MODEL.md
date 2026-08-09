@@ -1,7 +1,7 @@
 # D7 Research Security Model
 
 Tarih: 8 Ağustos 2026
-Durum: D7-R3A exact-QID Wikimedia acquisition ve transient passage security policy hazırdır; genel web HTML acquisition/sanitizer yoktur.
+Durum: D7-R3B supplied-passage-only extraction security boundary hazırdır; genel web HTML acquisition/sanitizer ve production entegrasyonu yoktur.
 
 ## 1. Güven sınırları
 
@@ -109,5 +109,11 @@ R3A discovered Wikipedia URL'sini yeniden R1 URL/registry policy'sinden geçirir
 Normalized plaintext içindeki script/HTML veya malformed Unicode document'i reddeder. Bounded prompt-injection/instruction/role/tool/encoded pattern'leri claim sayılmaz; riskli segment packet'tan çıkarılır. Packet, full document ve passage text `transient_only`dır; persistent cache validator'ı bunları reddeder. R3B extractor yalnız kalan passage envelope'larını açık untrusted-data sınırında görmelidir.
 
 Genel web HTML source desteği hâlâ kapalıdır. Gelecekte açılmadan önce streaming HTML sanitizer, DOM/content limitleri, license/source-specific identity relation ve pinned target operasyonel kanıtı ayrıca gerekir. R3A yalnız internal service/test'tir; Recommendation route güvenlik kanıtı değildir.
+
+## 10. R3B model isolation ve output güveni
+
+R3B provider request'i candidate title/provider ID/QID/URL, user role/minimum level, prompt ve kişisel alan taşımaz. Passage yalnız JSON user-data value'sudur; system instruction'a veya tool rolüne çevrilmez. Provider request'lerinde tools/web/function/retrieval yoktur, streaming kapalıdır ve OpenAI `store:false` kullanır.
+
+Model response'u evidence değildir. Exact provider envelope + strict JSON Schema + all-or-nothing unit grounding geçmeden claim üretilemez. Markdown fence temizleme, regex salvage, response repair prompt'u ve provider fallback yoktur. Unknown/wrong/citation-mismatched veya security-excluded unit `grounding_invalid` üretir. Raw response, reasoning, prompt ve unit text telemetry/persistence dışıdır; bounded provider request ID yalnız internal telemetry'de tutulabilir.
 
 İlgili belgeler: [Grounded Research Architecture](D7_GROUNDED_RESEARCH_ARCHITECTURE.md), [Research Source Policy](D7_RESEARCH_SOURCE_POLICY.md).

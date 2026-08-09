@@ -1,7 +1,7 @@
 # D7-R3A Grounded Research Passage Packet
 
 Tarih: 9 Ağustos 2026
-Durum: Provider-neutral transient packet ve deterministic passage preparation hazırdır; extraction R3B'ye ertelenmiştir.
+Durum: Provider-neutral transient packet R3B evidence-unit extraction girdisi olarak kullanılmaktadır; production entegrasyonu yoktur.
 
 ## Packet contract'ı
 
@@ -40,5 +40,9 @@ Script/HTML, malformed Unicode veya identity mismatch document seviyesinde redde
 ## Citation ve persistence
 
 Her passage mevcut packet citation ID'sine ve aynı document revision'ına çözülür. Exact quote locator yerine stable order/offset metadata kullanılır; passage text derived claim'e otomatik kopyalanmaz. Persistent olabilir: canonical revision URL, page/revision, attribution/license, accessedAt, source hash ve policy version. Packet, full normalized document, passage text ve injection fragment'i evidence cache/DB/localStorage'a yazılamaz.
+
+## R3B handoff
+
+R3B packet'ı provider'a doğrudan göndermez. Passage'lar 80–500 karakter hedefli, 700 hard-limitli stable evidence unit'lere bölünür; en fazla 64 unit ve sekiz assessment vardır. Unit citation ilişkisi local validator'da korunur fakat URL/revision/title model input'una girmez. R3A security flag taşıyan unit model input'undan dışlanır ve sonradan referanslanırsa bütün output reddedilir. Unit text, model input/output ve packet hash dışındaki ham içerik persistence'a girmez. Ayrıntı: [Grounded Extraction Contract](D7_GROUNDED_EXTRACTION_CONTRACT.md).
 
 İlgili belgeler: [Source Acquisition](D7_RESEARCH_SOURCE_ACQUISITION.md), [Cache Policy](D7_RESEARCH_CACHE_POLICY.md), [Source Policy](D7_RESEARCH_SOURCE_POLICY.md), [Security Model](D7_RESEARCH_SECURITY_MODEL.md).

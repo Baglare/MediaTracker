@@ -32,6 +32,7 @@ export * from "./passages/segmenter";
 export * from "./passages/relevance";
 export * from "./passages/coverage-selection";
 export * from "./passages/packet-builder";
+export * from "./extraction";
 export * from "./network/types";
 export * from "./network/ip-policy";
 export * from "./network/retry-policy";

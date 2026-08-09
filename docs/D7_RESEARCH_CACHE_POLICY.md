@@ -1,7 +1,7 @@
 # D7-R1 Research Cache Policy
 
 Tarih: 8 Ağustos 2026
-Durum: Owner-independent evidence port'u, Wikimedia metadata cache'i, request-only discovery coalescing ve R3A transient packet sınırı hazır; DB/localStorage yoktur.
+Durum: Owner-independent evidence port'u, Wikimedia/discovery/R3A transient sınırları ve R3B final-evidence/provenance codec'i hazır; DB/localStorage yoktur.
 
 ## Stable key
 
@@ -19,7 +19,7 @@ String key `research-evidence-cache:v1:` prefix'i ve encoded bileşenler taşır
 
 ## Value
 
-`ResearchEvidenceCacheEntry`; key, decision, bounded claims/citations, created/expires timestamps, source revision fingerprint, cache status ve warnings taşır.
+`ResearchEvidenceCacheEntry`; key, decision, bounded claims/citations, opsiyonel validated extraction provenance, created/expires timestamps, source revision fingerprint, cache status ve warnings taşır.
 
 Yasak alanlar:
 
@@ -67,3 +67,9 @@ OpenAI Responses, Groq Compound ve OpenRouter Responses payload'ları; output it
 - `adapter_unavailable`, security/network failure ve budget exhaustion negative-cache edilmez. Exact document/revision dedupe persistence değildir.
 
 İlgili belgeler: [Domain Contract](D7_RESEARCH_DOMAIN_CONTRACT.md), [Planner](D7_RESEARCH_PLANNER.md), [Source Registry](D7_RESEARCH_SOURCE_REGISTRY.md), [Source Acquisition](D7_RESEARCH_SOURCE_ACQUISITION.md), [Passage Packet](D7_RESEARCH_PASSAGE_PACKET.md).
+
+## D7-R3B extraction persistence
+
+Validated `PersistedResearchClaim`, existing citation metadata, deterministic `AspectResearchDecision` ve bounded `GroundedExtractionProvenance` persist edilebilir. Provenance yalnız provider/model/schema/extractor policy, packet hash, bounded timestamps/counts, response status ve warning taşır. Raw provider request ID public/cache surface'ine girmez.
+
+Cache codec; `packet`, `passages`, `evidenceUnits`, model input/output/raw response, prompt/instruction, reasoning/chain-of-thought ve nested raw text alanlarını reddeder. Provider/config/network/budget/refusal/schema/grounding failure final evidence değildir ve negative-cache edilmez. R3B in-flight coalescing yalnız process lifetime içindir; tamamlanan model response'u cache olmaz.

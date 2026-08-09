@@ -1,5 +1,7 @@
 import { containsForbiddenResearchData } from "../domain/codec";
 import { validatePersistedResearchCitation, validatePersistedResearchClaim } from "../domain/citations";
+import { validateGroundedExtractionProvenance } from "../extraction/domain/provenance";
+import type { GroundedExtractionProvenance } from "../extraction/domain/types";
 import type { RecommendationDecodeResult, RecommendationDomainIssue } from "../../domain/types";
 import type { ResearchEvidenceCacheEntry } from "../domain/types";
 
@@ -12,7 +14,8 @@ const FORBIDDEN_PERSISTED_FIELDS = new Set([
   "transientDocument", "rawPassage", "groqResponse", "openrouterResponse", "providerResponse",
   "tavilyMetadata", "exaMetadata", "providerSynthesizedAnswer", "highlight", "responseId",
   "packet", "passages", "passageText", "groundedResearchPacket", "normalizedText",
-  "normalizedDocument", "packetContentHash", "researchPassagePacket",
+  "normalizedDocument", "researchPassagePacket", "evidenceUnit", "evidenceUnits", "modelInput",
+  "modelOutput", "rawModelResponse", "rawPrompt", "systemInstruction", "reasoning", "chainOfThought",
 ]);
 
 function issue(code: string, path: string, message: string): RecommendationDomainIssue {
@@ -31,7 +34,7 @@ export function researchCachePolicyClass(entry: ResearchEvidenceCacheEntry): Res
   return "direct_source_long";
 }
 
-export function validateResearchEvidenceCacheEntry(entry: ResearchEvidenceCacheEntry): RecommendationDecodeResult<ResearchEvidenceCacheEntry> {
+export function validateResearchEvidenceCacheEntry(entry: ResearchEvidenceCacheEntry & { extractionProvenance?: GroundedExtractionProvenance }): RecommendationDecodeResult<ResearchEvidenceCacheEntry & { extractionProvenance?: GroundedExtractionProvenance }> {
   const issues: RecommendationDomainIssue[] = [];
   if (containsForbiddenResearchData(entry)) issues.push(issue("research_cache_owner_data_forbidden", "$", "Owner/private data research cache'e giremez."));
   if (containsTransientPayload(entry)) issues.push(issue("research_cache_transient_payload_forbidden", "$", "Raw passage/search response cache value içinde bulunamaz."));
@@ -52,6 +55,10 @@ export function validateResearchEvidenceCacheEntry(entry: ResearchEvidenceCacheE
     claimIds.add(claim.claimId);
     const result = validatePersistedResearchClaim({ claim, citations: entry.citations });
     if (!result.ok) issues.push(...result.issues);
+  }
+  if (entry.extractionProvenance) {
+    const provenance = validateGroundedExtractionProvenance(entry.extractionProvenance);
+    if (!provenance.ok) issues.push(...provenance.issues);
   }
   if (researchCachePolicyClass(entry) === "not_cacheable") issues.push(issue("research_cache_adapter_error_not_cacheable", "decision.reasonCode", "Adapter/budget failure negative-cache edilmez."));
   return issues.length > 0 ? { ok: false, issues } : { ok: true, value: entry };

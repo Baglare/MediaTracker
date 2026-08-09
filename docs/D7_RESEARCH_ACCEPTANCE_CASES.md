@@ -1,7 +1,7 @@
 # D7 Grounded Research Acceptance Cases
 
 Tarih: 8 Ağustos 2026
-Durum: D7-R3A exact-QID acquisition ve transient passage packet contract kabulü tamamlandı; conditional live varsayılan kapalıdır.
+Durum: D7-R3B strict grounded extraction ve deterministic claim/decision fixture kabulü tamamlandı; conditional live varsayılan kapalıdır.
 
 ## Ortak kabul invariant'ları
 
@@ -95,5 +95,19 @@ R2A Steins;Gate fixture'ı yalnız AniList exact ID → QID property verificatio
 R2B Steins;Gate fixture'ı aynı exact identity/work scope ve unresolved romance aspect'inden en fazla iki public deterministic query üretir. OpenAI request yalnız `wikipedia.org` provider filter'ı taşır. Accepted URL'nin `en.wikipedia.org|tr.wikipedia.org` exact registry host'larından gelmesi gerekir. Discovery sonucu romance kararı değildir; no-result `absent` yapmaz. Conditional live test exact URL veya claim değil, gerçek `web_search_call` ve accepted URL policy'sini sınar.
 
 R3A Steins;Gate fixture'ı R2A exact direct document+citation envelope'ını alır, normalizes/segments eder ve revision-bound `transient_only` packet üretir. Sentetik discovered-source fixture'ları aynı page/revision dedupe, out-of-domain policy reject ve different-QID reject'i doğrular. Conditional R3A Wikimedia live smoke yalnız existing Wikimedia flag/User-Agent ile direct acquisition + packet hazırlamayı sınar; search provider/model çağrısı yapmaz ve sabit metin/revision/passage sayısı beklemez.
+
+## R3B extraction acceptance
+
+- Steins;Gate synthetic passage: karşılıklı romantik his ve karar etkisi valid unit ID ile `support/significant`; Wikipedia trust cap nedeniyle overall `medium`; claim citation-bound.
+- Memory-leak/Kakegurui-like passage: supplied romance kanıtı yoksa claim yok ve `unknown/passage_insufficient`; popularity/title kullanılmaz.
+- Love-triangle presence: support claim R4 avoid mapping'ine hazırdır; R3B reject/rank yapmaz.
+- Explicit absence: yalnız açık “romantik ilişki/alt hikâye yok” ifadesi contradict claim üretir; omission üretmez.
+- Conflict: support + explicit absence iki claim'i korur ve decision `unknown/conflicting_sources` olur.
+- Unknown/wrong/security-excluded unit: all-or-nothing `grounding_invalid`; claim/decision yok.
+- Season/installment/edition: decision packet exact version scope'unu korur; başka scope'a uygulanamaz.
+
+Provider request privacy snapshots title/ID/QID/URL/role/minimum/personal alanların gönderilmediğini; provider contract testleri no-tools, strict schema, fixed endpoint, bounded retry/response ve raw payload non-persistence sınırını doğrular.
+
+Conditional Groq canlı kabulünde synthetic packet `claims_extracted` ve citation-bound support verdi. Gerçek Steins;Gate Wikimedia packet'i strict schema ve exact unit grounding'i geçerek `no_claims_extracted` döndü; acceptance exact supported/significant sonucu zorlamaz. OpenAI/OpenRouter explicit extraction modeli bulunmadığından live-unverified kalır.
 
 İlgili belgeler: [Grounded Research Architecture](D7_GROUNDED_RESEARCH_ARCHITECTURE.md), [Research Source Policy](D7_RESEARCH_SOURCE_POLICY.md), [Research Security Model](D7_RESEARCH_SECURITY_MODEL.md).

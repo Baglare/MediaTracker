@@ -85,4 +85,8 @@ D7-R2C.1 koşusunda Groq `groq/compound-mini` process-local model ayarıyla canl
 
 Discovery sonucu evidence değildir ve kendi başına persist edilmez. R3A yalnız supplied `DiscoveredResearchSource` içindeki enabled Wikipedia URL'sini ortak URL/registry policy'sinden tekrar geçirir; sonra normal HTML'i değil MediaWiki Action API'yi kullanır. Son page `pageprops.wikibase_item` exact candidate QID'sine eşleşmeden, revision-bound citation ve bounded plaintext alınmadan passage üretilemez. Search provider request/response/snippet/output'u R3A packet'ına taşınmaz ve R3A hiçbir discovery network çağrısı yapmaz.
 
+## R3B ile registry ayrımı
+
+Discovery ve extraction provider registry'leri ayrıdır. Bir provider'ın live-verified discovery yapması extraction capability/flag/model veya live doğrulaması anlamına gelmez. R3B search provider response'unu değil yalnız R3A'nın exact-QID, revision-bound transient packet'ını tüketir; extraction request'inde web/search tool yoktur. Ayrıntı: [Multi-Provider Extraction](D7_MULTI_PROVIDER_EXTRACTION.md).
+
 İlgili belgeler: [Discovery Contract](D7_RESEARCH_DISCOVERY_CONTRACT.md), [OpenAI Adapter](D7_OPENAI_WEB_DISCOVERY.md), [Source Expansion Matrix](D7_RESEARCH_SOURCE_EXPANSION_MATRIX.md), [Source Acquisition](D7_RESEARCH_SOURCE_ACQUISITION.md), [Security Model](D7_RESEARCH_SECURITY_MODEL.md).

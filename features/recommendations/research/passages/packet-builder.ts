@@ -25,6 +25,17 @@ function emptyTelemetry(): PassageBuildTelemetry {
   return { documentBytes: 0, normalizedCharacters: 0, segmentCount: 0, lexicalPassageCount: 0, coveragePassageCount: 0, injectionFlagCount: 0, packetCharacters: 0 };
 }
 
+export async function computeGroundedResearchPacketContentHash(packet: Pick<GroundedResearchPacket, "candidateIdentity" | "versionScope" | "aspectId" | "role" | "minimumLevel" | "documents" | "citations" | "passages" | "acquisitionPolicyVersion" | "passagePolicyVersion">): Promise<string> {
+  return researchSha256(JSON.stringify({
+    candidate: packet.candidateIdentity.canonicalKey, scope: packet.versionScope.scopeKey,
+    aspectId: packet.aspectId, role: packet.role, minimumLevel: packet.minimumLevel ?? null,
+    documents: packet.documents.map((document) => [document.documentId, document.contentHash, document.revisionId]),
+    citations: packet.citations.map((citation) => [citation.citationId, citation.revisionId, citation.sourceContentHash]),
+    passages: packet.passages.map((passage) => [passage.passageId, passage.textHash, passage.selectionReason]),
+    acquisitionPolicyVersion: packet.acquisitionPolicyVersion, passagePolicyVersion: packet.passagePolicyVersion,
+  }));
+}
+
 export async function buildGroundedResearchPacket(input: {
   candidateIdentity: RecommendationCandidateIdentity;
   versionScope: ResearchVersionScope;
@@ -97,14 +108,12 @@ export async function buildGroundedResearchPacket(input: {
     ...documents.flatMap((document) => document.securityFlags),
     ...passages.flatMap((passage) => passage.securityFlags),
   ])].sort();
-  const packetContentHash = await researchSha256(JSON.stringify({
-    candidate: input.candidateIdentity.canonicalKey, scope: input.versionScope.scopeKey,
-    aspectId: input.aspectId, role: input.role, minimumLevel: input.minimumLevel ?? null,
-    documents: documents.map((document) => [document.documentId, document.contentHash, document.revisionId]),
-    citations: citations.map((citation) => [citation.citationId, citation.revisionId, citation.sourceContentHash]),
-    passages: passages.map((passage) => [passage.passageId, passage.textHash, passage.selectionReason]),
-    acquisitionPolicyVersion: input.acquisitionPolicyVersion, passagePolicyVersion: RESEARCH_PASSAGE_POLICY_VERSION,
-  }));
+  const packetContentHash = await computeGroundedResearchPacketContentHash({
+    candidateIdentity: input.candidateIdentity, versionScope: input.versionScope, aspectId: input.aspectId,
+    role: input.role, ...(input.minimumLevel ? { minimumLevel: input.minimumLevel } : {}),
+    documents, citations, passages, acquisitionPolicyVersion: input.acquisitionPolicyVersion,
+    passagePolicyVersion: RESEARCH_PASSAGE_POLICY_VERSION,
+  });
   const packet: GroundedResearchPacket = {
     version: 1, candidateIdentity: input.candidateIdentity, versionScope: input.versionScope,
     aspectId: input.aspectId, role: input.role, ...(input.minimumLevel ? { minimumLevel: input.minimumLevel } : {}),
@@ -116,4 +125,3 @@ export async function buildGroundedResearchPacket(input: {
   };
   return { status: "packet_ready", packet, telemetry, warnings: [...warnings] };
 }
-
