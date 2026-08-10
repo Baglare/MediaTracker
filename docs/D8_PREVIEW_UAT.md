@@ -6,7 +6,7 @@ Bu paket D8-4A staging PASS sonrasındaki Vercel Preview kullanıcı kabulünü 
 
 | Sınıf | Durum |
 | --- | --- |
-| A — Preview/UAT öncesi blocker | Repo/runtime blocker bulunmadı. Preview deploy'un freeze SHA'dan üretilmesi, Preview-scope env'lerin staging hedefiyle atanması ve masked target kontrolü dış kapıdır. |
+| A — Preview/UAT öncesi blocker | Repo/runtime blocker bulunmadı. D8-4A.5B teknik kapısında protected Preview, staging target, env adı/scope sınırı, Media `d2c1`, Goal `v1`, guest capability ve dev-route 404 doğrulandı. P-01–P-04 dahil manuel sonuçlar kullanıcı tarafından işaretlenmelidir. |
 | B — UAT sırasında doğrulanacak | Aşağıdaki kullanıcı yolculukları, gerçek UI, Network ve console üzerinden elle kabul edilir. |
 | C — Production öncesine bırakılan | Belgenin sonundaki 16 maddelik mandatory hold queue; D8-4B öncesi tamamlanmalıdır. |
 | D — Opsiyonel backlog | Push/e-posta bildirimi ve benzeri ROADMAP backlog'u; mandatory hold ile birleştirilmez. |
