@@ -13,7 +13,7 @@ Bu paket D8-4A staging PASS sonrasındaki Vercel Preview kullanıcı kabulünü 
 
 ## Başlangıç ve kanıt kuralları
 
-1. Preview deployment source SHA'sını kaydet; freeze SHA'sını içerdiğini ve sonrasında yalnız audit edilmiş D8-4A.5 belge/test hazırlığı bulunduğunu doğrula. Ek runtime değişikliği varsa ilgili regresyonlar yeniden geçmeden UAT başlatma.
+1. Preview deployment source SHA'sını kaydet; freeze SHA'sını içerdiğini ve sonrasında yalnız audit edilmiş D8-4A.5 belge/test hazırlığı bulunduğunu doğrula. UAT'yi production alias/domain yerine raporlanan immutable Preview deployment URL'sinde yürüt. Ek runtime değişikliği varsa ilgili regresyonlar yeniden geçmeden UAT başlatma.
 2. Vercel Preview env'lerini [D8 env matrisi](D8_RELEASE_ENV_MATRIX.md) ile yalnız isim/scope seviyesinde kontrol et; masked staging/production hedef ayrımını kaydet.
 3. Staging User A (admin), User B (normal), ayrı tarayıcı profili ve guest/private pencere hazırla. Credential'ı forma yalnız test sırasında gir; ekran görüntüsü/log içine alma.
 4. Önce `P-*`, sonra guest/auth/cloud, en son provider/conditional research sırasını uygula. Her satırda tek sonuç seç ve kanıt bağlantısını ayrı, erişimi kısıtlı UAT kaydında tut.
@@ -34,10 +34,10 @@ Bu paket D8-4A staging PASS sonrasındaki Vercel Preview kullanıcı kabulünü 
 
 | ID | Seviye | Ön koşul | Kullanıcı | Yapılacak işlem | Beklenen sonuç / UI / Network | Sonuç |
 | --- | --- | --- | --- | --- | --- | --- |
-| G-01 | BLOCKER | Temiz browser profile | Guest | Uygulamayı aç, demo/local moda devam et | Auth zorunlu olmadan temel kütüphane kullanılabilir; cloud kapalı görünür | ☐ PASS ☐ FAIL ☐ BLOCKED |
-| G-02 | BLOCKER | Guest local mode | Guest | Medya ekle, düzenle, ilerleme kaydı ekle ve sil | CRUD hemen UI'a yansır; yanlış cloud çağrısı veya veri kaybı yok | ☐ PASS ☐ FAIL ☐ BLOCKED |
-| G-03 | BLOCKER | G-02 verisi | Guest | Hard refresh ve sekmeyi kapat/aç | Local state doğru scope'ta geri gelir; demo veri kullanıcı verisini ezmez | ☐ PASS ☐ FAIL ☐ BLOCKED |
-| G-04 | MAJOR | Local veri mevcut | Guest | Portable export al; ayrı temiz profile additive import yap | Önizleme/count anlaşılır; import bounded ve additive; mevcut kayıt sessizce silinmez | ☐ PASS ☐ FAIL ☐ BLOCKED |
+| G-01 | BLOCKER | Temiz browser profile | Guest | Uygulamayı aç, demo/local moda devam et | Auth zorunlu olmadan temel kütüphane kullanılabilir; cloud kapalı görünür | ☒ PASS ☐ FAIL ☐ BLOCKED |
+| G-02 | BLOCKER | Guest local mode | Guest | Medya ekle, düzenle, ilerleme kaydı ekle ve sil | CRUD hemen UI'a yansır; yanlış cloud çağrısı veya veri kaybı yok | ☒ PASS ☐ FAIL ☐ BLOCKED |
+| G-03 | BLOCKER | G-02 verisi | Guest | Hard refresh ve sekmeyi kapat/aç | Local state doğru scope'ta geri gelir; demo veri kullanıcı verisini ezmez | ☒ PASS ☐ FAIL ☐ BLOCKED |
+| G-04 | MAJOR | Local veri mevcut | Guest | Portable export al; ayrı temiz profile additive import yap | Önizleme/count anlaşılır; import bounded ve additive; mevcut kayıt sessizce silinmez | ☒ PASS ☐ FAIL ☐ BLOCKED |
 
 ## B — Authentication ve account switch
 
