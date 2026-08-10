@@ -49,3 +49,6 @@ design_references/dump/
 
 # D7 recommendation ML private datasets, annotations, exports and model artifacts
 /private/recommendation-ml/
+
+.vercel
+.env*
