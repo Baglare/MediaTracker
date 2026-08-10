@@ -1,4 +1,4 @@
-import { APP_THEME_TOKEN_CSS_VARIABLES } from "./appearance-runtime";
+import { themeTokensToCssVariables } from "./appearance-runtime";
 import { normalizeHexColor, mixHexColors } from "./color-utils";
 import { deriveCustomThemeTokens, evaluateThemeContrast } from "./custom-theme-tokens";
 import { normalizeCustomThemeDefinition } from "./custom-themes";
@@ -113,5 +113,17 @@ export function decodePublicProfileThemeSnapshot(value: unknown): PublicProfileT
 export function publicProfileThemeStyle(snapshotValue: PublicProfileThemeSnapshot | undefined): Record<string, string> {
   const snapshot = decodePublicProfileThemeSnapshot(snapshotValue);
   if (!snapshot) return {};
-  return Object.fromEntries(PUBLIC_PROFILE_THEME_TOKEN_KEYS.map((key) => [APP_THEME_TOKEN_CSS_VARIABLES[key], snapshot.tokens[key]]));
+  const runtimeTokens = deriveCustomThemeTokens({
+    colorScheme: snapshot.colorScheme,
+    background: snapshot.tokens.background,
+    surface: snapshot.tokens.surface1,
+    accent: snapshot.tokens.accent,
+    secondaryAccent: snapshot.tokens.accentStrong,
+    textColorMode: "custom",
+    textPrimary: snapshot.tokens.textPrimary,
+    textSecondary: snapshot.tokens.textSecondary,
+    textMuted: snapshot.tokens.textMuted,
+  });
+  const scopedTokens = { ...runtimeTokens, ...snapshot.tokens };
+  return { colorScheme: snapshot.colorScheme, ...themeTokensToCssVariables(scopedTokens) };
 }

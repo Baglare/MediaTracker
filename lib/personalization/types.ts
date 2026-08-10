@@ -150,10 +150,13 @@ export interface ThemeContrastWarning {
   key: string;
   message: string;
   ratio?: number;
+  threshold?: number;
+  severity: "critical" | "warning";
 }
 
 export interface ThemeContrastReport {
   valid: boolean;
+  status: "valid" | "warning" | "critical";
   warnings: ThemeContrastWarning[];
   corrections?: CustomThemeCorrections;
 }

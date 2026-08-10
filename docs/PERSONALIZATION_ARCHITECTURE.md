@@ -39,7 +39,7 @@ Kimlik görünen ad, tagline/bio, avatar, banner ve seçili ünvanı çözer. Gi
 
 ### Profile presentation
 
-Public profil görsel kimliğidir: palette, banner mode/position, overlay, avatar frame, surface style ve motif intensity. P2 ile allowlist değerleri cloud profile'a bağlanmıştır. Bu alanlar yalnız `ProfileHero` ve profil modül vurgularını etkiler; base theme'i veya bütün sayfayı değiştirmez.
+Public profil görsel kimliği palette, banner mode/position, overlay, avatar frame, surface style ve motif intensity alanlarını taşır. Profil sahibinin ayrıca açıkça yayımladığı `hidden`, `preset_only` veya `current_theme` tema snapshot'ı varsa allowlist semantic renkler `/u/[username]` route kökü, route-local public navigasyon, Hero ve profil modüllerinde uygulanır. Bu scope ziyaretçinin root appearance tercihini, cookie/localStorage değerini, authenticated sidebar/topbar'ını veya başka route'u değiştirmez. Profile palette yalnız motif/vurgu karakteridir; base theme değildir.
 
 ### Connection color
 
@@ -148,7 +148,7 @@ Cloud isteği başarısızlığı “profil yok” sayılmaz. `/profile` mevcut 
 
 Tek `ProfileHero`, `self`, `public` ve `preview` varyantlarını destekler. Banner, avatar, ad, kullanıcı adı, tagline, unvan, seviye/tier ve profil palette markup'ı ortaktır. Self varyantı düzenleme ve public görünüm aksiyonlarını; public varyantı takip/Yin-Yang ve görünürlük bağlamını; preview varyantı edit taslağını sunar. Aynı profil `self`, `public`, `followers`, `mutual` ve `anonymous` viewer bağlamlarında farklı izinlerle gösterilir; bunlar ayrı kimlikler değildir.
 
-Banner modu `none`, `gradient`, `world` veya `image` olabilir. Kullanıcı banner URL'si CSS string'ine gömülmez; güvenli image kaynağı olarak render edilir. Eksik image palette gradient'ine düşer. Overlay allowlist'i metin kontrastını korur. Avatar frame yalnız sunumdur ve avatar kaynağını değiştirmez. Motif metni kapatmaz ve sürekli animasyon üretmez.
+Banner modu `none`, `gradient`, `world` veya `image` olabilir. Kullanıcı banner URL'si CSS string'ine gömülmez; güvenli image kaynağı olarak render edilir. Gerçek image yüklenene kadar, URL eksikse veya load başarısızsa Hero `--app-*` surface/text tokenlarından theme-aware fallback üretir; profile palette yalnız kontrollü motif/vurgu ekler. Koyu image overlay ve beyaz foreground yalnız gerçekten yüklenmiş görselde kullanılır. `none` sade theme surface'tir. Avatar frame yalnız sunumdur ve avatar kaynağını değiştirmez.
 
 ### Birleşik editör
 
@@ -236,9 +236,11 @@ Yeni hazır temalar registry metadata'sı ve CSS semantic scope'ları üzerinden
 
 ### Custom theme girdileri ve token üretimi
 
-Kullanıcı yalnız `colorScheme`, `background`, `surface`, `accent` ve `secondaryAccent` değerlerini seçer. HEX girdisi `#RGB` veya `#RRGGBB`, RGB kanalları 0–255 aralığında kabul edilir ve kayıt öncesi canonical `#RRGGBB` biçimine çevrilir. CSS function, URL, gradient, alpha ve raw CSS kabul edilmez. `deriveCustomThemeTokens` bu dört renkten surface katmanları, metinler, border, hover/selected, focus, overlay, shadow, input ve disabled tokenlarını saf ve deterministik biçimde türetir. Error/success/warning semantic renkleri custom accent'e dönüştürülmez.
+Kullanıcı `colorScheme`, `background`, `surface`, `accent` ve `secondaryAccent` değerlerini seçer. `textColorMode: auto` aynı girdilerden ana/ikincil/soluk metni, accent/selected/action foreground'unu, border ve focus'u deterministik olarak üretir; `custom` modu ana/ikincil/soluk metni ayrıca kabul eder. HEX girdisi `#RGB` veya `#RRGGBB`, RGB kanalları 0–255 aralığında kabul edilir ve kayıt öncesi canonical `#RRGGBB` biçimine çevrilir. CSS function, URL, gradient, alpha ve raw CSS kabul edilmez. Error/success/warning semantic renkleri custom accent'e dönüştürülmez.
 
-`relativeLuminance`, `contrastRatio` ve `evaluateThemeContrast` ana/ikincil metin, muted metin, focus ve border ayrımını kontrol eder. Kritik ana metin uyarısı çözülmeden tema etkinleştirilmez. “Otomatik düzelt” yalnız türetilmiş metin/border/focus düzeltmelerini kaydeder; kullanıcının dört ana rengini sessizce değiştirmez. Bu rapor yardımcı bir uygulama kontrolüdür, WCAG sertifikası değildir.
+`relativeLuminance`, `contrastRatio` ve `evaluateThemeContrast`; ana/ikincil metni background/surface/card/panel üzerinde, muted ve disabled metni, accent/selected/action foreground'larını, focus/border ayrımını ve success/warning/danger soft-surface çiftlerini denetler. Sonuç `valid`, `warning` veya `critical` sınıfındadır; critical çözülmeden tema etkinleştirilemez veya public yayımlanamaz. “Otomatik düzelt” yalnız effective metin/border/focus düzeltmelerini kaydeder; kullanıcının ham ana renklerini sessizce değiştirmez. Bu rapor yardımcı bir uygulama kontrolüdür, WCAG sertifikası değildir.
+
+Public snapshot version 1 ve 21 renkli exact allowlist değişmemiştir. Selected, disabled, action ve status gibi ek runtime semantic roller bu güvenli snapshot'tan route scope'unda yeniden türetilir; custom theme ID, raw input, correction internals, CSS veya asset public payload'a eklenmez.
 
 ### Persistence, runtime ve ilk paint
 

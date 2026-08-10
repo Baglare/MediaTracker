@@ -119,7 +119,7 @@ describe("D4-2 light theme identity and contrast", () => {
 describe("D4-2 logo and chart accessibility", () => {
   it("uses a theme-token mask in every shell consumer", () => {
     const css = read("app/globals.css");
-    const consumers = ["components/app-topbar.tsx", "components/app-sidebar.tsx", "components/app-shell/app-shell.tsx"];
+    const consumers = ["components/app-topbar.tsx", "components/app-sidebar.tsx", "components/app-shell/public-topbar.tsx"];
     expect(css).toContain('mask: url("/brand/media-tracker-mark.svg")');
     expect(css).toContain("var(--app-logo-color, var(--app-text-primary))");
     for (const path of consumers) expect(read(path)).toContain("<BrandMark");

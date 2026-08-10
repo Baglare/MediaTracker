@@ -10,6 +10,7 @@ import { normalizeCustomThemeDefinition } from "@/lib/personalization/custom-the
 import { buildPublicProfileThemeSnapshot, decodePublicProfileThemeSnapshot, publicProfileThemeStyle } from "@/lib/personalization/public-profile-theme";
 import { BASE_THEME_REGISTRY } from "@/lib/personalization/theme-registry";
 import { parseAppearanceCookie, serializeAppearanceCookie } from "@/lib/personalization/appearance-cookie";
+import { APP_THEME_TOKEN_CSS_VARIABLES } from "@/lib/personalization/appearance-runtime";
 import { createThemeBundle, parseThemeBundleText } from "@/lib/personalization/theme-bundle";
 import { normalizeCanonicalThemeSyncPayload } from "@/lib/personalization/theme-cloud-sync";
 import { normalizeSearchResultDescription, SEARCH_RESULT_DESCRIPTION_MAX_CHARS } from "@/lib/search-result-description";
@@ -46,6 +47,14 @@ describe("D8-2 public profile theme privacy and contrast", () => {
     expect(Object.keys(custom?.tokens ?? {})).toHaveLength(21);
   });
 
+  it("keeps preset_only independent from the active theme and supports current preset explicitly", () => {
+    const selectedPreset = buildPublicProfileThemeSnapshot({ visibility: "preset_only", publicPreset: "porcelain" });
+    const currentPreset = buildPublicProfileThemeSnapshot({ visibility: "current_theme", currentTheme: { kind: "preset", id: "ocean" } });
+    expect(selectedPreset?.tokens.background).toBe(BASE_THEME_REGISTRY.porcelain.tokens.background.toUpperCase());
+    expect(currentPreset?.tokens.background).toBe(BASE_THEME_REGISTRY.ocean.tokens.background.toUpperCase());
+    expect(selectedPreset?.revision).not.toBe(currentPreset?.revision);
+  });
+
   it("rejects malformed, extra, url/var and low-contrast public snapshots", () => {
     const valid = buildPublicProfileThemeSnapshot({ visibility: "preset_only", publicPreset: "obsidian" })!;
     expect(decodePublicProfileThemeSnapshot({ ...valid, rawCss: "x" })).toBeUndefined();
@@ -68,6 +77,14 @@ describe("D8-2 public profile theme privacy and contrast", () => {
     expect(normalizeCanonicalThemeSyncPayload({ schemaVersion: 1, activeThemeSelection: { kind: "custom", id: custom!.id }, customThemes: [custom] }).value?.customThemes[0]?.inputs).toEqual(custom!.inputs);
   });
 
+  it("classifies every preset as non-critical across route semantic pairs", () => {
+    const reports = Object.values(BASE_THEME_REGISTRY)
+      .filter((theme) => theme.colorScheme !== "system")
+      .map((theme) => evaluateThemeContrast(theme.tokens));
+    expect(reports.every((report) => report.status !== "critical")).toBe(true);
+    expect(reports.flatMap((report) => report.warnings.filter((warning) => warning.severity === "critical"))).toEqual([]);
+  });
+
   it("keeps invalid themes draft-saveable but blocks activation in Theme Studio", () => {
     const source = readFileSync("components/personalization/theme-studio.tsx", "utf8");
     expect(source).toContain("if (apply && !contrast.valid)");
@@ -76,13 +93,22 @@ describe("D8-2 public profile theme privacy and contrast", () => {
 
   it("maps only scoped semantic variables and leaves shell/root untouched", () => {
     const valid = buildPublicProfileThemeSnapshot({ visibility: "preset_only", publicPreset: "polar" })!;
-    expect(Object.keys(publicProfileThemeStyle(valid))).toHaveLength(21);
+    expect(Object.keys(publicProfileThemeStyle(valid))).toHaveLength(Object.keys(APP_THEME_TOKEN_CSS_VARIABLES).length + 1);
     const view = readFileSync("components/social/social-profile-view.tsx", "utf8");
     const shell = readFileSync("components/app-shell/route-app-shell.tsx", "utf8");
     expect(view).toContain("style={scopedThemeStyle}");
+    expect(view).toContain("data-public-profile-route");
+    expect(view).toContain("<PublicTopbar");
     expect(view).toContain("data-profile-theme-source");
     expect(shell).not.toContain("publicProfileThemeStyle");
     expect(shell).not.toContain("themeSnapshot");
+  });
+
+  it("keeps unavailable states on visitor semantics and scopes the available route without document mutations", () => {
+    const view = readFileSync("components/social/social-profile-view.tsx", "utf8");
+    expect(view.indexOf("if (payload.status === \"not_configured\")")).toBeLessThan(view.indexOf("publicProfileThemeStyle(profile.themeSnapshot)"));
+    expect(view).not.toMatch(/document\.documentElement|localStorage|cookie/);
+    expect(view).toContain('themeSource={profile.themeSnapshot?.source ?? "visitor"}');
   });
 });
 

@@ -35,7 +35,7 @@ describe("D8 staging target safety", () => {
 
 describe("D8 release UI/provider contracts", () => {
   it("keeps public navigation accessible and collapses labels below sm", () => {
-    const source = readFileSync("components/app-shell/app-shell.tsx", "utf8");
+    const source = readFileSync("components/app-shell/public-topbar.tsx", "utf8");
     expect(source).toContain('aria-label="Kullanıcı ara"');
     expect(source).toContain('aria-label="Uygulamaya dön"');
     expect(source.match(/sr-only sm:not-sr-only/g)).toHaveLength(2);

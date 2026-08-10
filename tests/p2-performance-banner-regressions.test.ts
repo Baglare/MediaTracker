@@ -107,12 +107,13 @@ describe("P2 banner regression contracts", () => {
     expect(socialServer).toContain("rawProfile?.bannerPath");
   });
 
-  it("renders image banners with position, overlay and gradient fallback", () => {
+  it("renders image banners with position, image-only overlay and themed fallback", () => {
     expect(hero).toContain("<img src={imageBannerUrl}");
     expect(hero).toContain("resolveImageTransformStyle(presentation.bannerTransform");
     expect(hero).toContain("bannerPositionFallback(presentation.bannerPosition)");
     expect(hero).toContain("OVERLAY_CLASSES[presentation.overlayStrength]");
-    expect(hero).toContain("bannerGradient(presentation.paletteId)");
+    expect(hero).toContain("profile-hero-themed-fallback");
+    expect(hero).toContain("hasImageBanner && <div");
   });
 
   it("keeps avatar, palette and connection color boundaries intact", () => {

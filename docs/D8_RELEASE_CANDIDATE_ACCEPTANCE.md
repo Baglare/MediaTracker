@@ -10,6 +10,8 @@ D8-4A.5 kapsamındaki UAT, env matrisi, freeze belgesi ve contract testleri base
 
 Preview readiness audit'inde repo/runtime blocker bulunmadı: production-mode annotation UI/API fail-closed 404, service-role import'u server-only, request same-origin kontrolü deployment origin'iyle uyumlu, server candidate URL çözümü `VERCEL_URL` fallback'li ve Cloud Media/Goal stage uyuşmazlıkları fail-closed'dur. Preview teknik kapısı geçmiştir; 69 manuel senaryonun yürütülmesi dış kabul kapısı olarak kalır.
 
+D8-4A.5C2 profile-theme hardening'i public snapshot version/DB contract'ını değiştirmeden route-local scope'u tamamlar. Snapshot yalnız available payload'da route background, public navigasyon, Hero ve modüllere uygulanır; global root/sidebar/topbar ve ziyaretçi preference'ı değişmez. Bannerless/missing/failed Hero semantic fallback kullanır. Sekiz preset genişletilmiş critical contrast matrisinden geçer; custom auto/custom metin girdileri aynı import/cookie/cloud round-trip contract'ında kalır. Yeni immutable Preview'da hidden profil, ziyaretçi Obsidyen/Porselen temaları ve 375/1366/1536 boyutları taşma, console veya hydration hatası olmadan geçti; yayımlanmış preset/custom ve bozuk image fixture'ı olmadığı için kalan kısa profile-theme retest'i manuel UAT kapısıdır.
+
 D8-4A.5 doğrulaması: hedefli Preview/security/cloud/profile/recommendation/calendar setinde 12 dosya ve 105 test; full suite'te 179 dosya ve 2.311 test geçti. 18 dosya/55 conditional live-key-gated test skip kaldı; yeni normal skip yok. Lint ve production build geçti; build yalnız mevcut archived annotation NFT trace warning'ini üretti. `git diff --check`, local link ve secret-pattern kontrolleri temiz geçti.
 
 ## Canlı staging kapıları

@@ -7,6 +7,7 @@ const read = (path: string) => readFileSync(path, "utf8");
 const appPage = read("app/page.tsx");
 const rootLayout = read("app/layout.tsx");
 const appShell = read("components/app-shell/app-shell.tsx");
+const publicTopbar = read("components/app-shell/public-topbar.tsx");
 const routeShell = read("components/app-shell/route-app-shell.tsx");
 const socialShell = read("components/social/social-page-shell.tsx");
 const sidebarProfile = read("components/sidebar-profile-card.tsx");
@@ -22,7 +23,8 @@ describe("canonical application shell", () => {
   it("supports authenticated and public presentation modes", () => {
     expect(appShell).toContain('export type AppShellMode = "authenticated" | "public"');
     expect(appShell).toContain('mode === "public"');
-    expect(appShell).toContain("MediaTracker");
+    expect(publicTopbar).toContain("MediaTracker");
+    expect(routeShell).toContain("showPublicHeader={!publicProfileRoute}");
   });
 
   it("keeps SocialPageShell content-only", () => {

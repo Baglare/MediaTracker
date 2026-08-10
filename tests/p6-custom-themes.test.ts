@@ -100,12 +100,10 @@ describe("P6 color helpers", () => {
 });
 
 describe("P6 custom token derivation and contrast", () => {
-  it.each([
-    [LIGHT_INPUTS, "#1C1917"],
-    [DARK_INPUTS, "#F8FAFC"],
-  ] as const)("derives readable light/dark token families", (inputs, primaryText) => {
+  it.each([LIGHT_INPUTS, DARK_INPUTS] as const)("derives readable light/dark token families", (inputs) => {
     const tokens = deriveCustomThemeTokens(inputs);
-    expect(tokens.textPrimary).toBe(primaryText);
+    expect(contrastRatio(tokens.textPrimary, tokens.background)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(tokens.textPrimary, tokens.surface1)).toBeGreaterThanOrEqual(4.5);
     expect(tokens.surface1).toBe(inputs.surface);
     expect(tokens.surface2).not.toBe(tokens.surface1);
     expect(tokens.borderStrong).not.toBe(tokens.surface1);
@@ -121,6 +119,13 @@ describe("P6 custom token derivation and contrast", () => {
     expect(first.warning).not.toBe(DARK_INPUTS.accent);
   });
 
+  it("does not mutate canonical custom inputs while deriving effective tokens", () => {
+    const inputs = { ...LIGHT_INPUTS, textColorMode: "auto" as const };
+    const before = structuredClone(inputs);
+    deriveCustomThemeTokens(inputs);
+    expect(inputs).toEqual(before);
+  });
+
   it("rejects non-finite/arbitrary inputs and normalizes short HEX", () => {
     expect(normalizeCustomThemeInputs({ ...DARK_INPUTS, accent: "rgb(1,2,3)" })).toBeNull();
     expect(normalizeCustomThemeInputs({ ...DARK_INPUTS, accent: "#0af" })?.accent).toBe("#00AAFF");
@@ -133,11 +138,26 @@ describe("P6 custom token derivation and contrast", () => {
       surface: "#24211F",
       accent: "#302C29",
       secondaryAccent: "#453F3A",
+      textColorMode: "custom",
+      textPrimary: "#24211F",
+      textSecondary: "#24211F",
+      textMuted: "#24211F",
     });
     const report = evaluateThemeContrast(tokens);
     expect(report.valid).toBe(false);
     expect(report.warnings.some((warning) => warning.key === "text-primary")).toBe(true);
+    expect(report.status).toBe("critical");
     expect(Object.keys(report.corrections ?? {})).toEqual(expect.arrayContaining(["textPrimary"]));
+  });
+
+  it("derives deterministic bounded semantic foregrounds for extreme auto inputs", () => {
+    const inputs: CustomThemeInputs = { colorScheme: "light", background: "#FFFFFF", surface: "#FDFDFD", accent: "#FFFFFF", secondaryAccent: "#000000", textColorMode: "auto" };
+    const first = deriveCustomThemeTokens(inputs);
+    expect(deriveCustomThemeTokens({ ...inputs })).toEqual(first);
+    for (const key of ["textPrimary", "textSecondary", "textMuted", "accentContrast", "selectedText", "focus"] as const) {
+      expect(first[key]).toMatch(/^#[0-9A-F]{6}$/);
+    }
+    expect(evaluateThemeContrast(first).valid).toBe(true);
   });
 });
 

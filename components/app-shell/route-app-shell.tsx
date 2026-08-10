@@ -126,7 +126,10 @@ function ProductRouteAppShell({
     ? auth.user ? "authenticated" : "public"
     : "authenticated";
 
-  if (mode === "public") return <AppShell mode="public">{children}</AppShell>;
+  if (mode === "public") {
+    const publicProfileRoute = pathname.startsWith("/u/");
+    return <AppShell mode="public" showPublicHeader={!publicProfileRoute} fullWidthPublicContent={publicProfileRoute} contentClassName={publicProfileRoute ? "p-0" : undefined}>{children}</AppShell>;
+  }
 
   const navigateTab = (tab: DashboardTabId) => router.push(dashboardTabHref(tab));
   return (

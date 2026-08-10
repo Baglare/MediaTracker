@@ -21,9 +21,12 @@ describe("shared ProfileHero", () => {
     expect(hero).toContain(mode);
   });
 
-  it("falls back to a palette gradient when image mode has no URL", () => {
+  it("uses a themed fallback until an image banner is actually loaded", () => {
     expect(hero).toContain('presentation.bannerMode === "image" ? identity.bannerUrl : undefined');
-    expect(hero).toContain("bannerGradient(presentation.paletteId)");
+    expect(hero).toContain('loadedBannerUrl === imageBannerUrl');
+    expect(hero).toContain('"profile-hero-themed-fallback"');
+    expect(hero).toContain('data-profile-banner-state');
+    expect(hero).toContain('onLoad={() => setLoadedBannerUrl(imageBannerUrl)}');
   });
 
   it.each(["low", "medium", "high"])("defines the %s overlay", (strength) => {
@@ -48,6 +51,7 @@ describe("shared ProfileHero", () => {
 
   it("keeps banner text readable and exposes avatar labeling", () => {
     expect(hero).toContain("OVERLAY_CLASSES");
+    expect(hero).toContain('hasImageBanner ? "text-white" : "text-[var(--app-text-primary)]"');
     expect(hero).toContain("ariaLabel={`${identity.displayName} avatarı`}");
   });
 });

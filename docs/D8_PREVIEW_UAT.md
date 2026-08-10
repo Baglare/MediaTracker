@@ -105,6 +105,10 @@ Bu paket D8-4A staging PASS sonrasındaki Vercel Preview kullanıcı kabulünü 
 | THEME-04 | MAJOR | Valid custom + text colors | Guest | Custom published profili aç | Semantic tokenlar okunabilir; raw CSS/url/var yok | ☐ PASS ☐ FAIL ☐ BLOCKED |
 | THEME-05 | BLOCKER | Düşük kontrast custom draft | User A/Guest | Publish/activate dene; sonra profilden başka sayfaya git | Publish/activate engellenir; sidebar/topbar ve route-leave visitor temasında kalır | ☐ PASS ☐ FAIL ☐ BLOCKED |
 
+D8-4A.5C2 kısa yeniden kabulü: representative açık/koyu preset ve valid custom ile public profil route background'u, route-local navigasyon, Hero, modüller ve aksiyonların birlikte değiştiğini; authenticated sidebar/topbar ile ziyaretçi appearance cookie'sinin değişmediğini doğrula. `image` modunda URL olmayan ve bilerek bozuk banner theme-aware fallback göstermeli; gerçek görsel yüklenince overlay/beyaz foreground devreye girmeli. Düşük kontrast custom tema etkinleştirilememeli/yayımlanamamalı. Bu kısa smoke THEME-01..05'i kullanıcı adına otomatik PASS saymaz.
+
+10.08.2026 C2 Preview teknik smoke: hidden public profil ziyaretçi Obsidyen ve Porselen temalarında 375×812, 1366×768 ve 1536×864 boyutlarında açıldı; route-local header ile bannerless Hero semantic fallback kullandı, yatay taşma ve console/hydration hatası görülmedi, route çıkışında public header/Hero kalmadı. Staging'de yayımlanmış `preset_only`/`current_theme` custom ve bozuk image banner fixture'ı bulunmadığından THEME-01..05 durumları kullanıcı kabulü için işaretlenmeden bırakıldı.
+
 ## H — Discover
 
 | ID | Seviye | Ön koşul | Kullanıcı | Yapılacak işlem | Beklenen sonuç / UI / Network | Sonuç |

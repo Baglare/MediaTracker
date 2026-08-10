@@ -1,5 +1,7 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 
+import { PublicTopbar } from "@/components/app-shell/public-topbar";
 import { ProfileHero } from "@/components/profile/profile-hero";
 import { ProfileGrid } from "@/components/social/profile-grid";
 import { SocialActions } from "@/components/social/social-actions";
@@ -10,8 +12,21 @@ import { resolveProfileIdentity } from "@/lib/personalization/profile-identity";
 import type { SocialProfilePayload } from "@/lib/social/types";
 import { publicProfileThemeStyle } from "@/lib/personalization/public-profile-theme";
 
+function ProfileRouteFrame({ children, themeSource = "visitor", style }: {
+  children: ReactNode;
+  themeSource?: "visitor" | "preset" | "custom";
+  style?: Record<string, string>;
+}) {
+  return (
+    <div data-public-profile-route data-profile-theme-source={themeSource} style={style} className="min-h-screen w-full bg-[var(--app-bg)] text-[var(--app-text-primary)]">
+      <PublicTopbar sticky={false} label="Public profil navigasyonu" />
+      <div className="mx-auto w-full max-w-6xl space-y-5 px-3 py-5 sm:px-6 sm:py-7">{children}</div>
+    </div>
+  );
+}
+
 function StateCard({ title, text }: { title: string; text: string }) {
-  return <div className="mx-auto grid min-h-[55vh] max-w-3xl place-items-center"><EmptyState title={title} description={text} primaryAction={<Link href="/people" className="app-primary-action rounded-lg px-3 py-2 text-sm font-medium">Kullanıcı aramaya dön</Link>}/></div>;
+  return <ProfileRouteFrame><div className="grid min-h-[55vh] place-items-center"><EmptyState title={title} description={text} primaryAction={<Link href="/people" className="app-primary-action rounded-lg px-3 py-2 text-sm font-medium">Kullanıcı aramaya dön</Link>}/></div></ProfileRouteFrame>;
 }
 
 export function SocialProfileView({ payload }: { payload: SocialProfilePayload }) {
@@ -38,11 +53,13 @@ export function SocialProfileView({ payload }: { payload: SocialProfilePayload }
       : undefined;
   const scopedThemeStyle = publicProfileThemeStyle(profile.themeSnapshot);
   return (
-    <div data-profile-palette={profile.presentation.paletteId} data-profile-theme-source={profile.themeSnapshot?.source ?? "visitor"} style={scopedThemeStyle} className="mx-auto w-full max-w-6xl space-y-5 rounded-3xl bg-[var(--app-bg)] p-1 text-[var(--app-text-primary)] sm:p-2">
+    <ProfileRouteFrame themeSource={profile.themeSnapshot?.source ?? "visitor"} style={scopedThemeStyle}>
+      <div data-profile-palette={profile.presentation.paletteId} className="space-y-5">
       <ProfileHero variant="public" identity={identity} presentation={profile.presentation} progression={progression} visibilityLabel={profile.visibilityMode === "protected" ? "Korumalı" : "Herkese açık"} location={profile.location} language={profile.language} joinedAt={`Katılım ${new Date(profile.joinedAt).toLocaleDateString("tr-TR")}`} actions={publicActions} />
       {identity.bio && <PageSection title="Hakkında"><p className="whitespace-pre-wrap text-sm text-[var(--app-text-secondary)]">{identity.bio}</p></PageSection>}
       {payload.relationship.self && <YinYangConnection relationship={payload.relationship} following={profile.followingCount} followers={profile.followerCount} />}
       <ProfileGrid payload={payload} />
-    </div>
+      </div>
+    </ProfileRouteFrame>
   );
 }

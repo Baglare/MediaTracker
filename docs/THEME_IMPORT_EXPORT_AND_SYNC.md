@@ -12,7 +12,7 @@ Bu belge P6.1 tema bundle dosyasını, local-first aktarım akışını ve kulla
   "application": "MediaTracker",
   "themes": [
     {
-      "version": 1,
+      "version": 2,
       "id": "ct_example00",
       "name": "Örnek Tema",
       "createdAt": "2026-07-23T10:00:00.000Z",
@@ -22,7 +22,11 @@ Bu belge P6.1 tema bundle dosyasını, local-first aktarım akışını ve kulla
         "background": "#101820",
         "surface": "#182733",
         "accent": "#2AA7A1",
-        "secondaryAccent": "#C38A5A"
+        "secondaryAccent": "#C38A5A",
+        "textColorMode": "custom",
+        "textPrimary": "#F8FAFC",
+        "textSecondary": "#D8E0E7",
+        "textMuted": "#9AA8B4"
       }
     }
   ],
@@ -33,7 +37,7 @@ Bu belge P6.1 tema bundle dosyasını, local-first aktarım akışını ve kulla
 }
 ```
 
-`activeTheme` opsiyoneldir. Dosya semantic token, raw CSS, kullanıcı kimliği, profil, medya, layout, startup, chart palette, profile palette veya cookie bilgisi taşımaz. Uygulama tokenları import sırasında ana renklerden yeniden üretir.
+`activeTheme` opsiyoneldir. Tema tanımı version 1 ise kayıpsız biçimde `textColorMode: auto` kabul edilir; version 2 auto veya üç canonical custom metin rengini taşıyabilir. Dosya türetilmiş semantic token, raw CSS, kullanıcı kimliği, profil, medya, layout, startup, chart palette, profile palette veya cookie bilgisi taşımaz. Effective tokenlar import sırasında canonical girdilerden yeniden üretilir ve kritik kontrast yeniden doğrulanır.
 
 ## Dışa aktarma
 
