@@ -6,7 +6,7 @@ Bu paket D8-4A staging PASS sonrasındaki Vercel Preview kullanıcı kabulünü 
 
 | Sınıf | Durum |
 | --- | --- |
-| A — Preview/UAT öncesi blocker | Repo/runtime blocker bulunmadı. D8-4A.5B teknik kapısında protected Preview, staging target, env adı/scope sınırı, Media `d2c1`, Goal `v1`, guest capability ve dev-route 404 doğrulandı. P-01–P-04 dahil manuel sonuçlar kullanıcı tarafından işaretlenmelidir. |
+| A — Preview/UAT öncesi blocker | Repo/runtime blocker bulunmadı. D8-4A.5B teknik kapısında protected Preview, staging target, env adı/scope sınırı, Media `d2c1`, Goal `v1`, guest capability ve dev-route 404 doğrulandı. P-01–P-03 kullanıcı kabulüyle, P-04 ise FIX1 sonrası canlı Preview teknik kabulüyle geçti. |
 | B — UAT sırasında doğrulanacak | Aşağıdaki kullanıcı yolculukları, gerçek UI, Network ve console üzerinden elle kabul edilir. |
 | C — Production öncesine bırakılan | Belgenin sonundaki 16 maddelik mandatory hold queue; D8-4B öncesi tamamlanmalıdır. |
 | D — Opsiyonel backlog | Push/e-posta bildirimi ve benzeri ROADMAP backlog'u; mandatory hold ile birleştirilmez. |
@@ -25,10 +25,10 @@ Bu paket D8-4A staging PASS sonrasındaki Vercel Preview kullanıcı kabulünü 
 
 | ID | Seviye | Ön koşul | Kullanıcı | Yapılacak işlem | Beklenen sonuç / UI / Network | Sonuç |
 | --- | --- | --- | --- | --- | --- | --- |
-| P-01 | BLOCKER | Preview URL hazır | Guest | Ana sayfayı aç, hard refresh yap | HTTPS yüklenir; CSP/header hatası, hydration veya blank screen yok | ☐ PASS ☐ FAIL ☐ BLOCKED |
-| P-02 | BLOCKER | Env review erişimi | Ops | Preview env scope'unu masked karşılaştır | Supabase hedefi staging; production target ve test credential Preview runtime'da yok | ☐ PASS ☐ FAIL ☐ BLOCKED |
-| P-03 | BLOCKER | Preview build | Guest | `/dev/recommendation-annotation` ve `/api/dev/recommendation-annotation` aç | Production-mode Preview'da ikisi de güvenli 404; local dosya içeriği yok | ☐ PASS ☐ FAIL ☐ BLOCKED |
-| P-04 | MAJOR | DevTools açık | Guest | Ana sayfa, `/people`, bir public profil ve `/api/ai/capabilities` kontrol et | Security headers/no-store contract korunur; key/model/raw role/user ID görünmez | ☐ PASS ☐ FAIL ☐ BLOCKED |
+| P-01 | BLOCKER | Preview URL hazır | Guest | Ana sayfayı aç, hard refresh yap | HTTPS yüklenir; CSP/header hatası, hydration veya blank screen yok | ☒ PASS ☐ FAIL ☐ BLOCKED |
+| P-02 | BLOCKER | Env review erişimi | Ops | Preview env scope'unu masked karşılaştır | Supabase hedefi staging; production target ve test credential Preview runtime'da yok | ☒ PASS ☐ FAIL ☐ BLOCKED |
+| P-03 | BLOCKER | Preview build | Guest | `/dev/recommendation-annotation` ve `/api/dev/recommendation-annotation` aç | Production-mode Preview'da ikisi de güvenli 404; local dosya içeriği yok | ☒ PASS ☐ FAIL ☐ BLOCKED |
+| P-04 | MAJOR | DevTools açık | Guest | Ana sayfa, `/people`, bir public profil ve `/api/ai/capabilities` kontrol et | Security headers/no-store contract korunur; key/model/raw role/user ID görünmez | ☒ PASS ☐ FAIL ☐ BLOCKED |
 
 ## A — Guest ve local-first
 
