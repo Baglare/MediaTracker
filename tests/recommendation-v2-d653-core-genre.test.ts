@@ -191,7 +191,8 @@ describe("D6-5.3 planning provider transparency", () => {
     expect(source).toContain("Arama planı:");
     expect(source).toContain("LLM final sıralama: kullanılmadı");
     expect(advisor).toContain("OpenAI tercihi uygulanmaz");
-    expect(advisor).toContain('disabled={key === "useOpenAIProvider" && openAiPreferenceLocked}');
+    expect(advisor).toContain('(key === "useOpenAIProvider" && openAiPreferenceLocked)');
+    expect(advisor).toContain('key === "deepResearch" && aiEntitlement?.canUseGroundedResearch !== true');
   });
 
   it("planning policy active-session hydration'da allowlist ile korunur", () => {

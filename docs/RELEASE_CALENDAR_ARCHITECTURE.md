@@ -85,9 +85,11 @@ uygular. Provider cache hiçbir zaman bu akışlara katılmaz.
 
 ## UI ve erişilebilirlik
 
-Ajanda varsayılandır; aylık grid aynı filtrelenmiş event kümesini kullanır. Grid
-Pazartesi başlar, bugün–90 gün aralığında gezinir, hücre başına üç olay gösterir
-ve fazlasını `+N` ile özetler. TBA olayları grid dışında kalır.
+Ajanda varsayılandır; otomatik provider grupları bugün–90 gün ufkunu korur. Aylık
+grid Pazartesi başlar, provider olaylarını aynı 90 günlük sınırda tutarken kalıcı
+manuel olayları geçmiş ve gelecek aylarda gösterir. Oklar yanında native ay seçici
+uzak aya doğrudan gitmeyi sağlar; hücre başına üç olay gösterilir ve fazlası `+N`
+ile özetlenir. TBA olayları grid dışında kalır.
 
 Görünüm ve tür seçimleri `aria-pressed`, günler `aria-selected` ve
 `aria-current` taşır. Ay/gün navigasyonu klavyeyi destekler. Manuel event modalı
@@ -97,7 +99,8 @@ ve `aria-invalid` ile bağlanır. Motion sınıfları reduced-motion tercihini k
 
 ## Bilinen sınırlar
 
-- Otomatik provider ufku 90 gündür; geçmiş yayın arşivi değildir.
+- Otomatik provider ufku 90 gündür; geçmiş yayın arşivi değildir. Bu sınır manuel
+  olayların aylık navigasyonunu veya literal tarihini kısıtlamaz.
 - TMDB release takvimi token olmadan kullanılamaz.
 - Browser locale yalnız geçerli region alt etiketi taşıyorsa bölge seçimine girer.
 - Manual event conflict'i bağımsız alan birleştirmesi değildir; media kaydının mevcut

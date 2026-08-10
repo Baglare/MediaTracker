@@ -348,7 +348,7 @@ type ResearchMode = "library-only" | "source-apis" | "web";
 
 const RESEARCH_OPTIONS: { key: ResearchMode; label: string; desc: string; icon: typeof Database }[] = [
   { key: "library-only", label: "Sadece kütüphanem", desc: "Yalnızca eklediklerim üstünden", icon: Database },
-  { key: "source-apis", label: "Kaynak API'leriyle öner", desc: "AniList · TVmaze · OpenLibrary · TMDB/OMDb", icon: Search },
+  { key: "source-apis", label: "Kaynak API'leriyle öner", desc: "Yalnız release policy ile etkinleştirilen kaynaklar", icon: Search },
   { key: "web", label: "Web araştırması", desc: "Web araması + kaynak doğrulaması", icon: Cloud },
 ];
 
@@ -791,10 +791,14 @@ export default function AiAdvisor({
       }
       const storedPreferences = readAiPreferencesState(ownerScope);
       if (storedPreferences.status === "valid") {
-        setSettings(storedPreferences.data.settings);
+        setSettings({
+          ...storedPreferences.data.settings,
+          useOpenAIProvider: aiEntitlement?.canUseOpenAi === true && storedPreferences.data.settings.useOpenAIProvider,
+          deepResearch: aiEntitlement?.canUseGroundedResearch === true && storedPreferences.data.settings.deepResearch,
+        });
         setDataToggles(storedPreferences.data.dataToggles);
         setScopeMode(storedPreferences.data.scopeMode);
-        setResearchMode(storedPreferences.data.researchMode);
+        setResearchMode(aiEntitlement?.canUseServerProviders === true ? storedPreferences.data.researchMode : "library-only");
         setRecommendationStrictness(storedPreferences.data.recommendationStrictness ?? "balanced");
       }
       const storedSessions = readAiSessionState(ownerScope);
@@ -842,6 +846,8 @@ export default function AiAdvisor({
     } finally {
       feedbackLoadedRef.current = true;
     }
+  // Entitlement changes must not rehydrate/reset the entire owner session. Stored provider preferences are intentionally restored fail-closed and require an explicit re-selection after capability resolution.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ownerScope, ownerScopeKey]);
 
   // R40 — Aktif oturumu localStorage'a yaz. Boş state → key silinir.
@@ -1855,6 +1861,11 @@ export default function AiAdvisor({
               );
             })}
           </div>
+          {aiEntitlement?.canUseServerProviders !== true && (
+            <p className="text-[10px] text-[var(--app-text-muted)]">
+              Server AI politikası kapalı veya henüz doğrulanmadı; yalnız kütüphane içi deterministik mod kullanılabilir.
+            </p>
+          )}
         </div>
 
         {/* Şeffaflık */}
@@ -2242,8 +2253,13 @@ export default function AiAdvisor({
                 </span>
                 <input
                   type="checkbox"
-                  checked={key === "useOpenAIProvider" ? settings[key] && aiEntitlement?.canUseOpenAi === true : settings[key]}
-                  disabled={key === "useOpenAIProvider" && openAiPreferenceLocked}
+                  checked={key === "useOpenAIProvider"
+                    ? settings[key] && aiEntitlement?.canUseOpenAi === true
+                    : key === "deepResearch"
+                      ? settings[key] && aiEntitlement?.canUseGroundedResearch === true
+                      : settings[key]}
+                  disabled={(key === "useOpenAIProvider" && openAiPreferenceLocked)
+                    || (key === "deepResearch" && aiEntitlement?.canUseGroundedResearch !== true)}
                   onChange={(e) =>
                     setSettings((prev) => ({ ...prev, [key]: e.target.checked }))
                   }

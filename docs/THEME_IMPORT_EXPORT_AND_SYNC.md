@@ -128,3 +128,5 @@ Migration private `user_theme_preferences` tablosunu, self-only RLS select polit
 - **Import teması uygulanmadı:** Import önizlemesindeki “Dosyada seçili olan temayı uygula” seçeneği varsayılan kapalıdır.
 - **Bazı temalar import edilmedi:** Geçersiz kayıtları, conflict kararlarını ve 20 tema sınırını kontrol et.
 - **Cloud hatası sonrası tema kayboldu sanılıyor:** Tema local-first saklanır; sync durumu hata/pending olabilir fakat local katalog korunur.
+
+Public profil paylaşımı tema bundle/cloud katalogdan ayrı bir güvenlik projeksiyonudur. Version 1 exact 21-token snapshot decode ve route render sırasında aynı deterministic semantic türeticiyi kullanır; private custom ID ve raw theme girdileri public profile payload'ına girmez.

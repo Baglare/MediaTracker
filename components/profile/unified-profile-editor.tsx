@@ -58,6 +58,11 @@ export async function unblockSocialAccount(
   return refresh();
 }
 
+export async function deleteSocialBanner(fetchImpl: typeof fetch = fetch): Promise<void> {
+  const response = await fetchImpl("/api/social/assets?kind=banner", { method: "DELETE" });
+  if (!response.ok) throw new Error("Banner kaldırılamadı. Mevcut görsel korunuyor.");
+}
+
 export function BlockedAccountsSection({ accounts, unblockingId, onUnblock }: {
   accounts: SocialProfileEditorData["blockedAccounts"];
   unblockingId: string | null;
@@ -119,6 +124,8 @@ export function UnifiedProfileEditor({ initialData, authConfigured, authenticate
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [unblockingId, setUnblockingId] = useState<string | null>(null);
+  const [confirmBannerDelete, setConfirmBannerDelete] = useState(false);
+  const [bannerDeletePending, setBannerDeletePending] = useState(false);
   const activeCustomTheme = appearance.preferences.theme.kind === "custom"
     ? customThemes.themes.find((theme) => theme.id === appearance.preferences.theme.id)
     : undefined;
@@ -194,6 +201,31 @@ export function UnifiedProfileEditor({ initialData, authConfigured, authenticate
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Banner yüklenemedi."); }
   }
 
+  async function removeBanner() {
+    if (!data.profile?.bannerUrl || bannerDeletePending) return;
+    setMessage("");
+    setError("");
+    setBannerDeletePending(true);
+    try {
+      await deleteSocialBanner();
+      setData((current) => current.profile
+        ? { ...current, profile: { ...current.profile, bannerUrl: undefined } }
+        : current);
+      if (userId) updateOwnProfileCache(userId, { bannerUrl: undefined });
+      setConfirmBannerDelete(false);
+      try {
+        await refreshFromParent();
+        setMessage("Banner kaldırıldı. Profil artık tema uyumlu arka planı kullanıyor.");
+      } catch {
+        setMessage("Banner kaldırıldı. Cloud profil özeti daha sonra yeniden yüklenecek.");
+      }
+    } catch {
+      setError("Banner kaldırılamadı. Mevcut görsel korunuyor.");
+    } finally {
+      setBannerDeletePending(false);
+    }
+  }
+
   async function unblock(targetId: string) {
     setMessage("");
     setError("");
@@ -251,7 +283,25 @@ export function UnifiedProfileEditor({ initialData, authConfigured, authenticate
         </div>
         {cloudReady && (data.profile?.bannerUrl || data.profile?.avatarUrl || socialAvatarUrl) && (
           <div className="mt-5 grid gap-5 lg:grid-cols-2">
-            {data.profile?.bannerUrl && <div><h3 className="mb-2 text-sm font-semibold text-[var(--app-text-primary)]">Banner odağı ve zoom</h3><ImagePositionEditor kind="banner" src={data.profile.bannerUrl} value={form.presentation.bannerTransform} onChange={(value) => setForm((current) => updatePresentation(current, "bannerTransform", value))} /></div>}
+            {data.profile?.bannerUrl && (
+              <div>
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="text-sm font-semibold text-[var(--app-text-primary)]">Banner odağı ve zoom</h3>
+                  <button type="button" onClick={() => setConfirmBannerDelete(true)} className="rounded-lg border border-[var(--app-danger)] bg-[var(--app-danger-soft)] px-3 py-2 text-xs font-semibold text-[var(--app-danger)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-focus)]">Bannerı kaldır</button>
+                </div>
+                <ImagePositionEditor kind="banner" src={data.profile.bannerUrl} value={form.presentation.bannerTransform} onChange={(value) => setForm((current) => updatePresentation(current, "bannerTransform", value))} />
+                {confirmBannerDelete && (
+                  <div role="dialog" aria-modal="true" aria-labelledby="banner-delete-title" className="mt-3 rounded-xl border border-[var(--app-danger)] bg-[var(--app-danger-soft)] p-3">
+                    <h4 id="banner-delete-title" className="text-sm font-semibold text-[var(--app-text-primary)]">Banner kaldırılsın mı?</h4>
+                    <p className="mt-1 text-xs text-[var(--app-text-secondary)]">Görsel profilden ve depolamadan kaldırılacak. Profil tema uyumlu arka plana dönecek.</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button type="button" disabled={bannerDeletePending} onClick={() => void removeBanner()} className="rounded-lg border border-[var(--app-danger)] bg-[var(--app-danger-soft)] px-3 py-2 text-xs font-semibold text-[var(--app-danger)] disabled:cursor-wait disabled:opacity-60">{bannerDeletePending ? "Kaldırılıyor…" : "Bannerı kaldır"}</button>
+                      <button type="button" disabled={bannerDeletePending} onClick={() => setConfirmBannerDelete(false)} className="rounded-lg border border-[var(--app-border)] bg-[var(--app-surface-1)] px-3 py-2 text-xs font-semibold text-[var(--app-text-primary)] disabled:opacity-60">Vazgeç</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
             {(data.profile?.avatarUrl ?? socialAvatarUrl) && <div><h3 className="mb-2 text-sm font-semibold text-[var(--app-text-primary)]">Profil fotoğrafı odağı ve zoom</h3><ImagePositionEditor kind="avatar" src={(data.profile?.avatarUrl ?? socialAvatarUrl) as string} value={form.presentation.avatarTransform} onChange={(value) => setForm((current) => updatePresentation(current, "avatarTransform", value))} /></div>}
           </div>
         )}

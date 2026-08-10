@@ -71,11 +71,25 @@ describe("D8-1 server-funded AI entitlement", () => {
     expect(JSON.stringify(payload)).not.toMatch(/key|model|role|userId|admin-1/i);
   });
 
+  it("keeps even an admin fully provider-denied in the first-release disabled mode", async () => {
+    process.env.AI_SERVER_ACCESS_MODE = "disabled";
+    authGetUser.mockResolvedValue({ data: { user: { id: "admin-1", app_metadata: { role: "admin" } } }, error: null });
+    const providerFetch = vi.fn();
+    vi.stubGlobal("fetch", providerFetch);
+    const capability = await (await capabilitiesGet(new Request("http://localhost/api/ai/capabilities"))).json();
+    expect(capability).toMatchObject({ authenticated: true, isAdmin: true, canUseServerProviders: false, canUseOpenAi: false, canUseGroundedResearch: false });
+    const response = await recommendPost(recommendRequest({ researchMode: "web" }) as never);
+    expect(response.status).toBe(403);
+    expect(providerFetch).not.toHaveBeenCalled();
+  });
+
   it("keeps client/local state non-authoritative in the UI and route", () => {
     const ui = readFileSync("components/ai-advisor.tsx", "utf8");
     const route = readFileSync("app/api/ai/recommend/route.ts", "utf8");
     expect(ui).toContain("/api/ai/capabilities");
     expect(ui).toContain("aiEntitlement?.canUseOpenAi === true");
+    expect(ui).toContain("aiEntitlement?.canUseGroundedResearch === true");
+    expect(ui).toContain("yalnız kütüphane içi deterministik mod kullanılabilir");
     expect(route).toContain("entitlement.canUseOpenAi && body.settings?.useOpenAIProvider === true");
     expect(route.indexOf("ai_server_provider_forbidden")).toBeLessThan(route.indexOf("runPlanningWithProviders({"));
   });

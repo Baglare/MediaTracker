@@ -50,6 +50,21 @@ function snapshot(
   return { version: 1, source, colorScheme, tokens: publicTokens, revision, ...(updatedAt ? { updatedAt } : {}) };
 }
 
+function publicProfileRuntimeTokens(snapshot: PublicProfileThemeSnapshot): AppThemeTokens {
+  const runtimeTokens = deriveCustomThemeTokens({
+    colorScheme: snapshot.colorScheme,
+    background: snapshot.tokens.background,
+    surface: snapshot.tokens.surface1,
+    accent: snapshot.tokens.accent,
+    secondaryAccent: snapshot.tokens.accentStrong,
+    textColorMode: "custom",
+    textPrimary: snapshot.tokens.textPrimary,
+    textSecondary: snapshot.tokens.textSecondary,
+    textMuted: snapshot.tokens.textMuted,
+  });
+  return { ...runtimeTokens, ...snapshot.tokens };
+}
+
 export function normalizeProfileThemeSharingInput(value: unknown): ProfileThemeSharingInput | null {
   const record = recordOf(value);
   if (!record || !VISIBILITIES.has(record.visibility as ProfileThemeVisibility)) return null;
@@ -106,24 +121,11 @@ export function decodePublicProfileThemeSnapshot(value: unknown): PublicProfileT
     normalized[key] = color;
   }
   const candidate: PublicProfileThemeSnapshot = { version: 1, source: record.source, colorScheme: record.colorScheme, tokens: normalized as PublicProfileThemeSnapshot["tokens"], revision: record.revision, ...(record.updatedAt ? { updatedAt: record.updatedAt as string } : {}) };
-  const contrastTokens = { ...getBaseThemeDefinition(candidate.colorScheme === "light" ? "porcelain" : "obsidian").tokens, ...candidate.tokens };
-  return evaluateThemeContrast(contrastTokens).valid ? candidate : undefined;
+  return evaluateThemeContrast(publicProfileRuntimeTokens(candidate)).valid ? candidate : undefined;
 }
 
 export function publicProfileThemeStyle(snapshotValue: PublicProfileThemeSnapshot | undefined): Record<string, string> {
   const snapshot = decodePublicProfileThemeSnapshot(snapshotValue);
   if (!snapshot) return {};
-  const runtimeTokens = deriveCustomThemeTokens({
-    colorScheme: snapshot.colorScheme,
-    background: snapshot.tokens.background,
-    surface: snapshot.tokens.surface1,
-    accent: snapshot.tokens.accent,
-    secondaryAccent: snapshot.tokens.accentStrong,
-    textColorMode: "custom",
-    textPrimary: snapshot.tokens.textPrimary,
-    textSecondary: snapshot.tokens.textSecondary,
-    textMuted: snapshot.tokens.textMuted,
-  });
-  const scopedTokens = { ...runtimeTokens, ...snapshot.tokens };
-  return { colorScheme: snapshot.colorScheme, ...themeTokensToCssVariables(scopedTokens) };
+  return { colorScheme: snapshot.colorScheme, ...themeTokensToCssVariables(publicProfileRuntimeTokens(snapshot)) };
 }

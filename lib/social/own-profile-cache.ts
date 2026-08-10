@@ -96,7 +96,7 @@ export function updateOwnProfileCache(
   const now = Date.now();
   for (const resource of ["summary", "hero"] as const) {
     const cacheKey = key(ownerId, resource);
-    const current = cache.get(cacheKey)?.value ?? {};
+    const current = readOwnProfileCacheAt(ownerId, resource, now) ?? {};
     const entry = { value: { ...current, ...patch }, fetchedAt: now, expiresAt: now + OWN_PROFILE_CACHE_TTL_MS };
     cache.set(cacheKey, entry);
     writeSession(ownerId, resource, entry);

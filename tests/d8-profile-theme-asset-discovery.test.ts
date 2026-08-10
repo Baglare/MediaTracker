@@ -45,6 +45,7 @@ describe("D8-2 public profile theme privacy and contrast", () => {
     expect(custom?.source).toBe("custom");
     expect(JSON.stringify(custom)).not.toContain("ct_12345678");
     expect(Object.keys(custom?.tokens ?? {})).toHaveLength(21);
+    expect(decodePublicProfileThemeSnapshot(custom)).toEqual(custom);
   });
 
   it("keeps preset_only independent from the active theme and supports current preset explicitly", () => {

@@ -122,6 +122,8 @@ Bu env adlarının Production-scope değerleri Preview'dan kopyalanmaz; D8-4B ho
 - `GEMINI_API_KEY`, `GEMINI_MODEL`
 - `SUPABASE_SERVICE_ROLE_KEY` — yalnız mandatory hold sonucu gerçekten gerekliyse
 
+İlk Production release için AI satırları sabittir: `AI_SERVER_ACCESS_MODE=disabled`, `D7_RESEARCH_ROLLOUT_MODE=disabled`, `D7_RESEARCH_SHADOW_ENABLED=0`, `D7_RESEARCH_PUBLIC_CITATIONS_ENABLED=0`, `D7_RESEARCH_EVIDENCE_CACHE_ENABLED=0` ve `MEDIA_TRACKER_PERSISTENT_EMBEDDING_CACHE=off`. Preview'daki mevcut admin UAT ayarı Production'a kopyalanmaz; provider key provision edilmez.
+
 ## Fail-closed kombinasyonlar
 
 - Preview Supabase hedefi production hedefiyle aynıysa deploy kabul edilmez.

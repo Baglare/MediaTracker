@@ -107,7 +107,9 @@ Bu paket D8-4A staging PASS sonrasındaki Vercel Preview kullanıcı kabulünü 
 
 D8-4A.5C2 kısa yeniden kabulü: representative açık/koyu preset ve valid custom ile public profil route background'u, route-local navigasyon, Hero, modüller ve aksiyonların birlikte değiştiğini; authenticated sidebar/topbar ile ziyaretçi appearance cookie'sinin değişmediğini doğrula. `image` modunda URL olmayan ve bilerek bozuk banner theme-aware fallback göstermeli; gerçek görsel yüklenince overlay/beyaz foreground devreye girmeli. Düşük kontrast custom tema etkinleştirilememeli/yayımlanamamalı. Bu kısa smoke THEME-01..05'i kullanıcı adına otomatik PASS saymaz.
 
-10.08.2026 C2 Preview teknik smoke: hidden public profil ziyaretçi Obsidyen ve Porselen temalarında 375×812, 1366×768 ve 1536×864 boyutlarında açıldı; route-local header ile bannerless Hero semantic fallback kullandı, yatay taşma ve console/hydration hatası görülmedi, route çıkışında public header/Hero kalmadı. Staging'de yayımlanmış `preset_only`/`current_theme` custom ve bozuk image banner fixture'ı bulunmadığından THEME-01..05 durumları kullanıcı kabulü için işaretlenmeden bırakıldı.
+11.08.2026 C2 canlı UAT düzeltmesi: persisted custom snapshot decoder/runtime-token tamamlama ayrışması owner custom temayı `visitor` fallback'e düşürüyordu. C3 düzeltmesi v1/21-token contract'ı değiştirmeden decoder/render türetmesini birleştirdi ve gerçek SSR marker/style testini ekledi. Fresh Preview'da User A custom ve User B preset snapshot'ları raw SSR/hydrated DOM'da; aynı owner snapshot'ı Guest/User A/User B RPC projection'ında viewer'dan bağımsız doğrulandı. User B'nin staging public-preset fixture drift'i beklenen Porselen'e getirildi. Bu teknik kabul THEME-01..05'i kullanıcı adına PASS işaretlemez; hidden geçişi, route-leave ve representative light/custom görsel retest'i tester tarafından tamamlanmalıdır.
+
+C3 kısa takip: ASSET-03..05 ile CAL-02 kullanıcı kabulünü bekler. Özellikle profile gir/çık/gir ve A→B→A waterfall'ı, mevcut banner üzerinde “Bannerı kaldır” sonrası semantic Hero fallback'i, ayrıca 90 gün sonrası/geçmiş manuel olay create-edit-delete zinciri doğrulanmadan bu senaryolar PASS yapılmaz.
 
 ## H — Discover
 
@@ -150,7 +152,7 @@ Production/Preview RC başlangıcında research disabled kalır. Bu üç senaryo
 | ID | Seviye | Ön koşul | Kullanıcı | Yapılacak işlem | Beklenen sonuç / UI / Network | Sonuç |
 | --- | --- | --- | --- | --- | --- | --- |
 | CAL-01 | MAJOR | Bilinen airing/release medya | User B | Ajanda ve ay görünümünde tarihi bul | Provider event doğru gün/type/title ile görünür | ☐ PASS ☐ FAIL ☐ BLOCKED |
-| CAL-02 | MAJOR | Manuel event desteği | User B | Manuel event ekle/düzenle/sil | Owner-local event doğru görünür ve provider event'i bozmaz | ☐ PASS ☐ FAIL ☐ BLOCKED |
+| CAL-02 | MAJOR | Manuel event desteği | User B | 90 gün sonrası ve geçmiş ayda manuel event ekle/düzenle/sil; ay seçiciyle git | Owner-local event provider ufkundan bağımsız görünür ve provider event'i bozmaz | ☐ PASS ☐ FAIL ☐ BLOCKED |
 | CAL-03 | MAJOR | Timezone farklı sistem | User B | Gece yarısı sınırındaki event'i kontrol et | Yerel timezone/gün hesaplaması tutarlı; bir gün kayma yok | ☐ PASS ☐ FAIL ☐ BLOCKED |
 | CAL-04 | MAJOR | Cache dolu, provider block | User B | Refresh/refetch ve provider failure üret | Bounded refetch; geçerli stale cache korunur; raw provider error yok | ☐ PASS ☐ FAIL ☐ BLOCKED |
 

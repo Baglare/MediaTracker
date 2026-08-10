@@ -76,7 +76,7 @@ export default function AuthPanel() {
           </div>
 
           <p className="text-xs text-zinc-500 leading-relaxed">
-            Veriler şu an hâlâ yerel olarak tutuluyor. Cloud eşitleme sonraki aşamada eklenecek.
+            Yerel-first kayıtların korunur; Cloud Media ve Goal eşitlemesi bu hesap için etkin olduğunda değişiklikler güvenli kuyruk üzerinden senkronize edilir.
           </p>
 
           {error && (

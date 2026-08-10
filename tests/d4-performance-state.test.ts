@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   OWN_PROFILE_CACHE_TTL_MS,
@@ -12,6 +12,7 @@ import { summaryToLegacyProgression } from "@/lib/xp/progression";
 import type { MediaItem, ProgressLog } from "@/lib/types";
 
 beforeEach(() => resetOwnProfileCacheForTests());
+afterEach(() => vi.unstubAllGlobals());
 
 describe("D4 owner-scoped profile cache", () => {
   it("coalesces concurrent summary requests for the same owner", async () => {
@@ -49,6 +50,27 @@ describe("D4 owner-scoped profile cache", () => {
       bannerUrl: "https://example.test/banner.png",
     });
     expect(readOwnProfileCache("user-b", "hero")).toBeUndefined();
+  });
+
+  it("preserves a valid session snapshot when an asset update happens after reload", async () => {
+    const values = new Map<string, string>();
+    vi.stubGlobal("window", { sessionStorage: {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => values.set(key, value),
+      removeItem: (key: string) => values.delete(key),
+    } });
+    await loadOwnProfileCache({
+      ownerId: "user-a",
+      resource: "summary",
+      fetcher: async () => ({ displayName: "User A", tagline: "Saved", avatarUrl: "old" }),
+    });
+    resetOwnProfileCacheForTests();
+    updateOwnProfileCache("user-a", { avatarUrl: "new" });
+    expect(readOwnProfileCache("user-a", "summary")).toMatchObject({
+      displayName: "User A",
+      tagline: "Saved",
+      avatarUrl: "new",
+    });
   });
 });
 

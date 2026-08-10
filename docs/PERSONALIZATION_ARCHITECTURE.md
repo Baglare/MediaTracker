@@ -242,6 +242,8 @@ Kullanıcı `colorScheme`, `background`, `surface`, `accent` ve `secondaryAccent
 
 Public snapshot version 1 ve 21 renkli exact allowlist değişmemiştir. Selected, disabled, action ve status gibi ek runtime semantic roller bu güvenli snapshot'tan route scope'unda yeniden türetilir; custom theme ID, raw input, correction internals, CSS veya asset public payload'a eklenmez.
 
+C3'te decode ve render aynı deterministik runtime-token tamamlama yolunu kullanır. Böylece geçerli persisted custom snapshot, eksik runtime rollerini Obsidyen/Porselen'den karıştırarak yanlışlıkla reddedilmez; owner snapshot viewer temasından bağımsız kalır ve yalnız public profile route scope'unda uygulanır.
+
 ### Persistence, runtime ve ilk paint
 
 Custom katalog `mediaTracker:personal:v1:<scope>:customThemes` anahtarında owner-scoped local-first saklanır. Eski `mediaTracker:customThemes:v1` yalnız explicit ownership migration kaynağıdır. Runtime validation bozuk JSON/version/kayıtları atar, yinelenen kimlikleri temizler ve owner başına en fazla 20 temayı kabul eder. Tema adı 1–40 karakterdir; ID Web Crypto ile üretilir. Preset kayıtları düzenlenmez veya silinmez.

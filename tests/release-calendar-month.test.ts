@@ -42,6 +42,13 @@ function event(
   };
 }
 
+function manualEvent(id: string, date: ReleaseDatePrecision): ReleaseEvent {
+  return {
+    ...event(id, date),
+    origin: { kind: "manual", persistence: "persistent_user_data" },
+  };
+}
+
 function viewItem(
   id: string,
   type: ReleaseMediaFilter,
@@ -97,16 +104,18 @@ describe("release month grid", () => {
     expect(shiftReleaseMonth("2027-01", -1)).toBe("2026-12");
   });
 
-  it("keeps navigation between today and the inclusive 90-day horizon", () => {
+  it("keeps the provider horizon at 90 days without locking month navigation", () => {
     const bounds = releaseMonthNavigationBounds("2026-11-15");
     expect(bounds).toEqual({
-      firstMonth: "2026-11",
-      lastMonth: "2027-02",
+      firstMonth: "0001-01",
+      lastMonth: "9999-12",
       horizonDate: "2027-02-13",
     });
-    expect(canNavigateReleaseMonth("2026-11", -1, "2026-11-15")).toBe(false);
+    expect(canNavigateReleaseMonth("2026-11", -1, "2026-11-15")).toBe(true);
     expect(canNavigateReleaseMonth("2026-11", 1, "2026-11-15")).toBe(true);
-    expect(canNavigateReleaseMonth("2027-02", 1, "2026-11-15")).toBe(false);
+    expect(canNavigateReleaseMonth("2027-02", 1, "2026-11-15")).toBe(true);
+    expect(canNavigateReleaseMonth("0001-01", -1, "2026-11-15")).toBe(false);
+    expect(canNavigateReleaseMonth("9999-12", 1, "2026-11-15")).toBe(false);
   });
 
   it("keeps date-only on its literal day and exact datetimes on the local day", () => {
@@ -163,6 +172,20 @@ describe("release month grid", () => {
       .toEqual(["horizon"]);
     expect(selectReleaseAgenda([onHorizon, outside, tba], "2026-01-01").tba)
       .toEqual([tba]);
+  });
+
+  it("shows manual events beyond the provider horizon and in past/future months", () => {
+    const providerOutside = event("provider-day-91", { precision: "date_only", date: "2026-04-02" });
+    const manualOutside = manualEvent("manual-day-91", { precision: "date_only", date: "2026-04-02" });
+    const past = manualEvent("manual-past", { precision: "date_only", date: "2025-06-10" });
+    const future = manualEvent("manual-future", { precision: "date_only", date: "2028-05-20" });
+
+    expect(buildReleaseMonthGrid({ events: [providerOutside, manualOutside], month: "2026-04", today: "2026-01-01" })
+      .days.flatMap((day) => day.events).map((entry) => entry.id)).toEqual(["manual-day-91"]);
+    expect(buildReleaseMonthGrid({ events: [past], month: "2025-06", today: "2026-01-01" })
+      .days.flatMap((day) => day.events).map((entry) => entry.id)).toEqual(["manual-past"]);
+    expect(buildReleaseMonthGrid({ events: [future], month: "2028-05", today: "2026-01-01" })
+      .days.flatMap((day) => day.events).map((entry) => entry.id)).toEqual(["manual-future"]);
   });
 
   it("uses the same filtered view-item set for agenda and month", () => {

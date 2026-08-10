@@ -31,7 +31,7 @@ Ayrıntılı sıra ve sonraki aşamalar: [`docs/ROADMAP.md`](docs/ROADMAP.md).
 - Versioned JSON import/export, kontrollü additive import, checksum, rollback/undo ve portable backup akışı.
 - Supabase auth, manuel Cloud aktarım, owner-scoped sync queue, V2 revision/idempotency/tombstone ve conflict akışı.
 - Local-first kütüphaneden ayrılmış cloud sosyal profil, kullanıcı arama ve takip/engel temeli.
-- TMDB, OMDb, TVmaze, AniList ve Open Library entegrasyonları için normalize edilmiş medya modeli.
+- TVMaze ve Open Library ile aktif; TMDB/AniList için fail-closed izin kapılı, OMDb için yalnız legacy kayıt uyumlu normalize medya modeli.
 - AI Recommendation V2 için structured provider evidence, deterministik eligibility/ranking ve unresolved hard constraint'lerde optional source-grounded research; LLM final sıralama yapmaz.
 - Ana sayfada medya domain durumu, kalıcı kullanıcı tercihleri ve sekme render orkestrasyonu ayrıştırılmış modüler yapı.
 - React/Next.js state yönetimi, TypeScript tip güvenliği ve responsive dashboard tasarımı.
@@ -55,7 +55,7 @@ Ayrıntılı sıra ve sonraki aşamalar: [`docs/ROADMAP.md`](docs/ROADMAP.md).
   - Etiketler
   - Kişisel notlar
 - Release Calendar:
-  - TV sezonları için TVMaze, anime için AniList ve filmler için TMDB kaynaklı 90 günlük yayın ajandası
+  - Release policy'nin izin verdiği kaynaklardan 90 günlük otomatik yayın ajandası
   - Aynı normalize olay kümesini kullanan ajanda ve Pazartesi başlangıçlı aylık görünüm
   - Medyaya bağlı kalıcı manuel yayınlar ile stabil provider olaylarını gizleme/geri getirme
   - Aynı D3 veri kümesinden beslenen, sağ panelde ve dar Dashboard görünümünde en fazla üç olayı gösteren “Yakında” özeti
@@ -69,10 +69,10 @@ Ayrıntılı sıra ve sonraki aşamalar: [`docs/ROADMAP.md`](docs/ROADMAP.md).
   - Manuel grup yönetimi
 - Keşfet:
   - Global arama paneli
-  - Film için TMDB birincil, OMDb fallback
-  - Dizi için TVmaze
-  - Anime/manga/manhwa/manhua/novel için AniList
-  - Kitap için Open Library
+  - Dizi için TVMaze ve kitap için Open Library
+  - Film için TMDB yalnız non-commercial + approved logo/attribution kapısı tamamlandığında
+  - Anime/manga/manhwa/manhua/novel için AniList yalnız explicit Preview testi veya yazılı production izniyle
+  - OMDb yeni public arama/fallback zincirinde kapalı; mevcut legacy kayıtlar desteklenir
 - Veri yönetimi:
   - Versioned portable JSON yedeği ve SHA-256 bütünlük kontrolü
   - Salt-okunur dosya inceleme ve kullanıcı onaylı additive import
@@ -230,9 +230,11 @@ Temel kullanım için hiçbir değişken zorunlu değildir. Aşağıdaki değiş
 | `NEXT_PUBLIC_CLOUD_MEDIA_MAINTENANCE` | Hayır | Bakım sırasında Cloud mutation dispatch'ini durdurur |
 | `NEXT_PUBLIC_CLOUD_MEDIA_DEPLOYMENT_EPOCH` | Hayır | Açık istemcilerde deployment değişimini ve kontrollü reload gereksinimini tanımlar |
 | `NEXT_PUBLIC_CLOUD_MEDIA_MINIMUM_CLIENT_VERSION` | Hayır | Minimum uyumlu istemci sözleşmesini tanımlar |
-| `SUPABASE_SERVICE_ROLE_KEY` | Hayır | Yalnızca server-side persistent embedding cache erişimi için |
-| `TMDB_READ_ACCESS_TOKEN` | Hayır | Film araması ve TMDB Release Calendar için server-side token |
-| `OMDB_API_KEY` | Hayır | Film aramasında OMDb fallback ve detay kaynağı |
+| `SUPABASE_SERVICE_ROLE_KEY` | Hayır | Normal web runtime için önerilmez; production ihtiyacı mandatory security hold'da ayrıca kararlaştırılır |
+| `MEDIA_TRACKER_TMDB_MODE` | Hayır | `disabled` veya tüm attribution kapıları tamamlandığında `noncommercial` |
+| `TMDB_READ_ACCESS_TOKEN` | Hayır | TMDB mode/attribution kapıları hazırsa server-side token |
+| `MEDIA_TRACKER_ANILIST_MODE` | Hayır | `disabled`, Preview için `preview_test`, yazılı izin sonrası `authorized` |
+| `OMDB_API_KEY` | Hayır | Yalnız legacy/local teşhis; public search/fallback açmaz |
 | `AI_PROVIDER` | Hayır | `mock`, `auto`, `openai`, `gemini`, `openrouter`, `groq` |
 | `OPENAI_API_KEY` | Hayır | OpenAI uyumlu provider |
 | `OPENAI_MODEL` | Hayır | Varsayılan: `gpt-5.4-mini` |
@@ -336,11 +338,11 @@ Vitest'i izleme modunda veya tek seferlik test paketi olarak çalıştırır.
 - `GET /api/tmdb/details?id=...`
 - `GET /api/omdb/search?q=...`
 - `GET /api/omdb/details?id=...`
-- `GET /api/tvmaze/search?q=...`
+- `POST /api/tvmaze/search` (`{ "query": "..." }`)
 - `GET /api/tvmaze/details?id=...`
-- `GET /api/anilist/search?q=...&category=...`
+- `POST /api/anilist/search` (`query` + bounded category)
 - `GET /api/anilist/details?id=...&type=...`
-- `GET /api/openlibrary/search?q=...`
+- `POST /api/openlibrary/search` (`{ "query": "..." }`)
 - `GET /api/calendar/tvmaze?showId=...&season=...`
 - `GET /api/calendar/anilist?mediaId=...`
 - `GET /api/calendar/tmdb?movieId=...`
@@ -349,13 +351,14 @@ Vitest'i izleme modunda veya tek seferlik test paketi olarak çalıştırır.
 Dış API anahtarları server-side route'larda kullanılır; tarayıcıya token gönderilmez.
 Release Calendar route'ları yalnız yapılandırılmış provider kimliklerini kabul eder;
 başlık eşleştirmesi yapmaz ve sonuçları önümüzdeki 90 günle sınırlar. TMDB release
-takvimi için `TMDB_READ_ACCESS_TOKEN` gerekir. AniList ve TVMaze public API'leri
-anahtarsızdır; provider erişilemezse geçerli stale cache gösterilmeye devam eder.
+takvimi yalnız merkezi release policy ilgili kaynağı etkinleştirirse çağrılır;
+provider erişilemezse geçerli stale cache gösterilmeye devam eder.
 
 Release Calendar yerel-first çalışır. Otomatik provider olayları yeniden
 üretilebilir cache'tir; manuel olaylar ve gizleme kararları ilgili `MediaItem`
 metadata'sında kalıcı kullanıcı verisi olarak saklanır. Push bildirimi, harici
-takvim export'u ve geçmiş/future horizon dışı arşiv bu sürümün kapsamında değildir.
+takvim export'u bu sürümün kapsamında değildir. Manuel olaylar provider ufkundan
+bağımsız olarak geçmiş ve gelecek aylarda görüntülenebilir.
 
 ## Opsiyonel ML Servisi
 
@@ -397,7 +400,7 @@ Next.js tarafı `MEDIA_TRACKER_ML_SERVICE_URL` doluysa bu servisi kullanır. Ser
 - D2C.1 owner-scoped fiziksel primary key enforcement ve production cutover D8 aşamasındadır.
 - Cloud'dan otomatik realtime pull yoktur; download/merge kullanıcı aksiyonudur.
 - Release Calendar otomatik provider ufku 90 gündür. Push/e-posta, ICS/Google Calendar ve streaming availability zorunlu kapsamda değildir.
-- TMDB takvim/film verisi token olmadan kullanılamaz; provider erişilemezse geçerli stale Release Calendar cache'i korunabilir.
+- TMDB ve AniList production kapıları tamamlanana kadar fail-closed kapalıdır; provider erişilemezse diğer kaynaklar ve geçerli stale Release Calendar cache'i korunur.
 - Contract/unit testleri canlı Supabase, RLS veya production deployment kanıtı değildir.
 
 ## Roadmap Özeti
@@ -412,11 +415,11 @@ Bu normaldir. Supabase değişkenleri boşsa uygulama sadece tarayıcı verisini
 
 ### Film araması sonuç vermiyor
 
-`TMDB_READ_ACCESS_TOKEN` yoksa TMDB devre dışı kalır ve OMDb fallback denenir. OMDb için `OMDB_API_KEY` de yoksa film araması sınırlı kalır.
+İlk public release'te TMDB approved logo/attribution ve non-commercial kapısı tamamlanmadan film araması kapalıdır. OMDb yeni arama fallback'i değildir.
 
 ### AI Danışman gerçek provider kullanmıyor
 
-`AI_PROVIDER` varsayılan olarak `mock` davranır. Gerçek provider için `AI_PROVIDER` ve ilgili API key değerini `.env.local` içine ekleyip sunucuyu yeniden başlat.
+İlk Production release'te `AI_SERVER_ACCESS_MODE=disabled` zorunludur; gerçek provider kontrolleri kapalı kalır ve deterministik kütüphane modu çalışır. Provider enablement ayrı post-release güvenlik/bütçe kapısıdır.
 
 ### Embedding provider `local_mock` görünüyor
 

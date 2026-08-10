@@ -11,7 +11,7 @@ Bu runbook D8-4A gerçek staging migration, two-owner/RLS ve admin/non-admin AI 
 7. **D2C.1 post-check:** PK/FK, grant, RLS, queue/revision/idempotency/tombstone ve aggregate bütünlük doğrulanır.
 8. **Goal Cloud V1:** Yalnız D2C.1 RPC prerequisite'i geçtikten sonra additive Goal schema/RPC/RLS uygulanır.
 9. **Final DB post-check:** Goal owner isolation, migration ledger, public profile RPC projection ve exact current avatar/banner path ile sınırlı storage policy doğrulanır. `20260810120000_d8_profile_asset_visibility_hardening.sql` ledger'da bulunmadan profile asset rollout açılmaz.
-10. **Env/flag transition:** Önce schema stage/epoch, sonra deployment, en son feature flags. `AI_SERVER_ACCESS_MODE=admin_only`; `D7_RESEARCH_ROLLOUT_MODE=disabled`. Goal/media flag'i post-check öncesi açılmaz.
+10. **Env/flag transition:** Önce schema stage/epoch, sonra deployment, en son feature flags. İlk release için `AI_SERVER_ACCESS_MODE=disabled`, `D7_RESEARCH_ROLLOUT_MODE=disabled`, `D7_RESEARCH_SHADOW_ENABLED=0`, `D7_RESEARCH_PUBLIC_CITATIONS_ENABLED=0`, `D7_RESEARCH_EVIDENCE_CACHE_ENABLED=0` ve `MEDIA_TRACKER_PERSISTENT_EMBEDDING_CACHE=off` zorunludur. Goal/media flag'i post-check öncesi açılmaz.
 11. **Deployment:** Onaylı immutable artifact production'a alınır; migration sürecinden ayrı yetki ve kayıt kullanılır.
 12. **Post-deploy smoke:** [D8 post-deploy checklist](D8_POST_DEPLOY_SMOKE_CHECKLIST.md) uygulanır.
 13. **Decision:** Hata sınıfına göre önce feature flag/maintenance rollback'i; schema için [rollback/fail-forward planı](D8_PRODUCTION_ROLLBACK_AND_FAIL_FORWARD.md) izlenir.

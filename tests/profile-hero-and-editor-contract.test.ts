@@ -1,5 +1,7 @@
 import { readFileSync } from "node:fs";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+import { deleteSocialBanner } from "@/components/profile/unified-profile-editor";
 
 import { DEFAULT_PROFILE_PRESENTATION_PREFERENCES } from "@/lib/personalization/defaults";
 import { validateSocialProfileInput } from "@/lib/social/validation";
@@ -72,6 +74,20 @@ describe("unified profile editor", () => {
     expect(editor).toContain('updatePresentation(current, "bannerMode", "image")');
     expect(editor).toContain("bannerUrl: result.url");
     expect(editor).toContain("Banner yüklendi ve görsel modu seçildi");
+  });
+
+  it("removes an existing banner through the current asset endpoint without exposing its path", async () => {
+    const fetcher = vi.fn(async () => new Response(JSON.stringify({ ok: true }), { status: 200 }));
+    await expect(deleteSocialBanner(fetcher as typeof fetch)).resolves.toBeUndefined();
+    expect(fetcher).toHaveBeenCalledWith("/api/social/assets?kind=banner", { method: "DELETE" });
+    expect(editor).toContain("Bannerı kaldır");
+    expect(editor).toContain("Profil artık tema uyumlu arka planı kullanıyor");
+  });
+
+  it("keeps the current banner on a safe delete failure", async () => {
+    const fetcher = vi.fn(async () => new Response("private failure", { status: 500 }));
+    await expect(deleteSocialBanner(fetcher as typeof fetch)).rejects.toThrow("Mevcut görsel korunuyor");
+    expect(editor).not.toContain("private failure");
   });
 
   it("keeps cloud-only controls hidden in local-only mode", () => {

@@ -22,6 +22,8 @@ Kritik eşikler primary/secondary ve accent üzeri metinde 4.5:1, focus gösterg
 
 Own-profile bootstrap `/profile` başlangıç route’unda da çalışır ve pathname değişimine bağlı değildir. Memory cache owner/resource anahtarlı ve concurrent istekleri coalesce eder. Aynı veri schema v1, owner, resource, `fetchedAt` ve `expiresAt` ile yalnız `sessionStorage` içinde tutulur; signed URL/blob için yeni `localStorage` kaydı yoktur. TTL 240 saniyedir; süresi dolmuş URL gösterilmez. Owner değişiminde görünür state önce owner ID ile eşleştirilir; logout eski görünür state’i temizler. Upload/delete sonrası memory ve session cache mevcut event/update akışıyla yenilenir.
 
+C3 asset güncellemesi, memory yeniden oluşmadan önce geçerli session snapshot varsa patch'i bu tam snapshot üzerine uygular; avatar/banner değişimi display name/tagline gibi mevcut summary alanlarını düşürmez. Aktif UnifiedProfileEditor banner mevcutken güvenli confirmation ile `DELETE /api/social/assets?kind=banner` çağırır; başarıda owner cache temiz URL ile güncellenir ve theme-aware Hero fallback'i devreye girer, hata durumunda mevcut banner korunur.
+
 Server signed URL cache anahtarı bucket, asset kind, tam path ve revision’dan oluşur. En çok 256 process-local entry tutulur; 300 saniyelik signed URL için 240 saniye TTL uygulanır ve aynı anahtarın concurrent üretimi coalesce edilir. Path/revision değişimi doğal miss üretir; upload/delete eski path’i invalidate eder. Hatalar negative-cache edilmez. Cache instance-local’dır; distributed cache D8-3 rollout kararıdır. Viewer relationship ve profil visibility sonuçları global cache’e alınmaz.
 
 ## Keşif açıklama sözleşmesi

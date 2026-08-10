@@ -8,6 +8,8 @@ import {
 
 export const RELEASE_CALENDAR_HORIZON_DAYS = 90;
 export const RELEASE_MONTH_EVENT_LIMIT = 3;
+export const RELEASE_CALENDAR_FIRST_MONTH = "0001-01";
+export const RELEASE_CALENDAR_LAST_MONTH = "9999-12";
 
 interface CivilDateParts {
   year: number;
@@ -128,8 +130,8 @@ export function releaseMonthNavigationBounds(today: string): {
   if (!parseDate(today)) throw new RangeError("today geçerli YYYY-MM-DD olmalıdır.");
   const horizonDate = addReleaseCalendarDays(today, RELEASE_CALENDAR_HORIZON_DAYS);
   return {
-    firstMonth: today.slice(0, 7),
-    lastMonth: horizonDate.slice(0, 7),
+    firstMonth: RELEASE_CALENDAR_FIRST_MONTH,
+    lastMonth: RELEASE_CALENDAR_LAST_MONTH,
     horizonDate,
   };
 }
@@ -140,6 +142,8 @@ export function canNavigateReleaseMonth(
   today: string,
 ): boolean {
   const bounds = releaseMonthNavigationBounds(today);
+  if (direction === -1 && currentMonth <= bounds.firstMonth) return false;
+  if (direction === 1 && currentMonth >= bounds.lastMonth) return false;
   const target = shiftReleaseMonth(currentMonth, direction);
   return target >= bounds.firstMonth && target <= bounds.lastMonth;
 }
@@ -170,7 +174,8 @@ export function buildReleaseMonthGrid(input: {
   const eventsByDate = new Map<string, ReleaseEvent[]>();
   for (const event of monthEvents) {
     const date = getReleaseEventCalendarDate(event, input.options);
-    if (!date || date < input.today || date > horizonDate) continue;
+    if (!date) continue;
+    if (event.origin.kind === "provider" && (date < input.today || date > horizonDate)) continue;
     const current = eventsByDate.get(date) ?? [];
     current.push(event);
     eventsByDate.set(date, current);
@@ -199,4 +204,3 @@ export function buildReleaseMonthGrid(input: {
     ),
   };
 }
-

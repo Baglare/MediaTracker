@@ -313,15 +313,13 @@ export function ReleaseCalendarPanel({
     if (!canNavigateReleaseMonth(visibleMonth, direction, today)) return;
     const target = shiftReleaseMonth(visibleMonth, direction);
     setVisibleMonth(target);
-    const firstDay = `${target}-01`;
-    setSelectedDate(firstDay < today ? today : firstDay > bounds.horizonDate
-      ? bounds.horizonDate
-      : firstDay);
+    setSelectedDate(`${target}-01`);
   };
   const selectDay = (date: string) => {
-    if (date < today || date > bounds.horizonDate) return;
+    const month = date.slice(0, 7);
+    if (month < bounds.firstMonth || month > bounds.lastMonth) return;
     setSelectedDate(date);
-    setVisibleMonth(date.slice(0, 7));
+    setVisibleMonth(month);
   };
   const moveSelectedDay = (amount: number) => {
     const target = addReleaseCalendarDays(selectedDate, amount);
@@ -512,10 +510,10 @@ export function ReleaseCalendarPanel({
                     {monthLabel(visibleMonth)}
                   </h3>
                   <p className="text-[10px] text-[var(--app-text-muted)]">
-                    Pazartesi başlayan yerel takvim · 90 günlük yayın ufku
+                    Otomatik yayın verileri önümüzdeki 90 günü kapsar. Manuel olaylar diğer aylarda da görüntülenebilir.
                   </p>
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="flex flex-wrap items-center justify-end gap-1">
                   <button
                     type="button"
                     aria-label="Önceki aya git"
@@ -536,6 +534,22 @@ export function ReleaseCalendarPanel({
                   >
                     Bugün
                   </button>
+                  <label className="sr-only" htmlFor="release-calendar-month-picker">Aya git</label>
+                  <input
+                    id="release-calendar-month-picker"
+                    type="month"
+                    aria-label="Takvimde aya git"
+                    value={visibleMonth}
+                    min={bounds.firstMonth}
+                    max={bounds.lastMonth}
+                    onChange={(event) => {
+                      const target = event.target.value;
+                      if (target < bounds.firstMonth || target > bounds.lastMonth) return;
+                      setVisibleMonth(target);
+                      setSelectedDate(`${target}-01`);
+                    }}
+                    className="app-input min-h-8 w-[8.75rem] rounded-lg border px-2 py-1 text-[10px]"
+                  />
                   <button
                     type="button"
                     aria-label="Sonraki aya git"
@@ -570,13 +584,12 @@ export function ReleaseCalendarPanel({
                           : day.inCurrentMonth
                             ? "border-[var(--app-border)] bg-[var(--app-surface-2)]"
                             : "border-transparent bg-[var(--app-surface-1)] opacity-45"
-                      } ${day.inHorizon ? "" : "cursor-not-allowed opacity-30"}`}
+                      }`}
                     >
                       <button
                         type="button"
                         aria-label={dayLabel(day.date, day.events.length)}
                         aria-current={day.isToday ? "date" : undefined}
-                        disabled={!day.inHorizon}
                         onClick={() => selectDay(day.date)}
                         onKeyDown={(event) => {
                           const moves: Partial<Record<string, number>> = {
