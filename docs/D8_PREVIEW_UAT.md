@@ -83,6 +83,8 @@ Bu paket D8-4A staging PASS sonrasındaki Vercel Preview kullanıcı kabulünü 
 | SOC-06 | BLOCKER | A/B ilişkisi mevcut | User B | A'yı block et; A'dan profil/interaction dene; sonra unblock | Block server-side uygulanır; eski relationship yanlışlıkla geri gelmez | ☐ PASS ☐ FAIL ☐ BLOCKED |
 | SOC-07 | MAJOR | Social activity üretildi | User A/B | Feed ve notification center'ı aç, read/refresh yap | Doğru owner/viewer event'i görünür; duplicate/infinite polling veya private payload yok | ☐ PASS ☐ FAIL ☐ BLOCKED |
 
+> Preview regression durumu: **SOC-06 block enforcement PASS; unblock UI MANUAL RETEST PENDING.** SOC-07 başlatılmadı.
+
 ## F — Avatar ve banner
 
 | ID | Seviye | Ön koşul | Kullanıcı | Yapılacak işlem | Beklenen sonuç / UI / Network | Sonuç |

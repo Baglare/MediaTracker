@@ -44,6 +44,50 @@ async function post(body: Record<string, unknown>) {
   if (!response.ok) throw new Error(result.message ?? "İşlem tamamlanamadı.");
 }
 
+export async function unblockSocialAccount(
+  targetId: string,
+  refresh: () => Promise<SocialProfileEditorData | undefined>,
+  fetchImpl: typeof fetch = fetch,
+) {
+  const response = await fetchImpl("/api/social/relationships", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "unblock", targetId }),
+  });
+  if (!response.ok) throw new Error("Engel kaldırılamadı. Lütfen tekrar dene.");
+  return refresh();
+}
+
+export function BlockedAccountsSection({ accounts, unblockingId, onUnblock }: {
+  accounts: SocialProfileEditorData["blockedAccounts"];
+  unblockingId: string | null;
+  onUnblock: (targetId: string) => void;
+}) {
+  if (accounts.length === 0) return null;
+  return (
+    <section className="app-panel rounded-2xl border p-4 sm:p-5">
+      <h2 className="font-semibold text-[var(--app-text-primary)]">Engellenen hesaplar</h2>
+      <div className="mt-3 space-y-2">
+        {accounts.map((account) => (
+          <div key={account.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-1)] px-3 py-2 text-sm">
+            <span className="min-w-0 [overflow-wrap:anywhere] text-[var(--app-text-primary)]">
+              {account.displayName}{account.username ? ` · @${account.username}` : ""}
+            </span>
+            <button
+              type="button"
+              disabled={unblockingId === account.id}
+              onClick={() => onUnblock(account.id)}
+              className="rounded-lg border border-[var(--app-border-strong)] bg-[var(--app-surface-2)] px-3 py-2 text-xs font-semibold text-[var(--app-text-primary)] hover:bg-[var(--app-hover)] disabled:cursor-wait disabled:opacity-60"
+            >
+              {unblockingId === account.id ? "Kaldırılıyor…" : "Engeli kaldır"}
+            </button>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function updatePresentation<K extends keyof ProfilePresentationPreferences>(form: SocialProfileInput, key: K, value: ProfilePresentationPreferences[K]): SocialProfileInput {
   return { ...form, presentation: { ...form.presentation, [key]: value } };
 }
@@ -74,6 +118,7 @@ export function UnifiedProfileEditor({ initialData, authConfigured, authenticate
   const [modules, setModules] = useState<ProfileModuleLayout[]>(seed.modules.length ? mergeModuleDefaults(seed.modules) : defaultProfileModules());
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [unblockingId, setUnblockingId] = useState<string | null>(null);
   const activeCustomTheme = appearance.preferences.theme.kind === "custom"
     ? customThemes.themes.find((theme) => theme.id === appearance.preferences.theme.id)
     : undefined;
@@ -149,6 +194,22 @@ export function UnifiedProfileEditor({ initialData, authConfigured, authenticate
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Banner yüklenemedi."); }
   }
 
+  async function unblock(targetId: string) {
+    setMessage("");
+    setError("");
+    setUnblockingId(targetId);
+    try {
+      const next = await unblockSocialAccount(targetId, onProfileChanged);
+      if (next) applyData({ ...next, blockedAccounts: next.blockedAccounts.filter((account) => account.id !== targetId) });
+      else setData((current) => ({ ...current, blockedAccounts: current.blockedAccounts.filter((account) => account.id !== targetId) }));
+      setMessage("Engel kaldırıldı. Önceki takip ilişkileri geri yüklenmedi.");
+    } catch {
+      setError("Engel kaldırılamadı. Lütfen tekrar dene.");
+    } finally {
+      setUnblockingId(null);
+    }
+  }
+
   const cloudReady = !localOnly && Boolean(data.profile);
   return (
     <div className="space-y-5">
@@ -200,7 +261,7 @@ export function UnifiedProfileEditor({ initialData, authConfigured, authenticate
 
       <div className="flex flex-wrap gap-2"><button type="button" onClick={() => void save()} className="app-primary-action rounded-xl px-5 py-2.5 text-sm font-semibold">Değişiklikleri kaydet</button><button type="button" onClick={() => { setForm(savedForm); setMessage("Taslak değişiklikler geri alındı."); setError(""); }} className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-1)] px-5 py-2.5 text-sm">Vazgeç</button></div>
 
-      {cloudReady && userId && <><SocialPreferencesPanel userId={userId} /><SocialLayoutEditor modules={modules} profileVisibility={form.visibilityMode} onChange={setModules} onSave={async () => { try { await post({ action: "save_modules", modules }); setMessage("Profil modülleri kaydedildi."); } catch (reason) { setError(reason instanceof Error ? reason.message : "Modüller kaydedilemedi."); } }} /><SocialSharingEditor media={media} progression={progression} favorites={data.favorites} current={data.current} sharedNotes={data.sharedNotes} onRefresh={refreshFromParent} /></>}
+      {cloudReady && userId && <><SocialPreferencesPanel userId={userId} /><SocialLayoutEditor modules={modules} profileVisibility={form.visibilityMode} onChange={setModules} onSave={async () => { try { await post({ action: "save_modules", modules }); setMessage("Profil modülleri kaydedildi."); } catch (reason) { setError(reason instanceof Error ? reason.message : "Modüller kaydedilemedi."); } }} /><SocialSharingEditor media={media} progression={progression} favorites={data.favorites} current={data.current} sharedNotes={data.sharedNotes} onRefresh={refreshFromParent} /><BlockedAccountsSection accounts={data.blockedAccounts} unblockingId={unblockingId} onUnblock={(targetId) => void unblock(targetId)} /></>}
       {!localOnly && !data.profile && <p className="rounded-xl border border-dashed border-[var(--app-border)] p-5 text-sm text-[var(--app-text-muted)]">Modül, paylaşım ve banner kontrolleri ilk cloud profil kaydından sonra açılır.</p>}
     </div>
   );
