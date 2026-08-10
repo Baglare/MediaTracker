@@ -17,7 +17,7 @@ Gerçek değer, secret, project ref, database URL veya fixture credential bu bel
 | `NEXT_PUBLIC_CLOUD_MEDIA_MINIMUM_CLIENT_VERSION` | current client contract ile uyumlu | mismatch reload-required |
 | `AI_SERVER_ACCESS_MODE` | `admin_only` | unset/unknown = disabled; admin AI UAT BLOCKED |
 | `D7_RESEARCH_ROLLOUT_MODE` | `disabled` | conflict = disabled; release baseline değişmez |
-| `MEDIA_TRACKER_PROVIDER_USER_AGENT` | Discover/Calendar UAT için tanımlayıcı staging UA/contact | ilgili provider compliance UAT BLOCKED |
+| `MEDIA_TRACKER_PROVIDER_USER_AGENT` | `MediaTracker` adı ile gerçek operator contact içeren bounded UA | Open Library capability `missing_configuration`; ilgili UAT BLOCKED |
 
 ## OPTIONAL_PREVIEW
 
@@ -29,8 +29,9 @@ Gerçek değer, secret, project ref, database URL veya fixture credential bu bel
 | `GROQ_API_KEY`, `GROQ_MODEL` | Groq admin UAT'ı | Groq unavailable |
 | `OPENROUTER_API_KEY`, `OPENROUTER_MODEL` | OpenRouter admin UAT'ı | OpenRouter unavailable |
 | `GEMINI_API_KEY`, `GEMINI_MODEL` | Gemini admin UAT'ı | Gemini unavailable |
-| `TMDB_READ_ACCESS_TOKEN` | TMDB Discover/Calendar UAT'ı | TMDB fail-soft unavailable |
-| `OMDB_API_KEY` | yalnız lisans kararıyla izinli Preview UAT | OMDb disabled/unavailable |
+| `MEDIA_TRACKER_ANILIST_MODE` | `preview_test` yalnız izinli Preview UAT; aksi halde `disabled` | unset/invalid = disabled; Production `preview_test` reddedilir |
+| `MEDIA_TRACKER_TMDB_MODE` | `noncommercial` yalnız non-commercial karar + approved logo + notice hazırsa | unset/invalid = disabled |
+| `TMDB_READ_ACCESS_TOKEN` | TMDB mode ve attribution/logo kapıları birlikte hazırsa | TMDB `missing_configuration`; başka provider'lar korunur |
 | `MEDIA_TRACKER_EMBEDDING_MODEL` | server embedding modeli explicit seçilecekse | code default/mock fallback |
 
 ## MUST_BE_DISABLED
@@ -53,6 +54,8 @@ Preview RC baseline'ında aşağıdakiler unset/`0`/`off`/`disabled` kalır. Con
 - `D7_RESEARCH_SHADOW_ENABLED`
 - `D7_RESEARCH_PUBLIC_CITATIONS_ENABLED`
 - `D7_RESEARCH_EVIDENCE_CACHE_ENABLED`
+- `MEDIA_TRACKER_ANILIST_MODE` — explicit Preview UAT yoksa `disabled`
+- `MEDIA_TRACKER_TMDB_MODE` — approved logo asset yokken `disabled`
 
 ## LOCAL_ONLY
 
@@ -66,6 +69,7 @@ Bu adlar Vercel Preview/Production runtime env'ine taşınmaz.
 - `D8_PRODUCTION_PROJECT_REF`
 - `D8_STAGING_DATABASE_URL`
 - `SUPABASE_PRODUCTION_URL`
+- `OMDB_API_KEY` — yalnız legacy/local adapter teşhisi; public search/fallback her ortamda policy ile kapalı
 
 ## TEST_ONLY
 
@@ -109,8 +113,9 @@ Bu env adlarının Production-scope değerleri Preview'dan kopyalanmaz; D8-4B ho
 - `AI_SERVER_ACCESS_MODE`
 - `D7_RESEARCH_ROLLOUT_MODE`
 - `MEDIA_TRACKER_PROVIDER_USER_AGENT`
+- `MEDIA_TRACKER_ANILIST_MODE` — yalnız `disabled` veya yazılı izin sonrası `authorized`; `preview_test` yasak
+- `MEDIA_TRACKER_TMDB_MODE` — approved logo + notice + non-commercial karar kapanmadan `disabled`
 - `TMDB_READ_ACCESS_TOKEN`
-- `OMDB_API_KEY`
 - `OPENAI_API_KEY`, `OPENAI_MODEL`
 - `GROQ_API_KEY`, `GROQ_MODEL`
 - `OPENROUTER_API_KEY`, `OPENROUTER_MODEL`
@@ -124,4 +129,8 @@ Bu env adlarının Production-scope değerleri Preview'dan kopyalanmaz; D8-4B ho
 - Goal V1 açık + schema stage `v1` değilse yalnız Goal sync durur.
 - Research rollout disabled iken discovery/extraction/citation flag'leri açılmaz.
 - Provider key/model eksikse ücretli fallback yapılmaz.
+- AniList mode unset/invalid veya Production'da `preview_test` ise provider çağrısı başlamaz.
+- TMDB `noncommercial` olsa bile token, approved logo asset ve attribution birlikte yoksa provider çağrısı başlamaz.
+- OMDb public arama/fallback capability'si env/key'den bağımsız olarak kapalıdır; legacy `externalSource: "omdb"` kayıtları okunmaya devam eder.
+- Open Library gerçek contact içeren `MEDIA_TRACKER_PROVIDER_USER_AGENT` olmadan çağrılmaz.
 - Persistent embedding cache ve service-role key mandatory privacy/security kararı kapanmadan Preview/Production'da açılmaz.

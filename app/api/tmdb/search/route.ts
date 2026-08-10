@@ -25,6 +25,7 @@ import {
   readStrictJsonObject,
   resolveRateLimitIdentity,
 } from "@/lib/api/request-security";
+import { publicProviderCapability } from "@/lib/providers/release-policy";
 
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/w500";
 
@@ -102,6 +103,8 @@ export async function POST(request: NextRequest) {
   const requestedMediaType = parsed.value.mediaType === "tv" ? "tv" : "movie";
   const rateLimit = enforceRateLimit("search:tmdb", await resolveRateLimitIdentity(request), 60, 60_000);
   if (rateLimit) return rateLimit;
+  const capability = publicProviderCapability("tmdb");
+  if (!capability.enabled) return noStoreJson({ results: [], code: "provider_unavailable", reason: capability.reason }, { status: 503 });
 
   const token = process.env.TMDB_READ_ACCESS_TOKEN;
   if (!token) {

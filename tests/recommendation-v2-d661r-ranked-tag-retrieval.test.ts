@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 import { POST as searchAniListRoute } from "@/app/api/anilist/search/route";
@@ -117,7 +117,11 @@ function requestBody(init?: RequestInit) {
 }
 
 describe("D6.6-1R provider retrieval mapping and route", () => {
-  afterEach(() => vi.unstubAllGlobals());
+  beforeEach(() => vi.stubEnv("MEDIA_TRACKER_ANILIST_MODE", "authorized"));
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
 
   it("43 aspect id ve D6.6-1 strategy dağılımını değiştirmez", () => {
     expect(ASPECT_IDS).toHaveLength(43);

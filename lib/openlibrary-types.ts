@@ -47,4 +47,5 @@ export interface OpenLibraryNormalizedResult {
   isbn?: string[];                  // ISBN numaraları (en fazla 3 tane)
   workId?: string;                 // Exact work kimliği
   editionId?: string;              // Search doc içindeki exact edition ilişkisi
+  siteUrl?: string;
 }

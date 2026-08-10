@@ -18,6 +18,7 @@ import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import type { useLayoutPreferences } from "@/hooks/use-layout-preferences";
 import type { MediaItem, ProgressLog } from "@/lib/types";
 import type { LocalOwnerScope } from "@/lib/local-owner-scope";
+import { useProviderCapabilities } from "@/hooks/use-provider-capabilities";
 
 type LayoutController = ReturnType<typeof useLayoutPreferences>;
 
@@ -49,6 +50,7 @@ export default function SettingsFeature({
   onReset,
   onConfirm,
 }: SettingsFeatureProps) {
+  const { capabilities, loading: providerCapabilitiesLoading } = useProviderCapabilities();
   return (
     <div>
       <PageHeader
@@ -156,37 +158,33 @@ export default function SettingsFeature({
             <div className="my-4 h-px bg-[var(--app-border)]" />
             <h4 className="font-medium text-[var(--app-text-primary)]">Veri kaynakları</h4>
             <ul className="grid list-disc grid-cols-1 gap-x-6 gap-y-2 pl-5 lg:grid-cols-2">
-              <li>
+              {providerCapabilitiesLoading && <li>Aktif veri kaynakları doğrulanıyor…</li>}
+              {capabilities.providers.tvmaze.enabled && <li>
                 Dizi verileri{" "}
                 <a href="https://www.tvmaze.com/" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-[var(--app-accent)]">
-                  TVmaze
-                </a>.
-              </li>
-              <li>
+                  TVMaze
+                </a> kaynağından CC BY-SA koşulları altında sağlanır.
+              </li>}
+              {capabilities.providers.anilist.enabled && <li>
                 Anime ve manga verileri{" "}
                 <a href="https://anilist.co/" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-[var(--app-accent)]">
                   AniList
                 </a>.
-              </li>
-              <li>
+              </li>}
+              {capabilities.providers.openlibrary.enabled && <li>
                 Kitap verileri{" "}
                 <a href="https://openlibrary.org/" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-[var(--app-accent)]">
                   Open Library
-                </a>.
-              </li>
-              <li>
-                Film fallback verileri{" "}
-                <a href="https://www.omdbapi.com/" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-[var(--app-accent)]">
-                  OMDb API
-                </a>.
-              </li>
-              <li>
+                </a> üzerinden düşük hacimli kullanıcı aramalarında sağlanır.
+              </li>}
+              {capabilities.providers.tmdb.enabled && <li>
                 <span lang="en">This product uses the{" "}</span>
                 <a href="https://www.themoviedb.org/" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-[var(--app-accent)]">
                   TMDB API
                 </a>{" "}
                 <span lang="en">but is not endorsed or certified by TMDB.</span>
-              </li>
+              </li>}
+              {!providerCapabilitiesLoading && !Object.values(capabilities.providers).some((provider) => provider.enabled) && <li>Aktif public veri kaynağı bulunmuyor.</li>}
             </ul>
           </div>
         </div>

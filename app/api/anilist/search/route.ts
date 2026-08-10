@@ -27,6 +27,7 @@ import {
 } from "@/lib/anilist";
 import { providerRetrievalAllowlist } from "@/features/recommendations/domain/aspect-registry";
 import { SEARCH_REQUEST_MAX_BYTES, apiError, enforceRateLimit, fetchWithTimeout, noStoreJson, parseSearchQuery, readStrictJsonObject, resolveRateLimitIdentity } from "@/lib/api/request-security";
+import { publicProviderCapability } from "@/lib/providers/release-policy";
 
 // ---- GraphQL Sorgu Metinleri ----
 // `media(...)` alanı altında MEDIA_FIELDS aynı kalır; sadece dış argümanlar/sort
@@ -320,6 +321,8 @@ export async function POST(request: NextRequest) {
   }
   const rateLimit = enforceRateLimit("search:anilist", await resolveRateLimitIdentity(request), 60, 60_000);
   if (rateLimit) return rateLimit;
+  const capability = publicProviderCapability("anilist");
+  if (!capability.enabled) return noStoreJson({ results: [], code: "provider_unavailable", reason: capability.reason }, { status: 503 });
 
   try {
     let results: AniListRawMedia[] = [];

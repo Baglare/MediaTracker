@@ -4,6 +4,7 @@ import {
   isReleaseRouteTimeout,
   releaseRouteSignal,
 } from "@/app/api/calendar/release-route-utils";
+import { publicProviderCapability } from "@/lib/providers/release-policy";
 
 const ANILIST_URL = "https://graphql.anilist.co";
 const AIRING_QUERY = `
@@ -35,6 +36,8 @@ export async function GET(request: NextRequest) {
   if (!mediaId) {
     return NextResponse.json({ error: "Geçerli mediaId gereklidir." }, { status: 400 });
   }
+  const capability = publicProviderCapability("anilist");
+  if (!capability.enabled) return NextResponse.json({ events: [], code: "provider_unavailable", reason: capability.reason }, { status: 503, headers: { "Cache-Control": "no-store" } });
 
   try {
     const nowSeconds = Math.floor(Date.now() / 1000);

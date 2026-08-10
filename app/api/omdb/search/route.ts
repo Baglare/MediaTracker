@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { fetchOmdbDetail, fetchOmdbSearch, normalizeOmdbDetail } from "@/lib/omdb";
 import { OmdbNormalizedResult } from "@/lib/omdb-types";
 import { SEARCH_REQUEST_MAX_BYTES, apiError, enforceRateLimit, noStoreJson, parseSearchQuery, readStrictJsonObject, resolveRateLimitIdentity } from "@/lib/api/request-security";
+import { publicProviderCapability } from "@/lib/providers/release-policy";
 
 export async function POST(request: NextRequest) {
   const parsed = await readStrictJsonObject(request, new Set(["query"]), SEARCH_REQUEST_MAX_BYTES);
@@ -10,6 +11,8 @@ export async function POST(request: NextRequest) {
   if (!query.ok) return apiError("search_query_invalid", 400);
   const rateLimit = enforceRateLimit("search:omdb", await resolveRateLimitIdentity(request), 60, 60_000);
   if (rateLimit) return rateLimit;
+  const capability = publicProviderCapability("omdb");
+  if (!capability.enabled) return noStoreJson({ results: [], code: "provider_unavailable", reason: capability.reason }, { status: 503 });
 
   if (!process.env.OMDB_API_KEY) {
     return noStoreJson({ code: "provider_unavailable" }, { status: 503 });

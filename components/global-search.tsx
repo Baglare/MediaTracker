@@ -14,8 +14,8 @@ import {
 import GlobalSearchResultCard from "./global-search-result-card";
 import { TvmazeNormalizedResult } from "@/lib/tvmaze-types";
 import { OpenLibraryNormalizedResult } from "@/lib/openlibrary-types";
-import { OmdbNormalizedResult } from "@/lib/omdb-types";
 import { TmdbNormalizedResult } from "@/lib/tmdb-types";
+import type { PublicProviderCapabilities } from "@/lib/providers/types";
 import {
   anilistDiagnosticMessage,
   collectFulfilledSearchResults,
@@ -30,6 +30,7 @@ interface GlobalSearchProps {
   // sinyali. token monoton artar; aynı (query, category) için bile yeni
   // token ile değişirse prefill yeniden uygulanır.
   prefill?: { query: string; category?: GlobalSearchCategory; token: number } | null;
+  capabilities: PublicProviderCapabilities;
 }
 
 // R23.2: Kategori chip seti Kütüphanem'in Dünya taksonomisine paralel
@@ -38,15 +39,24 @@ interface GlobalSearchProps {
 // AniList format=NOVEL + light/web/visual novel tiplerini toplar. Fetch
 // katmanına yeni param geçmiyoruz: chip görünüm filtresi `viewCategoryOf`
 // üzerinden client-side yapılır; aynı raw havuz reuse edilir.
-const CATEGORIES: { value: GlobalSearchCategory; label: string }[] = [
-  { value: "all", label: "Hepsi" },
-  { value: "movie", label: "Film" },
-  { value: "tv", label: "Dizi" },
-  { value: "anime", label: "Anime" },
-  { value: "manga", label: "Manga" },
-  { value: "novel", label: "Novel" },
-  { value: "book", label: "Kitap" },
-];
+export function categoriesForCapabilities(capabilities: PublicProviderCapabilities): { value: GlobalSearchCategory; label: string }[] {
+  const categories: { value: GlobalSearchCategory; label: string }[] = [{ value: "all", label: "Hepsi" }];
+  if (capabilities.providers.tmdb.enabled) categories.push({ value: "movie", label: "Film" });
+  if (capabilities.providers.tvmaze.enabled) categories.push({ value: "tv", label: "Dizi" });
+  if (capabilities.providers.anilist.enabled) categories.push({ value: "anime", label: "Anime" }, { value: "manga", label: "Manga" }, { value: "novel", label: "Novel" });
+  if (capabilities.providers.openlibrary.enabled) categories.push({ value: "book", label: "Kitap" });
+  return categories;
+}
+
+export function categoryForCapabilities(
+  category: GlobalSearchCategory | undefined,
+  capabilities: PublicProviderCapabilities,
+): GlobalSearchCategory {
+  const requested = category ?? "all";
+  return categoriesForCapabilities(capabilities).some((item) => item.value === requested)
+    ? requested
+    : "all";
+}
 
 // Görsel chip / group anahtarı. AniList raw'ındaki format=NOVEL light novel
 // olarak konumlanır; type alanı (manga/manhwa/manhua) tek bir "Manga" grubu
@@ -76,7 +86,7 @@ const DEFAULT_LIBRARY_STATUS: GlobalSearchLibraryStatus = {
   hasAddableParts: false,
 };
 
-export default function GlobalSearch({ getLibraryStatus, onAddToLibrary, prefill }: GlobalSearchProps) {
+export default function GlobalSearch({ getLibraryStatus, onAddToLibrary, prefill, capabilities }: GlobalSearchProps) {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<GlobalSearchCategory>("all");
   const [isSearching, setIsSearching] = useState(false);
@@ -95,10 +105,13 @@ export default function GlobalSearch({ getLibraryStatus, onAddToLibrary, prefill
   // setIsSearching gibi iç state'ler effect body'sinin dışında oluşur.
   const [lastPrefillToken, setLastPrefillToken] = useState<number | null>(null);
   const consumedPrefillToken = useRef<number | null>(null);
+  const categories = categoriesForCapabilities(capabilities);
+  const enabledLabels = categories.slice(1).map((item) => item.label.toLocaleLowerCase("tr-TR"));
+  const anyProviderEnabled = enabledLabels.length > 0;
   if (prefill && prefill.token !== lastPrefillToken) {
     setLastPrefillToken(prefill.token);
     const nextQuery = prefill.query || "";
-    const nextCategory: GlobalSearchCategory = prefill.category || "all";
+    const nextCategory = categoryForCapabilities(prefill.category, capabilities);
     setQuery(nextQuery);
     setCategory(nextCategory);
   }
@@ -114,7 +127,7 @@ export default function GlobalSearch({ getLibraryStatus, onAddToLibrary, prefill
     // olmadan çağrıldığı için closure'daki `category` eski kalıyordu — sonuçlar
     // önceki kategoriye göre çekiliyor, kullanıcıya alakasız bir liste düşüyordu.
     // Çağıran taraf yeni değeri `overrideCategory` ile geçebilir.
-    const activeCategory = overrideCategory ?? category;
+    const activeCategory = categoryForCapabilities(overrideCategory ?? category, capabilities);
 
     setIsSearching(true);
     setError(null);
@@ -126,27 +139,8 @@ export default function GlobalSearch({ getLibraryStatus, onAddToLibrary, prefill
     try {
       const fetchPromises: Promise<GlobalSearchResult[]>[] = [];
 
-      if (activeCategory === "all" || activeCategory === "movie") {
-        // R21.2: Film pipeline'ı — TMDB **birincil**, OMDb fallback.
-        //
-        // Akış:
-        //   1) /api/tmdb/search → 200 + results.length > 0 ise TMDB sonuçlarını döndür.
-        //   2) TMDB unavailable (503), upstream hata (502), network exception veya
-        //      0 sonuç durumunda /api/omdb/search'e düş.
-        //   3) Kategori "movie" iken her iki kaynak da kırılırsa hatayı yukarı fırlat
-        //      ki kullanıcıya "Sonuç bulunamadı / arama başarısız" notu çıksın
-        //      (eski OMDb-only davranışın korunması).
-        //   4) Kategori "all" iken iki kaynak da boşsa sessizce boş döner —
-        //      diğer kaynaklar (tvmaze/anilist/openlibrary) etkilenmez.
-        //
-        // Bilinçli karar: paralel çalıştırıp dedupe ETMİYORUZ. Sıralı çalışma
-        // hem rate-limit dostu hem de "TMDB başarılıysa OMDb karışmasın"
-        // şartını doğal olarak sağlıyor. Sadece düşülen fallback'te OMDb
-        // sonuçları görünür — duplicate yüzeyi yok.
+      if (capabilities.providers.tmdb.enabled && (activeCategory === "all" || activeCategory === "movie")) {
         const moviePipeline: Promise<GlobalSearchResult[]> = (async () => {
-          // --- 1) TMDB dene ---
-          let tmdbResults: GlobalSearchResult[] = [];
-          let tmdbOk = false;
           try {
             const res = await fetch("/api/tmdb/search", {
               method: "POST",
@@ -158,9 +152,7 @@ export default function GlobalSearch({ getLibraryStatus, onAddToLibrary, prefill
               error?: string;
             };
             if (res.ok) {
-              tmdbOk = true;
-              const arr = data.results || [];
-              tmdbResults = arr.map((item): GlobalSearchResult => ({
+              return (data.results || []).map((item): GlobalSearchResult => ({
                 source: "tmdb",
                 externalId: item.externalId,
                 type: "movie",
@@ -170,65 +162,20 @@ export default function GlobalSearch({ getLibraryStatus, onAddToLibrary, prefill
                 releaseYear: item.releaseYear,
                 coverUrl: item.coverUrl,
                 totalProgress: item.totalProgress,
+                sourceUrl: `https://www.themoviedb.org/movie/${encodeURIComponent(item.externalId)}`,
                 raw: item,
               }));
-            } else {
-              // 502/503 vb. → fallback'e geç; logu sessizce bırak.
-              console.warn(
-                `[tmdb] arama başarısız (${res.status}) — OMDb fallback'ine düşülüyor.`,
-                data?.error,
-              );
             }
-          } catch (err) {
-            console.warn("[tmdb] fetch exception — OMDb fallback'ine düşülüyor:", err);
-          }
-
-          if (tmdbOk && tmdbResults.length > 0) {
-            return tmdbResults;
-          }
-
-          // --- 2) OMDb fallback ---
-          try {
-            const res = await fetch("/api/omdb/search", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ query }),
-            });
-            const data = (await res.json().catch(() => ({ results: [] }))) as {
-              results?: OmdbNormalizedResult[];
-              error?: string;
-            };
-            if (!res.ok) {
-              if (activeCategory === "movie") {
-                // Hem TMDB hem OMDb kırıldı → kullanıcıya görünür hata.
-                throw new Error(data?.error || "Film araması başarısız.");
-              }
-              return [];
-            }
-            const arr = data.results || [];
-            return arr.map((item): GlobalSearchResult => ({
-              source: "omdb",
-              externalId: item.externalId,
-              type: "movie",
-              title: item.title,
-              subtitle: item.director,
-              overview: item.overview,
-              releaseYear: item.releaseYear,
-              coverUrl: item.coverUrl,
-              genres: item.genres,
-              totalProgress: item.totalProgress,
-              raw: item,
-            }));
-          } catch (err) {
-            if (activeCategory === "movie") throw err;
+          } catch {
             return [];
           }
+          return [];
         })();
 
         fetchPromises.push(moviePipeline);
       }
 
-      if (activeCategory === "all" || activeCategory === "tv") {
+      if (capabilities.providers.tvmaze.enabled && (activeCategory === "all" || activeCategory === "tv")) {
         fetchPromises.push(
           fetch("/api/tvmaze/search", {
             method: "POST",
@@ -248,6 +195,7 @@ export default function GlobalSearch({ getLibraryStatus, onAddToLibrary, prefill
                 releaseYear: item.releaseYear,
                 coverUrl: item.coverUrl,
                 genres: item.genres,
+                sourceUrl: item.siteUrl,
                 raw: item,
               }));
             })
@@ -261,12 +209,12 @@ export default function GlobalSearch({ getLibraryStatus, onAddToLibrary, prefill
       //     filter yok → manhwa/manhua dahil; novel için format=NOVEL
       //     client-side filtre uygulanır).
       // movie/tv/book chip'lerinde anilist hiç çağrılmaz.
-      if (
+      if (capabilities.providers.anilist.enabled && (
         activeCategory === "all" ||
         activeCategory === "anime" ||
         activeCategory === "manga" ||
         activeCategory === "novel"
-      ) {
+      )) {
         const anilistParam = activeCategory === "anime" ? "anime" : "all";
         fetchPromises.push(
           fetchAniListGlobalSearch({ query, category: anilistParam })
@@ -284,13 +232,14 @@ export default function GlobalSearch({ getLibraryStatus, onAddToLibrary, prefill
                 coverUrl: item.coverUrl,
                 genres: item.genres,
                 totalProgress: item.totalProgress,
+                sourceUrl: item.siteUrl,
                 raw: item,
               }));
             })
         );
       }
 
-      if (activeCategory === "all" || activeCategory === "book") {
+      if (capabilities.providers.openlibrary.enabled && (activeCategory === "all" || activeCategory === "book")) {
         fetchPromises.push(
           fetch("/api/openlibrary/search", {
             method: "POST",
@@ -312,6 +261,7 @@ export default function GlobalSearch({ getLibraryStatus, onAddToLibrary, prefill
                 subjects: item.subjects,
                 authors: item.authors,
                 totalProgress: item.totalProgress,
+                sourceUrl: item.siteUrl,
                 raw: item,
               }));
             })
@@ -364,7 +314,7 @@ export default function GlobalSearch({ getLibraryStatus, onAddToLibrary, prefill
     // doğrudan zincirinde olmasın diye. Bu, react-hooks/set-state-in-effect
     // ihlalinden kaçınmanın temiz yolu.
     const handle = setTimeout(() => {
-      void handleSearch(null, prefill.category || "all");
+      void handleSearch(null, categoryForCapabilities(prefill.category, capabilities));
     }, 0);
     return () => clearTimeout(handle);
     // handleSearch closure'da güncel query/category'i okur (render fazında
@@ -418,7 +368,7 @@ export default function GlobalSearch({ getLibraryStatus, onAddToLibrary, prefill
   }
 
   // Kategori başına gösterilen maksimum sonuç sayısı.
-  // Backend tarafları: AniList 12, OpenLibrary 12, TVmaze/OMDb default — 9 hepsiyle uyumlu.
+  // Backend tarafları: AniList 12, OpenLibrary 12 ve TVMaze default — 9 hepsiyle uyumlu.
   const PER_CATEGORY_LIMIT = 9;
   // R23.2: Görsel gruplama `viewCategoryOf` üzerinden. Manga grubu
   // manga+manhwa+manhua'yı; novel grubu light/web/visual novel'i ve
@@ -448,7 +398,7 @@ export default function GlobalSearch({ getLibraryStatus, onAddToLibrary, prefill
           </span>
           <div className="flex-1 h-px bg-zinc-800/60" />
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-3">
           {items.map((res) => {
             const key = `${res.source}-${res.externalId}`;
             return (
@@ -480,7 +430,7 @@ export default function GlobalSearch({ getLibraryStatus, onAddToLibrary, prefill
           Global Arama
         </h2>
         <p className="text-[12px] text-zinc-500 mt-0.5">
-          Tüm aktif kaynakları aynı sorguda tara — film, dizi, anime, manga, novel ve kitap.
+          {anyProviderEnabled ? `Aktif kaynaklarda ${enabledLabels.join(", ")} ara.` : "Public arama sağlayıcıları şu anda kullanılamıyor."}
         </p>
       </div>
 
@@ -513,7 +463,7 @@ export default function GlobalSearch({ getLibraryStatus, onAddToLibrary, prefill
       {/* R23: Kategori pill'leri mobilde yatay scroll, sm+ wrap.
           Aktif state dünya tonunda; eski sabit violet kaldırıldı. */}
       <div className="-mx-1 flex sm:flex-wrap items-center gap-1.5 overflow-x-auto sm:overflow-visible scrollbar-hide px-1 touch-pan-x mb-5">
-        {CATEGORIES.map((cat) => {
+        {categories.map((cat) => {
           const active = category === cat.value;
           return (
             <button
@@ -595,7 +545,7 @@ export default function GlobalSearch({ getLibraryStatus, onAddToLibrary, prefill
               // ViewCategory'sine göre filtrele. AniList "all" çağrısından
               // gelen MANGA + format=NOVEL kayıtları "manga" chip'inde
               // görünmez, "novel" chip'inde görünür.
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-3">
                 {results
                   // category burada "all" değil — render üst seviyesinde
                   // ternary ile narrowed; doğrudan ViewCategory karşılaştırması.

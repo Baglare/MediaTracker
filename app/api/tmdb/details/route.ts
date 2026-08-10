@@ -13,6 +13,7 @@ import type {
   TmdbNormalizedDetail,
   TmdbTvDetailResponse,
 } from "@/lib/tmdb-types";
+import { publicProviderCapability } from "@/lib/providers/release-policy";
 
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/w500";
 
@@ -93,6 +94,8 @@ export async function GET(request: NextRequest) {
   if (!id || id.trim().length === 0) {
     return NextResponse.json({ error: "id gerekli." }, { status: 400 });
   }
+  const capability = publicProviderCapability("tmdb");
+  if (!capability.enabled) return NextResponse.json({ result: null, code: "provider_unavailable", reason: capability.reason }, { status: 503, headers: { "Cache-Control": "no-store" } });
 
   const token = process.env.TMDB_READ_ACCESS_TOKEN;
   if (!token) {

@@ -5,6 +5,8 @@ import {
   isReleaseRouteTimeout,
   releaseRouteSignal,
 } from "@/app/api/calendar/release-route-utils";
+import { providerUserAgent } from "@/lib/api/provider-identity";
+import { publicProviderCapability } from "@/lib/providers/release-policy";
 
 interface TvmazeReleaseEpisode {
   id: number;
@@ -42,10 +44,18 @@ export async function GET(request: NextRequest) {
       { status: 400 },
     );
   }
+  const capability = publicProviderCapability("tvmaze");
+  if (!capability.enabled) {
+    return NextResponse.json(
+      { events: [], code: "provider_unavailable", reason: capability.reason },
+      { status: 503, headers: { "Cache-Control": "no-store" } },
+    );
+  }
 
   try {
+    const userAgent = providerUserAgent();
     const response = await fetch(`https://api.tvmaze.com/shows/${showId}/episodes`, {
-      headers: { accept: "application/json" },
+      headers: { accept: "application/json", ...(userAgent ? { "User-Agent": userAgent } : {}) },
       cache: "no-store",
       signal: releaseRouteSignal(),
     });

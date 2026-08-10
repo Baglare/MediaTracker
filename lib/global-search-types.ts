@@ -6,9 +6,8 @@ import { MediaType } from "./types";
 
 /** Global Search sonuçlarının ortak yapısı */
 export interface GlobalSearchResult {
-  // R21.2: TMDB film aramalarında birincil kaynak olarak eklendi. OMDb
-  // hâlâ fallback kaynağı olarak kullanılıyor (TMDB unavailable veya 0 sonuç
-  // durumlarında).
+  // `omdb` legacy kütüphane/import uyumluluğu için korunur; public yeni arama
+  // policy'si bu kaynaktan yeni sonuç üretmez.
   source: "tvmaze" | "anilist" | "openlibrary" | "omdb" | "tmdb";
   externalId: string;
   type: MediaType;
@@ -22,6 +21,7 @@ export interface GlobalSearchResult {
   subjects?: string[];
   authors?: string[];
   totalProgress?: number;
+  sourceUrl?: string;
   // Ekleme sırasında detay çekmek için gerekli ham veri
   raw?: unknown;
 }

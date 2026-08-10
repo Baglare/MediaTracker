@@ -5,6 +5,7 @@ import {
   isReleaseRouteTimeout,
   releaseRouteSignal,
 } from "@/app/api/calendar/release-route-utils";
+import { publicProviderCapability } from "@/lib/providers/release-policy";
 
 interface TmdbReleaseDate {
   certification?: string;
@@ -36,6 +37,8 @@ export async function GET(request: NextRequest) {
   if (!movieId) {
     return NextResponse.json({ error: "Geçerli movieId gereklidir." }, { status: 400 });
   }
+  const capability = publicProviderCapability("tmdb");
+  if (!capability.enabled) return NextResponse.json({ events: [], code: "provider_unavailable", reason: capability.reason }, { status: 503, headers: { "Cache-Control": "no-store" } });
   const token = process.env.TMDB_READ_ACCESS_TOKEN;
   if (!token) {
     return NextResponse.json({ error: "TMDB yapılandırılmadı." }, { status: 503 });

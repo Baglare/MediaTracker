@@ -22,7 +22,6 @@ import {
 import { AniListNormalizedResult, AniListCategory } from "@/lib/anilist-types";
 import { TvmazeNormalizedResult } from "@/lib/tvmaze-types";
 import { OpenLibraryNormalizedResult } from "@/lib/openlibrary-types";
-import { OmdbNormalizedResult } from "@/lib/omdb-types";
 import { TmdbNormalizedResult } from "@/lib/tmdb-types";
 import { GlobalSearchResult } from "@/lib/global-search-types";
 import type { AdvisorScopeMode } from "./types";
@@ -1230,7 +1229,7 @@ async function searchForType(ctx: SearchContext, type: MediaType, q: string): Pr
     case "visual_novel":
       return searchOpenLibrary(ctx, q);
     case "movie":
-      return searchOmdb(ctx, q);
+      return searchTmdb(ctx, q, "movie");
   }
 }
 
@@ -1504,7 +1503,7 @@ async function runRetrievalPlan(
       if (p.source === "anilist") tasks.push(searchAniList(ctx, q, p.mediaType));
       else if (p.source === "tvmaze") tasks.push(searchTvmaze(ctx, q));
       else if (p.source === "openlibrary") tasks.push(searchOpenLibrary(ctx, q));
-      else if (p.source === "omdb") tasks.push(searchOmdb(ctx, q));
+      else if (p.source === "omdb") continue;
       else if (p.source === "tmdb") tasks.push(searchTmdb(ctx, q, p.mediaType === "tv" ? "tv" : "movie"));
     }
   }
@@ -1534,16 +1533,12 @@ async function searchForIdea(ctx: SearchContext, idea: AiCandidateIdea): Promise
     case "visual_novel":
       return searchOpenLibrary(ctx, query);
     case "movie":
-      return searchOmdb(ctx, query);
+      return searchTmdb(ctx, query, "movie");
   }
 }
 
-// R37/D6-2 — TMDB movie/TV araması. Movie source-apis modunun birincil film
-// kaynağıdır; TV ise TVMaze yanında discovery/enrichment kaynağıdır.
-// TMDB route'u token eksikse 503 + boş results döndürdüğü için bu fonksiyon
-// boş sonuç durumunda OMDb fallback'in çağrıldığını söyleyen bir sinyal
-// üretmez — orchestrator (searchSourceApiCandidates) zaten ardından OMDb'yi
-// çalıştırır.
+// R37/D6-2 — TMDB movie/TV araması. Release policy route seviyesinde de
+// uygulanır; devre dışıysa boş sonuçla fail-soft kalır ve OMDb fallback yoktur.
 async function searchTmdb(ctx: SearchContext, q: string, mediaType: "movie" | "tv" = "movie"): Promise<AiCandidate[]> {
   if (!q.trim()) return [];
   try {
@@ -1584,50 +1579,6 @@ async function searchTmdb(ctx: SearchContext, q: string, mediaType: "movie" | "t
     });
   } catch {
     recordQuery(ctx.debug, "tmdb", "movie", q, 0);
-    return [];
-  }
-}
-
-async function searchOmdb(ctx: SearchContext, q: string): Promise<AiCandidate[]> {
-  if (!q.trim()) return [];
-  try {
-    const url = `${ctx.baseUrl}/api/omdb/search`;
-    const res = await providerFetch(ctx, "omdb", url, {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: q }), cache: "no-store",
-    });
-    if (!res.ok) return [];
-    const data = (await res.json()) as { results?: unknown };
-    const results = decodeProviderResults<OmdbNormalizedResult>(data.results, ctx.debug, ["movie"]);
-    recordQuery(ctx.debug, "omdb", "movie", q, results.length);
-    return results.map<AiCandidate>((r) => {
-      const gs: GlobalSearchResult = {
-        source: "omdb",
-        externalId: r.externalId,
-        type: "movie",
-        title: r.title,
-        overview: r.overview,
-        releaseYear: r.releaseYear,
-        coverUrl: r.coverUrl,
-        genres: r.genres,
-        totalProgress: r.totalProgress,
-        raw: r,
-      };
-      return {
-        source: "omdb",
-        externalId: r.externalId,
-        type: "movie",
-        title: r.title,
-        overview: r.overview,
-        releaseYear: r.releaseYear,
-        coverUrl: r.coverUrl,
-        genres: r.genres,
-        totalProgress: r.totalProgress,
-        averageScore: r.imdbRating,
-        globalSearch: gs,
-      };
-    });
-  } catch {
-    recordQuery(ctx.debug, "omdb", "movie", q, 0);
     return [];
   }
 }
@@ -1878,8 +1829,6 @@ export async function searchCandidatesWithDebug(args: {
 interface ScopePlan {
   /** Bu kapsam için sorgulanacak (source, mediaType) çiftleri */
   pairs: { source: RetrievalSource; mediaType: MediaType }[];
-  /** TMDB → OMDb fallback yapılacak mı (sadece movie hedefliyse) */
-  tmdbToOmdbFallback: boolean;
 }
 
 function planForScope(scope: AdvisorScopeMode): ScopePlan {
@@ -1898,15 +1847,15 @@ function planForScope(scope: AdvisorScopeMode): ScopePlan {
 
   switch (scope) {
     case "east":
-      return { pairs: east, tmdbToOmdbFallback: false };
+      return { pairs: east };
     case "screen":
-      return { pairs: screen, tmdbToOmdbFallback: true };
+      return { pairs: screen };
     case "arch":
-      return { pairs: arch, tmdbToOmdbFallback: false };
+      return { pairs: arch };
     case "one-per-world":
     case "mixed":
     default:
-      return { pairs: [...east, ...screen, ...arch], tmdbToOmdbFallback: true };
+      return { pairs: [...east, ...screen, ...arch] };
   }
 }
 
@@ -1930,7 +1879,7 @@ function dispatchSearch(
     case "tmdb":
       return mediaType === "movie" || mediaType === "tv" ? searchTmdb(ctx, query, mediaType) : Promise.resolve([]);
     case "omdb":
-      return searchOmdb(ctx, query);
+      return Promise.resolve([]);
     case "web":
       return Promise.resolve([]);
     case "library":
@@ -2145,27 +2094,6 @@ export async function searchSourceApiCandidates(args: {
   const otherSettled = await Promise.allSettled(otherTasks);
   for (const s of otherSettled) {
     if (s.status === "fulfilled") collected.push(...s.value);
-  }
-
-  // Film için TMDB hiç sonuç döndürmediyse OMDb fallback'i.
-  if (plan.tmdbToOmdbFallback) {
-    const wantsMovie = pairs.some((p) => p.mediaType === "movie");
-    if (wantsMovie) {
-      const tmdbCount = collected.filter((c) => c.source === "tmdb").length;
-      if (tmdbCount === 0) {
-        notes.push("tmdb_empty_omdb_fallback");
-        const omdbPlan = sourceQueriesFor("tmdb", intent, profile, message, expanded);
-        notes.push(`omdb_query_strategy:source=tmdb_fallback queries=${omdbPlan.queries.join("|") || "-"}`);
-        for (const q of omdbPlan.queries) {
-          try {
-            const fb = await searchOmdb(ctx, q);
-            collected.push(...fb);
-          } catch {
-            // yutulur — fallback'in başarısız olması akışı durdurmaz
-          }
-        }
-      }
-    }
   }
 
   const deduped = dedupeCandidates(collected);

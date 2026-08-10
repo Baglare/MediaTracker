@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
+vi.mock("@/lib/providers/release-policy", () => ({
+  publicProviderCapability: () => ({ enabled: true, reason: "enabled" }),
+}));
+
 import { GET as getAniList } from "@/app/api/calendar/anilist/route";
 import { GET as getTmdb } from "@/app/api/calendar/tmdb/route";
 import { GET as getTvmaze } from "@/app/api/calendar/tvmaze/route";

@@ -1,4 +1,6 @@
 import type { OpenLibraryNormalizedResult } from "@/lib/openlibrary-types";
+import { providerUserAgent } from "@/lib/api/provider-identity";
+import { publicProviderCapability } from "@/lib/providers/release-policy";
 import { createVerifiedCandidateIdentity } from "./candidate-identity";
 import { mapProviderMetadataClaim, mapProviderSubjectClaims } from "./evidence-mappers";
 import type { CandidateProviderEvidenceSnapshot, SecondaryIdentity } from "./types";
@@ -33,14 +35,17 @@ export async function fetchOpenLibraryWorkEvidence(input: {
   fetchImpl?: typeof fetch;
   timeoutMs?: number;
 }): Promise<CandidateProviderEvidenceSnapshot> {
+  const capability = publicProviderCapability("openlibrary");
+  if (!capability.enabled) throw new Error(`openlibrary_evidence_unavailable:${capability.reason}`);
   const base = adaptOpenLibraryEvidence(input.result);
   const workId = input.result.workId || input.result.externalId;
   if (!/^\/works\/OL[A-Za-z0-9]+W$/.test(workId)) throw new Error("openlibrary_work_id_invalid");
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), input.timeoutMs ?? 2500);
   try {
+    const userAgent = providerUserAgent();
     const response = await (input.fetchImpl ?? fetch)(`https://openlibrary.org${workId}.json`, {
-      headers: { accept: "application/json" }, signal: controller.signal,
+      headers: { accept: "application/json", ...(userAgent ? { "User-Agent": userAgent } : {}) }, signal: controller.signal,
     });
     if (!response.ok) throw new Error(`openlibrary_evidence_unavailable:${response.status}`);
     const work = (await response.json()) as OpenLibraryWorkResponse;

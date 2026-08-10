@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 import { POST as searchAniList } from "@/app/api/anilist/search/route";
@@ -54,8 +54,13 @@ function rawMedia(overrides: Partial<AniListRawMedia> = {}): AniListRawMedia {
 }
 
 describe("global AniList search diagnostics", () => {
+  beforeEach(() => {
+    vi.stubEnv("MEDIA_TRACKER_ANILIST_MODE", "authorized");
+  });
+
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
   });
 
   it("keeps a successful result separate from diagnostics", async () => {

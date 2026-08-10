@@ -22,6 +22,7 @@ export interface TvmazeNetwork {
 /** TVmaze search endpoint'inden dönen ham show verisi */
 export interface TvmazeRawShow {
   id: number;
+  url?: string;
   name: string;
   type?: string | null;
   language?: string | null;
@@ -78,6 +79,7 @@ export interface TvmazeNormalizedResult {
   theTvdbId?: string;
   premiered?: string;
   ended?: string;
+  siteUrl?: string;
 }
 
 /** Normalize edilmiş TVmaze detay sonucu (listeye eklerken kullanılır) */

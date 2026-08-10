@@ -14,6 +14,7 @@ import {
 } from "@/lib/tvmaze-types";
 import { SEARCH_REQUEST_MAX_BYTES, apiError, enforceRateLimit, fetchWithTimeout, noStoreJson, parseSearchQuery, readStrictJsonObject, resolveRateLimitIdentity } from "@/lib/api/request-security";
 import { providerUserAgent } from "@/lib/api/provider-identity";
+import { publicProviderCapability } from "@/lib/providers/release-policy";
 
 /**
  * HTML etiketlerini kaldırıp düz metin döndüren basit fonksiyon.
@@ -75,6 +76,7 @@ export function normalizeSearchResult(
     theTvdbId: typeof show.externals?.thetvdb === "number" ? String(show.externals.thetvdb) : undefined,
     premiered: show.premiered || undefined,
     ended: show.ended || undefined,
+    siteUrl: show.url || `https://www.tvmaze.com/shows/${show.id}`,
   };
 }
 
@@ -88,6 +90,8 @@ export async function POST(request: NextRequest) {
   if (!query.ok) return apiError("search_query_invalid", 400);
   const rateLimit = enforceRateLimit("search:tvmaze", await resolveRateLimitIdentity(request), 60, 60_000);
   if (rateLimit) return rateLimit;
+  const capability = publicProviderCapability("tvmaze");
+  if (!capability.enabled) return noStoreJson({ results: [], code: "provider_unavailable", reason: capability.reason }, { status: 503 });
 
   // 2) TVmaze API'sine istek at
   try {

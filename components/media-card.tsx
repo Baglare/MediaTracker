@@ -45,6 +45,7 @@ import {
   topAccentGradient,
   MediaClassificationBadges,
 } from "@/components/theme-accent";
+import { MediaCardShell } from "@/components/media-card-shell";
 
 interface MediaCardProps {
   item: MediaItem;
@@ -192,12 +193,7 @@ export default function MediaCard({
     //   - bg artık iki katmanlı (gradient + zinc) — flat 2015 hissi gitti.
     //   - hover'da hafif lift (translate-y) + accent border + soft shadow.
     //   - overflow-hidden korunuyor (ribbon kart sınırı içinde yaşıyor).
-    <div className="media-card expandable-title-card group relative flex flex-col rounded-2xl border border-zinc-800/60 bg-gradient-to-b from-zinc-900/60 to-zinc-900/30 overflow-hidden transition-all duration-300 hover:border-[color-mix(in_srgb,var(--w-primary)_38%,#52525b)] hover:shadow-lg hover:shadow-black/40 motion-safe:hover:-translate-y-0.5">
-      {/* Üst accent — hover'da öne çıkan ince çizgi. */}
-      <div
-        aria-hidden
-        className={`absolute top-0 left-0 right-0 h-px bg-gradient-to-r ${accentGradient} opacity-40 group-hover:opacity-90 transition-opacity`}
-      />
+    <MediaCardShell className="media-card expandable-title-card" accentClassName={accentGradient}>
 
       {/* === Favori corner ribbon ===
           Görünür kurdele eski dikey bookmark oranını korur; dış button alanı
@@ -660,6 +656,6 @@ export default function MediaCard({
           </>
         )}
       </div>
-    </div>
+    </MediaCardShell>
   );
 }

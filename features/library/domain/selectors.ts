@@ -134,5 +134,5 @@ export function resolveWorldScope(
 }
 
 export function shouldShowDashboardRightRail(activeTab: string): boolean {
-  return !["dashboard", "ai", "settings"].includes(activeTab);
+  return !["dashboard", "discover", "ai", "settings"].includes(activeTab);
 }

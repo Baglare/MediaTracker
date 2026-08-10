@@ -15,6 +15,7 @@ import {
 } from "@/lib/openlibrary-types";
 import { SEARCH_REQUEST_MAX_BYTES, apiError, enforceRateLimit, fetchWithTimeout, noStoreJson, parseSearchQuery, readStrictJsonObject, resolveRateLimitIdentity } from "@/lib/api/request-security";
 import { providerUserAgent } from "@/lib/api/provider-identity";
+import { publicProviderCapability } from "@/lib/providers/release-policy";
 
 /**
  * Tek bir Open Library doc'unu normalize eder.
@@ -56,6 +57,7 @@ export function normalizeDoc(doc: OpenLibraryRawDoc): OpenLibraryNormalizedResul
     isbn,
     workId: doc.key,
     editionId: doc.edition_key?.[0] ? `/books/${doc.edition_key[0]}` : undefined,
+    siteUrl: `https://openlibrary.org${doc.key.startsWith("/") ? doc.key : `/${doc.key}`}`,
   };
 }
 
@@ -69,6 +71,8 @@ export async function POST(request: NextRequest) {
   if (!query.ok) return apiError("search_query_invalid", 400);
   const rateLimit = enforceRateLimit("search:openlibrary", await resolveRateLimitIdentity(request), 60, 60_000);
   if (rateLimit) return rateLimit;
+  const capability = publicProviderCapability("openlibrary");
+  if (!capability.enabled) return noStoreJson({ results: [], code: "provider_unavailable", reason: capability.reason }, { status: 503 });
 
   // 2) Open Library API'sine istek at
   try {

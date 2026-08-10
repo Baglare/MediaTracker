@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { AniListDetailResponse } from "@/lib/anilist-types";
 import { normalizeAniListMedia } from "@/lib/anilist";
+import { publicProviderCapability } from "@/lib/providers/release-policy";
 
 // ---- GraphQL Sorgu Metni ----
 const DETAIL_QUERY = `
@@ -93,6 +94,8 @@ export async function GET(request: NextRequest) {
       { status: 400 }
     );
   }
+  const capability = publicProviderCapability("anilist");
+  if (!capability.enabled) return NextResponse.json({ result: null, code: "provider_unavailable", reason: capability.reason }, { status: 503, headers: { "Cache-Control": "no-store" } });
 
   try {
     const response = await fetch(ANILIST_URL, {

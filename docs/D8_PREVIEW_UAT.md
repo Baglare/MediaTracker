@@ -109,13 +109,15 @@ Bu paket D8-4A staging PASS sonrasındaki Vercel Preview kullanıcı kabulünü 
 
 | ID | Seviye | Ön koşul | Kullanıcı | Yapılacak işlem | Beklenen sonuç / UI / Network | Sonuç |
 | --- | --- | --- | --- | --- | --- | --- |
-| DISC-01 | MAJOR | TMDB configured | User B | Film ara, sonuç aç/ekle | POST JSON; sorgu URL'de yok; film contract korunur | ☐ PASS ☐ FAIL ☐ BLOCKED |
-| DISC-02 | MAJOR | TVMaze/TMDB available | User B | TV dizisi ara | Kaynaklar fail-soft birleşir; duplicate/yanlış type yok | ☐ PASS ☐ FAIL ☐ BLOCKED |
-| DISC-03 | MAJOR | AniList available | User B | Anime ve manga ara | Type/country ayrımı ve sonuç kartları doğru | ☐ PASS ☐ FAIL ☐ BLOCKED |
+| DISC-01 | MAJOR | TMDB `noncommercial` + token + approved logo/notice hazır | User B | Film ara, sonuç aç/ekle | Capability Film chip'ini açar; POST JSON; sorgu URL'de yok | ☐ PASS ☐ FAIL ☐ BLOCKED |
+| DISC-02 | MAJOR | TVMaze available | User B | TV dizisi ara | TVMaze sonucu/source linki doğru; duplicate/yanlış type yok | ☐ PASS ☐ FAIL ☐ BLOCKED |
+| DISC-03 | MAJOR | AniList `preview_test`/`authorized` | User B | Anime ve manga ara | Yalnız mode izinliyken chip/panel görünür; type/country ayrımı doğru | ☐ PASS ☐ FAIL ☐ BLOCKED |
 | DISC-04 | MAJOR | Open Library available | User B | Kitap ara | Book kimliği/cover fallback ve plain-text açıklama doğru | ☐ PASS ☐ FAIL ☐ BLOCKED |
 | DISC-05 | MAJOR | Sonuçsuz sorgu | User B | Provider boş sonuç üret | Kullanıcı dostu boş state; diğer provider'lar çökmez | ☐ PASS ☐ FAIL ☐ BLOCKED |
 | DISC-06 | MAJOR | Bir provider request block/timeout | User B | Tek provider'ı fail ettirerek global arama yap | Güvenli provider error; diğer kaynak sonuçları kalır; raw upstream hata yok | ☐ PASS ☐ FAIL ☐ BLOCKED |
 | DISC-07 | MAJOR | 320/375 px + uzun fixture | User B | Uzun title/10k description ve missing cover kartlarını kontrol et | 2 mobile/3 desktop line contract, sabit action alanı, horizontal overflow yok | ☐ PASS ☐ FAIL ☐ BLOCKED |
+
+D8-4A.5C1 kısa yeniden kabulü: 375×812, 1280×720, 1366×768 ve 1536×864 boyutlarında Discover right rail'in kapalı olduğunu; 1280/1366'da iki, yeterli 2xl genişlikte üç kolon kullanıldığını; normal başlıkların kelime ortasından bölünmediğini; kaynak linki ile Ekle/Listede/Sezon Ekle footer'ının çakışmadığını kontrol et. AniList/TMDB kapalıysa ilgili chip/panelin görünmemesi beklenen PASS davranışıdır; OMDb yeni aramada hiçbir zaman görünmemelidir.
 
 ## I — Recommendation V2 ve AI Advisor
 
@@ -184,14 +186,14 @@ D8-4B giriş kriteri: **RELEASE BLOCKER = 0 ve MAJOR = 0**. BLOCKED senaryo, kan
 
 ## D8-4B öncesi mandatory hold queue
 
-Bu liste opsiyonel backlog değildir. Hiçbir madde bu aşamada tamamlanmış sayılmaz veya implement edilmez.
+Bu liste opsiyonel backlog değildir. Yalnız aşağıda açık closure kanıtı bulunan provider maddeleri kapanır; diğerleri D8-4B öncesi zorunlu kalır.
 
 | # | Zorunlu kapı | Kapanış kanıtı | Durum |
 | --- | --- | --- | --- |
 | 1 | AniList public-production şartı/permission değerlendirmesi; gerekirse fail-closed feature flag | Yazılı kullanım kararı ve config contract | ☐ NOT STARTED |
-| 2 | OMDb production kararı; lisans uygun değilse key boş/disabled | Lisans/disable kararı | ☐ NOT STARTED |
+| 2 | OMDb production kararı; lisans uygun değilse key boş/disabled | Public search/fallback kapalı, legacy kayıt uyumluluğu testli | ☑ COMPLETE — disabled |
 | 3 | TMDB approved logo ve attribution | Onaylı asset + UI kontrolü | ☐ NOT STARTED |
-| 4 | TVMaze attribution / CC BY-SA notice | Görünür attribution ve source link | ☐ NOT STARTED |
+| 4 | TVMaze attribution / CC BY-SA notice | Settings CC BY-SA notice + result source link | ☑ COMPLETE |
 | 5 | Open Library gerçek User-Agent/contact | Production env review + request smoke | ☐ NOT STARTED |
 | 6 | Public signup ilk release'te açık/kapalı nihai kararı | Auth config/runbook kararı | ☐ NOT STARTED |
 | 7 | KVKK/privacy/aydınlatma ve gerekiyorsa yurt dışı aktarım değerlendirmesi | Yetkili privacy/legal onayı | ☐ NOT STARTED |

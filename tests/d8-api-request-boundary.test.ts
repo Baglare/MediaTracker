@@ -9,6 +9,10 @@ import { POST as openLibraryPost } from "@/app/api/openlibrary/search/route";
 import nextConfig from "@/next.config";
 import { SEARCH_QUERY_MAX_LENGTH, enforceRateLimit, resetRateLimitsForTests } from "@/lib/api/request-security";
 
+vi.mock("@/lib/providers/release-policy", () => ({
+  publicProviderCapability: () => ({ enabled: true, reason: "enabled" }),
+}));
+
 function post(path: string, body: unknown, headers: HeadersInit = { "Content-Type": "application/json" }) {
   return new NextRequest(`http://localhost${path}`, { method: "POST", headers, body: JSON.stringify(body) });
 }
