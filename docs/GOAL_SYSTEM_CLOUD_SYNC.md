@@ -28,6 +28,6 @@ D2C.1 RPC aynı ID + aynı payload'ı idempotent `unchanged`, farklı payload'ı
 
 ## Rollout
 
-`NEXT_PUBLIC_CLOUD_GOALS_V1_ENABLED` ve `NEXT_PUBLIC_CLOUD_GOALS_SCHEMA_STAGE=absent|v1` Goal tarafını additive biçimde açar. Flag açık ama stage `v1` değilse yalnız Goal sync fail-closed durur ve yerel veri korunur. Media Cloud Sync etkilenmez. Migration production'a uygulanmadı. D2C.1 cutover ve Goal migration preflight/apply/post-verification sırası D8'e aittir.
+`NEXT_PUBLIC_CLOUD_GOALS_V1_ENABLED` ve `NEXT_PUBLIC_CLOUD_GOALS_SCHEMA_STAGE=absent|v1` Goal tarafını additive biçimde açar. Flag açık ama stage `v1` değilse yalnız Goal sync fail-closed durur ve yerel veri korunur. Media Cloud Sync etkilenmez. Migration staging'e D8-4A'da uygulandı ve iki-owner kabulü geçti; production'a uygulanmadı. Production D2C.1/Goal sıra ve post-check'i D8-4B runbook kapısındadır.
 
 Bağlantılar: [domain](./GOAL_SYSTEM_DOMAIN.md), [yerel kalıcılık](./GOAL_SYSTEM_LOCAL_PERSISTENCE.md), [evaluation](./GOAL_SYSTEM_EVALUATION.md), [portable format](./PORTABLE_BACKUP_FORMAT.md).

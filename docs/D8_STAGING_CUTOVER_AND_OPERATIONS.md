@@ -4,7 +4,7 @@ Doğrulama tarihi: 2026-08-09. Bu plan production veritabanına veya deploy hede
 
 ## Hedef güvenliği
 
-Canlı rehearsal ancak `D8_STAGING_CUTOVER_ENABLED=1`, `D8_STAGING_MIGRATION_ALLOWED=1`, farklı ve açık staging/production project ref'leri, staging ref'ine bağlı `D8_STAGING_DATABASE_URL` ve gerekli fixture'larla yapılır. Scriptler URL/parola/ref değerlerini yazdırmaz; hedef ayrımı ad tahminiyle yapılmaz. Bu audit sırasında kapılar ve credentials mevcut değildi, dolayısıyla DB/auth/provider live adımları çalıştırılmadı.
+Canlı rehearsal ancak `D8_STAGING_CUTOVER_ENABLED=1`, `D8_STAGING_MIGRATION_ALLOWED=1`, farklı ve açık staging/production project ref'leri, staging ref'ine bağlı `D8_STAGING_DATABASE_URL` ve gerekli fixture'larla yapılır. Scriptler URL/parola/ref değerlerini yazdırmaz; hedef ayrımı ad tahminiyle yapılmaz. Bu paragraf D8-3 hazırlık audit'inin tarihsel durumunu anlatıyordu; gerekli kapılar daha sonra sağlandı ve rehearsal D8-4A'da başarıyla tamamlandı.
 
 ## Dependency tabanlı sıra
 

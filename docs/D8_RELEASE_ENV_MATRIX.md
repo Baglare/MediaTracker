@@ -1,21 +1,127 @@
 # D8 release environment matrix
 
-| Grup / env | Zorunluluk ve varsayılan | Staging sınıfı | Production önerisi | Görünürlük | Fail davranışı |
-| --- | --- | --- | --- | --- | --- |
-| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Cloud için birlikte gerekli | staging project | production project | public | eksik/uyumsuzsa local mode |
-| `SUPABASE_SERVICE_ROLE_KEY` | yalnız privileged server işi | staging secret | secret manager | server secret | yoksa privileged iş kapalı |
-| `NEXT_PUBLIC_CLOUD_MEDIA_SCHEMA_STAGE`, `...V2_ENABLED` | default `legacy`/false | migration sonrası kademeli | D2C.1 post-check sonrası | public | conflict fail-closed/reload/maintenance |
-| Goal schema/flag değişkenleri | default `absent`/false | Goal post-check sonrası | kontrollü cutover | public | cloud Goal kapalı, local korunur |
-| `AI_SERVER_ACCESS_MODE` | default `disabled` | `admin_only` smoke | `admin_only` | server | unknown = disabled |
-| Provider key/model değişkenleri | provider seçilirse gerekli | staging secret/model | secret manager, explicit model | server secret/config | provider unavailable; ücretli fallback yok |
-| `D7_RESEARCH_ROLLOUT_MODE` | default `disabled` | önce disabled, explicit smoke | `disabled` | server | conflict = disabled |
-| Discovery/extraction provider ve enable flag'leri | ikili explicit opt-in | key-gated | disabled başlangıç | server | adapter/network çağrısı yok |
-| `D7_RESEARCH_PUBLIC_CITATIONS_ENABLED` | active için gerekli | explicit | research disabled iken 0 | server | active baseline'a düşer |
-| `D7_RESEARCH_EVIDENCE_CACHE_ENABLED` | optional process cache | 0/1 smoke | yalnız admin low-volume | server | cache miss; correctness değişmez |
-| API rate/body/timeout bütçeleri | code-bounded | aynı contract | aynı contract | server | 413/429/timeout safe error |
-| `MEDIA_TRACKER_PROVIDER_USER_AGENT` | düzenli OL/TVMaze kullanımında gerekli | test contact | gerçek ürün URL/contact | server config | header eklenmez; compliance rollout blocker |
-| `D8_STAGING_*` | staging rehearsal için explicit | yalnız staging | production runtime'a koyma | server/local secret | script DB'ye bağlanmaz |
-| `SUPABASE_TEST_*` | conditional two-owner smoke | disposable fixtures | production hesabı yasak | local secret | test skip/fail-closed |
-| `D7_*_LIVE_SMOKE` | conditional provider smoke | tek tek explicit | normal runtime'da 0 | server/local | live ağ çağrısı yok |
+Gerçek değer, secret, project ref, database URL veya fixture credential bu belgede tutulmaz. Aynı env adı Vercel Preview ve Production scope'larında bağımsız değer almalıdır; Preview hiçbir zaman production Supabase hedefini kullanmaz.
 
-Çelişkili kombinasyonlar (aynı staging/production ref, active research + legacy shadow flag, feature flag + uyumsuz schema stage, eksik provider key/model) fail-closed olmalıdır. Gerçek değerler bu belgede veya tracked dosyalarda tutulmaz.
+## REQUIRED_PREVIEW
+
+| Env adı | Preview contract | Eksik/çelişkili davranış |
+| --- | --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL` | staging browser/server URL | Cloud/auth yerine local mode; UAT BLOCKED |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | aynı staging projesinin public anon key'i | Cloud/auth yerine local mode; UAT BLOCKED |
+| `NEXT_PUBLIC_CLOUD_MEDIA_SCHEMA_STAGE` | staging D2C.1 seviyesiyle aynı | unknown/incompatible ise sync fail-closed |
+| `NEXT_PUBLIC_CLOUD_MEDIA_V2_ENABLED` | staging D2C.1 ile V2 istemci | stage uyumsuzsa sync fail-closed |
+| `NEXT_PUBLIC_CLOUD_GOALS_SCHEMA_STAGE` | staging Goal V1 seviyesiyle aynı | Goal sync fail-closed, local Goal korunur |
+| `NEXT_PUBLIC_CLOUD_GOALS_V1_ENABLED` | staging Goal V1 UAT için açık | kapalıysa Goal Cloud senaryoları BLOCKED |
+| `NEXT_PUBLIC_CLOUD_MEDIA_MAINTENANCE` | normal UAT'ta kapalı | açıkken queue korunur, mutation gönderilmez |
+| `NEXT_PUBLIC_CLOUD_MEDIA_DEPLOYMENT_EPOCH` | Preview artifact/rollout ile uyumlu public epoch | mismatch reload-required |
+| `NEXT_PUBLIC_CLOUD_MEDIA_MINIMUM_CLIENT_VERSION` | current client contract ile uyumlu | mismatch reload-required |
+| `AI_SERVER_ACCESS_MODE` | `admin_only` | unset/unknown = disabled; admin AI UAT BLOCKED |
+| `D7_RESEARCH_ROLLOUT_MODE` | `disabled` | conflict = disabled; release baseline değişmez |
+| `MEDIA_TRACKER_PROVIDER_USER_AGENT` | Discover/Calendar UAT için tanımlayıcı staging UA/contact | ilgili provider compliance UAT BLOCKED |
+
+## OPTIONAL_PREVIEW
+
+| Env adı | Ne zaman gerekir | Yoksa davranış |
+| --- | --- | --- |
+| `NEXT_PUBLIC_APP_URL` | Explicit absolute URL/OpenRouter referer UAT'ı | server candidate path platform `VERCEL_URL` fallback'ini kullanır |
+| `AI_PROVIDER` | admin provider-backed recommendation UAT'ı | mock/deterministic yol |
+| `OPENAI_API_KEY`, `OPENAI_MODEL` | OpenAI admin UAT'ı | OpenAI unavailable; ücretli fallback yok |
+| `GROQ_API_KEY`, `GROQ_MODEL` | Groq admin UAT'ı | Groq unavailable |
+| `OPENROUTER_API_KEY`, `OPENROUTER_MODEL` | OpenRouter admin UAT'ı | OpenRouter unavailable |
+| `GEMINI_API_KEY`, `GEMINI_MODEL` | Gemini admin UAT'ı | Gemini unavailable |
+| `TMDB_READ_ACCESS_TOKEN` | TMDB Discover/Calendar UAT'ı | TMDB fail-soft unavailable |
+| `OMDB_API_KEY` | yalnız lisans kararıyla izinli Preview UAT | OMDb disabled/unavailable |
+| `MEDIA_TRACKER_EMBEDDING_MODEL` | server embedding modeli explicit seçilecekse | code default/mock fallback |
+
+## MUST_BE_DISABLED
+
+Preview RC baseline'ında aşağıdakiler unset/`0`/`off`/`disabled` kalır. Conditional research UAT ancak ayrı onaylı kısa pencere, bütçe ve geri-kapatma adımıyla yapılır.
+
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `MEDIA_TRACKER_PERSISTENT_EMBEDDING_CACHE`
+- `MEDIA_TRACKER_EMBEDDING_CACHE`
+- `D7_ANNOTATION_TOOL_ENABLED`
+- `MEDIA_TRACKER_WIKIMEDIA_RESEARCH_ENABLED`
+- `D7_OPENAI_WEB_DISCOVERY_ENABLED`
+- `D7_GROQ_WEB_DISCOVERY_ENABLED`
+- `D7_OPENROUTER_WEB_DISCOVERY_ENABLED`
+- `D7_RESEARCH_DISCOVERY_PROVIDER`
+- `D7_RESEARCH_EXTRACTION_PROVIDER`
+- `D7_GROQ_GROUNDED_EXTRACTION_ENABLED`
+- `D7_OPENAI_GROUNDED_EXTRACTION_ENABLED`
+- `D7_OPENROUTER_GROUNDED_EXTRACTION_ENABLED`
+- `D7_RESEARCH_SHADOW_ENABLED`
+- `D7_RESEARCH_PUBLIC_CITATIONS_ENABLED`
+- `D7_RESEARCH_EVIDENCE_CACHE_ENABLED`
+
+## LOCAL_ONLY
+
+Bu adlar Vercel Preview/Production runtime env'ine taşınmaz.
+
+- `MEDIA_TRACKER_ML_SERVICE_URL`
+- `D7_ANNOTATION_DATA_DIR`
+- `D8_STAGING_CUTOVER_ENABLED`
+- `D8_STAGING_MIGRATION_ALLOWED`
+- `D8_STAGING_PROJECT_REF`
+- `D8_PRODUCTION_PROJECT_REF`
+- `D8_STAGING_DATABASE_URL`
+- `SUPABASE_PRODUCTION_URL`
+
+## TEST_ONLY
+
+Fixture credential'ları tracked dosyaya, Vercel Preview'a veya Production'a konmaz; yalnız kontrollü local/live test runner secret store'unda tutulur.
+
+- `SUPABASE_TEST_URL`
+- `SUPABASE_TEST_ANON_KEY`
+- `SUPABASE_TEST_USER_A_EMAIL`
+- `SUPABASE_TEST_USER_A_PASSWORD`
+- `SUPABASE_TEST_USER_B_EMAIL`
+- `SUPABASE_TEST_USER_B_PASSWORD`
+- `D7_RESEARCH_LIVE_SMOKE`
+- `D7_OPENAI_WEB_DISCOVERY_LIVE_SMOKE`
+- `D7_GROQ_WEB_DISCOVERY_LIVE_SMOKE`
+- `D7_OPENROUTER_WEB_DISCOVERY_LIVE_SMOKE`
+- `D7_GROQ_GROUNDED_EXTRACTION_LIVE_SMOKE`
+- `D7_OPENAI_GROUNDED_EXTRACTION_LIVE_SMOKE`
+- `D7_OPENROUTER_GROUNDED_EXTRACTION_LIVE_SMOKE`
+- `D7_R4_SHADOW_LIVE_SMOKE`
+- `D7_R5A_EVIDENCE_GAP_LIVE_SMOKE`
+- `D7_R5B_STABILITY_LIVE_SMOKE`
+- `D7_R5B1_EXTRACTION_STABILITY_LIVE_SMOKE`
+- `D7_R5B2_DOCUMENT_LIVE_SMOKE`
+- `D7_R5C_CACHE_LIVE_SMOKE`
+- `D7_R6_FINAL_LIVE_SMOKE`
+
+## PRODUCTION_ONLY
+
+Bu env adlarının Production-scope değerleri Preview'dan kopyalanmaz; D8-4B hold queue ve target verification sonrasında bağımsız atanır.
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `NEXT_PUBLIC_APP_URL`
+- `NEXT_PUBLIC_CLOUD_MEDIA_SCHEMA_STAGE`
+- `NEXT_PUBLIC_CLOUD_MEDIA_V2_ENABLED`
+- `NEXT_PUBLIC_CLOUD_GOALS_SCHEMA_STAGE`
+- `NEXT_PUBLIC_CLOUD_GOALS_V1_ENABLED`
+- `NEXT_PUBLIC_CLOUD_MEDIA_MAINTENANCE`
+- `NEXT_PUBLIC_CLOUD_MEDIA_DEPLOYMENT_EPOCH`
+- `NEXT_PUBLIC_CLOUD_MEDIA_MINIMUM_CLIENT_VERSION`
+- `AI_SERVER_ACCESS_MODE`
+- `D7_RESEARCH_ROLLOUT_MODE`
+- `MEDIA_TRACKER_PROVIDER_USER_AGENT`
+- `TMDB_READ_ACCESS_TOKEN`
+- `OMDB_API_KEY`
+- `OPENAI_API_KEY`, `OPENAI_MODEL`
+- `GROQ_API_KEY`, `GROQ_MODEL`
+- `OPENROUTER_API_KEY`, `OPENROUTER_MODEL`
+- `GEMINI_API_KEY`, `GEMINI_MODEL`
+- `SUPABASE_SERVICE_ROLE_KEY` — yalnız mandatory hold sonucu gerçekten gerekliyse
+
+## Fail-closed kombinasyonlar
+
+- Preview Supabase hedefi production hedefiyle aynıysa deploy kabul edilmez.
+- Media V2 açık + schema stage legacy/unknown ise sync durur.
+- Goal V1 açık + schema stage `v1` değilse yalnız Goal sync durur.
+- Research rollout disabled iken discovery/extraction/citation flag'leri açılmaz.
+- Provider key/model eksikse ücretli fallback yapılmaz.
+- Persistent embedding cache ve service-role key mandatory privacy/security kararı kapanmadan Preview/Production'da açılmaz.

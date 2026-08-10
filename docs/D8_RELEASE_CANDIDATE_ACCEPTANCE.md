@@ -2,6 +2,16 @@
 
 Durum tarihi: 2026-08-10. Sonuç: **PASS — D8-4A staging acceptance tamamlandı.** Production veritabanı, Auth, Storage ve deploy hedefi kullanılmadı.
 
+## D8-4A.5 release freeze
+
+D8-4A'nın başarıyla doğrulanan kod/migration baseline'ı `1d0a3c939e97a88a7f6d8ab457aa6b80587cc57c` SHA'sıdır. Bu SHA sonrası D8-4B production cutover'a kadar yalnız release blocker, veri kaybı, auth/security, privacy, ciddi UX, deployment/runtime veya compliance blocker düzeltmeleri kabul edilir; yeni ürün özelliği alınmaz.
+
+D8-4A.5 kapsamındaki UAT, env matrisi, freeze belgesi ve contract testleri baseline sonrası release hazırlığıdır; D8-4A live kanıtını geriye dönük değiştirmez. Vercel Preview deploy ve remote env config bu turda yapılmamıştır. Manuel kabul paketi [D8 Preview UAT](D8_PREVIEW_UAT.md) belgesindedir.
+
+Preview readiness audit'inde repo/runtime blocker bulunmadı: production-mode annotation UI/API fail-closed 404, service-role import'u server-only, request same-origin kontrolü deployment origin'iyle uyumlu, server candidate URL çözümü `VERCEL_URL` fallback'li ve Cloud Media/Goal stage uyuşmazlıkları fail-closed'dur. Remote Preview oluşturma, Preview-scope env atama ve 69 manuel senaryonun yürütülmesi dış kabul kapısıdır.
+
+D8-4A.5 doğrulaması: hedefli Preview/security/cloud/profile/recommendation/calendar setinde 12 dosya ve 105 test; full suite'te 179 dosya ve 2.311 test geçti. 18 dosya/55 conditional live-key-gated test skip kaldı; yeni normal skip yok. Lint ve production build geçti; build yalnız mevcut archived annotation NFT trace warning'ini üretti. `git diff --check`, local link ve secret-pattern kontrolleri temiz geçti.
+
 ## Canlı staging kapıları
 
 - Masked hard gate; explicit cutover/migration iznini, staging ve production hedeflerinin farklılığını, app/test/DB hedef eşleşmesini, staging anon/service-role doğrulamasını ve iki farklı gerçek Auth fixture kullanıcısını doğruladı. Secret, credential veya tam project ref kaydedilmedi.

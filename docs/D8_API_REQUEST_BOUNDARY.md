@@ -29,4 +29,4 @@ Global header contract CSP (`frame-ancestors 'none'`, `object-src 'none'`, `base
 
 ## Kalan rollout kapısı
 
-Rate limiter process-local'dır; birden fazla instance toplam limiti paylaşmaz ve restart ile sıfırlanır. Distributed limiter, proxy/CDN body enforcement, production origin/host doğrulaması ve gerçek deployment header/browser smoke D8-3 rollout kapısıdır. Bu turda dependency, canlı DB, deploy veya production config değişikliği yapılmamıştır.
+Rate limiter process-local'dır; birden fazla instance toplam limiti paylaşmaz ve restart ile sıfırlanır. Staging origin/header/browser kabulü D8-4A'da geçti; distributed limiter ve production CDN/body/origin doğrulaması D8-4B mandatory hold/runbook kapısında kalır. Dependency veya production config değişikliği bu belge kapsamında yapılmamıştır.
