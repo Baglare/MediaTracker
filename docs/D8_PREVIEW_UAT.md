@@ -48,6 +48,8 @@ Bu paket D8-4A staging PASS sonrasındaki Vercel Preview kullanıcı kabulünü 
 | AUTH-03 | BLOCKER | A ve B fixture | A→B→guest→A | Sırayla giriş/çıkış ve refresh yap | Önceki owner medya/goal/profile/avatar/banner/theme bir frame bile görünmez | ☐ PASS ☐ FAIL ☐ BLOCKED |
 | AUTH-04 | MAJOR | Aktif A/B session | User A/B | Oturumu beklet, focus/hard refresh ile token refresh davranışını gözle | Silent refresh çalışır veya güvenli yeniden giriş ister; infinite auth retry yok | ☐ PASS ☐ FAIL ☐ BLOCKED |
 
+> FIX3 durumu: **AUTH-01 — MANUAL RETEST READY.** Staging User A admin metadata'sı minimal merge ile düzeltildi ve fresh-session A/B/Guest capability matrisi geçti. Manuel tarayıcı oturumunda sign-out/sign-in yaparak AUTH-01 yeniden doğrulanmalıdır; senaryo kullanıcı kabulüne kadar PASS işaretlenmemiştir.
+
 ## C — Cloud Media V2
 
 | ID | Seviye | Ön koşul | Kullanıcı | Yapılacak işlem | Beklenen sonuç / UI / Network | Sonuç |
