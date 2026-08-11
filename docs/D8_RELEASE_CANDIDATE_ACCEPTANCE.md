@@ -1,12 +1,12 @@
 # D8 release-candidate acceptance
 
-Durum tarihi: 2026-08-10. Sonuç: **PASS — D8-4A staging acceptance tamamlandı.** Production veritabanı, Auth, Storage ve deploy hedefi kullanılmadı.
+Durum tarihi: 2026-08-11. Sonuç: **PASS — D8-4A staging acceptance ve C1-C3 Preview kullanıcı smoke kabulü tamamlandı.** D8-4A.5D first-release hardening kod ve belge kapılarını konsolide eder; production veritabanı, Auth, Storage, env veya deploy hedefi kullanılmadı.
 
 ## D8-4A.5 release freeze
 
 D8-4A'nın başarıyla doğrulanan kod/migration baseline'ı `1d0a3c939e97a88a7f6d8ab457aa6b80587cc57c` SHA'sıdır. Bu SHA sonrası D8-4B production cutover'a kadar yalnız release blocker, veri kaybı, auth/security, privacy, ciddi UX, deployment/runtime veya compliance blocker düzeltmeleri kabul edilir; yeni ürün özelliği alınmaz.
 
-D8-4A.5 kapsamındaki UAT, env matrisi, freeze belgesi ve contract testleri baseline sonrası release hazırlığıdır; D8-4A live kanıtını geriye dönük değiştirmez. D8-4A.5B'de current HEAD için Vercel Preview hazır bulundu; staging Supabase target'ı, Preview env adı/scope sınırı, Cloud Media `d2c1`, Goal Cloud `v1`, production-mode dev-route 404 ve Deployment Protection teknik olarak doğrulandı. Manuel kabul paketi [D8 Preview UAT](D8_PREVIEW_UAT.md) belgesindedir; P-01–P-04 kullanıcı tarafından henüz sonuçlandırılmadı.
+D8-4A.5 kapsamındaki UAT, env matrisi, freeze belgesi ve contract testleri baseline sonrası release hazırlığıdır; D8-4A live kanıtını geriye dönük değiştirmez. D8-4A.5B'de current HEAD için Vercel Preview hazır bulundu; staging Supabase target'ı, Preview env adı/scope sınırı, Cloud Media `d2c1`, Goal Cloud `v1`, production-mode dev-route 404 ve Deployment Protection teknik olarak doğrulandı. C1 Discovery/provider, C2 public profile theme ve C3 asset/Calendar/release-polish kullanıcı smoke kabulü tamamlandı. İşaretlenmemiş geniş senaryolar [D8 Preview UAT](D8_PREVIEW_UAT.md) belgesinde `EXTENDED_QA` olarak korunur; kanıtsız PASS değildir.
 
 Preview readiness audit'inde repo/runtime blocker bulunmadı: production-mode annotation UI/API fail-closed 404, service-role import'u server-only, request same-origin kontrolü deployment origin'iyle uyumlu, server candidate URL çözümü `VERCEL_URL` fallback'li ve Cloud Media/Goal stage uyuşmazlıkları fail-closed'dur. Preview teknik kapısı geçmiştir; 69 manuel senaryonun yürütülmesi dış kabul kapısı olarak kalır.
 
@@ -43,5 +43,40 @@ D8-4A.5 doğrulaması: hedefli Preview/security/cloud/profile/recommendation/cal
 ## Release politikası ve kalan production kapıları
 
 - İlk Production release server-funded AI olmadan başlar: `AI_SERVER_ACCESS_MODE=disabled`, `D7_RESEARCH_ROLLOUT_MODE=disabled`, shadow/citation/evidence-cache flag'leri `0` ve persistent embedding cache `off` kalır. Deterministik kütüphane danışmanı korunur; process-local limiter/cache cross-instance garanti değildir.
-- AniList yazılı production izni, TMDB resmi onaylı logo/non-commercial readiness, Open Library gerçek production contact'lı User-Agent ve production backup/target/change-window onayı D8-4B kapılarıdır. OMDb yeni public provider olarak kapalıdır; yalnız legacy veri uyumluluğu korunur.
+- AniList ve TMDB ilk sürümde fail-closed disabled olduğu için enablement işleri `POST_RELEASE_GATE` sınıfındadır. Open Library ancak gerçek production contact'lı User-Agent ile açılabilir; aksi halde production'da disabled seçilir. OMDb yeni public provider olarak kapalıdır ve yalnız legacy veri uyumluluğu korunur; TVMaze attribution ile açıktır.
 - Production cutover yalnız [runbook](D8_PRODUCTION_CUTOVER_RUNBOOK.md), [fail-forward planı](D8_PRODUCTION_ROLLBACK_AND_FAIL_FORWARD.md) ve [post-deploy checklist](D8_POST_DEPLOY_SMOKE_CHECKLIST.md) ile ayrı yetkilendirilir.
+
+## D8-4A.5D kanonik production hold tablosu
+
+Bu tablo tek kanonik hold kaynağıdır. Durumlar yalnız `CLOSED`, `BLOCKED_EXTERNAL`, `BLOCKED_MANUAL`, `POST_RELEASE_GATE` ve `NOT_APPLICABLE` sınıflarını kullanır. Ayrıntılı kod kanıtı [first-release security/privacy audit](D8_FIRST_RELEASE_SECURITY_AND_PRIVACY.md) ve env kapsamı [release env matrix](D8_RELEASE_ENV_MATRIX.md) içindedir.
+
+| Kapı | Durum | D8-4B blocker | Kapanış/sonraki kanıt |
+| --- | --- | --- | --- |
+| C1-C3 kullanıcı smoke kabulü | `CLOSED` | Hayır | Discovery/provider, public profile theme ve asset/Calendar smoke kabulü; kalan geniş senaryolar `EXTENDED_QA` |
+| Repo signup UI/action | `CLOSED` | Hayır | Signup control ve browser `signUp` aksiyonu yok; guest/local-first ve mevcut hesap girişi korunur |
+| Production Supabase Auth signup ayarı | `BLOCKED_MANUAL` | Evet | D8-4B öncesi dashboard/provider boundary'de yeni kullanıcı kaydı disabled olduğu doğrulanır ve direct signup deny smoke kaydedilir |
+| AI/research/persistent cache v1 politikası | `CLOSED` | Hayır | Paid AI/research disabled; persistent cache yalnız exact `on` ile açılır, v1 `off`; serbest `text_preview` yazılmaz |
+| Production runtime service-role ihtiyacı | `CLOSED` | Hayır | App/lib içinde tek referans disabled persistent-cache adapter'ıdır; Production env'de key forbidden |
+| SQL/RPC/`SECURITY DEFINER`/RLS/Storage source audit | `CLOSED` | Hayır | Explicit search path, grants, owner scope, RPC mutation ve exact asset-path policy audit'i; yeni blocker/major yok |
+| Production Supabase Security Advisor | `BLOCKED_MANUAL` | Evet | Exact Production project üzerinde review, bulgu sınıflandırması ve blocker closure kaydı |
+| Privacy/operator/deletion/disclosure paketi | `BLOCKED_EXTERNAL` | Evet | Gerçek operator/contact, privacy/aydınlatma, vendor/yurt dışı aktarım, hesap-veri silme talep yolu ve yetkili inceleme; placeholder yok |
+| Open Library Production User-Agent | `BLOCKED_MANUAL` | Evet | Gerçek contact içeren UA atanır ve bounded smoke yapılır **veya** provider Production'da disabled seçilir |
+| Production target/backup/env/change-window | `BLOCKED_MANUAL` | Evet | Exact targets, current SHA, DB/PITR+Storage planı, ledger, iki kişi env review, operator ve onaylı pencere |
+| TVMaze attribution | `CLOSED` | Hayır | CC BY-SA notice ve canonical result/source link mevcut |
+| OMDb yeni public kullanım | `CLOSED` | Hayır | Search/fallback disabled; legacy `externalSource: "omdb"` decode/import/display korunur |
+| AniList Production enablement | `POST_RELEASE_GATE` | Hayır | Disabled kalır; yazılı izin sonrası ayrı enablement |
+| TMDB Production enablement | `POST_RELEASE_GATE` | Hayır | Disabled kalır; approved logo/notice/non-commercial readiness sonrası ayrı enablement |
+| Production AI key/budget/monitoring | `POST_RELEASE_GATE` | Hayır | İlk sürümde key provision edilmez; AI enablement ayrı release gate'idir |
+| Canonical admin claim ve MFA/AAL2 | `POST_RELEASE_GATE` | Hayır | Aktif v1 privileged kullanıcı yüzeyi yok; AI/admin enablement öncesi ele alınır |
+| Admin/Ops panel | `NOT_APPLICABLE` | Hayır | v1 kararı yeni panel yapmamak; explicit ops scriptleri ve dashboard kullanılır |
+
+**D8-4B öncesi gerçek blocker sayısı: 5.** Bunlar signup provider ayarı, privacy/operator paketi, Open Library enable/disable kararı, Security Advisor ve production target/backup/env/change-window kapılarıdır.
+
+## D8-4A.5D validation ve Preview
+
+- Kod-side hardening hedefli seti 18 dosya/174 test geçti. Full suite 184 dosya/2.350 test PASS; 18 dosya/55 conditional live-key-gated test SKIP kaldı, yeni deterministic skip yok.
+- Lint, production build ve `git diff --check` geçti. Build yalnız daha önce kayıtlı archived annotation NFT trace warning'ini üretti.
+- Secret/local-absolute-path, Markdown link ve tracked temp/diagnostic taramaları geçti; dependency değişmedi.
+- Dirty çalışma ağacından yalnız tanı amaçlı immutable Preview oluşturuldu: `https://media-tracker-bxlbcl1cd-baglares-projects.vercel.app`. Bu artifact temiz committed RC SHA yerine geçmez ve Production'a promote edilmedi.
+- Protected Preview teknik smoke: home 200; CSP/nosniff/frame/referrer header'ları; dev page/API 404; guest server-provider/research false; TVMaze/Open Library enabled, AniList/TMDB/OMDb disabled; Cloud/profile server config ve public-theme marker PASS. Referans client chunk'larında signup toggle ve `auth.signUp` bulunmadı.
+- Hydrated Settings UI ve mevcut kullanıcı sign-in smoke'u Deployment Protection login duvarını credential ile aşmadan otomatikleştirilemedi; önceki kabul edilen Auth/C1-C3 kullanıcı smoke kanıtı korunur. Production Supabase Auth direct signup deny D8-4B manuel kapısıdır.

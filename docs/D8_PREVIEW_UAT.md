@@ -7,8 +7,8 @@ Bu paket D8-4A staging PASS sonrasındaki Vercel Preview kullanıcı kabulünü 
 | Sınıf | Durum |
 | --- | --- |
 | A — Preview/UAT öncesi blocker | Repo/runtime blocker bulunmadı. D8-4A.5B teknik kapısında protected Preview, staging target, env adı/scope sınırı, Media `d2c1`, Goal `v1`, guest capability ve dev-route 404 doğrulandı. P-01–P-03 kullanıcı kabulüyle, P-04 ise FIX1 sonrası canlı Preview teknik kabulüyle geçti. |
-| B — UAT sırasında doğrulanacak | Aşağıdaki kullanıcı yolculukları, gerçek UI, Network ve console üzerinden elle kabul edilir. |
-| C — Production öncesine bırakılan | Belgenin sonundaki 16 maddelik mandatory hold queue; D8-4B öncesi tamamlanmalıdır. |
+| B — UAT sırasında doğrulanacak | C1, C2 ve C3 kullanıcı smoke kabulü tamamlandı. Aşağıdaki işaretlenmemiş geniş/edge-case satırlar release PASS sayılmaz; `EXTENDED_QA` kaydıdır. |
+| C — Production öncesine bırakılan | Tek kanonik mandatory-hold tablosu [D8 release-candidate acceptance](D8_RELEASE_CANDIDATE_ACCEPTANCE.md#d8-4a5d-kanonik-production-hold-tablosu) belgesindedir. |
 | D — Opsiyonel backlog | Push/e-posta bildirimi ve benzeri ROADMAP backlog'u; mandatory hold ile birleştirilmez. |
 
 ## Başlangıç ve kanıt kuralları
@@ -16,7 +16,16 @@ Bu paket D8-4A staging PASS sonrasındaki Vercel Preview kullanıcı kabulünü 
 1. Preview deployment source SHA'sını kaydet; freeze SHA'sını içerdiğini ve sonrasında yalnız audit edilmiş D8-4A.5 belge/test hazırlığı bulunduğunu doğrula. UAT'yi production alias/domain yerine raporlanan immutable Preview deployment URL'sinde yürüt. Ek runtime değişikliği varsa ilgili regresyonlar yeniden geçmeden UAT başlatma.
 2. Vercel Preview env'lerini [D8 env matrisi](D8_RELEASE_ENV_MATRIX.md) ile yalnız isim/scope seviyesinde kontrol et; masked staging/production hedef ayrımını kaydet.
 3. Staging User A (admin), User B (normal), ayrı tarayıcı profili ve guest/private pencere hazırla. Credential'ı forma yalnız test sırasında gir; ekran görüntüsü/log içine alma.
-4. Önce `P-*`, sonra guest/auth/cloud, en son provider/conditional research sırasını uygula. Her satırda tek sonuç seç ve kanıt bağlantısını ayrı, erişimi kısıtlı UAT kaydında tut.
+4. P/Guest/Auth temel kapıları ile C1 Discovery, C2 public profile theme ve C3 asset/Calendar smoke'ları kullanıcı tarafından kabul edildi. İşaretlenmemiş geniş senaryolar `EXTENDED_QA` olarak korunur; otomatik PASS yapılmaz.
+
+## D8-4A.5 UAT kapanışı
+
+- **C1 CLOSED:** Discover full-width/card/provider-policy kullanıcı smoke'u kabul edildi; disabled AniList/TMDB/OMDb beklenen fail-closed davranıştır.
+- **C2 CLOSED:** Public owner preset/custom theme, hidden fallback, route scope ve bannerless semantic Hero kullanıcı smoke'u kabul edildi.
+- **C3 CLOSED:** Owner-safe asset/cache, banner kaldırma, geniş manuel Calendar navigasyonu ve ilk-release AI disabled yüzeyi kullanıcı smoke'u kabul edildi.
+- Aşağıdaki işaretlenmemiş provider failure, uzun süreli offline/conflict, tüm timezone ve tüm viewport kombinasyonları `EXTENDED_QA` olarak kalır. Bunlar kanıtsız PASS değildir ve yeni bir blocker bulgusu üretmedikçe v1 kapısını yeniden açmaz.
+
+D8-4A.5D tanı Preview'ında signup UI/action kaldırma ve first-release cache/service-role sınırı yeniden build edildi. Protected endpoint üzerinden home/header/dev-route/guest AI/provider/public-profile teknik smoke'u geçti; deployment protection login'i otomatik credential'sız hydrated Settings smoke'unu engelledi. Bu nedenle yeni hesap açma provider-boundary deny ve mevcut hesap sign-in, D8-4B öncesi manuel Auth kontrolünde tekrar doğrulanır; önceki Auth kullanıcı kabulü geriye dönük değiştirilmez.
 5. Console veya Network export'u paylaşmadan önce token, cookie, email, user ID, query ve response body redaction yap. Expected 401/403 ile gerçek 5xx'i ayır.
 
 `Sonuç` alanı her senaryo için: **☐ PASS ☐ FAIL ☐ BLOCKED**. Seviye, senaryo başarısızlığının varsayılan triage sınıfıdır.
@@ -190,25 +199,6 @@ Kozmetik, küçük copy veya nadir layout problemi. Owner ve hedef sürüm kayd�
 
 D8-4B giriş kriteri: **RELEASE BLOCKER = 0 ve MAJOR = 0**. BLOCKED senaryo, kanıtlanmış PASS değildir; gerekli environment/fixture sağlanıp yeniden çalıştırılır.
 
-## D8-4B öncesi mandatory hold queue
+## D8-4B hold kaynağı
 
-Bu liste opsiyonel backlog değildir. Yalnız aşağıda açık closure kanıtı bulunan provider maddeleri kapanır; diğerleri D8-4B öncesi zorunlu kalır.
-
-| # | Zorunlu kapı | Kapanış kanıtı | Durum |
-| --- | --- | --- | --- |
-| 1 | AniList public-production şartı/permission değerlendirmesi; gerekirse fail-closed feature flag | Yazılı kullanım kararı ve config contract | ☐ NOT STARTED |
-| 2 | OMDb production kararı; lisans uygun değilse key boş/disabled | Public search/fallback kapalı, legacy kayıt uyumluluğu testli | ☑ COMPLETE — disabled |
-| 3 | TMDB approved logo ve attribution | Onaylı asset + UI kontrolü | ☐ NOT STARTED |
-| 4 | TVMaze attribution / CC BY-SA notice | Settings CC BY-SA notice + result source link | ☑ COMPLETE |
-| 5 | Open Library gerçek User-Agent/contact | Production env review + request smoke | ☐ NOT STARTED |
-| 6 | Public signup ilk release'te açık/kapalı nihai kararı | Auth config/runbook kararı | ☐ NOT STARTED |
-| 7 | KVKK/privacy/aydınlatma ve gerekiyorsa yurt dışı aktarım değerlendirmesi | Yetkili privacy/legal onayı | ☐ NOT STARTED |
-| 8 | Persistent embedding cache `text_preview` ve `personalNotes` privacy yüzeyi; kapatma veya privacy-safe tasarım | Threat/privacy review + test | ☐ NOT STARTED |
-| 9 | Production runtime `SUPABASE_SERVICE_ROLE_KEY` ihtiyacını kaldırma/minimize etme | Import/runtime/env kanıtı | ☐ NOT STARTED |
-| 10 | Canonical tek admin claim ve MFA/AAL2 zorunluluğu değerlendirmesi | Auth security kararı | ☐ NOT STARTED |
-| 11 | SQL/RPC/`SECURITY DEFINER`/RLS adversarial security audit | Bulgular ve blocker closure | ☐ NOT STARTED |
-| 12 | Supabase Security Advisor review | Review kaydı ve kabul edilen bulgular | ☐ NOT STARTED |
-| 13 | Ayrı OpenAI production project/key, düşük budget/limit, monitoring ve rotation | Ops runbook + masked smoke | ☐ NOT STARTED |
-| 14 | Küçük read-only Admin/Ops paneli yapılıp yapılmayacağı kararı | Scope/security kararı | ☐ NOT STARTED |
-| 15 | Local `.env.local`, Vercel Preview ve Vercel Production env matrisini satır satır kesinleştirme | İki kişi env review | ☐ NOT STARTED |
-| 16 | Production backup, target verification ve change-window kapısı | PITR/backup kanıtı + onaylı pencere | ☐ NOT STARTED |
+Bu belge artık ikinci bir hold tablosu taşımaz. Tek kanonik durum ve closure kanıtı [D8 release-candidate acceptance](D8_RELEASE_CANDIDATE_ACCEPTANCE.md#d8-4a5d-kanonik-production-hold-tablosu) belgesinde tutulur.

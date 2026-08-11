@@ -27,7 +27,7 @@ Araçlar salt-okunur SQL çalıştırır ve `psql` yoksa işlem yapmadan durur. 
 
 ## AI/research production başlangıç politikası
 
-Başlangıç: `AI_SERVER_ACCESS_MODE=admin_only`, `D7_RESEARCH_ROLLOUT_MODE=disabled`. Mevcut korumalar user rate limit, request/provider timeout, bounded retry, provider başına attempt/concurrency ve request içi call-count telemetry sağlar. Raw prompt/provider response persist edilmez. Fiyat kod içine gömülmez; doğrulanmış fiyat yoksa token/call bütçesiyle fail-closed işletilir.
+Bu staging rehearsal bölümünün tarihsel başlangıcı `AI_SERVER_ACCESS_MODE=admin_only`, `D7_RESEARCH_ROLLOUT_MODE=disabled` idi. D8-4A.5D canonical Production v1 kararı server-funded AI'ı da `disabled` yapar; admin/provider enablement post-release'tir. Mevcut korumalar user rate limit, request/provider timeout, bounded retry, provider başına attempt/concurrency ve request içi call-count telemetry sağlar. Raw prompt/provider response persist edilmez. Fiyat kod içine gömülmez; doğrulanmış fiyat yoksa token/call bütçesiyle fail-closed işletilir.
 
 Seçenek sırası: disabled en düşük maliyet/429 riski; admin-only shadow gözlem sağlar ama latency/maliyet üretir; admin-only active yalnız citation gate ve düşük hacimde kabul edilebilir; geniş active + shared cache/limiter olmadan release edilmez. Process-local limiter/cache instance'lar arasında duplicate çağrı veya ortak bütçe garantisi vermez. Bu turda DB tabanlı limiter/evidence cache eklenmedi: request yoluna yeni DB availability/latency bağımlılığı ve cleanup/row-growth operasyonu eklemek release rehearsal için küçük güvenli değişiklik değildir. Post-release backlog'tur.
 

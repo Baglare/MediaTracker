@@ -1,27 +1,22 @@
 "use client";
 
 // ============================================
-// AuthPanel — Giriş / Kayıt / Hesap Kartı
+// AuthPanel — Giriş / Hesap Kartı
 // ============================================
 // Supabase yapılandırılmamışsa yerel mod bilgisi gösterir.
-// Yapılandırılmışsa giriş/kayıt formu veya hesap özeti gösterir.
+// Yapılandırılmışsa yalnız mevcut hesaplar için giriş formu veya hesap özeti gösterir.
 // mediaItems / progressLogs üzerinde hiçbir işlem yapmaz.
 
 import { useState } from "react";
-import { LogIn, LogOut, Mail, ShieldCheck, Lock, UserPlus } from "lucide-react";
+import { LogIn, LogOut, Mail, ShieldCheck, Lock } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 
-type Mode = "signin" | "signup";
-
 export default function AuthPanel() {
-  const { configured, loading, user, signIn, signUp, signOut } = useAuth();
+  const { configured, loading, user, signIn, signOut } = useAuth();
 
-  const [mode, setMode] = useState<Mode>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [passwordConfirm, setPasswordConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const cardCls =
@@ -56,7 +51,6 @@ export default function AuthPanel() {
     const handleSignOut = async () => {
       setSubmitting(true);
       setError(null);
-      setSuccess(null);
       const res = await signOut();
       setSubmitting(false);
       if (!res.ok) setError(res.error ?? "Çıkış yapılamadı.");
@@ -105,34 +99,24 @@ export default function AuthPanel() {
     if (!/^\S+@\S+\.\S+$/.test(email.trim())) return "Geçerli bir e-posta adresi gir.";
     if (!password) return "Şifre boş olamaz.";
     if (password.length < 6) return "Şifre en az 6 karakter olmalı.";
-    if (mode === "signup" && password !== passwordConfirm)
-      return "Şifreler eşleşmiyor.";
     return null;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    setSuccess(null);
     const validation = validate();
     if (validation) {
       setError(validation);
       return;
     }
     setSubmitting(true);
-    const res = mode === "signin"
-      ? await signIn(email.trim(), password)
-      : await signUp(email.trim(), password);
+    const res = await signIn(email.trim(), password);
     setSubmitting(false);
 
     if (!res.ok) {
       setError(res.error ?? "İşlem başarısız.");
       return;
-    }
-    if (mode === "signup") {
-      setSuccess("Kayıt oluşturuldu. E-posta doğrulaması gerekiyorsa gelen kutunu kontrol et.");
-      setPassword("");
-      setPasswordConfirm("");
     }
   };
 
@@ -142,28 +126,11 @@ export default function AuthPanel() {
 
   return (
     <div className={cardCls}>
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center gap-2 mb-4">
         <div className="flex items-center gap-2">
-          {mode === "signin" ? (
-            <LogIn className="w-5 h-5 text-violet-400" />
-          ) : (
-            <UserPlus className="w-5 h-5 text-violet-400" />
-          )}
-          <h3 className="text-lg font-semibold text-zinc-100">
-            {mode === "signin" ? "Giriş Yap" : "Kayıt Ol"}
-          </h3>
+          <LogIn className="w-5 h-5 text-violet-400" />
+          <h3 className="text-lg font-semibold text-zinc-100">Giriş Yap</h3>
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            setMode((m) => (m === "signin" ? "signup" : "signin"));
-            setError(null);
-            setSuccess(null);
-          }}
-          className="text-xs text-[var(--app-accent-strong)] hover:text-[var(--app-accent)] transition-colors cursor-pointer"
-        >
-          {mode === "signin" ? "Kayıt ol" : "Girişe dön"}
-        </button>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-3">
@@ -188,7 +155,7 @@ export default function AuthPanel() {
             <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
             <input
               type="password"
-              autoComplete={mode === "signin" ? "current-password" : "new-password"}
+              autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="En az 6 karakter"
@@ -197,48 +164,21 @@ export default function AuthPanel() {
           </div>
         </div>
 
-        {mode === "signup" && (
-          <div>
-            <label className={labelCls}>Şifre (Tekrar)</label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
-              <input
-                type="password"
-                autoComplete="new-password"
-                value={passwordConfirm}
-                onChange={(e) => setPasswordConfirm(e.target.value)}
-                placeholder="Şifreyi tekrar gir"
-                className={inputCls}
-              />
-            </div>
-          </div>
-        )}
-
         {error && (
           <p className="text-xs text-rose-400 bg-rose-500/10 ring-1 ring-rose-500/30 rounded-md px-3 py-2">
             {error}
           </p>
         )}
-        {success && (
-          <p className="text-xs text-emerald-300 bg-emerald-500/10 ring-1 ring-emerald-500/30 rounded-md px-3 py-2">
-            {success}
-          </p>
-        )}
-
         <button
           type="submit"
           disabled={submitting}
           className="app-primary-action w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors disabled:opacity-50 cursor-pointer"
         >
-          {submitting
-            ? "Lütfen bekle…"
-            : mode === "signin"
-              ? "Giriş Yap"
-              : "Kayıt Ol"}
+          {submitting ? "Lütfen bekle…" : "Giriş Yap"}
         </button>
 
         <p className="text-[11px] text-zinc-500 leading-relaxed pt-1">
-          Giriş sonrası yerel veri ana kaynak olarak kalır; Cloud aktarımı ve eşitleme durumu Ayarlar bölümünden yönetilir.
+          İlk sürümde yeni hesap kaydı kapalıdır. Mevcut hesabınla giriş yapabilir; giriş yapmadan yerel-first kullanıma devam edebilirsin.
         </p>
       </form>
     </div>

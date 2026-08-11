@@ -19,14 +19,14 @@ interface EmbeddingCacheRow {
   vector: unknown;
 }
 
-function isPersistentCacheEnabled(): boolean {
+export function isPersistentEmbeddingCacheEnabled(): boolean {
   if (process.env.MEDIA_TRACKER_EMBEDDING_CACHE === "off") return false;
-  if (process.env.MEDIA_TRACKER_PERSISTENT_EMBEDDING_CACHE === "off") return false;
+  if (process.env.MEDIA_TRACKER_PERSISTENT_EMBEDDING_CACHE !== "on") return false;
   return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
 }
 
 function getClient() {
-  if (!isPersistentCacheEnabled()) return null;
+  if (!isPersistentEmbeddingCacheEnabled()) return null;
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL as string,
     process.env.SUPABASE_SERVICE_ROLE_KEY as string,
@@ -145,7 +145,6 @@ export async function writePersistentEmbeddingCache(args: {
       hash: result.hash,
       dimensions: result.dimensions,
       vector,
-      text_preview: payload.text.slice(0, 240),
       last_used_at: now,
     }];
   });

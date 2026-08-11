@@ -22,4 +22,4 @@ Geçersiz veya eksik değer `disabled` olur. Supabase config/auth hatası guest 
 
 ## Operasyon
 
-Release ortamında açıkça `AI_SERVER_ACCESS_MODE=admin_only` ayarlanmalı ve admin claim'leri yalnız trusted server/admin akışıyla `app_metadata` içine yazılmalıdır. Claim yönetimi bu değişikliğin kapsamı dışındadır. Production DB veya deploy yapılmamıştır.
+Bu belge D8-1 tamamlandığı andaki `admin_only` önerisini kaydeder. D8-4A.5D canonical ilk-release kararı bunu supersede eder: Production v1 `AI_SERVER_ACCESS_MODE=disabled` ile başlar; admin claim/MFA ve provider enablement `POST_RELEASE_GATE`tir. Production DB veya deploy yapılmamıştır.
