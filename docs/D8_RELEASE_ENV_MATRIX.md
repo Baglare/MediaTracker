@@ -80,3 +80,43 @@ Araştırma adapter/model env'lerinin tamamı LOCAL conditional test dışında 
 Production review şu exact değer sınıfını doğrular: `AI_SERVER_ACCESS_MODE=disabled`, `D7_RESEARCH_ROLLOUT_MODE=disabled`, `D7_RESEARCH_SHADOW_ENABLED=0`, `D7_RESEARCH_PUBLIC_CITATIONS_ENABLED=0`, `D7_RESEARCH_EVIDENCE_CACHE_ENABLED=0`, `MEDIA_TRACKER_PERSISTENT_EMBEDDING_CACHE=off`, `MEDIA_TRACKER_ANILIST_MODE=disabled`, `MEDIA_TRACKER_TMDB_MODE=disabled`. Paid AI/provider keys, `SUPABASE_SERVICE_ROLE_KEY`, test/staging/fixture/local-ML/live-smoke env'leri bulunmaz.
 
 Çelişkili kombinasyonlarda feature açılmaz: unknown AI/signup/provider mode, Cloud stage/flag mismatch, research conflict, missing Open Library contact, TMDB readiness eksikliği veya Production'da AniList `preview_test` fail-closed'dur.
+
+### D8-4B exact Production value planı
+
+Bu tablo final maintenance-off Production durumudur. Tüm satırların Vercel scope'u yalnız `Production` olmalıdır. `NEXT_PUBLIC_*` değerleri client build'e gömüldüğü, diğer Vercel env'leri de yeni deployment'a uygulandığı için her transition yeni deployment gerektirir.
+
+| Variable | Exact intended value / güvenli kaynak | Source of truth | Visibility | Phase |
+| --- | --- | --- | --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL` | Değer yazılmaz; Production Project URL, fingerprint `fbfe801aeb` | Supabase Dashboard → MediaTracker Production → Project Settings → API → Project URL | public, build-time | maintenance-on deploy öncesi |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Değer yazılmaz; Production legacy `anon` public key, fingerprint `fd1d9d7578` | Supabase Dashboard → MediaTracker Production → Project Settings → API Keys → Legacy `anon`/public | public, build-time | maintenance-on deploy öncesi |
+| `NEXT_PUBLIC_APP_URL` | `https://media-tracker-pi-two.vercel.app` | Vercel Production deployment primary alias | public, build-time | maintenance-on deploy öncesi |
+| `NEXT_PUBLIC_CLOUD_MEDIA_SCHEMA_STAGE` | final `d2c1`; transient pre-migration `d2b1` | Production ledger/post-check + `lib/cloud-rollout.ts` | public, build-time | post-migration stage deploy |
+| `NEXT_PUBLIC_CLOUD_MEDIA_V2_ENABLED` | `true` | D2C.1 client contract | public, build-time | maintenance-on deploy; maintenance açık kalır |
+| `NEXT_PUBLIC_CLOUD_GOALS_SCHEMA_STAGE` | final `v1`; transient pre-migration `absent` | Goal Cloud V1 migration/post-check | public, build-time | post-migration stage deploy |
+| `NEXT_PUBLIC_CLOUD_GOALS_V1_ENABLED` | final `true`; transient pre-migration `false` | Goal Cloud V1 post-check | public, build-time | post-migration stage deploy |
+| `NEXT_PUBLIC_CLOUD_MEDIA_MAINTENANCE` | final `false`; cutover boyunca `true` | D8 production runbook | public, build-time | maintenance-on deploy; en son maintenance-off deploy |
+| `NEXT_PUBLIC_CLOUD_MEDIA_DEPLOYMENT_EPOCH` | `d8-v1-3a847701` | Approved RC SHA `3a847701…`; deterministic bounded release epoch | public, build-time | maintenance-on deploy; üç deploy boyunca değişmez |
+| `NEXT_PUBLIC_CLOUD_MEDIA_MINIMUM_CLIENT_VERSION` | `d2c2` | `CLOUD_MEDIA_CLIENT_VERSION` in `lib/cloud-rollout.ts` | public, build-time | maintenance-on deploy |
+| `MEDIA_TRACKER_PROVIDER_USER_AGENT` | `MediaTracker/1.0 (mediatracker.contact@gmail.com)` | Approved operator/provider contact | server non-secret, deployment runtime | maintenance-on deploy öncesi |
+| `MEDIA_TRACKER_ANILIST_MODE` | `disabled` | First-release provider policy | server non-secret, deployment runtime | maintenance-on deploy öncesi |
+| `MEDIA_TRACKER_TMDB_MODE` | `disabled` | First-release provider policy | server non-secret, deployment runtime | maintenance-on deploy öncesi |
+| `AI_SERVER_ACCESS_MODE` | `disabled` | First-release AI policy | server non-secret, deployment runtime | maintenance-on deploy öncesi |
+| `D7_RESEARCH_ROLLOUT_MODE` | `disabled` | First-release Research policy | server non-secret, deployment runtime | maintenance-on deploy öncesi |
+| `D7_RESEARCH_SHADOW_ENABLED` | `0` | First-release Research policy | server non-secret, deployment runtime | maintenance-on deploy öncesi |
+| `D7_RESEARCH_PUBLIC_CITATIONS_ENABLED` | `0` | First-release Research policy | server non-secret, deployment runtime | maintenance-on deploy öncesi |
+| `D7_RESEARCH_EVIDENCE_CACHE_ENABLED` | `0` | First-release Research policy | server non-secret, deployment runtime | maintenance-on deploy öncesi |
+| `MEDIA_TRACKER_PERSISTENT_EMBEDDING_CACHE` | `off` | First-release cache policy | server non-secret, deployment runtime | maintenance-on deploy öncesi |
+
+Production Supabase target fingerprint'i `227403b3cd`, staging target fingerprint'i `84c9d12522`'dir; eşitlik stop condition'dır. Dashboard'dan alınan URL ve anon key aynı Production project ekranından, iki kişi tarafından fingerprint/host eşleşmesiyle doğrulanır. Gerçek değer belgeye, terminal çıktısına veya review kaydına yazılmaz.
+
+### Production v1 forbidden set
+
+| Grup | Production'da bulunmaması gereken env |
+| --- | --- |
+| Privileged runtime | `SUPABASE_SERVICE_ROLE_KEY` |
+| Paid AI/provider | `AI_PROVIDER`, `OPENAI_API_KEY`, `OPENAI_MODEL`, `GROQ_API_KEY`, `GROQ_MODEL`, `OPENROUTER_API_KEY`, `OPENROUTER_MODEL`, `GEMINI_API_KEY`, `GEMINI_MODEL`, `TMDB_READ_ACCESS_TOKEN`, `OMDB_API_KEY` |
+| Semantic/ML | `MEDIA_TRACKER_ML_SERVICE_URL`, `MEDIA_TRACKER_EMBEDDING_MODEL`, `AI_RECOMMENDATION_SEMANTIC_MODE`, `AI_LOCAL_SEMANTIC_VERIFIER_URL`, `AI_REMOTE_SEMANTIC_VERIFIER_URL` |
+| Research providers | `MEDIA_TRACKER_WIKIMEDIA_RESEARCH_ENABLED`, `MEDIA_TRACKER_RESEARCH_USER_AGENT`, `D7_OPENAI_WEB_DISCOVERY_ENABLED`, `OPENAI_RESEARCH_MODEL`, `D7_RESEARCH_DISCOVERY_PROVIDER`, `D7_GROQ_WEB_DISCOVERY_ENABLED`, `GROQ_RESEARCH_MODEL`, `D7_OPENROUTER_WEB_DISCOVERY_ENABLED`, `OPENROUTER_RESEARCH_MODEL`, `D7_RESEARCH_EXTRACTION_PROVIDER`, `D7_GROQ_GROUNDED_EXTRACTION_ENABLED`, `GROQ_RESEARCH_EXTRACTION_MODEL`, `D7_OPENAI_GROUNDED_EXTRACTION_ENABLED`, `OPENAI_RESEARCH_EXTRACTION_MODEL`, `D7_OPENROUTER_GROUNDED_EXTRACTION_ENABLED`, `OPENROUTER_RESEARCH_EXTRACTION_MODEL` |
+| Staging/test/fixture | `D8_STAGING_*`, `SUPABASE_TEST_*`, `SUPABASE_PRODUCTION_URL`, fixture e-mail/password değişkenleri |
+| Diagnostics/live smoke | `D7_ANNOTATION_TOOL_ENABLED`, `D7_ANNOTATION_DATA_DIR`, `D7_*_LIVE_SMOKE` |
+| Platform-managed user override | Kullanıcı tanımlı `VERCEL_URL`, `VERCEL_ENV`, `NODE_ENV` |
