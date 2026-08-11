@@ -14,6 +14,7 @@
 create or replace function public.set_updated_at()
 returns trigger
 language plpgsql
+set search_path = pg_catalog
 as $$
 begin
   new.updated_at = now();
@@ -297,6 +298,7 @@ drop policy if exists embedding_cache_select_global on public.embedding_cache;
 drop policy if exists embedding_cache_insert_global on public.embedding_cache;
 drop policy if exists embedding_cache_update_global on public.embedding_cache;
 drop policy if exists embedding_cache_delete_global on public.embedding_cache;
+revoke all on table public.embedding_cache from public, anon, authenticated;
 
 -- ============================================================
 -- SOCIAL PROFILE FOUNDATION

@@ -28,13 +28,13 @@ Supabase Auth **Allow new users to sign up** bir env değildir. İlk release Pro
 
 | Env | LOCAL | PREVIEW | PRODUCTION | Allowed/default | Visibility | Owner ve fail-closed davranış |
 | --- | --- | --- | --- | --- | --- | --- |
-| `MEDIA_TRACKER_PROVIDER_USER_AGENT` | O | R if Open Library | R if Open Library | Bounded app/version + gerçek contact; unset | server/non-secret | Provider ops; eksik/geçersizse Open Library çağrılmaz, TVMaze korunur |
+| `MEDIA_TRACKER_PROVIDER_USER_AGENT` | O | R | R | Exact value class: `MediaTracker/1.0 (mediatracker.contact@gmail.com)` | server/non-secret | Provider ops; Preview smoke PASS. Aynı değer Production scope'una yalnız D8-4B env adımında atanır; eksik/geçersizse Open Library çağrılmaz |
 | `MEDIA_TRACKER_ANILIST_MODE` | O | O | R | `disabled`, Preview'da `preview_test`, izin sonrası `authorized`; default disabled | server/non-secret | Production v1 exact `disabled`; invalid/Preview mode prod'da deny |
 | `MEDIA_TRACKER_TMDB_MODE` | O | O | R | `disabled`/`noncommercial`; default disabled | server/non-secret | Production v1 exact `disabled`; logo/notice/token hazır değilse deny |
 | `TMDB_READ_ACCESS_TOKEN` | O | O | F v1 | Token | server/secret | TMDB disabled iken provision edilmez |
 | `OMDB_API_KEY` | O legacy diagnosis | F | F | Key | server/secret | Yeni public search/fallback policy ile daima kapalı; legacy data okunur |
 
-TVMaze için enable env yoktur; attribution/source-link code contract'ıyla açıktır. Open Library gerçek contact sağlanmazsa Production'da capability disabled bırakılır.
+TVMaze için enable env yoktur; attribution/source-link code contract'ıyla açıktır. Open Library contact kararı ve Preview smoke'u `CLOSED`; Production Vercel env uygulaması D8-4B final env operasyonunun parçasıdır.
 
 ## AI, Research ve cache
 

@@ -26,6 +26,8 @@ Bu paket D8-4A staging PASS sonrasındaki Vercel Preview kullanıcı kabulünü 
 - Aşağıdaki işaretlenmemiş provider failure, uzun süreli offline/conflict, tüm timezone ve tüm viewport kombinasyonları `EXTENDED_QA` olarak kalır. Bunlar kanıtsız PASS değildir ve yeni bir blocker bulgusu üretmedikçe v1 kapısını yeniden açmaz.
 
 D8-4A.5D tanı Preview'ında signup UI/action kaldırma ve first-release cache/service-role sınırı yeniden build edildi. Protected endpoint üzerinden home/header/dev-route/guest AI/provider/public-profile teknik smoke'u geçti; deployment protection login'i otomatik credential'sız hydrated Settings smoke'unu engelledi. Bu nedenle yeni hesap açma provider-boundary deny ve mevcut hesap sign-in, D8-4B öncesi manuel Auth kontrolünde tekrar doğrulanır; önceki Auth kullanıcı kabulü geriye dönük değiştirilmez.
+
+D8-4A.5E `/privacy` route'u auth gerektirmeyen public shell'de eklenmiştir. Fresh protected Preview'da Guest HTTP 200, gerçek hydrated DOM, responsive overflow, semantic theme, operator/contact, local-first, Cloud/social/provider/hosting, AI-disabled, export/deletion-request ve sıfır console/hydration error doğrulandı. P-05 `PASS` kapandı.
 5. Console veya Network export'u paylaşmadan önce token, cookie, email, user ID, query ve response body redaction yap. Expected 401/403 ile gerçek 5xx'i ayır.
 
 `Sonuç` alanı her senaryo için: **☐ PASS ☐ FAIL ☐ BLOCKED**. Seviye, senaryo başarısızlığının varsayılan triage sınıfıdır.
@@ -38,6 +40,7 @@ D8-4A.5D tanı Preview'ında signup UI/action kaldırma ve first-release cache/s
 | P-02 | BLOCKER | Env review erişimi | Ops | Preview env scope'unu masked karşılaştır | Supabase hedefi staging; production target ve test credential Preview runtime'da yok | ☒ PASS ☐ FAIL ☐ BLOCKED |
 | P-03 | BLOCKER | Preview build | Guest | `/dev/recommendation-annotation` ve `/api/dev/recommendation-annotation` aç | Production-mode Preview'da ikisi de güvenli 404; local dosya içeriği yok | ☒ PASS ☐ FAIL ☐ BLOCKED |
 | P-04 | MAJOR | DevTools açık | Guest | Ana sayfa, `/people`, bir public profil ve `/api/ai/capabilities` kontrol et | Security headers/no-store contract korunur; key/model/raw role/user ID görünmez | ☒ PASS ☐ FAIL ☐ BLOCKED |
+| P-05 | MAJOR | D8-4A.5E Preview | Guest | `/privacy` aç; auth olmadan operator/contact, veri akışı ve export/delete bölümlerini kontrol et | 200, responsive semantic theme, login redirect yok, yalnız approved contact, console/hydration/secret hatası yok | ☒ PASS ☐ FAIL ☐ BLOCKED |
 
 ## A — Guest ve local-first
 

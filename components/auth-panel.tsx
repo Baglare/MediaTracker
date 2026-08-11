@@ -8,6 +8,7 @@
 // mediaItems / progressLogs üzerinde hiçbir işlem yapmaz.
 
 import { useState } from "react";
+import Link from "next/link";
 import { LogIn, LogOut, Mail, ShieldCheck, Lock } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 
@@ -180,6 +181,9 @@ export default function AuthPanel() {
         <p className="text-[11px] text-zinc-500 leading-relaxed pt-1">
           İlk sürümde yeni hesap kaydı kapalıdır. Mevcut hesabınla giriş yapabilir; giriş yapmadan yerel-first kullanıma devam edebilirsin.
         </p>
+        <Link href="/privacy" className="block text-center text-xs text-[var(--app-accent-strong)] underline underline-offset-4">
+          Gizlilik ve veri kullanımı
+        </Link>
       </form>
     </div>
   );

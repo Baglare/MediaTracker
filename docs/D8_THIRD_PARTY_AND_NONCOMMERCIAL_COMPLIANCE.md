@@ -1,6 +1,6 @@
 # D8 third-party ve non-commercial compliance envanteri
 
-Doğrulama tarihi: 2026-08-10. Bu belge hukuk görüşü değildir; release öncesi ürün/operasyon kontrol listesidir. Yalnız resmi kaynaklar kullanılmıştır. D8-4A yeniden kontrolünde TMDB logo/notice, OMDb non-commercial, TVMaze CC BY-SA/User-Agent ve Open Library identified-client koşulları değişmeden doğrulandı.
+Doğrulama tarihi: 2026-08-11. Bu belge hukuk görüşü değildir; release öncesi ürün/operasyon kontrol listesidir. Yalnız resmi kaynaklar kullanılmıştır. D8-4A yeniden kontrolünde TMDB logo/notice, OMDb non-commercial, TVMaze CC BY-SA/User-Agent ve Open Library identified-client koşulları değişmeden doğrulandı.
 
 | Servis | Rol ve release contract'ı | Attribution / retention / AI sınırı | Durum |
 | --- | --- | --- | --- |
@@ -8,7 +8,7 @@ Doğrulama tarihi: 2026-08-10. Bu belge hukuk görüşü değildir; release önc
 | TVMaze | Dizi arama/takvim | [API](https://www.tvmaze.com/api): CC BY-SA attribution/link; en az 20 çağrı/10 sn/IP, 429 backoff; output 60 dk, image URL'leri uzun süre cachelenebilir. Ticari kullanım ayrı lisans gerektirebilir. | Aktif; Settings attribution ve sonuç-level canonical source link görünür. |
 | TMDB | Film arama/takvim | [FAQ](https://developer.themoviedb.org/docs/faq): non-commercial attribution ile; commercial lisans ayrı. About/Credits'te TMDB notice ve resmi logo gerekir. | Production v1 disabled; approved logo/non-commercial readiness sonrası enablement `POST_RELEASE_GATE`tir. |
 | OMDb | Legacy kayıt uyumluluğu | [Legal](https://www.omdbapi.com/legal.htm): kişisel/non-commercial; ticari kullanım yasak. | Public search/fallback ve aktif attribution listesinden çıkarıldı; eski `externalSource: "omdb"` kayıt decode/import/display uyumluluğu korunur. |
-| Open Library | Kitap arama | [API](https://openlibrary.org/developers/api): human-facing low-volume, cache, tanımlayıcı User-Agent; varsayılan 1 rps, tanımlı istemci 3 rps. [Licensing](https://openlibrary.org/developers/licensing): kayıt/katkı bazlı haklar değişebilir. | Server User-Agent desteği eklendi; gerçek contact env release kapısı. |
+| Open Library | Kitap arama | [API](https://openlibrary.org/developers/api): human-facing low-volume, cache, tanımlayıcı User-Agent; varsayılan 1 rps, tanımlı istemci 3 rps. [Licensing](https://openlibrary.org/developers/licensing): kayıt/katkı bazlı haklar değişebilir. | `CLOSED`: public contact `mediatracker.contact@gmail.com`; UA `MediaTracker/1.0 (mediatracker.contact@gmail.com)`. Preview Dune araması ve attribution PASS. Production env uygulaması D8-4B'dedir. |
 | Wikimedia / Wikipedia / Wikidata | D7 bounded research evidence | [Wikimedia Terms](https://foundation.wikimedia.org/wiki/Policy:Terms_of_Use), [Wikidata licensing](https://www.wikidata.org/wiki/Wikidata:Licensing): Wikipedia metni ağırlıkla CC BY-SA attribution/share-alike; dosya bazlı lisans değişir; Wikidata CC0. Revision-bound citation korunur, transient passage/prompt persist edilmez. | Research default disabled; açılırsa citation/attribution zorunlu. |
 | OpenAI | Planning/extraction/discovery | [Data use](https://openai.com/policies/how-your-data-is-used-to-improve-model-performance/): API verisi varsayılan olarak training için kullanılmaz; opt-in ayrıdır. Raw prompt/response persist edilmez. | Production v1 disabled; key provision edilmez, enablement `POST_RELEASE_GATE`tir. |
 | Groq | Planning/extraction/discovery | [Data](https://console.groq.com/docs/your-data): inference içeriği varsayılan retention dışı; abuse/reliability kayıtları ve metadata koşulları vardır, ZDR sunulur. [Agreement](https://console.groq.com/docs/legal/services-agreement): explicit izin olmadan training yok. | ZDR/retention seçimi ve hesap sözleşmesi doğrulanmalı. |
@@ -24,9 +24,9 @@ Uygulamadaki Ayarlar veri kaynakları alanı yalnız merkezi capability ile akti
 
 - TVMaze `CLOSED`: attribution/source link ile v1 enabled.
 - OMDb `CLOSED`: yeni public yol disabled, legacy data supported.
-- Open Library `BLOCKED_MANUAL`: gerçek contact UA doğrulanır veya Production capability disabled seçilir.
+- Open Library `CLOSED`: contact/UA kararı ve Preview live smoke tamamlandı; aynı UA'nın Production env'e atanması bağımsız provider blocker değil, D8-4B final env adımıdır.
 - AniList ve TMDB `POST_RELEASE_GATE`: v1 disabled; izin/logo hazır olmaması v1 blocker değildir.
 - OpenAI/Groq/OpenRouter/Gemini/Research `POST_RELEASE_GATE`: v1 disabled; key/budget/MFA/provider privacy enablement öncesi ele alınır.
-- Supabase/Vercel vendor, region, retention ve disclosure incelemesi privacy/operator `BLOCKED_EXTERNAL` kapısının parçasıdır.
+- Supabase/Vercel vendor teknik veri akışı disclosure'a işlendi. Doğrulanmamış region/foreign-transfer hukuki dayanağı için `MANUAL_LEGAL_REVIEW_REQUIRED` kanonik privacy kapısının parçasıdır.
 
 Tek kanonik production hold tablosu [D8 release-candidate acceptance](D8_RELEASE_CANDIDATE_ACCEPTANCE.md#d8-4a5d-kanonik-production-hold-tablosu) belgesindedir.
