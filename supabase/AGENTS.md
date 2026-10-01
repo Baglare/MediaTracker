@@ -1,5 +1,5 @@
 <!-- knowledge-compiler-adapter-v1
-{"adapter_contract":"codex-agents-v1","generated_body_sha256":"e8b795b944181724a0a0fb52a2677dc49ef65ce8294ea75b3669975ec18a19ea","generator":"knowledge-compiler","generator_version":"adapter-compiler-v2","project_id":"media-tracker","routing_sha256":"5ff1d00e7c37223fec6f256130db91554b59fbca7cd7bf57ea53e75a87fa5a51","source_structured_contract_sha256":"4b53fdac17e35b692556b071a8a1dda67d2719718cda1624cbb02e138255b678","target":"codex"}
+{"adapter_contract":"codex-agents-v1","generated_body_sha256":"e8b795b944181724a0a0fb52a2677dc49ef65ce8294ea75b3669975ec18a19ea","generator":"knowledge-compiler","generator_version":"adapter-compiler-v3","project_id":"media-tracker","routing_sha256":"5ff1d00e7c37223fec6f256130db91554b59fbca7cd7bf57ea53e75a87fa5a51","source_structured_contract_sha256":"4b53fdac17e35b692556b071a8a1dda67d2719718cda1624cbb02e138255b678","target":"codex"}
 -->
 
 # Generated Codex Instructions: MediaTracker: cloud-sync-auth
