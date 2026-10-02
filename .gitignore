@@ -52,3 +52,6 @@ design_references/dump/
 
 .vercel
 .env*
+
+# KnowledgeCompiler local operational state
+.knowledge-compiler/

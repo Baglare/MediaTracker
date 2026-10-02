@@ -25,7 +25,6 @@ export interface AuthActionResult {
 
 export interface UseAuthApi extends UseAuthState {
   signIn: (email: string, password: string) => Promise<AuthActionResult>;
-  signUp: (email: string, password: string) => Promise<AuthActionResult>;
   signOut: () => Promise<AuthActionResult>;
 }
 
@@ -105,14 +104,6 @@ export function useAuth(): UseAuthApi {
     return { ok: true };
   };
 
-  const signUp = async (email: string, password: string): Promise<AuthActionResult> => {
-    const client = getSupabaseBrowserClient();
-    if (!client) return { ok: false, error: "Supabase yapılandırılmadı." };
-    const { error } = await client.auth.signUp({ email, password });
-    if (error) return { ok: false, error: translateAuthError(error) };
-    return { ok: true };
-  };
-
   const signOut = async (): Promise<AuthActionResult> => {
     const client = getSupabaseBrowserClient();
     if (!client) return { ok: false, error: "Supabase yapılandırılmadı." };
@@ -121,5 +112,5 @@ export function useAuth(): UseAuthApi {
     return { ok: true };
   };
 
-  return { ...state, signIn, signUp, signOut };
+  return { ...state, signIn, signOut };
 }

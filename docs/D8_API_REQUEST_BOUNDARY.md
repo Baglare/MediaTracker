@@ -29,4 +29,4 @@ Global header contract CSP (`frame-ancestors 'none'`, `object-src 'none'`, `base
 
 ## Kalan rollout kapısı
 
-Rate limiter process-local'dır; birden fazla instance toplam limiti paylaşmaz ve restart ile sıfırlanır. Staging origin/header/browser kabulü D8-4A'da geçti; distributed limiter ve production CDN/body/origin doğrulaması D8-4B mandatory hold/runbook kapısında kalır. Dependency veya production config değişikliği bu belge kapsamında yapılmamıştır.
+Rate limiter process-local'dır; birden fazla instance toplam limiti paylaşmaz ve restart ile sıfırlanır. Staging origin/header/browser kabulü D8-4A'da geçti; production CDN/body/origin smoke'u D8-4B runbook kapısındadır. İlk release paid AI/research disabled olduğundan distributed provider limiter v1 blocker değildir ve AI enablement ile birlikte `POST_RELEASE_GATE` olarak ele alınır. Dependency veya production config değişikliği bu belge kapsamında yapılmamıştır.

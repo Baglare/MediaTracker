@@ -1,4 +1,4 @@
-import { ArrowLeft, Users } from "lucide-react";
+import { ArrowLeft, ShieldCheck, Users } from "lucide-react";
 import Link from "next/link";
 
 import { BrandMark } from "@/components/brand-mark";
@@ -15,6 +15,7 @@ export function PublicTopbar({ sticky = true, label = "Public navigasyon" }: {
           <span className="font-semibold text-[var(--app-text-primary)]">MediaTracker</span>
         </Link>
         <nav aria-label={label} className="ml-auto flex min-w-0 items-center gap-1 text-sm sm:gap-2">
+          <Link href="/privacy" aria-label="Gizlilik ve veri kullanımı" className="inline-flex items-center gap-1.5 rounded-lg px-2 py-2 text-[var(--app-text-muted)] hover:bg-[var(--app-hover)] hover:text-[var(--app-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-focus)] sm:px-3"><ShieldCheck className="h-4 w-4" aria-hidden="true" /><span className="hidden sm:inline">Gizlilik</span></Link>
           <Link href="/people" aria-label="Kullanıcı ara" className="inline-flex items-center gap-1.5 rounded-lg px-2 py-2 text-[var(--app-text-muted)] hover:bg-[var(--app-hover)] hover:text-[var(--app-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-focus)] sm:px-3"><Users className="h-4 w-4" aria-hidden="true" /><span className="sr-only sm:not-sr-only">Kullanıcı ara</span></Link>
           <Link href="/" aria-label="Uygulamaya dön" className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--app-border)] bg-[var(--app-surface-1)] px-2 py-2 text-[var(--app-text-secondary)] hover:border-[var(--app-accent)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-focus)] sm:px-3"><ArrowLeft className="h-4 w-4" aria-hidden="true" /><span className="sr-only sm:not-sr-only">Uygulamaya dön</span></Link>
         </nav>

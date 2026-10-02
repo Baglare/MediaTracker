@@ -10,6 +10,7 @@ import {
 } from "@/lib/ai/embedding-cache";
 import {
   readPersistentEmbeddingCache,
+  isPersistentEmbeddingCacheEnabled,
   writePersistentEmbeddingCache,
   type PersistentEmbeddingCacheStats,
 } from "@/lib/ai/persistent-embedding-cache";
@@ -140,7 +141,7 @@ export async function embedManyWithFallback(
       dimensions: 0,
       fallbackUsed: false,
       cache: { hits: 0, misses: 0, stored: 0, size: 0, enabled: process.env.MEDIA_TRACKER_EMBEDDING_CACHE !== "off" },
-      persistentCache: { hits: 0, misses: 0, stored: 0, disabled: process.env.MEDIA_TRACKER_PERSISTENT_EMBEDDING_CACHE === "off" },
+      persistentCache: { hits: 0, misses: 0, stored: 0, disabled: !isPersistentEmbeddingCacheEnabled() },
       results: [],
     };
   }

@@ -122,7 +122,7 @@ function ProductRouteAppShell({
     automaticTitle: progression.title,
   }), [auth.user, localPreferences, progression.title, visibleCloudIdentity]);
 
-  const mode: AppShellMode = pathname.startsWith("/u/") || pathname === "/people"
+  const mode: AppShellMode = pathname.startsWith("/u/") || pathname === "/people" || pathname === "/privacy"
     ? auth.user ? "authenticated" : "public"
     : "authenticated";
 

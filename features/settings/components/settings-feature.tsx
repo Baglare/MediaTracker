@@ -1,6 +1,7 @@
 "use client";
 
 import type { User } from "@supabase/supabase-js";
+import Link from "next/link";
 import { CloudCog, Home, PanelsTopLeft, Settings as SettingsIcon } from "lucide-react";
 import AuthPanel from "@/components/auth-panel";
 import { BrandMark } from "@/components/brand-mark";
@@ -154,6 +155,11 @@ export default function SettingsFeature({
               <strong>MediaTracker</strong> verilerini tarayıcının yerel depolama alanında
               tutar. Cloud eşitleme yalnız kullanıcı tarafından etkinleştirildiğinde mevcut
               hesap üzerinden yürütülür.
+            </p>
+            <p>
+              <Link href="/privacy" className="font-medium text-[var(--app-accent-strong)] underline underline-offset-4">
+                Gizlilik, veri kullanımı, dışa aktarma ve silme bilgileri
+              </Link>
             </p>
             <div className="my-4 h-px bg-[var(--app-border)]" />
             <h4 className="font-medium text-[var(--app-text-primary)]">Veri kaynakları</h4>

@@ -1,12 +1,12 @@
 # D8 release-candidate acceptance
 
-Durum tarihi: 2026-08-10. Sonuç: **PASS — D8-4A staging acceptance tamamlandı.** Production veritabanı, Auth, Storage ve deploy hedefi kullanılmadı.
+Durum tarihi: 2026-08-11. Sonuç: **PASS — D8-4A.5E code/Staging/Preview hazırlığı tamamlandı; D8-4B manuel Production kapıları açık.** Production veritabanı, Auth, Storage, env veya deploy hedefinde mutation yapılmadı.
 
 ## D8-4A.5 release freeze
 
 D8-4A'nın başarıyla doğrulanan kod/migration baseline'ı `1d0a3c939e97a88a7f6d8ab457aa6b80587cc57c` SHA'sıdır. Bu SHA sonrası D8-4B production cutover'a kadar yalnız release blocker, veri kaybı, auth/security, privacy, ciddi UX, deployment/runtime veya compliance blocker düzeltmeleri kabul edilir; yeni ürün özelliği alınmaz.
 
-D8-4A.5 kapsamındaki UAT, env matrisi, freeze belgesi ve contract testleri baseline sonrası release hazırlığıdır; D8-4A live kanıtını geriye dönük değiştirmez. D8-4A.5B'de current HEAD için Vercel Preview hazır bulundu; staging Supabase target'ı, Preview env adı/scope sınırı, Cloud Media `d2c1`, Goal Cloud `v1`, production-mode dev-route 404 ve Deployment Protection teknik olarak doğrulandı. Manuel kabul paketi [D8 Preview UAT](D8_PREVIEW_UAT.md) belgesindedir; P-01–P-04 kullanıcı tarafından henüz sonuçlandırılmadı.
+D8-4A.5 kapsamındaki UAT, env matrisi, freeze belgesi ve contract testleri baseline sonrası release hazırlığıdır; D8-4A live kanıtını geriye dönük değiştirmez. D8-4A.5B'de current HEAD için Vercel Preview hazır bulundu; staging Supabase target'ı, Preview env adı/scope sınırı, Cloud Media `d2c1`, Goal Cloud `v1`, production-mode dev-route 404 ve Deployment Protection teknik olarak doğrulandı. C1 Discovery/provider, C2 public profile theme ve C3 asset/Calendar/release-polish kullanıcı smoke kabulü tamamlandı. İşaretlenmemiş geniş senaryolar [D8 Preview UAT](D8_PREVIEW_UAT.md) belgesinde `EXTENDED_QA` olarak korunur; kanıtsız PASS değildir.
 
 Preview readiness audit'inde repo/runtime blocker bulunmadı: production-mode annotation UI/API fail-closed 404, service-role import'u server-only, request same-origin kontrolü deployment origin'iyle uyumlu, server candidate URL çözümü `VERCEL_URL` fallback'li ve Cloud Media/Goal stage uyuşmazlıkları fail-closed'dur. Preview teknik kapısı geçmiştir; 69 manuel senaryonun yürütülmesi dış kabul kapısı olarak kalır.
 
@@ -19,7 +19,7 @@ D8-4A.5 doğrulaması: hedefli Preview/security/cloud/profile/recommendation/cal
 - Masked hard gate; explicit cutover/migration iznini, staging ve production hedeflerinin farklılığını, app/test/DB hedef eşleşmesini, staging anon/service-role doğrulamasını ve iki farklı gerçek Auth fixture kullanıcısını doğruladı. Secret, credential veya tam project ref kaydedilmedi.
 - Mevcut staging şeması **B — eski fakat forward-migratable** sınıfındaydı. Owner-null, duplicate owner/ID, orphan ve PK/FK conflict aggregate kontrolleri temizdi.
 - User A'nın mevcut `app_metadata` alanları korunarak yalnız server contract'ının beklediği admin claim'i atandı. Taze oturumda A admin, B non-admin kaldı; B/guest forged body ile yetki kazanamadı.
-- Remote ledger'a göre D2C.1 önceden uygulanmıştı. D8 public profile theme ve Goal Cloud V1 additive migration'ları dependency sırasıyla uygulandı; ardından profile asset path-scope hardening migration'ı uygulandı. Tüm post-check'lerde pending migration sıfırdı. CLI'nin local catalog cache için verdiği Docker-yok warning'i remote uygulamayı etkilemedi.
+- Remote ledger'a göre D2C.1 önceden uygulanmıştı. D8 public profile theme ve Goal Cloud V1 additive migration'ları dependency sırasıyla uygulandı; ardından profile asset path-scope ve `20260811120000_d8_security_advisor_hardening.sql` migration'ları uygulandı. Tüm post-check'lerde pending migration sıfırdı. CLI'nin local catalog cache için verdiği Docker-yok warning'i remote uygulamayı etkilemedi.
 - D2C.1 live kabulü owner-scoped fiziksel PK/FK, RPC-only mutation, RLS, revision CAS, idempotency ve tombstone/restore davranışlarını iki owner ile doğruladı. Goal Cloud V1 CRUD/replay/owner isolation/tombstone kabulü geçti.
 - Public profile hidden, preset-only, current preset ve validated custom projection'ları geçti; düşük kontrastlı custom publish reddedildi, private/internal alan sızmadı ve cross-owner update PostgreSQL/RLS tarafından reddedildi.
 - Asset live kabulünde eski storage policy'nin profil görünürlüğünü path'e bağlamadığı bulundu. Yeni policy non-owner erişimini yalnız güncel `avatar_path`/`banner_path` ile sınırlar; unreferenced ve temizlenmiş path signed URL erişimi reddedilir. Upload/update/delete/invalidation ve cleanup geçti.
@@ -43,5 +43,54 @@ D8-4A.5 doğrulaması: hedefli Preview/security/cloud/profile/recommendation/cal
 ## Release politikası ve kalan production kapıları
 
 - İlk Production release server-funded AI olmadan başlar: `AI_SERVER_ACCESS_MODE=disabled`, `D7_RESEARCH_ROLLOUT_MODE=disabled`, shadow/citation/evidence-cache flag'leri `0` ve persistent embedding cache `off` kalır. Deterministik kütüphane danışmanı korunur; process-local limiter/cache cross-instance garanti değildir.
-- AniList yazılı production izni, TMDB resmi onaylı logo/non-commercial readiness, Open Library gerçek production contact'lı User-Agent ve production backup/target/change-window onayı D8-4B kapılarıdır. OMDb yeni public provider olarak kapalıdır; yalnız legacy veri uyumluluğu korunur.
+- AniList ve TMDB ilk sürümde fail-closed disabled olduğu için enablement işleri `POST_RELEASE_GATE` sınıfındadır. Open Library public contact/UA kararı ve Preview Dune smoke'u kapandı; aynı UA'nın Production env'e atanması D8-4B final env adımıdır. OMDb yeni public provider olarak kapalıdır ve yalnız legacy veri uyumluluğu korunur; TVMaze attribution ile açıktır.
 - Production cutover yalnız [runbook](D8_PRODUCTION_CUTOVER_RUNBOOK.md), [fail-forward planı](D8_PRODUCTION_ROLLBACK_AND_FAIL_FORWARD.md) ve [post-deploy checklist](D8_POST_DEPLOY_SMOKE_CHECKLIST.md) ile ayrı yetkilendirilir.
+
+## D8-4A.5D kanonik production hold tablosu
+
+Bu tablo tek kanonik hold kaynağıdır. Durumlar yalnız `CLOSED`, `BLOCKED_EXTERNAL`, `BLOCKED_MANUAL`, `POST_RELEASE_GATE` ve `NOT_APPLICABLE` sınıflarını kullanır. Ayrıntılı kod kanıtı [first-release security/privacy audit](D8_FIRST_RELEASE_SECURITY_AND_PRIVACY.md) ve env kapsamı [release env matrix](D8_RELEASE_ENV_MATRIX.md) içindedir.
+
+| Kapı | Durum | D8-4B blocker | Kapanış/sonraki kanıt |
+| --- | --- | --- | --- |
+| C1-C3 kullanıcı smoke kabulü | `CLOSED` | Hayır | Discovery/provider, public profile theme ve asset/Calendar smoke kabulü; kalan geniş senaryolar `EXTENDED_QA` |
+| Repo signup UI/action | `CLOSED` | Hayır | Signup control ve browser `signUp` aksiyonu yok; guest/local-first ve mevcut hesap girişi korunur |
+| Production Supabase Auth signup ayarı | `BLOCKED_MANUAL` | Evet | D8-4B öncesi dashboard/provider boundary'de yeni kullanıcı kaydı disabled olduğu doğrulanır ve direct signup deny smoke kaydedilir |
+| AI/research/persistent cache v1 politikası | `CLOSED` | Hayır | Paid AI/research disabled; persistent cache yalnız exact `on` ile açılır, v1 `off`; serbest `text_preview` yazılmaz |
+| Production runtime service-role ihtiyacı | `CLOSED` | Hayır | App/lib içinde tek referans disabled persistent-cache adapter'ıdır; Production env'de key forbidden |
+| SQL/RPC/`SECURITY DEFINER`/RLS/Storage source audit | `CLOSED` | Hayır | CSV+body+consumer audit'i 62 ismi 7 public read, 9 auth read, 27 auth mutation, 19 internal olarak sınıflandırdı; additive migration Staging ledger/live regresyondan geçti |
+| Production Supabase Security Advisor / approved migration | `BLOCKED_MANUAL` | Evet | Current export 123 WARN. `20260811120000_d8_security_advisor_hardening.sql` Production ledger'a D8-4B'de uygulanır, post-check ve yeni Advisor export'u kaydedilir |
+| Privacy/operator/deletion/disclosure paketi | `BLOCKED_MANUAL` | Evet | Operator/contact, public `/privacy`, factual data flow ve deletion runbook hazır; region/foreign-transfer/legal-basis için `MANUAL_LEGAL_REVIEW_REQUIRED` |
+| Open Library contact ve Preview smoke | `CLOSED` | Hayır | `mediatracker.contact@gmail.com`; `MediaTracker/1.0 (mediatracker.contact@gmail.com)`; Preview Dune + attribution PASS. Production env uygulaması final env gate'indedir |
+| Production final env review | `BLOCKED_MANUAL` | Evet | İki kişi review; fixed disabled flags, Open Library UA ve Cloud stage/value class; service-role/AI/test/staging secrets absent |
+| Production exact target, backup ve change-window | `BLOCKED_MANUAL` | Evet | Exact Vercel/Supabase targets ve deployed SHA, DB/PITR+Storage planı, ledger, operator/onaylı pencere |
+| TVMaze attribution | `CLOSED` | Hayır | CC BY-SA notice ve canonical result/source link mevcut |
+| OMDb yeni public kullanım | `CLOSED` | Hayır | Search/fallback disabled; legacy `externalSource: "omdb"` decode/import/display korunur |
+| AniList Production enablement | `POST_RELEASE_GATE` | Hayır | Disabled kalır; yazılı izin sonrası ayrı enablement |
+| TMDB Production enablement | `POST_RELEASE_GATE` | Hayır | Disabled kalır; approved logo/notice/non-commercial readiness sonrası ayrı enablement |
+| Production AI key/budget/monitoring | `POST_RELEASE_GATE` | Hayır | İlk sürümde key provision edilmez; AI enablement ayrı release gate'idir |
+| Canonical admin claim ve MFA/AAL2 | `POST_RELEASE_GATE` | Hayır | Aktif v1 privileged kullanıcı yüzeyi yok; AI/admin enablement öncesi ele alınır |
+| Leaked-password protection | `POST_RELEASE_GATE` | Hayır | Free-plan capability yoksa `ACCEPTED_PLATFORM_LIMITATION`; signup disabled + güçlü benzersiz existing credentials; capability açıldığında etkinleştir |
+| Admin/Ops panel | `NOT_APPLICABLE` | Hayır | v1 kararı yeni panel yapmamak; explicit ops scriptleri ve dashboard kullanılır |
+
+**D8-4B öncesi gerçek blocker sayısı: 5.** Bunlar Production direct signup deny; approved security migration + Advisor rerun; privacy paketinin manuel hukuki incelemesi; final Production env review; exact target + backup/Storage + change-window kapılarıdır. Open Library artık bağımsız blocker değildir.
+
+## D8-4A.5E security/privacy/preflight closeout
+
+- Production Security Advisor CSV yeniden hesaplandı: 123 WARN, 0 ERROR; beklenen category sayıları ve 57/62 overlap doğrulandı.
+- Tek additive migration `set_updated_at` search path'ini, 62 SECURITY DEFINER rol matrisini ve dormant `embedding_cache` client erişimini harden eder. Historical migration değiştirilmedi.
+- Migration yalnız Test/Staging'e uygulandı; remote ledger eşleşti. Guest public/XP, auth social/theme, internal-helper denial, embedding anon/auth denial, Cloud/Goal ve A/B owner isolation canlı testleri geçti. Production Advisor hâlâ current 123-warning export'tur.
+- Migration sonrası tahmini Advisor görünümü 51 WARN'dır: intentional 7 anon + 43 authenticated definer warning'i ve 1 accepted platform limitation. Production uygulama/rerun yapılmadan bu tahmin PASS sayılmaz.
+- Public `/privacy`, operator/contact, active provider disclosure, export/delete sınırları ve manual deletion runbook hazırdır. Hukuki/foreign-transfer review teknik audit dışındadır.
+- D8-4B runbook minimum pending migration listesi, fixed env class, explicit mutation labels, backup/Storage ve rollback/fail-forward karar noktalarıyla güncellendi.
+- D8-4A.5E full suite 187 dosya/2.359 test PASS; 18 dosya/59 koşullu live test SKIP, lint ve build PASS. Build yalnız kayıtlı archived annotation NFT trace warning'ini üretti. `git diff --check`, secret-shape, local absolute path, onaysız Gmail ve tracked temp/diagnostic taramaları temizdir.
+- Fresh non-production Preview READY oldu. `/privacy` gerçek DOM/responsive/console-hydration PASS; local-first Guest ve signup-disabled copy görüldü; mevcut Staging kullanıcı girişi `Cloud Hazır` verdi. Open Library Dune 12, TVMaze 8 normalize sonuç; Calendar contract, public-profile Guest render, profile asset yüzeyi ve AI server/research disabled PASS. Production deployment/env değişmedi.
+- Browser sign-out aksiyonu otomasyon altında session durumunu değiştirmedi; hata/console kaydı da üretmedi. Bu kanıt tek başına ürün regresyonu sayılmaz ve D8-4B blocker sayısını artırmaz; operator gerçek kullanıcı oturumunda sign-out'u bir kez manuel retest eder, tekrar üretirse cutover durur.
+
+## D8-4A.5D validation ve Preview
+
+- Kod-side hardening hedefli seti 18 dosya/174 test geçti. Full suite 184 dosya/2.350 test PASS; 18 dosya/55 conditional live-key-gated test SKIP kaldı, yeni deterministic skip yok.
+- Lint, production build ve `git diff --check` geçti. Build yalnız daha önce kayıtlı archived annotation NFT trace warning'ini üretti.
+- Secret/local-absolute-path, Markdown link ve tracked temp/diagnostic taramaları geçti; dependency değişmedi.
+- Dirty çalışma ağacından yalnız tanı amaçlı immutable Preview oluşturuldu: `https://media-tracker-bxlbcl1cd-baglares-projects.vercel.app`. Bu artifact temiz committed RC SHA yerine geçmez ve Production'a promote edilmedi.
+- Protected Preview teknik smoke: home 200; CSP/nosniff/frame/referrer header'ları; dev page/API 404; guest server-provider/research false; TVMaze/Open Library enabled, AniList/TMDB/OMDb disabled; Cloud/profile server config ve public-theme marker PASS. Referans client chunk'larında signup toggle ve `auth.signUp` bulunmadı.
+- Hydrated Settings UI ve mevcut kullanıcı sign-in smoke'u Deployment Protection login duvarını credential ile aşmadan otomatikleştirilemedi; önceki kabul edilen Auth/C1-C3 kullanıcı smoke kanıtı korunur. Production Supabase Auth direct signup deny D8-4B manuel kapısıdır.
