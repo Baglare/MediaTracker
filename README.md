@@ -2,14 +2,14 @@
 
 MediaTracker; film, dizi, anime, manga, manhwa, manhua, novel ve kitap takibi için geliştirilmiş local-first bir medya takip uygulamasıdır. Proje Next.js 16 App Router, React 19, TypeScript ve Tailwind CSS 4 üzerine kuruludur.
 
-Uygulamanın ana veri kaynağı tarayıcıdaki owner-scoped yerel depolamadır. Supabase yapılandırılırsa hesap, kontrollü Cloud aktarımı ve kuyruk tabanlı senkronizasyon devreye girer; yapılandırılmazsa uygulama yerel modda çalışmaya devam eder. Proje henüz public frontend olarak yayınlanmamıştır.
+Uygulamanın ana veri kaynağı tarayıcıdaki owner-scoped yerel depolamadır. Supabase yapılandırılırsa hesap, kontrollü Cloud aktarımı ve kuyruk tabanlı senkronizasyon devreye girer; yapılandırılmazsa uygulama yerel modda çalışmaya devam eder. Repository kayıtlarında D8-4A.5E code/Staging/Preview hazırlığı tamamlanmış, D8-4B Production cutover başlamamıştır; canlı Production durumu bu dokümanla doğrulanmış sayılmaz.
 
 ## Mevcut Durum
 
 - App Router sayfaları ile sekmeli ana uygulamayı birleştiren Next.js uygulaması.
 - Varsayılan kullanım yerel moddur; medya ve ilerleme verisi owner-scoped biçimde tarayıcıda saklanır.
 - Supabase opsiyoneldir: auth, manuel Cloud upload/download/merge, owner-scoped sync queue, revision/idempotency ve conflict akışları vardır.
-- AI Danışman opsiyoneldir: varsayılan mock provider ile çalışır, API anahtarları verilirse gerçek provider kullanılabilir.
+- AI Danışman kütüphane tabanlı deterministik modda kullanılabilir. İlk Production release politikası AI server provider, Grounded Research ve persistent embedding cache yollarını kapalı tutar; API anahtarı eklemek tek başına erişim açmaz.
 - Python tabanlı embedding/ML servisi yalnız opsiyonel legacy geliştirme yoludur; Recommendation V2'nin aktif production karar hattı değildir.
 
 ### Geliştirme aşamaları
@@ -22,6 +22,10 @@ Uygulamanın ana veri kaynağı tarayıcıdaki owner-scoped yerel depolamadır. 
 | D2C.1 production cutover | D8 release aşamasına bırakıldı |
 | D3 — Release Calendar | Tamamlandı |
 | D4 — Product Polish / Performance / UX Reliability | Tamamlandı |
+| D5 — Goals | Yerel/test kapsamı tamamlandı; Goal Cloud Production rollout D8'de |
+| D6 — Recommendation V2 | Deterministik karar/fixture ve kayıtlı provider kabul kapsamı tamamlandı |
+| D7 — Grounded Research | Uygulandı; ilk Production release'te kapalı |
+| D8 — Release hardening | Code/Staging/Preview hazırlığı tamamlandı; D8-4B manuel/external kapıları açık |
 
 Ayrıntılı sıra ve sonraki aşamalar: [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
@@ -31,7 +35,7 @@ Ayrıntılı sıra ve sonraki aşamalar: [`docs/ROADMAP.md`](docs/ROADMAP.md).
 - Versioned JSON import/export, kontrollü additive import, checksum, rollback/undo ve portable backup akışı.
 - Supabase auth, manuel Cloud aktarım, owner-scoped sync queue, V2 revision/idempotency/tombstone ve conflict akışı.
 - Local-first kütüphaneden ayrılmış cloud sosyal profil, kullanıcı arama ve takip/engel temeli.
-- TVMaze ve Open Library ile aktif; TMDB/AniList için fail-closed izin kapılı, OMDb için yalnız legacy kayıt uyumlu normalize medya modeli.
+- TVMaze ve contact/User-Agent kapısı sağlanırsa Open Library ile aktif; TMDB/AniList için fail-closed izin kapılı, OMDb için yalnız legacy kayıt uyumlu normalize medya modeli.
 - AI Recommendation V2 için structured provider evidence, deterministik eligibility/ranking ve unresolved hard constraint'lerde optional source-grounded research; LLM final sıralama yapmaz.
 - Ana sayfada medya domain durumu, kalıcı kullanıcı tercihleri ve sekme render orkestrasyonu ayrıştırılmış modüler yapı.
 - React/Next.js state yönetimi, TypeScript tip güvenliği ve responsive dashboard tasarımı.
@@ -69,7 +73,7 @@ Ayrıntılı sıra ve sonraki aşamalar: [`docs/ROADMAP.md`](docs/ROADMAP.md).
   - Manuel grup yönetimi
 - Keşfet:
   - Global arama paneli
-  - Dizi için TVMaze ve kitap için Open Library
+  - Dizi için TVMaze; kitap için geçerli contact/User-Agent yapılandırmasıyla Open Library
   - Film için TMDB yalnız non-commercial + approved logo/attribution kapısı tamamlandığında
   - Anime/manga/manhwa/manhua/novel için AniList yalnız explicit Preview testi veya yazılı production izniyle
   - OMDb yeni public arama/fallback zincirinde kapalı; mevcut legacy kayıtlar desteklenir
@@ -106,7 +110,7 @@ Ayrıntılı sıra ve sonraki aşamalar: [`docs/ROADMAP.md`](docs/ROADMAP.md).
   - `/recommendations` yapılandırılmış medya önerisi; cevap/ilerleme yaşam döngüsü ve cihaz bazlı local library link’i
   - `/notifications` tercihli cloud bildirim merkezi, unread badge ve kontrollü polling
   - Faz 2 veri/RPC/outbox ayrıntıları: [`docs/SOCIAL_INTERACTIONS_AND_RECOMMENDATIONS.md`](docs/SOCIAL_INTERACTIONS_AND_RECOMMENDATIONS.md)
-- AI Danışman:
+- AI Danışman (server provider/research akışları release policy ile kapılı):
   - Kütüphane profiline göre öneri
   - Puanlara, favorilere, ilerlemeye ve notlara göre öneri
   - Dünya kapsamı: karışık, Doğu, Kadraj, Arşiv veya her dünyadan bir öneri
@@ -152,7 +156,7 @@ media-tracker/
 1. Proje klasörüne gir:
 
 ```bash
-cd "C:\Takip Programı\media-tracker"
+cd media-tracker
 ```
 
 2. Bağımlılıkları kur:
@@ -188,7 +192,7 @@ Embedding tabanlı benzerlik skorunu gerçek modelle çalıştırmak istersen Py
 1. Python sanal ortamını kur:
 
 ```bash
-cd "C:\Takip Programı\media-tracker\ml-service"
+cd ml-service
 py -3.12 -m venv .venv
 .\.venv\Scripts\activate
 python -m pip install -r requirements.txt
@@ -197,7 +201,7 @@ python -m pip install -r requirements.txt
 2. Kök klasöre dön:
 
 ```bash
-cd "C:\Takip Programı\media-tracker"
+cd ..
 ```
 
 3. Hazır Windows başlatıcısını çalıştır:
@@ -219,22 +223,24 @@ http://127.0.0.1:8001/health
 
 ## Ortam Değişkenleri
 
-Temel kullanım için hiçbir değişken zorunlu değildir. Aşağıdaki değişkenler ilgili özellikleri açar veya güçlendirir.
+Temel yerel kullanım için hiçbir değişken zorunlu değildir. Provider anahtarları tek başına yetki veya release gate açmaz. İlk Production release sözleşmesi `AI_SERVER_ACCESS_MODE=disabled`, research kapalı ve persistent embedding cache `off` değerlerini gerektirir; ayrıntılar [env matrisi](docs/D8_RELEASE_ENV_MATRIX.md) içindedir.
 
 | Değişken | Zorunlu mu? | Kullanım |
 | --- | --- | --- |
-| `NEXT_PUBLIC_SUPABASE_URL` | Hayır | Supabase auth, cloud aktarım ve persistent embedding cache bağlantısı için |
+| `NEXT_PUBLIC_SUPABASE_URL` | Hayır | Opsiyonel Supabase auth ve kontrollü Cloud aktarımı için |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Hayır | Supabase client bağlantısı için |
 | `NEXT_PUBLIC_CLOUD_MEDIA_SCHEMA_STAGE` | Hayır | Cloud şema fazı: local varsayılan `legacy`; D2B.1 ortamı için kontrollü `d2b1` |
 | `NEXT_PUBLIC_CLOUD_MEDIA_V2_ENABLED` | Hayır | Cloud Media V2 adapter'ını açıkça etkinleştirir; varsayılan `false` |
 | `NEXT_PUBLIC_CLOUD_MEDIA_MAINTENANCE` | Hayır | Bakım sırasında Cloud mutation dispatch'ini durdurur |
 | `NEXT_PUBLIC_CLOUD_MEDIA_DEPLOYMENT_EPOCH` | Hayır | Açık istemcilerde deployment değişimini ve kontrollü reload gereksinimini tanımlar |
 | `NEXT_PUBLIC_CLOUD_MEDIA_MINIMUM_CLIENT_VERSION` | Hayır | Minimum uyumlu istemci sözleşmesini tanımlar |
-| `SUPABASE_SERVICE_ROLE_KEY` | Hayır | Normal web runtime için önerilmez; production ihtiyacı mandatory security hold'da ayrıca kararlaştırılır |
+| `SUPABASE_SERVICE_ROLE_KEY` | Hayır | İlk release normal web runtime için gerekmez; ops/script ve ayrı gated geliştirme yolları içindir |
 | `MEDIA_TRACKER_TMDB_MODE` | Hayır | `disabled` veya tüm attribution kapıları tamamlandığında `noncommercial` |
 | `TMDB_READ_ACCESS_TOKEN` | Hayır | TMDB mode/attribution kapıları hazırsa server-side token |
 | `MEDIA_TRACKER_ANILIST_MODE` | Hayır | `disabled`, Preview için `preview_test`, yazılı izin sonrası `authorized` |
 | `OMDB_API_KEY` | Hayır | Yalnız legacy/local teşhis; public search/fallback açmaz |
+| `AI_SERVER_ACCESS_MODE` | Hayır | Eksik/geçersiz değer `disabled`; ilk Production release'te `disabled` |
+| `MEDIA_TRACKER_PROVIDER_USER_AGENT` | Open Library için | Gerçek contact içeren MediaTracker User-Agent; eksikse provider kapalı |
 | `AI_PROVIDER` | Hayır | `mock`, `auto`, `openai`, `gemini`, `openrouter`, `groq` |
 | `OPENAI_API_KEY` | Hayır | OpenAI uyumlu provider |
 | `OPENAI_MODEL` | Hayır | Varsayılan: `gpt-5.4-mini` |
@@ -250,7 +256,7 @@ Temel kullanım için hiçbir değişken zorunlu değildir. Aşağıdaki değiş
 | `MEDIA_TRACKER_EMBEDDING_CACHE` | Hayır | `off` verilirse embedding cache kapanır |
 | `MEDIA_TRACKER_PERSISTENT_EMBEDDING_CACHE` | Hayır | `off` verilirse Supabase tabanlı embedding cache kapanır |
 
-Güvenlik notu: `SUPABASE_SERVICE_ROLE_KEY` yalnızca server-side kullanılmalı; client component'e, API yanıtına veya loglara eklenmemeli ve `NEXT_PUBLIC_` prefix'i almamalıdır. Persistent embedding cache için opsiyoneldir. Anahtar yoksa persistent cache hata vermeden devre dışı kalır; bellek içi cache, mock fallback ve ana offline-first uygulama çalışmaya devam eder. `.env.local` ve gerçek anahtarlar Git'e gönderilmemelidir.
+Güvenlik notu: İlk release normal web runtime service-role veya paid AI anahtarı gerektirmez. Persistent embedding cache kapalıdır. Ayrı yetkili operasyonlarda kullanılan secret hiçbir client component, API yanıtı veya loga eklenmemeli ve `NEXT_PUBLIC_` prefix'i almamalıdır. `.env.local` ve gerçek anahtarlar Git'e gönderilmemelidir.
 
 ## Supabase Kurulumu
 
@@ -264,12 +270,10 @@ Cloud özelliklerini kullanmak istiyorsan:
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=...
 NEXT_PUBLIC_SUPABASE_ANON_KEY=...
-# Opsiyonel, yalnızca server-side persistent embedding cache için:
-SUPABASE_SERVICE_ROLE_KEY=...
 ```
 
 5. Uygulamayı yeniden başlat.
-6. Ayarlar sekmesinden giriş/kayıt ve cloud veri durumunu kontrol et.
+6. Mevcut yetkili hesapla giriş ve cloud veri durumunu kontrol et. Public signup UI/action mevcut ilk release kapsamı içinde kapalıdır; hosted Auth ayarı ayrı manuel release kapısıdır.
 
 Cloud davranışı:
 
@@ -405,7 +409,18 @@ Next.js tarafı `MEDIA_TRACKER_ML_SERVICE_URL` doluysa bu servisi kullanır. Ser
 
 ## Roadmap Özeti
 
-D1–D5 kod, otomatik test ve yerel kabul kapsamı tamamlandı; D6 AI Recommendation V2 deterministik final karar motorunu, D7 ise optional source-grounded research katmanını tamamladı. V2 structured provider evidence kullanır; unresolved hard constraint'ler exact identity/revision-bound Wikimedia ve provider-neutral discovery/extraction ile araştırılabilir. LLM final sıralama yapmaz ve public-safe citation üretilemeyen research kararı sonucu değiştiremez. Research varsayılan kapalıdır; production flag/cost/security/deploy rollout'u D8'dedir. Eski embedding/ML hattı aktif production release yolu değildir. D2C.1 cutover ile Goal Cloud V1 rollout da D8'de yapılacaktır. Güncel ayrıntı [`docs/ROADMAP.md`](docs/ROADMAP.md), [`docs/AI_RECOMMENDATION_V2_ACCEPTANCE.md`](docs/AI_RECOMMENDATION_V2_ACCEPTANCE.md) ve [`docs/D7_FINAL_ACCEPTANCE.md`](docs/D7_FINAL_ACCEPTANCE.md) içindedir.
+D1–D7 implementation ve kayıtlı kabul kapsamı mevcut; D6 deterministik final sıralama,
+D7 ise explicit gate ile çalışan source-grounded research altyapısıdır. İlk Production
+release'te library-only deterministik öneri açık kalabilir; server AI/research ve
+persistent embedding cache kapalı tutulur. LLM final sıralama yapmaz.
+
+D8-4A.5E code/Staging/Preview hazırlığı repository kayıtlarında tamamlanmıştır;
+D8-4B Production cutover başlamamıştır. D2C.1 ve Goal Cloud rollout, operator/privacy,
+Production Advisor, hedef/env ve backup/change-window gibi manuel/external kapılar
+tamamlanmadan uygulanmış kabul edilmez. Tek kanonik hold tablosu
+[release acceptance](docs/D8_RELEASE_CANDIDATE_ACCEPTANCE.md#d8-4a5d-kanonik-production-hold-tablosu),
+güncel aşama özeti [roadmap](docs/ROADMAP.md) içindedir. Tarihsel live kayıtları
+bu README güncellemesinde yeniden yürütülmemiştir.
 
 ## Sorun Giderme
 
