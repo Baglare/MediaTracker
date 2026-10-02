@@ -55,3 +55,9 @@ design_references/dump/
 
 # KnowledgeCompiler local operational state
 .knowledge-compiler/
+
+# Keep the public configuration template
+!.env.example
+
+# Generated D7-R2A live smoke output
+/d7-r2a-live-smoke.txt
