@@ -1,3 +1,4 @@
+import { runSafeApiRoute } from "@/lib/api/safe-route";
 import { NextResponse } from "next/server";
 
 import { loadSocialPersonSummary, searchSocialPeople } from "@/lib/social/server";
@@ -10,6 +11,7 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export async function GET(request: Request) {
+  return runSafeApiRoute("/api/social/people", "GET", async () => {
   const url = new URL(request.url);
   const idValue = url.searchParams.get("id");
   if (!idValue || [...url.searchParams.keys()].some((key) => key !== "id")) return apiError("people_id_invalid", 400);
@@ -17,9 +19,12 @@ export async function GET(request: Request) {
   if (!id.ok) return apiError("people_id_invalid", 400);
   const person = await loadSocialPersonSummary(id.value);
   return NextResponse.json({ ok: true, person }, { status: person ? 200 : 404, headers: PRIVATE_NO_STORE_HEADERS });
+
+  });
 }
 
 export async function POST(request: Request) {
+  return runSafeApiRoute("/api/social/people", "POST", async () => {
   const parsed = await readStrictJsonObject(request, new Set(["query", "offset"]), SEARCH_REQUEST_MAX_BYTES);
   if (!parsed.ok) return parsed.response;
   const query = validateSearchQuery(parsed.value.query);
@@ -31,4 +36,6 @@ export async function POST(request: Request) {
   const rateLimit = enforceRateLimit("search:social-people", await resolveRateLimitIdentity(request), 60, 60_000);
   if (rateLimit) return rateLimit;
   return NextResponse.json({ ok: true, results: await searchSocialPeople(query.value, offset), offset }, { headers: PRIVATE_NO_STORE_HEADERS });
+
+  });
 }

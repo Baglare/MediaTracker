@@ -1,3 +1,4 @@
+import { runSafeApiRoute } from "@/lib/api/safe-route";
 import { analyzeIntent } from "@/lib/ai/intent-analyzer";
 import { DEFAULT_AI_SETTINGS } from "@/lib/ai/local-state";
 import type { AiSettings } from "@/lib/ai/types";
@@ -38,6 +39,7 @@ function sanitizeReferenceItems(value: unknown): ReferenceMediaItem[] {
 }
 
 export async function POST(request: Request) {
+  return runSafeApiRoute("/api/ai/interpret", "POST", async () => {
   const parsed = await readStrictJsonObject(request, ALLOWED_FIELDS, AI_REQUEST_MAX_BYTES);
   if (!parsed.ok) return parsed.response;
   const body = parsed.value;
@@ -62,4 +64,6 @@ export async function POST(request: Request) {
     ...result,
     planningPolicy: getPlanningProviderPolicy(settings, entitlement.canUseServerProviders ? undefined : "mock"),
   }, { status: result.request || result.needsClarification || "resetRequested" in result ? 200 : 422 });
+
+  });
 }

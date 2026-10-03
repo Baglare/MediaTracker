@@ -1,3 +1,4 @@
+import { safeLog } from "@/lib/security/safe-logging";
 import type { User } from "@supabase/supabase-js";
 import type { StorageWriteResult } from "./local-data-storage";
 import type { LocalOwnerScope } from "./local-owner-scope";
@@ -129,7 +130,7 @@ export function saveProfilePreferences(preferences: ProfilePreferences): void {
       JSON.stringify(normalizeProfilePreferences(preferences))
     );
   } catch {
-    console.warn("localStorage'a profil tercihleri kaydedilemedi.");
+    safeLog({ event: "storage_error", errorCode: "operation_failed" });
   }
 }
 

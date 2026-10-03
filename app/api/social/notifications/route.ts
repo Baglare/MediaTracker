@@ -1,3 +1,5 @@
+import { supabaseApplicationError } from "@/lib/supabase/safe-error";
+import { runSafeApiRoute } from "@/lib/api/safe-route";
 import { validateAuthenticatedMutationRequest } from "@/lib/api/request-security";
 import { loadSocialNotifications } from "@/lib/social/interactions-server";
 import { socialRecord, validateCursor, validateUuid } from "@/lib/social/interactions-validation";
@@ -8,13 +10,17 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export async function GET(request: Request) {
+  return runSafeApiRoute("/api/social/notifications", "GET", async () => {
   const cursor = validateCursor(new URL(request.url).searchParams);
   if (!cursor.ok) return Response.json({ message: cursor.error }, { status: 400, headers: PRIVATE_NO_STORE_HEADERS });
   try { return Response.json(await loadSocialNotifications(cursor.value), { headers: PRIVATE_NO_STORE_HEADERS }); }
   catch (error) { return safeSocialRouteError(error); }
+
+  });
 }
 
 export async function PATCH(request: Request) {
+  return runSafeApiRoute("/api/social/notifications", "PATCH", async () => {
   const boundaryError = validateAuthenticatedMutationRequest(request);
   if (boundaryError) return boundaryError;
 
@@ -30,7 +36,9 @@ export async function PATCH(request: Request) {
   try {
     const client = await getSupabaseServerClient(); if (!client) throw new Error("social_not_configured");
     const { data, error } = await client.rpc("social_notification_action", { p_action: action, p_notification: notification?.ok ? notification.value : null, p_entity_type: action === "mark_entity_read" ? entityType : null, p_entity_id: entity?.ok ? entity.value : null });
-    if (error) throw new Error(error.message);
+    if (error) throw supabaseApplicationError(error);
     return Response.json(data, { headers: PRIVATE_NO_STORE_HEADERS });
   } catch (error) { return safeSocialRouteError(error); }
+
+  });
 }

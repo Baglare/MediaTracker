@@ -1,3 +1,4 @@
+import { safeDiagnostic } from "@/lib/security/safe-diagnostic";
 import "server-only";
 
 import { SecureResearchHttpClientImpl } from "../network/secure-http-client";
@@ -305,7 +306,7 @@ async function runJob(input: { job: ResearchJob; context: GroundedResearchShadow
     const effect = mapShadowHypotheticalEffect(decision, constraint, handoff?.claims ?? [], handoff?.citations ?? []);
     return { discoveryUsed, completed: handoffValidated, stages, result: { candidateIdentity: input.context.researchCandidate.identity, aspectId: input.job.aspectId, structuredStatusBeforeResearch: constraint.currentStructuredDecision as "partial" | "unknown", researchStatus: extraction.status, researchDecisionStatus: decision?.status ?? "unavailable", researchLevel: decision?.level ?? null, hypotheticalEffect: effect, durationBucket: durationBucket(duration), providerAdapterStatus: stageStatus({ direct: directStatus, discovery: discoveryStatus, acquisition: acquisitionStatus, extraction: extractionStatus, provider }), warnings: safeWarnings(warnings) }, transparency: transparency({ context: input.context, job: input.job, cacheStatus, stageStatus: handoffValidated ? "completed" : "failed_soft", decision, citationCount: handoffValidated ? handoff?.citations.length ?? 0 : 0, effect, providerId: provider, stages, totalMs: duration, warnings }) };
   } catch (error) {
-    warnings.push(error instanceof Error ? error.message : "research_shadow_job_failed");
+    warnings.push(safeDiagnostic(error, "research_shadow_job_failed"));
     const duration = Math.max(0, (dependencies.monotonicNow ?? Date.now)() - startedAt);
     const effect = "would_remain_unknown" as const;
     return { discoveryUsed: Boolean(discoveryStatus), completed: false, stages, result: { candidateIdentity: input.context.researchCandidate.identity, aspectId: input.job.aspectId, structuredStatusBeforeResearch: constraint.currentStructuredDecision as "partial" | "unknown", researchStatus: input.signal.aborted ? "budget_exhausted" : "adapter_unavailable", researchDecisionStatus: "unavailable", researchLevel: null, hypotheticalEffect: effect, durationBucket: durationBucket(duration), providerAdapterStatus: stageStatus({ direct: directStatus, discovery: discoveryStatus, acquisition: acquisitionStatus, extraction: extractionStatus, provider }), warnings: safeWarnings(warnings) }, transparency: transparency({ context: input.context, job: input.job, cacheStatus: cacheEnabled ? "bypassed" : cacheStatus, stageStatus: "failed_soft", citationCount: 0, effect, providerId: provider, stages, totalMs: duration, warnings }) };

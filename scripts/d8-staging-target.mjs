@@ -62,7 +62,8 @@ export async function runReadOnlySql(relativeFile, env = process.env) {
     const child = spawn("psql", ["--no-psqlrc", "--set", "ON_ERROR_STOP=1", "--file", sqlFile], {
       cwd: repositoryRoot,
       env: childEnv,
-      stdio: "inherit",
+      // Suppress subprocess SQL/credential/error output; exit status remains authoritative.
+      stdio: "ignore",
       shell: false,
     });
     child.once("error", () => reject(new Error("psql is unavailable; no database operation was performed")));

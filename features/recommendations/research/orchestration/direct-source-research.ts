@@ -1,3 +1,4 @@
+import { safeDiagnostic } from "@/lib/security/safe-diagnostic";
 import "server-only";
 
 import { fetchWikipediaDirectDocument } from "../adapters/wikipedia/document-adapter";
@@ -113,7 +114,7 @@ export async function researchDirectWikimediaSource(input: DirectSourceResearchI
     return {
       status, ...(wikimediaIdentity ? { wikimediaIdentity } : {}), documents: [], citations: [],
       telemetry: { ...telemetry, network: networkTelemetry(input.httpClient) },
-      warnings: [...warnings, error instanceof Error ? error.message : "direct_source_adapter_failure"],
+      warnings: [...warnings, safeDiagnostic(error, "direct_source_adapter_failure")],
     };
   } finally {
     clearTimeout(timeout);

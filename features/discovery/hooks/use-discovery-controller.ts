@@ -1,5 +1,7 @@
 "use client";
 
+import { safeLog } from "@/lib/security/safe-logging";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { AniListNormalizedResult } from "@/lib/anilist-types";
 import type {
@@ -227,8 +229,8 @@ export function useDiscoveryController({
           }
           addTmdb(detail ?? minimalTmdbDetail(item));
         }
-      } catch (error) {
-        console.error("Global search ekleme hatası:", error);
+      } catch {
+        safeLog({ event: "client_error", errorCode: "operation_failed" });
         window.alert("Ekleme sırasında bir hata oluştu. Lütfen tekrar deneyin.");
       }
     },

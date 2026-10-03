@@ -1,3 +1,4 @@
+import { safeDiagnostic } from "@/lib/security/safe-diagnostic";
 import "server-only";
 
 import { validateResearchUrl } from "../../security/url-policy";
@@ -88,7 +89,7 @@ export async function resolveWikipediaPageByTitle(input: {
     };
   } catch (error) {
     if (input.signal?.aborted) return { status: "budget_exhausted", warnings: ["direct_source_budget_exhausted"] };
-    const message = error instanceof Error ? error.message : "wikipedia_page_adapter_failure";
-    return { status: message.includes("security") ? "security_rejected" : "unavailable", warnings: [message] };
+    const message = safeDiagnostic(error, "wikipedia_page_adapter_failure");
+    return { status: error instanceof Error && error.message.includes("security") ? "security_rejected" : "unavailable", warnings: [message] };
   }
 }

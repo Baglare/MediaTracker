@@ -1,9 +1,11 @@
+import { runSafeApiRoute } from "@/lib/api/safe-route";
 import { NextResponse } from "next/server";
 
 import { validateUserId } from "@/lib/social/validation";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 
 export async function GET(request: Request) {
+  return runSafeApiRoute("/api/social/connections", "GET", async () => {
   const client = await getSupabaseServerClient();
   if (!client) return NextResponse.json({ ok: false, message: "Sosyal sistem yapılandırılmamış.", results: [] }, { status: 503 });
   const url = new URL(request.url);
@@ -24,4 +26,6 @@ export async function GET(request: Request) {
     return { ...safe, avatarUrl: signed?.error ? undefined : signed?.data.signedUrl };
   }));
   return NextResponse.json({ ok: true, results: results.filter(Boolean), offset });
+
+  });
 }

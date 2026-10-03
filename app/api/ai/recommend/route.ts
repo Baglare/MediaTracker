@@ -1,3 +1,4 @@
+import { runSafeApiRoute } from "@/lib/api/safe-route";
 // ============================================
 // POST /api/ai/recommend
 // ============================================
@@ -687,7 +688,7 @@ function classifyProviderError(error: unknown): {
     return {
       provider: error.provider,
       providerError: "timeout",
-      note: error.message,
+      note: "provider_request_failed",
       rateLimitHit: false,
       fallbackReason: "timeout",
     };
@@ -696,7 +697,7 @@ function classifyProviderError(error: unknown): {
     return {
       provider: error.provider,
       providerError: error.code,
-      note: error.message,
+      note: "provider_request_failed",
       rateLimitHit: error.code === "rate_limit",
       fallbackReason: error.code,
     };
@@ -705,13 +706,13 @@ function classifyProviderError(error: unknown): {
     return {
       provider: error.provider,
       providerError: error.code,
-      note: error.message,
+      note: "provider_request_failed",
       rateLimitHit: error.code === "rate_limit",
       fallbackReason: error.code,
     };
   }
 
-  const message = error instanceof Error ? error.message : `${error}`;
+  const message = "provider_request_failed";
   return {
     provider: "unknown",
     providerError: "api_error",
@@ -1176,6 +1177,7 @@ function applySourceTitleExclusion(
 }
 
 export async function POST(req: NextRequest) {
+  return runSafeApiRoute("/api/ai/recommend", "POST", async () => {
   const requestStartedAt = performance.now();
   const stageLatencyMs: NonNullable<AiRetrievalDebug["latencyMs"]> = {};
   const parsed = await readStrictJsonObject(req, AI_RECOMMEND_ALLOWED_FIELDS, AI_REQUEST_MAX_BYTES);
@@ -1619,10 +1621,10 @@ export async function POST(req: NextRequest) {
       if (candidates.length === 0) {
         debugNotes.push("r37_source_candidates_empty");
       }
-    } catch (error) {
+    } catch {
       // Kaynak API toplaması başarısız olursa mevcut havuzla devam.
       debugNotes.push(
-        `r37_source_apis_error:${error instanceof Error ? error.message.slice(0, 80) : "unknown"}`
+        `r37_source_apis_error:failed`
       );
     }
   } else if (researchMode === "source-apis") {
@@ -1649,9 +1651,9 @@ export async function POST(req: NextRequest) {
       } else {
         debugNotes.push("r44_web_research_empty");
       }
-    } catch (error) {
+    } catch {
       debugNotes.push(
-        `r44_web_research_error:${error instanceof Error ? error.message.slice(0, 80) : "unknown"}`
+        `r44_web_research_error:failed`
       );
     }
 
@@ -1674,9 +1676,9 @@ export async function POST(req: NextRequest) {
         } else {
           debugNotes.push("r44_source_api_fallback_empty");
         }
-      } catch (error) {
+      } catch {
         debugNotes.push(
-          `r44_source_api_fallback_error:${error instanceof Error ? error.message.slice(0, 80) : "unknown"}`
+          `r44_source_api_fallback_error:failed`
         );
       }
     }
@@ -2207,4 +2209,6 @@ export async function POST(req: NextRequest) {
     });
     return NextResponse.json(fallback);
   }
+
+  });
 }

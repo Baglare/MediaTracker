@@ -1,3 +1,4 @@
+import { safeDiagnostic } from "@/lib/security/safe-diagnostic";
 import "server-only";
 
 import type { RecommendationCandidateIdentity } from "../../../providers/types";
@@ -84,7 +85,7 @@ export async function resolveExactWikidataIdentity(input: {
       if (error instanceof SecureResearchHttpError && ["security_rejected", "dns_security_rejected", "redirect_rejected"].includes(error.kind)) {
         return { status: "security_rejected", propertyId: candidate.propertyId, resultCount: 0, warnings: [error.reason] };
       }
-      return { status: "adapter_unavailable", propertyId: candidate.propertyId, resultCount: 0, warnings: [error instanceof Error ? error.message : "wikidata_adapter_failure"] };
+      return { status: "adapter_unavailable", propertyId: candidate.propertyId, resultCount: 0, warnings: [safeDiagnostic(error, "wikidata_adapter_failure")] };
     }
   }
   return { status: "identity_not_found", ...(lastProperty ? { propertyId: lastProperty } : {}), resultCount: 0, warnings: [...warnings] };

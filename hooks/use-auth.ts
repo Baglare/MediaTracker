@@ -90,7 +90,7 @@ function translateAuthError(err: AuthError | Error | null | undefined): string {
   if (msg.includes("rate limit") || msg.includes("too many"))
     return "Çok fazla deneme yapıldı. Bir süre sonra tekrar dene.";
   if (msg.includes("network")) return "Ağ hatası. İnternet bağlantını kontrol et.";
-  return err.message || "İşlem sırasında bir hata oluştu.";
+  return "İşlem sırasında bir hata oluştu.";
 }
 
 export function useAuth(): UseAuthApi {

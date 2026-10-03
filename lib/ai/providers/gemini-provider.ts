@@ -181,9 +181,8 @@ async function fetchGeminiJson(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : `${error}`;
-    throw new GeminiProviderError("api_error", `Gemini ${context} network error: ${message}`);
+  } catch {
+    throw new GeminiProviderError("api_error", `Gemini ${context} network error: request failed`);
   }
 
   if (!res.ok) {
@@ -193,7 +192,7 @@ async function fetchGeminiJson(
     }
     throw new GeminiProviderError(
       "api_error",
-      `Gemini ${context} HTTP ${res.status}: ${bodyText.slice(0, 200)}`,
+      `Gemini ${context} HTTP ${res.status}: request failed`,
       res.status
     );
   }

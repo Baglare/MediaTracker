@@ -1,3 +1,4 @@
+import { safeDiagnostic } from "@/lib/security/safe-diagnostic";
 import type { AspectId } from "../../domain/aspect-registry";
 import type { ConstraintRole } from "../../domain/types";
 import type { RecommendationCandidateIdentity } from "../../providers/types";
@@ -87,7 +88,7 @@ export async function buildGroundedResearchPacket(input: {
       });
       citationByDocument.set(document.documentId, document.citation);
     } catch (error) {
-      warnings.add(error instanceof Error ? error.message : "packet_document_normalization_failed");
+      warnings.add(safeDiagnostic(error, "packet_document_normalization_failed"));
     }
   }
   if (packetDocuments.length === 0) return { status: "security_rejected", telemetry, warnings: [...warnings] };

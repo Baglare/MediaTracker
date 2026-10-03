@@ -1,3 +1,4 @@
+import { runSafeApiRoute } from "@/lib/api/safe-route";
 import { ANNOTATION_TOOL_LIMITS } from "@/features/recommendations/evaluation/annotation-tool/domain/constants";
 import { annotationApiGuard, annotationJson } from "@/features/recommendations/evaluation/annotation-tool/server/access";
 import { AnnotationToolService, mapAnnotationServiceError } from "@/features/recommendations/evaluation/annotation-tool/server/service";
@@ -22,6 +23,7 @@ async function readBoundedJson(request: Request): Promise<Record<string, unknown
 }
 
 export async function GET(request: Request) {
+  return runSafeApiRoute("/api/dev/recommendation-annotation", "GET", async () => {
   const denied = annotationApiGuard(request);
   if (denied) return denied;
   try {
@@ -32,9 +34,12 @@ export async function GET(request: Request) {
     const mapped = mapAnnotationServiceError(error);
     return annotationJson({ error: mapped.message }, mapped.status);
   }
+
+  });
 }
 
 export async function POST(request: Request) {
+  return runSafeApiRoute("/api/dev/recommendation-annotation", "POST", async () => {
   const denied = annotationApiGuard(request);
   if (denied) return denied;
   try {
@@ -60,4 +65,6 @@ export async function POST(request: Request) {
     const mapped = mapAnnotationServiceError(error);
     return annotationJson({ error: mapped.message }, mapped.status);
   }
+
+  });
 }

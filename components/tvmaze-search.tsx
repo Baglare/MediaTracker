@@ -7,6 +7,8 @@
 
 "use client";
 
+import { safeLog } from "@/lib/security/safe-logging";
+
 import { useState, useCallback } from "react";
 import { Search, Tv, Loader2, X, ChevronDown, ChevronUp } from "lucide-react";
 import { TvmazeNormalizedResult, TvmazeNormalizedDetail } from "@/lib/tvmaze-types";
@@ -112,7 +114,7 @@ export default function TvmazeSearch({
         );
 
         if (!response.ok) {
-          console.error("TVmaze detay hatası:", response.status);
+          safeLog({ event: "client_error", errorCode: "operation_failed" });
           // Detail alınamazsa bile arama sonucu verileriyle ekle
           const fallbackDetail: TvmazeNormalizedDetail = {
             externalSource: "tvmaze",
@@ -134,8 +136,8 @@ export default function TvmazeSearch({
 
         const detail = (await response.json()) as TvmazeNormalizedDetail;
         onAddToLibrary(detail);
-      } catch (err) {
-        console.error("TVmaze eklerken hata:", err);
+      } catch {
+        safeLog({ event: "client_error", errorCode: "operation_failed" });
       } finally {
         setAddingId(null);
       }

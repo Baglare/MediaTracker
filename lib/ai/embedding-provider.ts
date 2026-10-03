@@ -62,7 +62,7 @@ function pythonModelName(): string {
 }
 
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message.slice(0, 120) : "unknown";
+  return error instanceof Error && error.name === "AbortError" ? "embedding_timeout" : "embedding_failed";
 }
 
 export class LocalMockEmbeddingProvider implements EmbeddingProvider {

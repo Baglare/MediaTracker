@@ -1,3 +1,4 @@
+import { runSafeApiRoute } from "@/lib/api/safe-route";
 // ============================================
 // Open Library Kitap Arama API Route'u
 // ============================================
@@ -65,6 +66,7 @@ export function normalizeDoc(doc: OpenLibraryRawDoc): OpenLibraryNormalizedResul
  * POST /api/openlibrary/search { query: "mistborn" }
  */
 export async function POST(request: NextRequest) {
+  return runSafeApiRoute("/api/openlibrary/search", "POST", async () => {
   const parsed = await readStrictJsonObject(request, new Set(["query"]), SEARCH_REQUEST_MAX_BYTES);
   if (!parsed.ok) return parsed.response;
   const query = parseSearchQuery(parsed.value.query);
@@ -109,4 +111,6 @@ export async function POST(request: NextRequest) {
   } catch {
     return noStoreJson({ code: "upstream_error" }, { status: 502 });
   }
+
+  });
 }

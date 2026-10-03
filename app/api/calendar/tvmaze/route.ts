@@ -1,3 +1,4 @@
+import { runSafeApiRoute } from "@/lib/api/safe-route";
 import { NextRequest, NextResponse } from "next/server";
 
 import {
@@ -36,6 +37,7 @@ function upstreamFailure(response: Response) {
 }
 
 export async function GET(request: NextRequest) {
+  return runSafeApiRoute("/api/calendar/tvmaze", "GET", async () => {
   const showId = positiveInteger(request.nextUrl.searchParams.get("showId"));
   const seasonNumber = positiveInteger(request.nextUrl.searchParams.get("season"));
   if (!showId || !seasonNumber) {
@@ -97,4 +99,6 @@ export async function GET(request: NextRequest) {
       { status: isReleaseRouteTimeout(error) ? 504 : 502 },
     );
   }
+
+  });
 }

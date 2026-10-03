@@ -1,3 +1,5 @@
+import { supabaseApplicationError } from "@/lib/supabase/safe-error";
+import { runSafeApiRoute } from "@/lib/api/safe-route";
 import { validateAuthenticatedMutationRequest } from "@/lib/api/request-security";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import type { Json } from "@/lib/supabase/types";
@@ -38,20 +40,24 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export async function GET(): Promise<Response> {
+  return runSafeApiRoute("/api/personalization/themes/sync", "GET", async () => {
   try {
     const auth = await context();
     if (!auth) return failure("Tema senkronizasyonu için giriş yapmalısın.", 401);
     const { data, error } = await auth.client.rpc("get_theme_sync_state");
-    if (error) throw new Error(error.message);
+    if (error) throw supabaseApplicationError(error);
     const state = normalizeThemeCloudState(data);
     if (!state) throw new Error("theme_sync_payload_invalid");
     return Response.json(state, { headers: HEADERS });
   } catch (error) {
     return safeError(error);
   }
+
+  });
 }
 
 export async function PUT(request: Request): Promise<Response> {
+  return runSafeApiRoute("/api/personalization/themes/sync", "PUT", async () => {
   try {
     const auth = await context();
     if (!auth) return failure("Tema senkronizasyonu için giriş yapmalısın.", 401);
@@ -83,7 +89,7 @@ export async function PUT(request: Request): Promise<Response> {
       p_active_theme_selection: payload.value.activeThemeSelection as unknown as Json,
       p_custom_themes: payload.value.customThemes as unknown as Json,
     });
-    if (error) throw new Error(error.message);
+    if (error) throw supabaseApplicationError(error);
     if (isRecord(data) && data.conflict === true) {
       const state = normalizeThemeCloudState(data.state);
       return Response.json({
@@ -99,16 +105,19 @@ export async function PUT(request: Request): Promise<Response> {
   } catch (error) {
     return safeError(error);
   }
+
+  });
 }
 
 export async function DELETE(request: Request): Promise<Response> {
+  return runSafeApiRoute("/api/personalization/themes/sync", "DELETE", async () => {
   try {
     const auth = await context();
     if (!auth) return failure("Tema senkronizasyonu için giriş yapmalısın.", 401);
     const boundaryError = validateAuthenticatedMutationRequest(request);
     if (boundaryError) return boundaryError;
     const { data, error } = await auth.client.rpc("delete_theme_sync_state");
-    if (error) throw new Error(error.message);
+    if (error) throw supabaseApplicationError(error);
     return Response.json({
       ok: isRecord(data) && data.ok === true,
       deleted: isRecord(data) && data.deleted === true,
@@ -116,4 +125,6 @@ export async function DELETE(request: Request): Promise<Response> {
   } catch (error) {
     return safeError(error);
   }
+
+  });
 }

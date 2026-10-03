@@ -1,10 +1,11 @@
+import { safeOpsError } from "./safe-ops-error.mjs";
 import { loadD8Environment } from "./d8-staging-env.mjs";
 import { runReadOnlySql } from "./d8-staging-target.mjs";
 
 try {
   loadD8Environment();
 } catch (error) {
-  console.error(error instanceof Error ? error.message : "D8 environment could not be loaded");
+  console.error(safeOpsError(error, "D8 environment could not be loaded"));
   process.exit(1);
 }
 
@@ -19,7 +20,7 @@ if (!Object.hasOwn(checks, name)) {
   process.exitCode = 2;
 } else {
   runReadOnlySql(checks[name]).catch((error) => {
-    console.error(error instanceof Error ? error.message : "staging post-check failed");
+    console.error(safeOpsError(error, "staging post-check failed"));
     process.exitCode = 1;
   });
 }

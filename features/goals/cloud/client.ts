@@ -67,7 +67,7 @@ export async function dispatchGoalCloudQueueItem(
       : null,
     p_delete: item.operation === "tombstone",
   });
-  if (error) return { kind: "retryable", error: error.message };
+  if (error) return { kind: "retryable", error: "goal_cloud_operation_failed" };
   const decoded = decodeGoalCloudRpcSnapshot(data, item.goalId);
   return decoded.ok
     ? { kind: "result", snapshot: decoded.snapshot }

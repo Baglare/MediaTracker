@@ -4,6 +4,8 @@
 
 "use client";
 
+import { safeLog } from "@/lib/security/safe-logging";
+
 import { useEffect, useRef, useState } from "react";
 import { Search, Loader2 } from "lucide-react";
 import {
@@ -283,7 +285,7 @@ export default function GlobalSearch({ getLibraryStatus, onAddToLibrary, prefill
       // veya "Sezon/Parça Ekle" aksiyonu olarak yansıtılıyor — sonuç görünür kalmalı.
       setResults(combined);
     } catch (err) {
-      console.error(err);
+      safeLog({ event: "client_error", errorCode: "operation_failed" });
       setError(err instanceof Error ? err.message : "Arama sırasında beklenmeyen bir hata oluştu.");
     } finally {
       setIsSearching(false);

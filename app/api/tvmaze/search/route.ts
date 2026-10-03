@@ -1,3 +1,4 @@
+import { runSafeApiRoute } from "@/lib/api/safe-route";
 // ============================================
 // TVmaze Dizi Arama API Route'u
 // ============================================
@@ -84,6 +85,7 @@ export function normalizeSearchResult(
  * POST /api/tvmaze/search { query }
  */
 export async function POST(request: NextRequest) {
+  return runSafeApiRoute("/api/tvmaze/search", "POST", async () => {
   const parsed = await readStrictJsonObject(request, new Set(["query"]), SEARCH_REQUEST_MAX_BYTES);
   if (!parsed.ok) return parsed.response;
   const query = parseSearchQuery(parsed.value.query);
@@ -118,4 +120,6 @@ export async function POST(request: NextRequest) {
   } catch {
     return noStoreJson({ code: "upstream_error" }, { status: 502 });
   }
+
+  });
 }

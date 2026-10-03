@@ -1,3 +1,4 @@
+import { safeDiagnostic } from "@/lib/security/safe-diagnostic";
 import "server-only";
 
 import { fetchWikipediaDirectDocument } from "../adapters/wikipedia/document-adapter";
@@ -49,7 +50,7 @@ export async function acquireDiscoveredWikipediaSource(input: {
   } catch (error) {
     if (input.signal?.aborted) return { status: "budget_exhausted", warnings: ["research_acquisition_budget_exhausted"] };
     const tagged = error as { pageResolution?: { status?: string; warnings?: readonly string[] } };
-    const warnings = [...(tagged.pageResolution?.warnings ?? []), error instanceof Error ? error.message : "wikipedia_acquisition_failed"];
+    const warnings = [...(tagged.pageResolution?.warnings ?? []), safeDiagnostic(error, "wikipedia_acquisition_failed")];
     if (warnings.some((warning) => /wikidata_identity_mismatch/.test(warning))) return { status: "source_identity_mismatch", warnings };
     if (warnings.some((warning) => /security_rejected|control_character|oversized|script_or_html|citation_invalid|document_invalid/.test(warning))) return { status: "security_rejected", warnings };
     return { status: tagged.pageResolution?.status === "budget_exhausted" ? "budget_exhausted" : "adapter_unavailable", warnings };

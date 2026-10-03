@@ -1,3 +1,4 @@
+import { runSafeApiRoute } from "@/lib/api/safe-route";
 import { validateAuthenticatedMutationRequest } from "@/lib/api/request-security";
 import { NextResponse } from "next/server";
 
@@ -30,12 +31,16 @@ async function context() {
 }
 
 export async function GET() {
+  return runSafeApiRoute("/api/social/profile", "GET", async () => {
   return NextResponse.json(await loadOwnSocialEditorData(), {
     headers: { "Cache-Control": "private, no-store, max-age=0" },
+  });
+
   });
 }
 
 export async function POST(request: Request) {
+  return runSafeApiRoute("/api/social/profile", "POST", async () => {
   const auth = await context();
   if (!auth) return failure("Bu işlem için giriş yapmalısın.", 401);
   const boundaryError = validateAuthenticatedMutationRequest(request);
@@ -147,4 +152,6 @@ export async function POST(request: Request) {
   }
 
   return failure("Bilinmeyen sosyal profil işlemi.");
+
+  });
 }

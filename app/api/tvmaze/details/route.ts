@@ -1,3 +1,4 @@
+import { runSafeApiRoute } from "@/lib/api/safe-route";
 // ============================================
 // TVmaze Dizi Detay API Route'u
 // ============================================
@@ -38,6 +39,7 @@ function stripHtml(html: string): string {
  * GET /api/tvmaze/details?id=169
  */
 export async function GET(request: NextRequest) {
+  return runSafeApiRoute("/api/tvmaze/details", "GET", async () => {
   // 1) Show ID'sini al
   const searchParams = request.nextUrl.searchParams;
   const showId = searchParams.get("id");
@@ -152,11 +154,12 @@ export async function GET(request: NextRequest) {
     };
 
     return NextResponse.json(result);
-  } catch (err) {
-    console.error("TVmaze detay hatası:", err);
+  } catch {
     return NextResponse.json(
       { error: "TVmaze'e bağlanırken bir hata oluştu." },
       { status: 502 }
     );
   }
+
+  });
 }

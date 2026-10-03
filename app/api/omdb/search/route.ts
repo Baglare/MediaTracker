@@ -1,3 +1,4 @@
+import { runSafeApiRoute } from "@/lib/api/safe-route";
 import { NextRequest } from "next/server";
 import { fetchOmdbDetail, fetchOmdbSearch, normalizeOmdbDetail } from "@/lib/omdb";
 import { OmdbNormalizedResult } from "@/lib/omdb-types";
@@ -5,6 +6,7 @@ import { SEARCH_REQUEST_MAX_BYTES, apiError, enforceRateLimit, noStoreJson, pars
 import { publicProviderCapability } from "@/lib/providers/release-policy";
 
 export async function POST(request: NextRequest) {
+  return runSafeApiRoute("/api/omdb/search", "POST", async () => {
   const parsed = await readStrictJsonObject(request, new Set(["query"]), SEARCH_REQUEST_MAX_BYTES);
   if (!parsed.ok) return parsed.response;
   const query = parseSearchQuery(parsed.value.query);
@@ -42,4 +44,6 @@ export async function POST(request: NextRequest) {
   } catch {
     return noStoreJson({ code: "upstream_error" }, { status: 502 });
   }
+
+  });
 }

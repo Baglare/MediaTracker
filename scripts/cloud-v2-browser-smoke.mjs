@@ -1,3 +1,4 @@
+import { safeOpsError } from "./safe-ops-error.mjs";
 import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
@@ -49,11 +50,14 @@ if (process.argv.includes("--preflight-only")) {
     assertSmokeEnvironment();
     console.info("D2C.2 browser smoke preflight başarılı.");
   } catch (error) {
-    console.error(error instanceof Error ? error.message : "Preflight başarısız.");
+    console.error(safeOpsError(error, "Preflight başarısız."));
     process.exitCode = 1;
   }
 } else {
-  await runSmoke();
+  try { await runSmoke(); } catch (error) {
+    console.error(safeOpsError(error, "Smoke komutu başarısız."));
+    process.exitCode = 1;
+  }
 }
 
 async function runSmoke() {
@@ -63,7 +67,8 @@ async function runSmoke() {
   const runId = `d2c2-browser-${randomUUID()}`;
   const titleA = `${runId}-user-a`;
   const titleB = `${runId}-user-b`;
-  const port = process.env.CLOUD_V2_BROWSER_SMOKE_PORT ?? "3100";
+  const port = Number(process.env.CLOUD_V2_BROWSER_SMOKE_PORT ?? "3100");
+  if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("Smoke port is invalid");
   const appUrl = `http://127.0.0.1:${port}`;
   let epoch = `${runId}-epoch-1`;
   let maintenance = false;
@@ -229,7 +234,7 @@ async function runSmoke() {
         console.info("Komutlar: epoch | maintenance | normal | cleanup | quit");
       }
     } catch (error) {
-      console.error(error instanceof Error ? error.message : "Smoke komutu başarısız.");
+      console.error(safeOpsError(error, "Smoke komutu başarısız."));
     }
   });
 }

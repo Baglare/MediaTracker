@@ -1,3 +1,4 @@
+import { runSafeApiRoute } from "@/lib/api/safe-route";
 import { NextRequest, NextResponse } from "next/server";
 
 import {
@@ -33,6 +34,7 @@ function positiveInteger(value: string | null): number | null {
 }
 
 export async function GET(request: NextRequest) {
+  return runSafeApiRoute("/api/calendar/tmdb", "GET", async () => {
   const movieId = positiveInteger(request.nextUrl.searchParams.get("movieId"));
   if (!movieId) {
     return NextResponse.json({ error: "Geçerli movieId gereklidir." }, { status: 400 });
@@ -103,4 +105,6 @@ export async function GET(request: NextRequest) {
       { status: isReleaseRouteTimeout(error) ? 504 : 502 },
     );
   }
+
+  });
 }

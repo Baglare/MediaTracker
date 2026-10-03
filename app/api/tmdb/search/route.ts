@@ -1,3 +1,4 @@
+import { runSafeApiRoute } from "@/lib/api/safe-route";
 // ============================================
 // TMDB Arama API Route'u (Server-Side)
 // ============================================
@@ -93,6 +94,7 @@ interface TmdbSearchMovieResponse {
  * Film araması yapar; sonuç dizisini normalize edip döner.
  */
 export async function POST(request: NextRequest) {
+  return runSafeApiRoute("/api/tmdb/search", "POST", async () => {
   const parsed = await readStrictJsonObject(request, new Set(["query", "mediaType"]), SEARCH_REQUEST_MAX_BYTES);
   if (!parsed.ok) return parsed.response;
   const query = parseSearchQuery(parsed.value.query);
@@ -140,4 +142,6 @@ export async function POST(request: NextRequest) {
   } catch {
     return noStoreJson({ results: [], code: "upstream_error" }, { status: 502 });
   }
+
+  });
 }

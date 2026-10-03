@@ -290,7 +290,7 @@ describe("Cloud Media V2 client adapter", () => {
       dispatchCloudMediaV2QueueItem(userId, queueItem(), networkClient),
     ).resolves.toEqual({
       kind: "retryable-error",
-      error: "network request failed",
+      error: "cloud_operation_failed",
     });
     expect(decodeCloudMediaV2Result(
       { ok: true, revision: "wrong" },

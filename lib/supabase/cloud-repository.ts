@@ -1,3 +1,4 @@
+import { safeLog } from "@/lib/security/safe-logging";
 // ============================================
 // Cloud Repository — Supabase okuma/yazma
 // ============================================
@@ -23,11 +24,9 @@ const ERR_UPLOAD_FAILED = "Cloud aktarımı başarısız.";
 const ERR_FETCH_FAILED = "Cloud verisi okunamadı.";
 const ERR_DELETE_FAILED = "Cloud silme başarısız.";
 
-function logError(scope: string, err: unknown): void {
-  // Tam Postgres mesajını konsola düşür; UI'a kısa Türkçe metin döner.
-  if (typeof console !== "undefined") {
-    console.warn(`[cloud-repo:${scope}]`, err);
-  }
+function logError(_scope: string, _err: unknown): void {
+  void _scope; void _err;
+  safeLog({ event: "cloud_error", provider: "supabase", errorCode: "operation_failed" });
 }
 
 // Supabase upsert tek seferde çok büyük diziye dayanmasın diye chunked.
@@ -214,13 +213,13 @@ export async function clearCloudData(
     .from("progress_logs")
     .delete()
     .eq("user_id", ctx.userId);
-  if (logsRes.error) return { ok: false, error: logsRes.error.message };
+  if (logsRes.error) return { ok: false, error: ERR_DELETE_FAILED };
 
   const mediaRes = await ctx.client
     .from("media_items")
     .delete()
     .eq("user_id", ctx.userId);
-  if (mediaRes.error) return { ok: false, error: mediaRes.error.message };
+  if (mediaRes.error) return { ok: false, error: ERR_DELETE_FAILED };
 
   return { ok: true, data: { media: mediaRes.count ?? 0, logs: logsRes.count ?? 0 } };
 }

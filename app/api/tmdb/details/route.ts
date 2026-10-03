@@ -1,3 +1,4 @@
+import { runSafeApiRoute } from "@/lib/api/safe-route";
 // ============================================
 // TMDB Detay API Route'u (Server-Side) — R21.2
 // ============================================
@@ -89,6 +90,7 @@ function normalizeTvDetail(detail: TmdbTvDetailResponse): TmdbNormalizedDetail |
 }
 
 export async function GET(request: NextRequest) {
+  return runSafeApiRoute("/api/tmdb/details", "GET", async () => {
   const id = request.nextUrl.searchParams.get("id");
   const requestedMediaType = request.nextUrl.searchParams.get("mediaType") === "tv" ? "tv" : "movie";
   if (!id || id.trim().length === 0) {
@@ -136,11 +138,12 @@ export async function GET(request: NextRequest) {
       );
     }
     return NextResponse.json({ result: normalized });
-  } catch (err) {
-    console.error("TMDB detay hatası:", err);
+  } catch {
     return NextResponse.json(
       { result: null, error: "TMDB'ye bağlanırken bir hata oluştu." },
       { status: 502 },
     );
   }
+
+  });
 }

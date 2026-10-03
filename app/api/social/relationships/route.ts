@@ -1,3 +1,4 @@
+import { runSafeApiRoute } from "@/lib/api/safe-route";
 import { validateAuthenticatedMutationRequest } from "@/lib/api/request-security";
 import { NextResponse } from "next/server";
 
@@ -7,6 +8,7 @@ import { getSupabaseServerClient } from "@/lib/supabase/server";
 const FOLLOW_ACTIONS = new Set(["unfollow", "cancel", "accept", "reject", "remove_follower"]);
 
 export async function POST(request: Request) {
+  return runSafeApiRoute("/api/social/relationships", "POST", async () => {
   const client = await getSupabaseServerClient();
   if (!client) return NextResponse.json({ ok: false, message: "Sosyal sistem yapılandırılmamış." }, { status: 503 });
   const { data: auth } = await client.auth.getUser();
@@ -27,4 +29,6 @@ export async function POST(request: Request) {
   else return NextResponse.json({ ok: false, message: "İlişki işlemi geçersiz." }, { status: 400 });
   if (result.error) return NextResponse.json({ ok: false, message: "İşlem uygulanamadı veya profil kullanılamıyor." }, { status: 409 });
   return NextResponse.json(result.data);
+
+  });
 }

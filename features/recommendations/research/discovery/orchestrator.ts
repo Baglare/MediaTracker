@@ -1,3 +1,4 @@
+import { safeDiagnostic } from "@/lib/security/safe-diagnostic";
 import "server-only";
 
 import { createHash } from "node:crypto";
@@ -116,7 +117,7 @@ export class ResearchDiscoveryOrchestrator {
     }
     let queries: readonly string[];
     try { queries = buildResearchDiscoveryQueries(request); }
-    catch (error) { return emptyResult("invalid_request", [error instanceof Error ? error.message : "discovery_query_invalid"]); }
+    catch (error) { return emptyResult("invalid_request", [safeDiagnostic(error, "discovery_query_invalid")]); }
     if (queries.length === 0 || queries.length > 2) return emptyResult("invalid_request", ["discovery_query_budget_invalid"]);
 
     const environment = this.selectionEnvironment();

@@ -1,3 +1,4 @@
+import { safeLog } from "@/lib/security/safe-logging";
 // ============================================
 // localStorage Yardımcı Fonksiyonları
 // ============================================
@@ -188,6 +189,6 @@ export function saveUIPreferences(prefs: UIPreferences): void {
   try {
     localStorage.setItem(UI_PREFS_STORAGE_KEY, JSON.stringify(prefs));
   } catch {
-    console.warn("localStorage'a UI tercihleri kaydedilemedi.");
+    safeLog({ event: "storage_error", errorCode: "operation_failed" });
   }
 }

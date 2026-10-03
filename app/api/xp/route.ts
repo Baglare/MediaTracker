@@ -1,3 +1,5 @@
+import { supabaseApplicationError } from "@/lib/supabase/safe-error";
+import { runSafeApiRoute } from "@/lib/api/safe-route";
 import { validateAuthenticatedMutationRequest } from "@/lib/api/request-security";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import type { Json } from "@/lib/supabase/types";
@@ -28,16 +30,20 @@ function safeError(error: unknown): Response {
 }
 
 export async function GET(): Promise<Response> {
+  return runSafeApiRoute("/api/xp", "GET", async () => {
   try {
     const auth = await context();
     if (!auth) return failure("Bu işlem için giriş yapmalısın.", 401);
     const { data, error } = await auth.client.rpc("get_xp_dashboard", { p_event_limit: 25 });
-    if (error) throw new Error(error.message);
+    if (error) throw supabaseApplicationError(error);
     return Response.json(data, { headers: HEADERS });
   } catch (error) { return safeError(error); }
+
+  });
 }
 
 export async function POST(request: Request): Promise<Response> {
+  return runSafeApiRoute("/api/xp", "POST", async () => {
   try {
     const auth = await context();
     if (!auth) return failure("Bu işlem için giriş yapmalısın.", 401);
@@ -54,7 +60,7 @@ export async function POST(request: Request): Promise<Response> {
       if (!validated.ok) return failure(validated.error);
       const item = validated.value;
       const { data, error } = await auth.client.rpc("xp_sync_media_states", { p_items: item.items as unknown as Json, p_replace: item.replace });
-      if (error) throw new Error(error.message);
+      if (error) throw supabaseApplicationError(error);
       return Response.json(data, { headers: HEADERS });
     }
 
@@ -62,7 +68,7 @@ export async function POST(request: Request): Promise<Response> {
       const keys = Array.isArray(input.badgeKeys) && input.badgeKeys.length <= 5 && input.badgeKeys.every((key) => typeof key === "string" && /^[a-z0-9_]{2,60}$/.test(key)) ? input.badgeKeys as string[] : null;
       if (!keys || new Set(keys).size !== keys.length) return failure("Rozet seçimi geçersiz.");
       const { data, error } = await auth.client.rpc("xp_select_badges", { p_badge_keys: keys });
-      if (error) throw new Error(error.message);
+      if (error) throw supabaseApplicationError(error);
       return Response.json(data, { headers: HEADERS });
     }
 
@@ -70,9 +76,11 @@ export async function POST(request: Request): Promise<Response> {
       const title = typeof input.title === "string" && input.title.trim().length >= 2 && input.title.trim().length <= 80 ? input.title.trim() : null;
       if (!title) return failure("Unvan seçimi geçersiz.");
       const { data, error } = await auth.client.rpc("xp_select_title", { p_title: title });
-      if (error) throw new Error(error.message);
+      if (error) throw supabaseApplicationError(error);
       return Response.json(data, { headers: HEADERS });
     }
     return failure("Bilinmeyen XP işlemi.");
   } catch (error) { return safeError(error); }
+
+  });
 }

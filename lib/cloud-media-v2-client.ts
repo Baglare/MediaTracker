@@ -247,7 +247,7 @@ export async function dispatchCloudMediaV2QueueItem(
     p_payload: payload,
   });
   if (error) {
-    return { kind: "retryable-error", error: error.message };
+    return { kind: "retryable-error", error: "cloud_operation_failed" };
   }
   return decodeCloudMediaV2Result(data, item);
 }

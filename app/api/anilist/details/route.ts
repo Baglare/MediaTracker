@@ -1,3 +1,4 @@
+import { runSafeApiRoute } from "@/lib/api/safe-route";
 // ============================================
 // AniList Detay API Route'u
 // ============================================
@@ -77,6 +78,7 @@ const ANILIST_URL = "https://graphql.anilist.co";
  * GET /api/anilist/details?id=21
  */
 export async function GET(request: NextRequest) {
+  return runSafeApiRoute("/api/anilist/details", "GET", async () => {
   const params = request.nextUrl.searchParams;
   const idStr = params.get("id");
 
@@ -129,11 +131,12 @@ export async function GET(request: NextRequest) {
     const result = normalizeAniListMedia(json.data.Media);
 
     return NextResponse.json({ result });
-  } catch (err) {
-    console.error("AniList detay hatası:", err);
+  } catch {
     return NextResponse.json(
       { error: "AniList'e bağlanırken bir hata oluştu." },
       { status: 502 }
     );
   }
+
+  });
 }

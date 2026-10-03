@@ -1,3 +1,5 @@
+import { supabaseApplicationError } from "@/lib/supabase/safe-error";
+import { safeRouteLog } from "@/lib/api/safe-route";
 import "server-only";
 
 import { createSignedSocialAssetUrl } from "@/lib/social/server";
@@ -68,7 +70,7 @@ function cursorOf(value: unknown): CursorPage<never>["nextCursor"] {
 export async function loadSocialFeed(cursor?:{createdAt?:string;id?:string;limit?:number}):Promise<CursorPage<SocialActivity>>{
   const client=await getSupabaseServerClient(); if(!client) throw new Error("social_not_configured");
   const {data,error}=await client.rpc("list_social_feed",{p_cursor_created_at:cursor?.createdAt,p_cursor_id:cursor?.id,p_limit:cursor?.limit??20});
-  if(error) throw new Error(error.message);
+  if(error) throw supabaseApplicationError(error);
   const root=socialRecord(data); const items=(await Promise.all((Array.isArray(root?.items)?root.items:[]).map(activityOf))).filter((item):item is SocialActivity=>Boolean(item));
   return {items,nextCursor:cursorOf(root?.nextCursor)};
 }
@@ -81,13 +83,13 @@ async function recommendationMessageOf(value:unknown):Promise<SocialRecommendati
 
 export async function loadSocialRecommendations(options:{box:string;status:string;createdAt?:string;id?:string;limit?:number}):Promise<CursorPage<SocialRecommendation>>{
   const client=await getSupabaseServerClient();if(!client)throw new Error("social_not_configured");
-  const {data,error}=await client.rpc("list_social_recommendations",{p_box:options.box,p_status:options.status,p_cursor_created_at:options.createdAt,p_cursor_id:options.id,p_limit:options.limit??20});if(error)throw new Error(error.message);
-  const root=socialRecord(data);const parsed=await Promise.all((Array.isArray(root?.items)?root.items:[]).map((item)=>parseSocialRecommendation(item,createSignedSocialAssetUrl)));const skipped=parsed.filter((item)=>!item.ok);if(skipped.length>0)console.warn("social_recommendation_parse_skipped",{count:skipped.length,reasons:[...new Set(skipped.map((item)=>item.reason))]});const items=parsed.flatMap((item)=>item.ok?[item.value]:[]);return{items,nextCursor:cursorOf(root?.nextCursor)};
+  const {data,error}=await client.rpc("list_social_recommendations",{p_box:options.box,p_status:options.status,p_cursor_created_at:options.createdAt,p_cursor_id:options.id,p_limit:options.limit??20});if(error)throw supabaseApplicationError(error);
+  const root=socialRecord(data);const parsed=await Promise.all((Array.isArray(root?.items)?root.items:[]).map((item)=>parseSocialRecommendation(item,createSignedSocialAssetUrl)));const skipped=parsed.filter((item)=>!item.ok);if(skipped.length>0)safeRouteLog({ event: "social_parse_skipped", errorCode: "operation_failed" });const items=parsed.flatMap((item)=>item.ok?[item.value]:[]);return{items,nextCursor:cursorOf(root?.nextCursor)};
 }
 
 export async function loadSocialRecommendationDetail(recommendationId:string):Promise<SocialRecommendationDetail>{
   const client=await getSupabaseServerClient();if(!client)throw new Error("social_not_configured");
-  const {data,error}=await client.rpc("get_social_recommendation_detail",{p_recommendation:recommendationId});if(error)throw new Error(error.message);
+  const {data,error}=await client.rpc("get_social_recommendation_detail",{p_recommendation:recommendationId});if(error)throw supabaseApplicationError(error);
   const root=socialRecord(data);if(!root)throw new Error("recommendation_unavailable");
   const events=(Array.isArray(root.events)?root.events:[]).map(parseRecommendationEvent).filter((item):item is SocialRecommendationEvent=>Boolean(item));
   const messages=(await Promise.all((Array.isArray(root.messages)?root.messages:[]).map(recommendationMessageOf))).filter((item):item is SocialRecommendationMessage=>Boolean(item));
@@ -102,7 +104,7 @@ async function notificationOf(value:unknown):Promise<SocialNotification|undefine
 }
 
 export async function loadSocialNotifications(cursor?:{createdAt?:string;id?:string;limit?:number}):Promise<CursorPage<SocialNotification>&{unreadCount:number}>{
-  const client=await getSupabaseServerClient();if(!client)throw new Error("social_not_configured");const {data,error}=await client.rpc("list_social_notifications",{p_cursor_created_at:cursor?.createdAt,p_cursor_id:cursor?.id,p_limit:cursor?.limit??30});if(error)throw new Error(error.message);
+  const client=await getSupabaseServerClient();if(!client)throw new Error("social_not_configured");const {data,error}=await client.rpc("list_social_notifications",{p_cursor_created_at:cursor?.createdAt,p_cursor_id:cursor?.id,p_limit:cursor?.limit??30});if(error)throw supabaseApplicationError(error);
   const root=socialRecord(data);const items=(await Promise.all((Array.isArray(root?.items)?root.items:[]).map(notificationOf))).filter((item):item is SocialNotification=>Boolean(item));return{items,unreadCount:numberValue(root?.unreadCount)??0,nextCursor:cursorOf(root?.nextCursor)};
 }
 
@@ -113,15 +115,15 @@ export async function loadSocialPreferences():Promise<SocialPreferences>{
   if(authError||!auth.user)throw new Error("authentication_required");
   const owner=auth.user.id;
   const {data:profile,error:profileError}=await client.from("profiles").select("username,recommendation_permission").eq("id",owner).is("deleted_at",null).maybeSingle();
-  if(profileError)throw new Error(profileError.message);
+  if(profileError)throw supabaseApplicationError(profileError);
   if(!profile||profile.username===null)return defaults;
   // RLS-scoped reads only: missing rows are virtual defaults until a user saves.
   const [activityResult,notificationResult]=await Promise.all([
     client.from("social_activity_preferences").select("share_completed,share_started,share_rating,share_favorite,share_recommendation_completed,default_visibility").eq("user_id",owner).maybeSingle(),
     client.from("social_notification_preferences").select("follow_notifications,comment_notifications,reaction_notifications,recommendation_received,recommendation_accepted,recommendation_started,recommendation_completed,recommendation_rejected,recommendation_withdrawn").eq("user_id",owner).maybeSingle(),
   ]);
-  if(activityResult.error)throw new Error(activityResult.error.message);
-  if(notificationResult.error)throw new Error(notificationResult.error.message);
+  if(activityResult.error)throw supabaseApplicationError(activityResult.error);
+  if(notificationResult.error)throw supabaseApplicationError(notificationResult.error);
   const a=activityResult.data;const n=notificationResult.data;
   const permission=validateRecommendationPermission(profile.recommendation_permission);
   const activity=validateActivityPreferences(a?{shareCompleted:a.share_completed,shareStarted:a.share_started,shareRating:a.share_rating,shareFavorite:a.share_favorite,shareRecommendationCompleted:a.share_recommendation_completed,defaultVisibility:a.default_visibility}:DEFAULT_ACTIVITY_PREFERENCES);

@@ -1,8 +1,10 @@
+import { runSafeApiRoute } from "@/lib/api/safe-route";
 import { NextRequest, NextResponse } from "next/server";
 import { fetchOmdbDetail, normalizeOmdbDetail } from "@/lib/omdb";
 import { publicProviderCapability } from "@/lib/providers/release-policy";
 
 export async function GET(request: NextRequest) {
+  return runSafeApiRoute("/api/omdb/details", "GET", async () => {
   const imdbId = request.nextUrl.searchParams.get("id");
   if (!imdbId || imdbId.trim().length === 0) {
     return NextResponse.json({ error: "IMDb id gerekli." }, { status: 400 });
@@ -18,7 +20,7 @@ export async function GET(request: NextRequest) {
     const detail = await fetchOmdbDetail(imdbId.trim());
     if (detail.Response !== "True") {
       return NextResponse.json(
-        { error: detail.Error || "OMDb detay verisi alınamadı." },
+        { error: "omdb_upstream_error" },
         { status: 502 }
       );
     }
@@ -29,8 +31,9 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json(normalized);
-  } catch (error) {
-    console.error("OMDb detay hatası:", error);
+  } catch {
     return NextResponse.json({ error: "OMDb detay verisi alınamadı." }, { status: 502 });
   }
+
+  });
 }

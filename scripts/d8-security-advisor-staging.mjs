@@ -1,3 +1,4 @@
+import { safeOpsError } from "./safe-ops-error.mjs";
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import path from "node:path";
@@ -14,7 +15,7 @@ if (!new Set(["list", "up"]).has(mode)) {
 try {
   loadD8Environment();
 } catch (error) {
-  console.error(error instanceof Error ? error.message : "D8 environment could not be loaded");
+  console.error(safeOpsError(error, "D8 environment could not be loaded"));
   process.exit(1);
 }
 
@@ -24,7 +25,7 @@ try {
     requireMigrationPermission: mode === "up",
   }));
 } catch (error) {
-  console.error(error instanceof Error ? error.message : "D8 staging target was refused");
+  console.error(safeOpsError(error, "D8 staging target was refused"));
   process.exit(1);
 }
 
@@ -59,7 +60,8 @@ console.log(`D8 staging migration ${mode} started; target passed the masked ref-
 const child = spawn(command, args, {
   cwd: repositoryRoot,
   env: childEnv,
-  stdio: "inherit",
+  // Suppress subprocess SQL/credential/error output; exit status remains authoritative.
+  stdio: "ignore",
   shell: false,
 });
 

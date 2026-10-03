@@ -1,3 +1,4 @@
+import { runSafeApiRoute } from "@/lib/api/safe-route";
 // ============================================
 // AniList Arama API Route'u
 // ============================================
@@ -150,8 +151,7 @@ async function queryAniList(
     errors?: { message: string }[];
   };
   if (json.errors && json.errors.length > 0) {
-    const msg = json.errors.map((e) => e.message).join("; ");
-    throw new AniListGraphqlError(`AniList GraphQL hatası: ${msg}`);
+    throw new AniListGraphqlError("anilist_graphql_error");
   }
   return json.data?.Page?.media || [];
 }
@@ -229,8 +229,7 @@ async function discoverAniList(args: {
     errors?: { message: string }[];
   };
   if (json.errors && json.errors.length > 0) {
-    const msg = json.errors.map((e) => e.message).join("; ");
-    throw new AniListGraphqlError(`AniList GraphQL hatası: ${msg}`);
+    throw new AniListGraphqlError("anilist_graphql_error");
   }
   return json.data?.Page?.media || [];
 }
@@ -259,6 +258,7 @@ function parseStructuredValues(
  * POST /api/anilist/search. `query` structured discover isteklerinde opsiyoneldir.
  */
 export async function POST(request: NextRequest) {
+  return runSafeApiRoute("/api/anilist/search", "POST", async () => {
   const parsed = await readStrictJsonObject(
     request,
     new Set(["query", "category", "genres", "tags", "episodesLte", "minimumTagRank", "sort"]),
@@ -380,7 +380,7 @@ export async function POST(request: NextRequest) {
     // Üst-akım AniList outage'larında veya search index degradasyonunda burada
     // q="frieren" gibi sorgular için bile 0 dönebiliyor (deneylerle gözlendi).
     if (normalized.length === 0) {
-      console.warn("[anilist:search] upstream returned no results");
+
     }
 
     return noStoreJson({
@@ -429,4 +429,6 @@ export async function POST(request: NextRequest) {
       }
     );
   }
+
+  });
 }

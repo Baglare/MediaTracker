@@ -1,3 +1,4 @@
+import { runSafeApiRoute } from "@/lib/api/safe-route";
 import { NextRequest, NextResponse } from "next/server";
 
 import {
@@ -32,6 +33,7 @@ function positiveInteger(value: string | null): number | null {
 }
 
 export async function GET(request: NextRequest) {
+  return runSafeApiRoute("/api/calendar/anilist", "GET", async () => {
   const mediaId = positiveInteger(request.nextUrl.searchParams.get("mediaId"));
   if (!mediaId) {
     return NextResponse.json({ error: "Geçerli mediaId gereklidir." }, { status: 400 });
@@ -117,4 +119,6 @@ export async function GET(request: NextRequest) {
       { status: isReleaseRouteTimeout(error) ? 504 : 502 },
     );
   }
+
+  });
 }

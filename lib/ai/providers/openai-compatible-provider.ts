@@ -205,9 +205,8 @@ async function fetchChatJson(config: CompatibleConfig, prompt: string, temperatu
         response_format: { type: "json_object" },
       }),
     });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : `${error}`;
-    throw new CompatibleProviderError(config.name, "api_error", `${config.name} network error: ${message}`);
+  } catch {
+    throw new CompatibleProviderError(config.name, "api_error", `${config.name} network error: request failed`);
   }
 
   if (!res.ok) {
@@ -215,7 +214,7 @@ async function fetchChatJson(config: CompatibleConfig, prompt: string, temperatu
     if (isRateLimit(res.status, body)) {
       throw new CompatibleProviderError(config.name, "rate_limit", `${config.name} rate limit`, res.status);
     }
-    throw new CompatibleProviderError(config.name, "api_error", `${config.name} HTTP ${res.status}: ${body.slice(0, 200)}`, res.status);
+    throw new CompatibleProviderError(config.name, "api_error", `${config.name} HTTP ${res.status}: request failed`, res.status);
   }
 
   try {

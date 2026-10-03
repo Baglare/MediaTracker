@@ -1,3 +1,5 @@
+import { supabaseApplicationError } from "@/lib/supabase/safe-error";
+import { runSafeApiRoute } from "@/lib/api/safe-route";
 import { validateAuthenticatedMutationRequest } from "@/lib/api/request-security";
 import { isRecommendationTransitionAllowed } from "@/lib/social/interactions";
 import { loadSocialRecommendationDetail, loadSocialRecommendations } from "@/lib/social/interactions-server";
@@ -10,6 +12,7 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export async function GET(request: Request) {
+  return runSafeApiRoute("/api/social/recommendations", "GET", async () => {
   const search = new URL(request.url).searchParams;
   const detailId = search.get("recommendationId");
   if (detailId) {
@@ -26,9 +29,12 @@ export async function GET(request: Request) {
   }
   try { return Response.json(await loadSocialRecommendations({ box, status, ...cursor.value }), { headers: PRIVATE_NO_STORE_HEADERS }); }
   catch (error) { return safeSocialRouteError(error); }
+
+  });
 }
 
 export async function POST(request: Request) {
+  return runSafeApiRoute("/api/social/recommendations", "POST", async () => {
   const boundaryError = validateAuthenticatedMutationRequest(request);
   if (boundaryError) return boundaryError;
 
@@ -43,7 +49,7 @@ export async function POST(request: Request) {
     try {
       const client = await getSupabaseServerClient(); if (!client) throw new Error("social_not_configured");
       const { data, error } = await client.rpc("social_send_recommendation_message", { p_recommendation: recommendation.value, p_body: message.value, p_dedupe_key: dedupe.value });
-      if (error) throw new Error(error.message);
+      if (error) throw supabaseApplicationError(error);
       return Response.json(data, { headers: PRIVATE_NO_STORE_HEADERS });
     } catch (error) { return safeSocialRouteError(error); }
   }
@@ -58,12 +64,15 @@ export async function POST(request: Request) {
   try {
     const client = await getSupabaseServerClient(); if (!client) throw new Error("social_not_configured");
     const { data, error } = await client.rpc("social_send_recommendation", { p_recipient: recipient.value, p_media: media.value as unknown as Json, p_sender_note: note.value ?? "", p_dedupe_key: dedupe.value });
-    if (error) throw new Error(error.message);
+    if (error) throw supabaseApplicationError(error);
     return Response.json(data, { headers: PRIVATE_NO_STORE_HEADERS });
   } catch (error) { return safeSocialRouteError(error); }
+
+  });
 }
 
 export async function PATCH(request: Request) {
+  return runSafeApiRoute("/api/social/recommendations", "PATCH", async () => {
   const boundaryError = validateAuthenticatedMutationRequest(request);
   if (boundaryError) return boundaryError;
 
@@ -83,7 +92,9 @@ export async function PATCH(request: Request) {
   try {
     const client = await getSupabaseServerClient(); if (!client) throw new Error("social_not_configured");
     const { data, error } = await client.rpc("social_recommendation_transition", { p_recommendation: recommendation.value, p_action: action, p_response_note: note.value ?? null, p_already_in_library: body.alreadyInLibrary === true, p_dedupe_key: dedupe.value ?? null, p_response_message: responseMessage.value ?? null });
-    if (error) throw new Error(error.message);
+    if (error) throw supabaseApplicationError(error);
     return Response.json(data, { headers: PRIVATE_NO_STORE_HEADERS });
   } catch (error) { return safeSocialRouteError(error); }
+
+  });
 }

@@ -64,3 +64,8 @@ Production CSV source audit'in göremediği gerçek grant/policy drift'ini kanı
 4. `profile-assets` içindeki yalnız aynı owner klasöründeki avatar/banner objelerini sil; path ve object count'u doğrula, başka owner prefix'ine dokunma.
 5. Tam hesap silme istenmişse application/asset cleanup sonrası yetkili Auth admin yoluyla doğru Auth hesabını sil. Bu UI/runtime service-role işi değildir.
 6. Row/object/Auth aggregate post-check yap, talep ve sonucu secret/user UUID yayımlamadan kaydet, requester'a tamamlanan kapsamı bildir.
+
+
+## V1 application logging contract — 2026-10-04
+
+[Canonical safe logging/error contract and 02C evidence](V1_HARDENING_02C.md): allowlisted bounded application telemetry, generated request correlation, controlled API/provider/Supabase errors, no PII by default. Platform log transport/retention remains separately managed and live-unverified; no vendor or deployment change. Historical D8 evidence and the canonical release hold table are unchanged.

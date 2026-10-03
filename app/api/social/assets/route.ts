@@ -1,3 +1,4 @@
+import { runSafeApiRoute } from "@/lib/api/safe-route";
 import { validateAuthenticatedMutationRequest } from "@/lib/api/request-security";
 import { NextResponse } from "next/server";
 
@@ -15,6 +16,7 @@ async function authContext() {
 }
 
 export async function POST(request: Request) {
+  return runSafeApiRoute("/api/social/assets", "POST", async () => {
   const auth = await authContext();
   if (!auth) return NextResponse.json({ ok: false, message: "Bu işlem için giriş yapmalısın." }, { status: 401 });
   const boundaryError = validateAuthenticatedMutationRequest(request);
@@ -42,9 +44,12 @@ export async function POST(request: Request) {
   invalidateSignedSocialAssetUrl(oldPath);
   const signedUrl = await createSignedSocialAssetUrl(path, kind, path);
   return NextResponse.json({ ok: true, url: signedUrl, cleanupPending: Boolean(cleanup?.error) });
+
+  });
 }
 
 export async function DELETE(request: Request) {
+  return runSafeApiRoute("/api/social/assets", "DELETE", async () => {
   const auth = await authContext();
   if (!auth) return NextResponse.json({ ok: false, message: "Bu işlem için giriş yapmalısın." }, { status: 401 });
   const boundaryError = validateAuthenticatedMutationRequest(request);
@@ -59,4 +64,6 @@ export async function DELETE(request: Request) {
   const cleanup = path ? await auth.client.storage.from("profile-assets").remove([path]) : null;
   invalidateSignedSocialAssetUrl(path);
   return NextResponse.json({ ok: true, cleanupPending: Boolean(cleanup?.error) });
+
+  });
 }
