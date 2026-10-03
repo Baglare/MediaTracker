@@ -7,6 +7,7 @@ import { POST as tvmazePost } from "@/app/api/tvmaze/search/route";
 import { POST as anilistPost } from "@/app/api/anilist/search/route";
 import { POST as openLibraryPost } from "@/app/api/openlibrary/search/route";
 import nextConfig from "@/next.config";
+import { proxy } from "@/proxy";
 import { SEARCH_QUERY_MAX_LENGTH, enforceRateLimit, resetRateLimitsForTests } from "@/lib/api/request-security";
 
 vi.mock("@/lib/providers/release-policy", () => ({
@@ -90,7 +91,8 @@ describe("D8-1 search POST JSON boundary", () => {
   it("sets the minimum security-header contract", async () => {
     const entries = await nextConfig.headers?.();
     const headers = new Map(entries?.[0].headers.map((header) => [header.key, header.value]));
-    const csp = headers.get("Content-Security-Policy") || "";
+    const csp = proxy(new NextRequest("https://app.example/privacy")).headers.get("Content-Security-Policy") || "";
+    expect(headers.has("Content-Security-Policy")).toBe(false);
     expect(csp).toContain("frame-ancestors 'none'");
     expect(csp).toContain("object-src 'none'");
     expect(csp).toContain("base-uri 'self'");

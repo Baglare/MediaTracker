@@ -49,13 +49,17 @@ describe("D8-4A.5 Preview readiness contract", () => {
 
   it("retains the minimum production security-header contract", () => {
     const config = source("next.config.ts");
+    const policy = source("lib/security/content-security-policy.ts");
+    expect(source("proxy.ts")).toContain("Content-Security-Policy");
+    expect(config).not.toContain("Content-Security-Policy");
 
     for (const value of [
-      "Content-Security-Policy",
       "frame-ancestors 'none'",
       "object-src 'none'",
       "base-uri 'self'",
       "form-action 'self'",
+    ]) expect(policy).toContain(value);
+    for (const value of [
       "Referrer-Policy",
       "Permissions-Policy",
       "X-Content-Type-Options",

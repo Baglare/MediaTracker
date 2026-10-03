@@ -24,6 +24,7 @@
 "use client";
 
 import { useState } from "react";
+import { safeExternalUrl } from "@/lib/safe-external-url";
 import {
   X,
   Plus,
@@ -219,6 +220,7 @@ export default function MediaModal({ isOpen, editingItem, onSave, onClose }: Med
   if (!isOpen) return null;
 
   const isEditMode = editingItem !== null;
+  const sourceUrl = safeExternalUrl(editingItem?.siteUrl);
   const isMovie = type === "movie";
   const isTV = type === "tv";
   const isAnime = type === "anime";
@@ -906,9 +908,9 @@ export default function MediaModal({ isOpen, editingItem, onSave, onClose }: Med
                     <span className="text-zinc-300 break-all">{editingItem.externalId}</span>
                   </div>
                 )}
-                {editingItem?.siteUrl && (
+                {sourceUrl && (
                   <a
-                    href={editingItem.siteUrl}
+                    href={sourceUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="ml-auto text-[12px] font-medium text-[var(--w-primary-strong)] hover:underline cursor-pointer"

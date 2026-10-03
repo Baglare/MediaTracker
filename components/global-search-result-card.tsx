@@ -5,6 +5,7 @@ import { BookOpen, Check, Clapperboard, ExternalLink, Languages, Library, Loader
 
 import { MediaCardShell } from "@/components/media-card-shell";
 import { SearchResultDescription } from "@/components/search-result-description";
+import { safeExternalUrl } from "@/lib/safe-external-url";
 import { ThemeSubBadge } from "@/components/theme-accent";
 import { getGlobalSearchTitleDisplay } from "@/lib/global-search-title-display";
 import type { GlobalSearchLibraryStatus, GlobalSearchResult } from "@/lib/global-search-types";
@@ -37,6 +38,7 @@ function TypeGlyph({ type, className }: { type: string; className?: string }) {
 
 export default function GlobalSearchResultCard({ result, libraryStatus, isAdding, onAdd }: Props) {
   const badge = sourceBadge(result.source);
+  const sourceUrl = safeExternalUrl(result.sourceUrl);
   const tags = (result.genres ?? result.subjects ?? []).slice(0, 3);
   const titleDisplay = getGlobalSearchTitleDisplay(result);
   const rawFormat = result.raw && typeof result.raw === "object" && "format" in result.raw
@@ -92,8 +94,8 @@ export default function GlobalSearchResultCard({ result, libraryStatus, isAdding
       </div>
 
       <div className="mt-auto flex min-h-12 flex-wrap items-center justify-between gap-2 border-t border-[var(--app-border)] bg-[var(--app-surface-2)] px-3 py-2.5 sm:px-4">
-        {result.sourceUrl ? (
-          <a href={result.sourceUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-w-0 items-center gap-1 text-[11px] font-medium text-[var(--app-text-muted)] hover:text-[var(--app-accent)]" aria-label={`${badge.label} kaynak sayfasını aç`}>
+        {sourceUrl ? (
+          <a href={sourceUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-w-0 items-center gap-1 text-[11px] font-medium text-[var(--app-text-muted)] hover:text-[var(--app-accent)]" aria-label={`${badge.label} kaynak sayfasını aç`}>
             <ExternalLink className="h-3 w-3 shrink-0" /><span className="truncate">Kaynak: {badge.label}</span>
           </a>
         ) : <span className="text-[11px] text-[var(--app-text-muted)]">{badge.label}</span>}

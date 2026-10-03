@@ -25,6 +25,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import Image from "next/image";
+import { safeExternalUrl } from "@/lib/safe-external-url";
 import {
   X,
   Heart,
@@ -313,7 +314,7 @@ export default function MediaDetailModal({
   const canRate = !!onUpdateRating;
 
   const sourceLabel = sourceLabelOf(media.externalSource);
-  const sourceLink = resolveSourceLink(media);
+  const sourceLink = safeExternalUrl(resolveSourceLink(media));
 
   const hasTags = !!(media.tags && media.tags.length > 0);
   const hasNotes = !!(media.personalNotes && media.personalNotes.trim().length > 0);
