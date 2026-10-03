@@ -217,7 +217,7 @@ describe("release event runtime codec", () => {
     [{ precision: "month_only", month: "2026-01" }],
     [{ precision: "year_only", year: 2026 }],
     [{ precision: "tba" }],
-  ] satisfies ReleaseDatePrecision[])("accepts the %s precision", (date) => {
+  ] satisfies [ReleaseDatePrecision][])("accepts the %s precision", (date) => {
     expect(decodeReleaseEvent(event("valid", date)).status).toBe("valid");
   });
 

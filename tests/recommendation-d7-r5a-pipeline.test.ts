@@ -14,7 +14,7 @@ import {
   SYNTHETIC_NO_ROMANCE,
 } from "@/features/recommendations/research/testing/extraction-fixtures";
 
-const ENVIRONMENT: NodeJS.ProcessEnv = {
+const ENVIRONMENT: NodeJS.ProcessEnv = { NODE_ENV: "test" as const,
   D7_RESEARCH_EXTRACTION_PROVIDER: "groq",
   D7_GROQ_GROUNDED_EXTRACTION_ENABLED: "1",
   GROQ_API_KEY: "test-secret",

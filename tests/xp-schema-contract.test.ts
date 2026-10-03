@@ -2,8 +2,8 @@ import { readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const migrationName="20260721140000_xp_v2_progression.sql";
-const sql=readFileSync(new URL(`../supabase/migrations/${migrationName}`,import.meta.url),"utf8").trim();
-const schema=readFileSync(new URL("../supabase/schema.sql",import.meta.url),"utf8");
+const sql=readFileSync(new URL(`../supabase/migrations/${migrationName}`,import.meta.url),"utf8").replace(/\r\n/g, "\n").trim();
+const schema=readFileSync(new URL("../supabase/schema.sql",import.meta.url),"utf8").replace(/\r\n/g, "\n");
 const begin="-- BEGIN XP V2 PROGRESSION";const end="-- END XP V2 PROGRESSION";
 const schemaBlock=schema.slice(schema.lastIndexOf(begin),schema.lastIndexOf(end)+end.length).trim();
 

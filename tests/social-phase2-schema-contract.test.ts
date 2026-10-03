@@ -1,8 +1,8 @@
 import { readFileSync,readdirSync } from "node:fs";
 import { describe,expect,it } from "vitest";
 
-const path=new URL("../supabase/migrations/20260721130000_social_interactions_recommendations.sql",import.meta.url);const sql=readFileSync(path,"utf8");
-const schema=readFileSync(new URL("../supabase/schema.sql",import.meta.url),"utf8");
+const path=new URL("../supabase/migrations/20260721130000_social_interactions_recommendations.sql",import.meta.url);const sql=readFileSync(path,"utf8").replace(/\r\n/g, "\n");
+const schema=readFileSync(new URL("../supabase/schema.sql",import.meta.url),"utf8").replace(/\r\n/g, "\n");
 const phaseTwoMarker="-- Social Phase 2 (kept in sync with 20260721130000_social_interactions_recommendations.sql)";
 const nextMigrationMarker="-- Recommendation feedback & notification UX (kept in sync with 20260721133000_recommendation_feedback_notification_ux.sql)";
 const schemaPhaseTwo=schema.slice(schema.indexOf(phaseTwoMarker)+phaseTwoMarker.length,schema.indexOf(nextMigrationMarker)).trim();

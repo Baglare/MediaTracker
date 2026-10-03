@@ -1,5 +1,7 @@
 # D8 release environment matrix
 
+Current gate (2026-10-03): D8-4B is **FROZEN until new RC acceptance**. The exact Production value plan and `d8-v1-3a847701` epoch below are historical August evidence, not values to apply now. Hardening baseline is `657cfba66167c8a8493768614ed9348d14563967`; a new immutable RC/epoch has not been accepted. Revalidate the final matrix and runtime in fresh Production preflight; no remote env changes are authorized here.
+
 Gerçek değer, secret, project ref, database URL veya fixture credential bu belgede tutulmaz. `.env.local` Vercel'e topluca kopyalanmaz. `LOCAL`, `PREVIEW` ve `PRODUCTION` değerleri bağımsız atanır; final local cleanup D8-4B sonrasıdır.
 
 Sınıflar: `R` required, `O` optional, `F` forbidden, `S` platform/system managed. Visibility `public` yalnız browser bundle'a bilerek giren `NEXT_PUBLIC_*` değerleridir; diğerleri server-only/secret veya server-only/non-secret'tır.

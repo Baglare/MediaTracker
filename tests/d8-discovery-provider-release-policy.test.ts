@@ -73,15 +73,15 @@ describe("D8-4A.5C1 provider release policy", () => {
   });
 
   it("requires a bounded MediaTracker User-Agent with contact for Open Library", () => {
-    expect(resolvePublicProviderCapabilities({ MEDIA_TRACKER_PROVIDER_USER_AGENT: "MediaTracker/1" } as NodeJS.ProcessEnv).providers.openlibrary.enabled).toBe(false);
-    expect(resolvePublicProviderCapabilities({ MEDIA_TRACKER_PROVIDER_USER_AGENT: "MediaTracker/1 (contact@example.test)" } as NodeJS.ProcessEnv).providers.openlibrary.enabled).toBe(true);
+    expect(resolvePublicProviderCapabilities({ NODE_ENV: "test" as const, MEDIA_TRACKER_PROVIDER_USER_AGENT: "MediaTracker/1" } as NodeJS.ProcessEnv).providers.openlibrary.enabled).toBe(false);
+    expect(resolvePublicProviderCapabilities({ NODE_ENV: "test" as const, MEDIA_TRACKER_PROVIDER_USER_AGENT: "MediaTracker/1 (contact@example.test)" } as NodeJS.ProcessEnv).providers.openlibrary.enabled).toBe(true);
   });
 
   it.each([
     ["OMDb", searchOmdb, "/api/omdb/search", {}],
     ["TMDB", searchTmdb, "/api/tmdb/search", { MEDIA_TRACKER_TMDB_MODE: "disabled" }],
     ["AniList", searchAniList, "/api/anilist/search", { MEDIA_TRACKER_ANILIST_MODE: "preview_test", VERCEL_ENV: "production" }],
-    ["Open Library", searchOpenLibrary, "/api/openlibrary/search", { MEDIA_TRACKER_PROVIDER_USER_AGENT: "" }],
+    ["Open Library", searchOpenLibrary, "/api/openlibrary/search", { NODE_ENV: "test" as const, MEDIA_TRACKER_PROVIDER_USER_AGENT: "" }],
   ] as const)("does not start a %s upstream request while disabled", async (_label, route, path, env) => {
     for (const [name, value] of Object.entries(env)) vi.stubEnv(name, value);
     const fetcher = vi.fn();

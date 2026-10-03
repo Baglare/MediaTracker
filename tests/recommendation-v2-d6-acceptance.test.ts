@@ -1,3 +1,4 @@
+import type { MediaItem } from "@/lib/types";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { POST as interpretPost } from "@/app/api/ai/interpret/route";
@@ -86,7 +87,7 @@ describe("D6-5 strictness, deterministic order and privacy acceptance", () => {
   });
 
   it("minimizes interpretation and recommendation payload personal fields", () => {
-    const item = { id: "local-1", title: "Private", type: "anime", status: "watching", coverImage: "", currentProgress: 5, totalProgress: 12, userRating: 9, rating: 9, favorite: true, tags: ["özel"], personalNotes: "secret note", releaseCalendar: { version: 1, manualEvents: [], hiddenProviderEventKeys: [] }, externalSource: "anilist", externalId: "1" } as const;
+    const item: MediaItem = { id: "local-1", title: "Private", type: "anime", status: "watching", coverImage: "", currentProgress: 5, totalProgress: 12, userRating: 9, rating: 9, favorite: true, tags: ["özel"], personalNotes: "secret note", releaseCalendar: { version: 1, manualEvents: [], hiddenProviderEventKeys: [] }, externalSource: "anilist", externalId: "1" };
     expect(buildInterpretReferencePayload([item])).toEqual([{ title: "Private", type: "anime", externalSource: "anilist", externalId: "1" }]);
     const payload = buildRecommendationMediaPayload([item], { ratings: false, favorites: false, progress: false, notes: false, profile: false })[0];
     expect(payload).not.toHaveProperty("personalNotes");

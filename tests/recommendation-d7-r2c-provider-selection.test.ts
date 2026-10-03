@@ -18,7 +18,7 @@ import { steinsGateDiscoveryRequest } from "@/features/recommendations/research/
 
 class FakePort implements SearchDiscoveryPort {
   readonly requests: SearchDiscoveryPortRequest[] = [];
-  readonly adapterId;
+  readonly adapterId: SearchDiscoveryPort["adapterId"];
   constructor(
     readonly providerId: ResearchDiscoveryProviderId,
     private readonly handler: () => SearchDiscoveryPortResult,
@@ -56,18 +56,18 @@ describe("D7-R2C provider registry", () => {
 
 describe("D7-R2C provider selection", () => {
   it("invalid/unset selector fail-closed disabled olur", () => {
-    expect(readResearchDiscoverySelectionEnvironment({}).mode).toBe("disabled");
-    expect(readResearchDiscoverySelectionEnvironment({ D7_RESEARCH_DISCOVERY_PROVIDER: "surprise" })).toMatchObject({ mode: "disabled", warnings: ["research_discovery_provider_invalid"] });
+    expect(readResearchDiscoverySelectionEnvironment({ NODE_ENV: "test" }).mode).toBe("disabled");
+    expect(readResearchDiscoverySelectionEnvironment({ NODE_ENV: "test" as const, D7_RESEARCH_DISCOVERY_PROVIDER: "surprise" })).toMatchObject({ mode: "disabled", warnings: ["research_discovery_provider_invalid"] });
   });
 
   it("explicit provider yalnız kendisini seçer; flag/key/model eksikliği config'te görünür", () => {
-    const environment = readResearchDiscoverySelectionEnvironment({ D7_RESEARCH_DISCOVERY_PROVIDER: "groq" });
+    const environment = readResearchDiscoverySelectionEnvironment({ NODE_ENV: "test" as const, D7_RESEARCH_DISCOVERY_PROVIDER: "groq" });
     expect(selectResearchDiscoveryProviders(environment, "must")).toEqual(["groq"]);
     expect(environment.providers.groq.valid).toBe(false);
   });
 
   it("auto yalnız explicit enabled+configured provider'ları deterministic seçer ve AI_PROVIDER eşleşmesini öne alır", () => {
-    const environment = readResearchDiscoverySelectionEnvironment({
+    const environment = readResearchDiscoverySelectionEnvironment({ NODE_ENV: "test" as const,
       D7_RESEARCH_DISCOVERY_PROVIDER: "auto",
       AI_PROVIDER: "groq",
       D7_OPENAI_WEB_DISCOVERY_ENABLED: "1", OPENAI_API_KEY: "o", OPENAI_RESEARCH_MODEL: "gpt-5.4-mini",
@@ -77,7 +77,7 @@ describe("D7-R2C provider selection", () => {
   });
 
   it("adapter_unavailable auto fallback yapar; no_source provider storm üretmez", async () => {
-    const environment = readResearchDiscoverySelectionEnvironment({
+    const environment = readResearchDiscoverySelectionEnvironment({ NODE_ENV: "test" as const,
       D7_RESEARCH_DISCOVERY_PROVIDER: "auto",
       D7_OPENAI_WEB_DISCOVERY_ENABLED: "1", OPENAI_API_KEY: "o", OPENAI_RESEARCH_MODEL: "gpt-5.4-mini",
       D7_GROQ_WEB_DISCOVERY_ENABLED: "1", GROQ_API_KEY: "g", GROQ_RESEARCH_MODEL: "groq/compound-mini",
@@ -95,7 +95,7 @@ describe("D7-R2C provider selection", () => {
   });
 
   it("explicit provider unavailable iken başka ücretli provider'a sessiz düşmez", async () => {
-    const environment = readResearchDiscoverySelectionEnvironment({
+    const environment = readResearchDiscoverySelectionEnvironment({ NODE_ENV: "test" as const,
       D7_RESEARCH_DISCOVERY_PROVIDER: "openai",
       D7_OPENAI_WEB_DISCOVERY_ENABLED: "1", OPENAI_API_KEY: "o", OPENAI_RESEARCH_MODEL: "gpt-5.4-mini",
       D7_GROQ_WEB_DISCOVERY_ENABLED: "1", GROQ_API_KEY: "g", GROQ_RESEARCH_MODEL: "groq/compound-mini",
@@ -109,9 +109,9 @@ describe("D7-R2C provider selection", () => {
 
   it("üç provider'ın URL sinyali aynı ortak canonical/source-registry sonucuna gider", async () => {
     const envByProvider = {
-      openai: readResearchDiscoverySelectionEnvironment({ D7_RESEARCH_DISCOVERY_PROVIDER: "openai", D7_OPENAI_WEB_DISCOVERY_ENABLED: "1", OPENAI_API_KEY: "o", OPENAI_RESEARCH_MODEL: "gpt-5.4-mini" }),
-      groq: readResearchDiscoverySelectionEnvironment({ D7_RESEARCH_DISCOVERY_PROVIDER: "groq", D7_GROQ_WEB_DISCOVERY_ENABLED: "1", GROQ_API_KEY: "g", GROQ_RESEARCH_MODEL: "groq/compound-mini" }),
-      openrouter: readResearchDiscoverySelectionEnvironment({ D7_RESEARCH_DISCOVERY_PROVIDER: "openrouter", D7_OPENROUTER_WEB_DISCOVERY_ENABLED: "1", OPENROUTER_API_KEY: "r", OPENROUTER_RESEARCH_MODEL: "openai/o4-mini" }),
+      openai: readResearchDiscoverySelectionEnvironment({ NODE_ENV: "test" as const, D7_RESEARCH_DISCOVERY_PROVIDER: "openai", D7_OPENAI_WEB_DISCOVERY_ENABLED: "1", OPENAI_API_KEY: "o", OPENAI_RESEARCH_MODEL: "gpt-5.4-mini" }),
+      groq: readResearchDiscoverySelectionEnvironment({ NODE_ENV: "test" as const, D7_RESEARCH_DISCOVERY_PROVIDER: "groq", D7_GROQ_WEB_DISCOVERY_ENABLED: "1", GROQ_API_KEY: "g", GROQ_RESEARCH_MODEL: "groq/compound-mini" }),
+      openrouter: readResearchDiscoverySelectionEnvironment({ NODE_ENV: "test" as const, D7_RESEARCH_DISCOVERY_PROVIDER: "openrouter", D7_OPENROUTER_WEB_DISCOVERY_ENABLED: "1", OPENROUTER_API_KEY: "r", OPENROUTER_RESEARCH_MODEL: "openai/o4-mini" }),
     } as const;
     for (const providerId of ["openai", "groq", "openrouter"] as const) {
       const port = new FakePort(providerId, () => result(providerId, "completed", ["https://en.wikipedia.org/wiki/Steins%3BGate#Plot"]));

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createAspectEvidence, createUnknownAspectEvidence } from "@/features/recommendations/domain";
-import type { EvidenceConfidence, RecommendationRequestV2 } from "@/features/recommendations/domain";
+import type { AspectId, EvidenceConfidence, RecommendationRequestV2 } from "@/features/recommendations/domain";
 import { createVerifiedCandidateIdentity } from "@/features/recommendations/providers/candidate-identity";
 import type { CandidateProviderEvidenceSnapshot } from "@/features/recommendations/providers/types";
 import { rerankForDiversity, scoreEligibleCandidates } from "@/features/recommendations/ranking";
@@ -19,7 +19,7 @@ const request: RecommendationRequestV2 = {
 function rankable(id: string, strength: number | null, score = 80, confidence: EvidenceConfidence = "medium") {
   const candidate: AiCandidate = { source: "anilist", externalId: id, type: "anime", title: `Anime ${id}` };
   const evidence = strength === null ? createUnknownAspectEvidence("romance") : createAspectEvidence({ aspectId: "romance", strength, confidence, sources: [{ id: `g-${id}`, sourceKind: "provider_genre", scope: "candidate_metadata", provider: "anilist", field: "genres", reliability: 0.8 }, { id: `t-${id}`, sourceKind: "provider_tag_rank", scope: "candidate_metadata", provider: "anilist", field: "tags", reliability: 0.8 }], supportingEvidence: [{ id: `g-${id}`, sourceKind: "provider_genre", scope: "candidate_metadata", provider: "anilist", field: "genres", reliability: 0.8 }, { id: `t-${id}`, sourceKind: "provider_tag_rank", scope: "candidate_metadata", provider: "anilist", field: "tags", reliability: 0.8 }], contradictoryEvidence: [], verifierMode: "structured_only", warnings: [] });
-  return { candidate, snapshot: snapshot(id, score), aspectEvidence: new Map([["romance" as const, evidence]]) };
+  return { candidate, snapshot: snapshot(id, score), aspectEvidence: new Map<AspectId, typeof evidence>([["romance", evidence]]) };
 }
 
 describe("D6-3 deterministic eligibility and ranking", () => {

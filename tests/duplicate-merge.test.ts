@@ -186,7 +186,7 @@ describe("duplicate merge eligibility and plan", () => {
       redirects: emptyMediaRecordRedirectRegistry(),
       recommendationLinks: [],
     });
-    const selections = Object.fromEntries(prepared.fieldConflicts.map((conflict) => [
+    const selections: Record<string, FieldMergeSelection> = Object.fromEntries(prepared.fieldConflicts.map((conflict) => [
       String(conflict.field),
       { kind: "record", recordId: "omdb" } satisfies FieldMergeSelection,
     ]));
@@ -315,7 +315,7 @@ describe("duplicate merge eligibility and plan", () => {
     );
     expect(currentPreparation.ok).toBe(true);
     if (!currentPreparation.ok) return;
-    const selections = Object.fromEntries(
+    const selections: Record<string, FieldMergeSelection> = Object.fromEntries(
       currentPreparation.preparation.fieldConflicts.map((conflict) => [
         String(conflict.field),
         { kind: "record", recordId: "record-a" } satisfies FieldMergeSelection,

@@ -24,6 +24,7 @@ function context(): GroundedResearchShadowContext {
 }
 
 const controlledResult: GroundedResearchShadowResult = {
+  transparency: [],
   status: "complete",
   results: [{ candidateIdentity: researchCandidate().identity, aspectId: "romance", structuredStatusBeforeResearch: "unknown", researchStatus: "complete", researchDecisionStatus: "supported", researchLevel: "significant", hypotheticalEffect: "would_satisfy_must", durationBucket: "lt_1s", providerAdapterStatus: "direct=document_ready;acquisition=packet_ready;extraction=complete;provider=fake", warnings: [] }],
   telemetry: { plannerRan: true, plannedCandidateCount: 1, plannedJobCount: 1, attemptedJobCount: 1, completedJobCount: 1, skippedJobCount: 0, coalescedJobCount: 0, discoveryOperationCount: 0, timeoutCount: 0, sampleCount: 1, stageDurationsMs: { planning: 1, directSource: 1, discovery: 0, acquisition: 1, extraction: 1, total: 4 }, durationBucket: "lt_1s" },

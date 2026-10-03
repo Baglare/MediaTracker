@@ -33,10 +33,10 @@ const completed = (sources: unknown[] = [{ type: "url", url: "https://en.wikiped
 
 describe("D7-R2B OpenAI config/request", () => {
   it("feature/key/model fail-closed; OPENAI_MODEL explicit fallback olabilir", () => {
-    expect(readOpenAiWebDiscoveryEnvironment({})).toMatchObject({ valid: false, enabled: false });
-    expect(readOpenAiWebDiscoveryEnvironment({ D7_OPENAI_WEB_DISCOVERY_ENABLED: "1", OPENAI_API_KEY: "sk-test", OPENAI_MODEL: "gpt-5.4-mini" })).toMatchObject({ valid: true, model: "gpt-5.4-mini", explicitResearchModel: false });
-    expect(readOpenAiWebDiscoveryEnvironment({ D7_OPENAI_WEB_DISCOVERY_ENABLED: "1", OPENAI_API_KEY: "sk-test", OPENAI_RESEARCH_MODEL: "gpt-5.4-mini" })).toMatchObject({ valid: true, model: "gpt-5.4-mini", explicitResearchModel: true });
-    expect(readOpenAiWebDiscoveryEnvironment({ D7_OPENAI_WEB_DISCOVERY_ENABLED: "1", OPENAI_API_KEY: "sk-test", OPENAI_RESEARCH_MODEL: "bad model" })).toMatchObject({ valid: false, model: null });
+    expect(readOpenAiWebDiscoveryEnvironment({ NODE_ENV: "test" })).toMatchObject({ valid: false, enabled: false });
+    expect(readOpenAiWebDiscoveryEnvironment({ NODE_ENV: "test" as const, D7_OPENAI_WEB_DISCOVERY_ENABLED: "1", OPENAI_API_KEY: "sk-test", OPENAI_MODEL: "gpt-5.4-mini" })).toMatchObject({ valid: true, model: "gpt-5.4-mini", explicitResearchModel: false });
+    expect(readOpenAiWebDiscoveryEnvironment({ NODE_ENV: "test" as const, D7_OPENAI_WEB_DISCOVERY_ENABLED: "1", OPENAI_API_KEY: "sk-test", OPENAI_RESEARCH_MODEL: "gpt-5.4-mini" })).toMatchObject({ valid: true, model: "gpt-5.4-mini", explicitResearchModel: true });
+    expect(readOpenAiWebDiscoveryEnvironment({ NODE_ENV: "test" as const, D7_OPENAI_WEB_DISCOVERY_ENABLED: "1", OPENAI_API_KEY: "sk-test", OPENAI_RESEARCH_MODEL: "bad model" })).toMatchObject({ valid: false, model: null });
   });
 
   it("exact /v1/responses, stable web_search, allowlist ve store=false gönderir", async () => {
@@ -135,7 +135,7 @@ describe("D7-R2B OpenAI errors and bounds", () => {
 
   it("malformed JSON, wrong content type ve oversized response controlled error üretir", async () => {
     const malformedAdapter = new OpenAiWebSearchDiscoveryAdapter(
-      readOpenAiWebDiscoveryEnvironment({ D7_OPENAI_WEB_DISCOVERY_ENABLED: "1", OPENAI_API_KEY: "k", OPENAI_RESEARCH_MODEL: "m" }),
+      readOpenAiWebDiscoveryEnvironment({ NODE_ENV: "test" as const, D7_OPENAI_WEB_DISCOVERY_ENABLED: "1", OPENAI_API_KEY: "k", OPENAI_RESEARCH_MODEL: "m" }),
       new OpenAiResponsesClient(async () => new Response("{", { headers: { "content-type": "application/json" } })),
     );
     await expect(malformedAdapter.discover(portRequest())).resolves.toMatchObject({ status: "response_invalid" });

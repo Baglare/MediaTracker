@@ -66,7 +66,7 @@ describe.skipIf(!LIVE)("D7-R5B.2 conditional extended Wikipedia document live", 
         requestId: `d7-r5b2-${item.id}`, researchPolicyVersion: RESEARCH_POLICY_VERSION,
         sourceRegistryVersion: RESEARCH_SOURCE_REGISTRY_VERSION, acquisitionPolicyVersion: RESEARCH_ACQUISITION_POLICY_VERSION,
       }, { httpClient, environment: process.env });
-      if (acquired.status !== "packet_ready") throw new Error(`d7_r5b2_packet_unavailable:${item.id}:${acquired.status}:${acquired.warnings.join(",")}`);
+      if (acquired.status !== "packet_ready" || !acquired.packet) throw new Error(`d7_r5b2_packet_unavailable:${item.id}:${acquired.status}:${acquired.warnings.join(",")}`);
       const units = await buildGroundedEvidenceUnits({ packet: acquired.packet, maxUnits: 64 });
       const workingSet = buildGroundedEvidenceWorkingSet({ packet: acquired.packet, eligibleUnits: units.eligibleUnits });
       rows.push({

@@ -26,8 +26,8 @@ const jsonResponse = (body: unknown, status = 200) => new Response(JSON.stringif
 
 describe("D7-R2C OpenRouter contract", () => {
   it("beta adapter yalnız code-controlled model allowlist'i ile açılır", () => {
-    expect(readOpenRouterWebDiscoveryEnvironment({ D7_OPENROUTER_WEB_DISCOVERY_ENABLED: "1", OPENROUTER_API_KEY: "k", OPENROUTER_RESEARCH_MODEL: "openai/o4-mini" })).toMatchObject({ valid: true });
-    expect(readOpenRouterWebDiscoveryEnvironment({ D7_OPENROUTER_WEB_DISCOVERY_ENABLED: "1", OPENROUTER_API_KEY: "k", OPENROUTER_RESEARCH_MODEL: "openrouter/auto" })).toMatchObject({ valid: false, model: null });
+    expect(readOpenRouterWebDiscoveryEnvironment({ NODE_ENV: "test" as const, D7_OPENROUTER_WEB_DISCOVERY_ENABLED: "1", OPENROUTER_API_KEY: "k", OPENROUTER_RESEARCH_MODEL: "openai/o4-mini" })).toMatchObject({ valid: true });
+    expect(readOpenRouterWebDiscoveryEnvironment({ NODE_ENV: "test" as const, D7_OPENROUTER_WEB_DISCOVERY_ENABLED: "1", OPENROUTER_API_KEY: "k", OPENROUTER_RESEARCH_MODEL: "openrouter/auto" })).toMatchObject({ valid: false, model: null });
   });
 
   it("Responses beta server tool'u, forced Exa ve hard allowed_domains kullanır", async () => {
@@ -69,7 +69,7 @@ describe("D7-R2C OpenRouter contract", () => {
     expect(decoded).toMatchObject({ valid: true, malformedItemCount: 1 });
     let sent = "";
     const adapter = new OpenRouterWebSearchDiscoveryAdapter(
-      readOpenRouterWebDiscoveryEnvironment({ D7_OPENROUTER_WEB_DISCOVERY_ENABLED: "1", OPENROUTER_API_KEY: "k", OPENROUTER_RESEARCH_MODEL: "openai/o4-mini" }),
+      readOpenRouterWebDiscoveryEnvironment({ NODE_ENV: "test" as const, D7_OPENROUTER_WEB_DISCOVERY_ENABLED: "1", OPENROUTER_API_KEY: "k", OPENROUTER_RESEARCH_MODEL: "openai/o4-mini" }),
       new OpenRouterWebSearchDiscoveryClient(async (_input, init) => { sent = String(init?.body); return jsonResponse(responseBody()); }),
     );
     await adapter.discover(portRequest());

@@ -9,7 +9,7 @@ import { extractGroundedResearch } from "@/features/recommendations/research/ext
 import { createGroundedExtractionPacket, createGroundedExtractionRequest } from "@/features/recommendations/research/testing/extraction-fixtures";
 
 function environment(model = "openai/gpt-oss-20b"): NodeJS.ProcessEnv {
-  return { D7_RESEARCH_EXTRACTION_PROVIDER: "groq", D7_GROQ_GROUNDED_EXTRACTION_ENABLED: "1", GROQ_API_KEY: "test-secret", GROQ_RESEARCH_EXTRACTION_MODEL: model };
+  return { NODE_ENV: "test" as const, D7_RESEARCH_EXTRACTION_PROVIDER: "groq", D7_GROQ_GROUNDED_EXTRACTION_ENABLED: "1", GROQ_API_KEY: "test-secret", GROQ_RESEARCH_EXTRACTION_MODEL: model };
 }
 
 function successfulAdapter(finding: "supports_presence" | "supports_explicit_absence" | "irrelevant" | "insufficient" = "supports_presence"): GroundedExtractionProviderPort {
@@ -51,7 +51,7 @@ describe("D7-R3B extraction service", () => {
 
   it("disabled/missing config and unsupported model create no fake unknown evidence", async () => {
     const request = await createGroundedExtractionRequest();
-    const disabled = await extractGroundedResearch(request, { environment: { D7_RESEARCH_EXTRACTION_PROVIDER: "disabled" } });
+    const disabled = await extractGroundedResearch(request, { environment: { NODE_ENV: "test" as const, D7_RESEARCH_EXTRACTION_PROVIDER: "disabled" } });
     const unsupported = await extractGroundedResearch(request, { environment: environment("groq/compound-mini") });
     expect(disabled).toMatchObject({ status: "disabled", claims: [] });
     expect(unsupported).toMatchObject({ status: "model_unsupported", claims: [], providerId: "groq" });

@@ -114,7 +114,7 @@ describe("D7-R2A direct-source orchestration ve metadata cache", () => {
   it("feature flag veya User-Agent eksikse fail-closed ve network'süz kapanır", async () => {
     const candidate = identity();
     const client = new FakeSecureResearchHttpClient([]);
-    const result = await researchDirectWikimediaSource({ identity: candidate, versionScope: createResearchVersionScope({ identity: candidate, scopeKind: "work" }), httpClient: client, environment: {} });
+    const result = await researchDirectWikimediaSource({ identity: candidate, versionScope: createResearchVersionScope({ identity: candidate, scopeKind: "work" }), httpClient: client, environment: { NODE_ENV: "test" } });
     expect(result).toMatchObject({ status: "adapter_unavailable", documents: [], citations: [] });
     expect(client.requests).toHaveLength(0);
   });
@@ -128,7 +128,7 @@ describe("D7-R2A direct-source orchestration ve metadata cache", () => {
     ]);
     const result = await researchDirectWikimediaSource({
       identity: candidate, versionScope: scope, httpClient: client,
-      environment: { MEDIA_TRACKER_WIKIMEDIA_RESEARCH_ENABLED: "1", MEDIA_TRACKER_RESEARCH_USER_AGENT: "MediaTracker/0.1 (contact@example.invalid)" },
+      environment: { NODE_ENV: "test" as const, MEDIA_TRACKER_WIKIMEDIA_RESEARCH_ENABLED: "1", MEDIA_TRACKER_RESEARCH_USER_AGENT: "MediaTracker/0.1 (contact@example.invalid)" },
       now: () => new Date("2026-08-08T00:00:00Z"),
     });
     expect(result).toMatchObject({ status: "document_ready", wikimediaIdentity: { versionScopeKey: scope.scopeKey }, telemetry: { entityVerificationPassed: true, revisionFetched: true, documentReady: true } });
@@ -143,7 +143,7 @@ describe("D7-R2A direct-source orchestration ve metadata cache", () => {
     const client = new FakeSecureResearchHttpClient([]);
     const result = await researchDirectWikimediaSource({
       identity: candidate, versionScope: createResearchVersionScope({ identity: other, scopeKind: "work" }), httpClient: client,
-      environment: { MEDIA_TRACKER_WIKIMEDIA_RESEARCH_ENABLED: "1", MEDIA_TRACKER_RESEARCH_USER_AGENT: "MediaTracker/0.1 (contact@example.invalid)" },
+      environment: { NODE_ENV: "test" as const, MEDIA_TRACKER_WIKIMEDIA_RESEARCH_ENABLED: "1", MEDIA_TRACKER_RESEARCH_USER_AGENT: "MediaTracker/0.1 (contact@example.invalid)" },
     });
     expect(result.status).toBe("identity_unverified");
     expect(client.requests).toHaveLength(0);

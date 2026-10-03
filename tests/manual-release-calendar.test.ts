@@ -247,6 +247,7 @@ describe("manual release calendar domain", () => {
 
   it("hides only the stable provider event and restores it without changing cache", () => {
     const first = providerEvent("release-1");
+    if (first.origin.kind !== "provider") throw new Error("expected_provider_event");
     const second = providerEvent("release-2");
     const hidden = hideProviderReleaseEvent(media(), first);
     expect(hidden.ok).toBe(true);

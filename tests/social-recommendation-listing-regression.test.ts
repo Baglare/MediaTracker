@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest";
 import { parseSocialRecommendation } from "@/lib/social/recommendation-parser";
 
 const migrationName = "20260721134500_recommendation_listing_regression_fix.sql";
-const migration = readFileSync(new URL(`../supabase/migrations/${migrationName}`, import.meta.url), "utf8").trim();
-const schema = readFileSync(new URL("../supabase/schema.sql", import.meta.url), "utf8");
+const migration = readFileSync(new URL(`../supabase/migrations/${migrationName}`, import.meta.url), "utf8").replace(/\r\n/g, "\n").trim();
+const schema = readFileSync(new URL("../supabase/schema.sql", import.meta.url), "utf8").replace(/\r\n/g, "\n");
 const marker = `-- Recommendation listing regression fix (kept in sync with ${migrationName})`;
 const xpMarker = "-- BEGIN XP V2 PROGRESSION";
 const inboxSource = readFileSync(new URL("../components/social/recommendation-inbox.tsx", import.meta.url), "utf8");

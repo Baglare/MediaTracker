@@ -292,7 +292,7 @@ describe("XP and social legacy compatibility", () => {
 });
 
 describe("cloud mapping compatibility", () => {
-  const row = {
+  const row: Parameters<typeof fromMediaRow>[0] = {
     id: "cloud-record",
     user_id: "user-a",
     title: "Cloud Movie",
@@ -311,9 +311,10 @@ describe("cloud mapping compatibility", () => {
     tags: [],
     personal_notes: null,
     metadata: {},
+    deleted_at: null,
     created_at: "2026-07-27T00:00:00.000Z",
     updated_at: "2026-07-27T00:00:00.000Z",
-  } as Parameters<typeof fromMediaRow>[0];
+  };
 
   it("derives deterministic V2 identity on download", () => {
     expect(fromMediaRow(row).identity?.key).toBe("v2:tmdb:movie:42");

@@ -22,7 +22,7 @@ function steinsRequest(): RecommendationRequestV2 {
       { id: "time-travel", kind: "aspect", aspectId: "time_travel", role: "must", source: "explicit", minimumLevel: "significant" },
       { id: "romance", kind: "aspect", aspectId: "romance", role: "must", source: "explicit", minimumLevel: "significant" },
     ],
-    objectiveConstraints: [{ id: "year", kind: "objective", field: "releaseYear", operator: "gte", value: 2000, role: "must", source: "explicit" }],
+    objectiveConstraints: [{ id: "year", kind: "objective", field: "release_year", operator: "gte", value: 2000, role: "must", source: "explicit" }],
     strictness: "strict",
     references: [],
     profileSignalsEnabled: false,

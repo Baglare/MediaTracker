@@ -22,11 +22,11 @@ function mapped(input: { outcome?: ActiveResearchProvenanceSidecar["whetherResea
 
 describe("D7-R6A2 public research evidence", () => {
   it("active yalnız public citation flag ile açılır; disabled/shadow/conflict fail-closed kalır", () => {
-    expect(resolveResearchRolloutExecution({ D7_RESEARCH_ROLLOUT_MODE: "active" } as NodeJS.ProcessEnv)).toMatchObject({ activeResearchAllowed: false });
-    expect(resolveResearchRolloutExecution({ D7_RESEARCH_ROLLOUT_MODE: "active", D7_RESEARCH_PUBLIC_CITATIONS_ENABLED: "1" } as NodeJS.ProcessEnv)).toMatchObject({ activeResearchAllowed: true });
-    expect(resolveResearchRolloutExecution({ D7_RESEARCH_ROLLOUT_MODE: "shadow", D7_RESEARCH_PUBLIC_CITATIONS_ENABLED: "1" } as NodeJS.ProcessEnv)).toMatchObject({ activeResearchAllowed: false });
-    expect(resolveResearchRolloutExecution({ D7_RESEARCH_ROLLOUT_MODE: "disabled", D7_RESEARCH_PUBLIC_CITATIONS_ENABLED: "1" } as NodeJS.ProcessEnv)).toMatchObject({ activeResearchAllowed: false });
-    expect(resolveResearchRolloutExecution({ D7_RESEARCH_ROLLOUT_MODE: "active", D7_RESEARCH_SHADOW_ENABLED: "1", D7_RESEARCH_PUBLIC_CITATIONS_ENABLED: "1" } as NodeJS.ProcessEnv)).toMatchObject({ activeResearchAllowed: false, conflict: true });
+    expect(resolveResearchRolloutExecution({ NODE_ENV: "test" as const, D7_RESEARCH_ROLLOUT_MODE: "active" } as NodeJS.ProcessEnv)).toMatchObject({ activeResearchAllowed: false });
+    expect(resolveResearchRolloutExecution({ NODE_ENV: "test" as const, D7_RESEARCH_ROLLOUT_MODE: "active", D7_RESEARCH_PUBLIC_CITATIONS_ENABLED: "1" } as NodeJS.ProcessEnv)).toMatchObject({ activeResearchAllowed: true });
+    expect(resolveResearchRolloutExecution({ NODE_ENV: "test" as const, D7_RESEARCH_ROLLOUT_MODE: "shadow", D7_RESEARCH_PUBLIC_CITATIONS_ENABLED: "1" } as NodeJS.ProcessEnv)).toMatchObject({ activeResearchAllowed: false });
+    expect(resolveResearchRolloutExecution({ NODE_ENV: "test" as const, D7_RESEARCH_ROLLOUT_MODE: "disabled", D7_RESEARCH_PUBLIC_CITATIONS_ENABLED: "1" } as NodeJS.ProcessEnv)).toMatchObject({ activeResearchAllowed: false });
+    expect(resolveResearchRolloutExecution({ NODE_ENV: "test" as const, D7_RESEARCH_ROLLOUT_MODE: "active", D7_RESEARCH_SHADOW_ENABLED: "1", D7_RESEARCH_PUBLIC_CITATIONS_ENABLED: "1" } as NodeJS.ProcessEnv)).toMatchObject({ activeResearchAllowed: false, conflict: true });
   });
 
   it("supported significant/primary ve explicit absence bounded Türkçe registry label üretir", () => {

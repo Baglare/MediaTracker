@@ -2,8 +2,8 @@ import { readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const migrationName="20260721143000_xp_reversible_local_state.sql";
-const sql=readFileSync(new URL(`../supabase/migrations/${migrationName}`,import.meta.url),"utf8").trim();
-const schema=readFileSync(new URL("../supabase/schema.sql",import.meta.url),"utf8");
+const sql=readFileSync(new URL(`../supabase/migrations/${migrationName}`,import.meta.url),"utf8").replace(/\r\n/g, "\n").trim();
+const schema=readFileSync(new URL("../supabase/schema.sql",import.meta.url),"utf8").replace(/\r\n/g, "\n");
 const begin="-- BEGIN XP REVERSIBLE LOCAL STATE";const end="-- END XP REVERSIBLE LOCAL STATE";
 const schemaBlock=schema.slice(schema.lastIndexOf(begin),schema.lastIndexOf(end)+end.length).trim();
 

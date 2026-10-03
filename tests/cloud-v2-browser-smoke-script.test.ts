@@ -58,7 +58,7 @@ describe("D2C.2 local browser smoke runner", () => {
   });
 
   it("fails before starting Next when credentials are missing", () => {
-    const env: Record<string, string | undefined> = { ...safeEnvironment };
+    const env: NodeJS.ProcessEnv = { ...safeEnvironment };
     delete env.SUPABASE_TEST_USER_B_PASSWORD;
     const result = spawnSync(
       process.execPath,

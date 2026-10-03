@@ -24,8 +24,8 @@ const jsonResponse = (body: unknown, status = 200, headers: Record<string, strin
 
 describe("D7-R2C Groq contract", () => {
   it("yalnız exact Compound model allowlist'ini kabul eder", () => {
-    expect(readGroqWebDiscoveryEnvironment({ D7_GROQ_WEB_DISCOVERY_ENABLED: "1", GROQ_API_KEY: "k", GROQ_RESEARCH_MODEL: "groq/compound-mini" })).toMatchObject({ valid: true });
-    expect(readGroqWebDiscoveryEnvironment({ D7_GROQ_WEB_DISCOVERY_ENABLED: "1", GROQ_API_KEY: "k", GROQ_RESEARCH_MODEL: "llama-3.3-70b-versatile" })).toMatchObject({ valid: false, model: null });
+    expect(readGroqWebDiscoveryEnvironment({ NODE_ENV: "test" as const, D7_GROQ_WEB_DISCOVERY_ENABLED: "1", GROQ_API_KEY: "k", GROQ_RESEARCH_MODEL: "groq/compound-mini" })).toMatchObject({ valid: true });
+    expect(readGroqWebDiscoveryEnvironment({ NODE_ENV: "test" as const, D7_GROQ_WEB_DISCOVERY_ENABLED: "1", GROQ_API_KEY: "k", GROQ_RESEARCH_MODEL: "llama-3.3-70b-versatile" })).toMatchObject({ valid: false, model: null });
   });
 
   it("exact endpoint, include_domains ve yalnız web_search tool'u gönderir", async () => {
@@ -64,7 +64,7 @@ describe("D7-R2C Groq contract", () => {
     expect(decoded).toMatchObject({ valid: true, malformedItemCount: 1 });
     let sent = "";
     const adapter = new GroqWebSearchDiscoveryAdapter(
-      readGroqWebDiscoveryEnvironment({ D7_GROQ_WEB_DISCOVERY_ENABLED: "1", GROQ_API_KEY: "k", GROQ_RESEARCH_MODEL: "groq/compound-mini" }),
+      readGroqWebDiscoveryEnvironment({ NODE_ENV: "test" as const, D7_GROQ_WEB_DISCOVERY_ENABLED: "1", GROQ_API_KEY: "k", GROQ_RESEARCH_MODEL: "groq/compound-mini" }),
       new GroqCompoundDiscoveryClient(async (_input, init) => { sent = String(init?.body); return jsonResponse(responseBody()); }),
     );
     await adapter.discover(portRequest());

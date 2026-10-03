@@ -1,3 +1,4 @@
+import type { GoalCloudQueueItem, GoalCloudConflict } from "@/features/goals/cloud/types";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -30,6 +31,8 @@ class MemoryStorage implements PersonalStorageLike {
 }
 
 const scope = createUserOwnerScope("goal-acceptance-owner");
+if (scope.kind !== "user") throw new Error("expected_user_scope");
+const userId = scope.userId;
 const now = "2026-08-04T10:00:00.000Z";
 const goal: Goal = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -44,12 +47,12 @@ const goal: Goal = {
 };
 const remoteGoal: Goal = { ...goal, title: "Cloud başlığı", updatedAt: "2026-08-04T11:00:00.000Z" };
 
-function blocked(operation: "upsert" | "tombstone" = "upsert") {
+function blocked(operation: "upsert" | "tombstone" = "upsert"): GoalCloudQueueItem & { blockedConflict: GoalCloudConflict } {
   return {
     schemaVersion: 1 as const,
     operationId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
     ownerScope: scope.key,
-    userId: scope.userId,
+    userId: userId,
     goalId: goal.id,
     operation,
     expectedRevision: 1,

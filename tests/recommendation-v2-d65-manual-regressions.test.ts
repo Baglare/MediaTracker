@@ -20,7 +20,7 @@ import type { AiCandidate, AiIntent } from "@/lib/ai/types";
 import type { MediaItem } from "@/lib/types";
 
 const intent: AiIntent = {
-  kind: "general", references: [], targetTypes: ["anime"], sourceTypes: [], mood: [], avoid: [],
+  kind: "general_recommendation", references: [], targetTypes: ["anime"], sourceTypes: [], mood: [], avoid: [],
   needsLibraryProfile: false, needsCandidateSearch: true, needsWebResearch: false,
 };
 

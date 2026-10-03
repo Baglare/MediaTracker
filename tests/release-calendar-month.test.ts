@@ -60,7 +60,7 @@ function viewItem(
     type,
     theme: "screen",
     mediaType: type,
-    subType: type === "movie" ? "film" : type === "anime" ? "anime_series" : "tv_series",
+    subType: type === "movie" ? "movie" : type === "anime" ? "anime_tv" : "tv_series",
     status: "watching",
     coverImage: "",
     currentProgress: 0,

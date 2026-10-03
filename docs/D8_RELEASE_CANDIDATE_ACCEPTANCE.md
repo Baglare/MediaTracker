@@ -1,5 +1,11 @@
 # D8 release-candidate acceptance
 
+## Current release state — 2026-10-03
+
+**D8-4B Production cutover: FROZEN until new RC acceptance.** Historical August RC `3a847701e5161186cfb16ade0e625666120c5e29` and the evidence below are retained for history only; they are not current deployment authority. V1-HARDENING-01 starts on `release/v1-hardening` from main baseline `657cfba66167c8a8493768614ed9348d14563967`. A new immutable RC does not yet exist. Fresh Production preflight must remeasure targets, migration ledger/pending set, backup capability and asset counts; August measurements are not October truth. The historical hold table below remains the single hold inventory and requires fresh evidence before cutover.
+
+**Current local security baseline: `V1-HARDENING-01 COMPLETE_WITH_DOCUMENTED_DEV_EXCEPTION`.** [01B audit and canonical exception](V1_HARDENING_01B.md) supersede the earlier local test/type failures and unconditional full-audit High gate: runtime Critical/High must be zero; full audit remains reported with exact approved-exception enforcement. `V1-SEC-EXCEPTION-001` is an accepted temporary dev-tooling exception, not a fixed vulnerability, with review/expiry no later than 2026-11-03. New/adapted/expired exceptions, reachable unreviewed Critical/High and unapplied available patches block release. Future CI controls are documented requirements, not an implemented workflow. This working-tree validation does not accept an immutable RC or remote deployment.
+
 Durum tarihi: 2026-08-11. Sonuç: **PASS — D8-4A.5E code/Staging/Preview hazırlığı tamamlandı; D8-4B manuel Production kapıları açık.** Production veritabanı, Auth, Storage, env veya deploy hedefinde mutation yapılmadı.
 
 ## D8-4A.5 release freeze
@@ -52,6 +58,7 @@ Bu tablo tek kanonik hold kaynağıdır. Durumlar yalnız `CLOSED`, `BLOCKED_EXT
 
 | Kapı | Durum | D8-4B blocker | Kapanış/sonraki kanıt |
 | --- | --- | --- | --- |
+| 2026-10-03 new immutable RC acceptance | `BLOCKED_MANUAL` | Evet | D8-4B FROZEN; yeni immutable RC yok. [01B local baseline](V1_HARDENING_01B.md): 2,373 PASS/59 conditional skip, typecheck/lint/build PASS, runtime audit temiz; full audit yalnız süreli V1-SEC-EXCEPTION-001 ile kabul edildi. Clean committed SHA, Node 24 CI/Preview ve artifact review/yeni RC acceptance ayrı kapılardır; August ölçümleri current kanıt değildir. |
 | C1-C3 kullanıcı smoke kabulü | `CLOSED` | Hayır | Discovery/provider, public profile theme ve asset/Calendar smoke kabulü; kalan geniş senaryolar `EXTENDED_QA` |
 | Repo signup UI/action | `CLOSED` | Hayır | Signup control ve browser `signUp` aksiyonu yok; guest/local-first ve mevcut hesap girişi korunur |
 | Production Supabase Auth signup ayarı | `BLOCKED_MANUAL` | Evet | D8-4B öncesi dashboard/provider boundary'de yeni kullanıcı kaydı disabled olduğu doğrulanır ve direct signup deny smoke kaydedilir |

@@ -156,6 +156,7 @@ describe("Cloud Media V2 sync manager integration", () => {
     const manager = await import("@/lib/sync-manager");
     const queue = await import("@/lib/sync-queue");
     const scope = createUserOwnerScope("user-a");
+    if (scope.kind !== "user") throw new Error("expected_user_scope");
     manager.setOwnerScope(scope);
     queue.saveSyncQueue(scope, [{
       schemaVersion: 2,
@@ -202,6 +203,7 @@ describe("Cloud Media V2 sync manager integration", () => {
     const manager = await import("@/lib/sync-manager");
     const queue = await import("@/lib/sync-queue");
     const scope = createUserOwnerScope("user-a");
+    if (scope.kind !== "user") throw new Error("expected_user_scope");
     manager.setOwnerScope(scope);
     queue.saveSyncQueue(scope, [{
       schemaVersion: 2,
@@ -257,6 +259,7 @@ describe("Cloud Media V2 sync manager integration", () => {
     const queue = await import("@/lib/sync-queue");
     const state = await import("@/lib/cloud-media-v2-state");
     const scope = createUserOwnerScope("user-a");
+    if (scope.kind !== "user") throw new Error("expected_user_scope");
     manager.setOwnerScope(scope);
     queue.saveSyncQueue(scope, [{
       schemaVersion: 2,
@@ -367,6 +370,7 @@ describe("Cloud Media V2 sync manager integration", () => {
     const queue = await import("@/lib/sync-queue");
     const repository = await import("@/lib/supabase/cloud-repository");
     const scope = createUserOwnerScope("user-a");
+    if (scope.kind !== "user") throw new Error("expected_user_scope");
     manager.setOwnerScope(scope);
     queue.saveSyncQueue(scope, [{
       schemaVersion: 2,

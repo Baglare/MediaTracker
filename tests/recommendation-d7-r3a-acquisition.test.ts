@@ -8,8 +8,8 @@ import type { SecureResearchHttpClient, SecureResearchHttpRequest, SecureResearc
 import { FakeSecureResearchHttpClient, fakeHttpJson } from "@/features/recommendations/research/testing/fakes";
 import { r3aAcquisitionRequest, r3aDirectDocument, r3aDiscoveredSource, r3aWikimediaIdentity } from "@/features/recommendations/research/testing/acquisition-fixtures";
 
-const LIVE_ENV = { NODE_ENV: "test", MEDIA_TRACKER_WIKIMEDIA_RESEARCH_ENABLED: "1", MEDIA_TRACKER_RESEARCH_USER_AGENT: "MediaTracker/0.1 (contact@example.invalid)" };
-const DISABLED_ENV = { NODE_ENV: "test" };
+const LIVE_ENV = { NODE_ENV: "test" as const, MEDIA_TRACKER_WIKIMEDIA_RESEARCH_ENABLED: "1", MEDIA_TRACKER_RESEARCH_USER_AGENT: "MediaTracker/0.1 (contact@example.invalid)" };
+const DISABLED_ENV = { NODE_ENV: "test" as const };
 
 function pageBody(input: { qid?: string; revid?: number; extract?: unknown; missing?: boolean; disambiguation?: boolean; redirects?: unknown[] } = {}) {
   return {

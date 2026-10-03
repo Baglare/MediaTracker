@@ -1,5 +1,9 @@
 # D8 production cutover runbook
 
+## Current execution gate — 2026-10-03
+
+**FROZEN until new RC acceptance. Do not execute the historical commands below.** `3a847701e5161186cfb16ade0e625666120c5e29` is historical August RC/evidence only. Current hardening baseline: `657cfba66167c8a8493768614ed9348d14563967`, branch `release/v1-hardening`; new immutable RC: **none**. All approved/current/exact-RC statements, deployment epochs, target fingerprints, backup and migration/asset counts below describe the August snapshot, not current authorization or October truth. Fresh Production read-only preflight and separate cutover authorization must establish and update these values before this runbook becomes executable again. See [current acceptance state](D8_RELEASE_CANDIDATE_ACCEPTANCE.md#current-release-state--2026-10-03).
+
 Bu runbook D8-4A gerçek staging migration, two-owner/RLS ve D8-4A.5E Security Advisor/privacy audit'i sonrasında hazırlanmıştır. Production uygulaması yine ayrı D8-4B yetkisi, backup ve change-window onayı gerektirir. Gerçek ref, URL, key veya fixture credential belgeye yazılmaz.
 
 Known approved RC baseline: branch `develop`, HEAD `3a847701e5161186cfb16ade0e625666120c5e29`, upstream `origin/test`; approved commit temizdir ve aynı SHA remote branch'te bulunur. D8-4B-A.1/A.2 operasyon belgesi değişiklikleri çalışma ağacında ayrıca tutulur ve deploy artifact'ını değiştirmez. 2026-08-11 read-only Vercel kanıtında current Production deployment `main` branch'indeki `c6e877dd58000449586845f93af056e6c4c067b1` SHA'sıdır. Production Supabase ledger/schema/security, backup capability, Auth policy ve Vercel env presence A.2'de read-only sorgulandı; hiçbir Production değeri değiştirilmedi. D8-4B release artifact'ı current hardening'i içeren, operator tarafından onaylanmış temiz committed `3a847701e5161186cfb16ade0e625666120c5e29` SHA'sıdır.
@@ -41,6 +45,7 @@ Backup bu A.2 aşamasında çalıştırılmaz. D8-4B-B yetkisinden sonra aşağ�
 
 ```powershell
 $ErrorActionPreference = 'Stop'
+throw 'FROZEN: historical August procedure; new RC acceptance and fresh Production preflight required.'
 $expectedRc = '3a847701e5161186cfb16ade0e625666120c5e29'
 $expectedProductionRefFingerprint = '227403b3cd'
 $backupRoot = [IO.Path]::GetFullPath('C:\MediaTracker-Production-Backup')

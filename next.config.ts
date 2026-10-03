@@ -34,26 +34,31 @@ const nextConfig: NextConfig = {
       {
         protocol: "https",
         hostname: "image.tmdb.org",
+        port: "",
         pathname: "/t/p/**",
       },
       {
         protocol: "https",
         hostname: "covers.openlibrary.org",
+        port: "",
         pathname: "/b/id/**",
       },
       {
         protocol: "https",
         hostname: "s4.anilist.co",
+        port: "",
         pathname: "/file/**",
       },
       {
         protocol: "https",
         hostname: "m.media-amazon.com",
+        port: "",
         pathname: "/images/**",
       },
       {
         protocol: "https",
         hostname: "ia.media-imdb.com",
+        port: "",
         pathname: "/images/**",
       },
     ],

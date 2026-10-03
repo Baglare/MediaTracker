@@ -2,8 +2,8 @@ import { readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const migrationName = "20260721133000_recommendation_feedback_notification_ux.sql";
-const migration = readFileSync(new URL(`../supabase/migrations/${migrationName}`, import.meta.url), "utf8").trim();
-const schema = readFileSync(new URL("../supabase/schema.sql", import.meta.url), "utf8");
+const migration = readFileSync(new URL(`../supabase/migrations/${migrationName}`, import.meta.url), "utf8").replace(/\r\n/g, "\n").trim();
+const schema = readFileSync(new URL("../supabase/schema.sql", import.meta.url), "utf8").replace(/\r\n/g, "\n");
 const marker = `-- Recommendation feedback & notification UX (kept in sync with ${migrationName})`;
 const listingMarker = "-- Recommendation listing regression fix (kept in sync with 20260721134500_recommendation_listing_regression_fix.sql)";
 const schemaPhase = schema.slice(schema.indexOf(marker) + marker.length, schema.indexOf(listingMarker)).trim();

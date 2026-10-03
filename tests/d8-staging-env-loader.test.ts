@@ -71,7 +71,7 @@ afterEach(() => {
 describe("D8 staging env loader", () => {
   it("resolves the default env file from the script application root", () => {
     expect(defaultD8EnvFile).toBe(path.join(applicationRoot, ".env.local"));
-    expect(resolveD8EnvFile([], {})).toBe(defaultD8EnvFile);
+    expect(resolveD8EnvFile([], { NODE_ENV: "test" })).toBe(defaultD8EnvFile);
   });
 
   it.each([
@@ -101,7 +101,7 @@ describe("D8 staging env loader", () => {
   it("preserves values already present in the target process environment", () => {
     const directory = fixtureDirectory();
     const envFile = writeFixture(directory);
-    const env: Record<string, string | undefined> = { SUPABASE_TEST_USER_A_EMAIL: "preserved@example.test" };
+    const env: NodeJS.ProcessEnv = { NODE_ENV: "test", SUPABASE_TEST_USER_A_EMAIL: "preserved@example.test" };
     loadD8Environment({ env, envFile });
     expect(env.SUPABASE_TEST_USER_A_EMAIL).toBe("preserved@example.test");
     expect(env.SUPABASE_TEST_USER_B_EMAIL).toBe("user-b@example.test");

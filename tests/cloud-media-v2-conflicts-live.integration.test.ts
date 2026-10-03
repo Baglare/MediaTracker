@@ -450,6 +450,7 @@ describe.skipIf(!liveEnvironmentAvailable)(
         nextRemote.revision,
       );
       expect(retryResult.ok).toBe(true);
+      if (!retryResult.ok) throw new Error("expected_resolution_success");
       expect(retryResult.operationId).toBeTruthy();
       expect(retryResult.operationId).not.toBe(oldOperationId);
       await startedPromise;
@@ -524,6 +525,7 @@ describe.skipIf(!liveEnvironmentAvailable)(
         media(parentMediaId, parentManualId),
       );
       expect(result.ok).toBe(true);
+      if (!result.ok) throw new Error("expected_resolution_success");
       expect(result.operationId).not.toBe(operationId);
       await vi.waitFor(() => {
         expect(queue.loadSyncQueue(scopeA)).toEqual([]);
@@ -611,6 +613,7 @@ describe.skipIf(!liveEnvironmentAvailable)(
         remoteUpdate.revision,
       );
       expect(resolution.ok).toBe(true);
+      if (!resolution.ok) throw new Error("expected_resolution_success");
       await networkFinishedPromise;
 
       const beforeScopeBRevision = state.getCloudMediaV2RecordState(

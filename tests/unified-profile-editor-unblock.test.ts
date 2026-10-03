@@ -39,7 +39,7 @@ describe("UnifiedProfileEditor blocked account management", () => {
   });
 
   it("posts the unblock action and refreshes without restoring follow state", async () => {
-    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ ok: true }), { status: 200 }));
+    const fetchImpl = vi.fn<typeof fetch>(async () => new Response(JSON.stringify({ ok: true }), { status: 200 }));
     const refreshed = { configured: true, authenticated: true, modules: [], favorites: [], current: [], sharedNotes: [], blockedAccounts: [] };
     const refresh = vi.fn(async () => refreshed);
 

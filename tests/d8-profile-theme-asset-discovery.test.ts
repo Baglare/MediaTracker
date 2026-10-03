@@ -51,8 +51,11 @@ describe("D8-2 public profile theme privacy and contrast", () => {
   it("keeps preset_only independent from the active theme and supports current preset explicitly", () => {
     const selectedPreset = buildPublicProfileThemeSnapshot({ visibility: "preset_only", publicPreset: "porcelain" });
     const currentPreset = buildPublicProfileThemeSnapshot({ visibility: "current_theme", currentTheme: { kind: "preset", id: "ocean" } });
-    expect(selectedPreset?.tokens.background).toBe(BASE_THEME_REGISTRY.porcelain.tokens.background.toUpperCase());
-    expect(currentPreset?.tokens.background).toBe(BASE_THEME_REGISTRY.ocean.tokens.background.toUpperCase());
+    const porcelain = BASE_THEME_REGISTRY.porcelain;
+    const ocean = BASE_THEME_REGISTRY.ocean;
+    if (!("tokens" in porcelain) || !("tokens" in ocean)) throw new Error("expected_preset_tokens");
+    expect(selectedPreset?.tokens.background).toBe(porcelain.tokens.background.toUpperCase());
+    expect(currentPreset?.tokens.background).toBe(ocean.tokens.background.toUpperCase());
     expect(selectedPreset?.revision).not.toBe(currentPreset?.revision);
   });
 

@@ -213,7 +213,7 @@ describe("D6.6-1R strict/relaxed ranked-tag candidate discovery", () => {
   });
 
   it("tag sorgusu sıfır sonuçsa generic title adaylarıyla havuzu doldurmaz", async () => {
-    const fetcher = vi.fn(async () => new Response(JSON.stringify({ results: [] }), { status: 200 }));
+    const fetcher = vi.fn<typeof fetch>(async () => new Response(JSON.stringify({ results: [] }), { status: 200 }));
     vi.stubGlobal("fetch", fetcher);
     const result = await searchCandidatesWithDebug({ intent, retrievalPlan: providerPlan, profile: null, message: request().queryText, mediaItems: [], progressLogs: [], structuredRequest: request() });
     expect(result.candidates).toEqual([]);

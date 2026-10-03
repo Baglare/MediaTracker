@@ -376,8 +376,8 @@ describe("P6.1 cloud API", () => {
 
 describe("P6.1 migration, privacy, and architecture contracts", () => {
   const migrationPath = "supabase/migrations/20260722130000_theme_cloud_sync.sql";
-  const migration = readFileSync(migrationPath, "utf8");
-  const schema = readFileSync("supabase/schema.sql", "utf8");
+  const migration = readFileSync(migrationPath, "utf8").replace(/\r\n/g, "\n");
+  const schema = readFileSync("supabase/schema.sql", "utf8").replace(/\r\n/g, "\n");
   const studio = readFileSync("components/personalization/theme-studio.tsx", "utf8");
   const transfer = readFileSync("components/personalization/theme-transfer-panel.tsx", "utf8");
   const syncPanel = readFileSync("components/personalization/theme-cloud-sync-panel.tsx", "utf8");

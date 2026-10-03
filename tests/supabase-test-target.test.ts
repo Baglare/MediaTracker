@@ -29,7 +29,7 @@ describe("Supabase live-test target guard", () => {
   });
 
   it("accepts an unlabelled Supabase ref only under the explicit D8 staging contract", () => {
-    const environment = {
+    const environment = { NODE_ENV: "test" as const,
       D8_STAGING_CUTOVER_ENABLED: "1",
       D8_STAGING_MIGRATION_ALLOWED: "1",
       D8_STAGING_PROJECT_REF: "abcdefghijklmnopqrst",

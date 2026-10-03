@@ -32,20 +32,20 @@ describe("D7-R3B provider registry and selection", () => {
   });
 
   it("explicit provider never silently falls back", () => {
-    const environment = readGroundedExtractionSelectionEnvironment({ D7_RESEARCH_EXTRACTION_PROVIDER: "groq", D7_OPENAI_GROUNDED_EXTRACTION_ENABLED: "1", OPENAI_API_KEY: "secret", OPENAI_RESEARCH_EXTRACTION_MODEL: "gpt-5.4-mini" });
+    const environment = readGroundedExtractionSelectionEnvironment({ NODE_ENV: "test" as const, D7_RESEARCH_EXTRACTION_PROVIDER: "groq", D7_OPENAI_GROUNDED_EXTRACTION_ENABLED: "1", OPENAI_API_KEY: "secret", OPENAI_RESEARCH_EXTRACTION_MODEL: "gpt-5.4-mini" });
     expect(selectGroundedExtractionProviders(environment)).toEqual(["groq"]);
     expect(environment.providers.groq.valid).toBe(false);
   });
 
   it("auto selects at most one enabled provider in deterministic order", () => {
-    const environment = readGroundedExtractionSelectionEnvironment({ D7_RESEARCH_EXTRACTION_PROVIDER: "auto", D7_GROQ_GROUNDED_EXTRACTION_ENABLED: "1", GROQ_API_KEY: "g", GROQ_RESEARCH_EXTRACTION_MODEL: "openai/gpt-oss-20b", D7_OPENAI_GROUNDED_EXTRACTION_ENABLED: "1", OPENAI_API_KEY: "o", OPENAI_RESEARCH_EXTRACTION_MODEL: "gpt-5.4-mini" });
+    const environment = readGroundedExtractionSelectionEnvironment({ NODE_ENV: "test" as const, D7_RESEARCH_EXTRACTION_PROVIDER: "auto", D7_GROQ_GROUNDED_EXTRACTION_ENABLED: "1", GROQ_API_KEY: "g", GROQ_RESEARCH_EXTRACTION_MODEL: "openai/gpt-oss-20b", D7_OPENAI_GROUNDED_EXTRACTION_ENABLED: "1", OPENAI_API_KEY: "o", OPENAI_RESEARCH_EXTRACTION_MODEL: "gpt-5.4-mini" });
     expect(selectGroundedExtractionProviders(environment)).toEqual(["groq"]);
   });
 
   it.each([
-    [{ D7_RESEARCH_EXTRACTION_PROVIDER: "groq", D7_GROQ_GROUNDED_EXTRACTION_ENABLED: "1", GROQ_RESEARCH_EXTRACTION_MODEL: "openai/gpt-oss-20b" }, "groq_grounded_extraction_key_missing"],
-    [{ D7_RESEARCH_EXTRACTION_PROVIDER: "groq", D7_GROQ_GROUNDED_EXTRACTION_ENABLED: "1", GROQ_API_KEY: "g" }, "groq_grounded_extraction_model_missing"],
-    [{ D7_RESEARCH_EXTRACTION_PROVIDER: "groq", D7_GROQ_GROUNDED_EXTRACTION_ENABLED: "1", GROQ_API_KEY: "g", GROQ_RESEARCH_EXTRACTION_MODEL: "groq/compound-mini" }, "groq_grounded_extraction_model_unsupported"],
+    [{ NODE_ENV: "test" as const, D7_RESEARCH_EXTRACTION_PROVIDER: "groq", D7_GROQ_GROUNDED_EXTRACTION_ENABLED: "1", GROQ_RESEARCH_EXTRACTION_MODEL: "openai/gpt-oss-20b" }, "groq_grounded_extraction_key_missing"],
+    [{ NODE_ENV: "test" as const, D7_RESEARCH_EXTRACTION_PROVIDER: "groq", D7_GROQ_GROUNDED_EXTRACTION_ENABLED: "1", GROQ_API_KEY: "g" }, "groq_grounded_extraction_model_missing"],
+    [{ NODE_ENV: "test" as const, D7_RESEARCH_EXTRACTION_PROVIDER: "groq", D7_GROQ_GROUNDED_EXTRACTION_ENABLED: "1", GROQ_API_KEY: "g", GROQ_RESEARCH_EXTRACTION_MODEL: "groq/compound-mini" }, "groq_grounded_extraction_model_unsupported"],
   ])("missing/unsupported config stays invalid", (env, warning) => {
     expect(readGroundedExtractionSelectionEnvironment(env).providers.groq).toMatchObject({ valid: false, warnings: expect.arrayContaining([warning]) });
   });

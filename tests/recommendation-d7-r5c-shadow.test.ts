@@ -23,14 +23,14 @@ function currentEntry() {
 describe("D7-R5C shadow cache and transparency", () => {
   it("flag disabled iken cache erişimi yapmaz", async () => {
     const cache = { get: vi.fn(), set: vi.fn(), delete: vi.fn(), invalidateByScope: vi.fn(), invalidateBySourceRevision: vi.fn() };
-    await runGroundedResearchShadow(shadowInput(), { environment: { D7_RESEARCH_SHADOW_ENABLED: "1" }, evidenceCache: cache as never, directResearch: vi.fn(async () => ({ status: "identity_not_found", documents: [], citations: [], telemetry: {}, warnings: [] })) as never });
+    await runGroundedResearchShadow(shadowInput(), { environment: { NODE_ENV: "test" as const, D7_RESEARCH_SHADOW_ENABLED: "1" }, evidenceCache: cache as never, directResearch: vi.fn(async () => ({ status: "identity_not_found", documents: [], citations: [], telemetry: {}, warnings: [] })) as never });
     expect(cache.get).not.toHaveBeenCalled(); expect(cache.set).not.toHaveBeenCalled();
   });
 
   it("valid hit provider zincirini atlar ve bounded transparency üretir", async () => {
     const cache = new MemoryResearchEvidenceCache(256, () => Date.parse("2026-08-08T10:00:00.000Z")); await cache.set(currentEntry());
     const directResearch = vi.fn(); const acquire = vi.fn(); const extract = vi.fn();
-    const result = await runGroundedResearchShadow(shadowInput(), { environment: { D7_RESEARCH_SHADOW_ENABLED: "1", D7_RESEARCH_EVIDENCE_CACHE_ENABLED: "1" }, evidenceCache: cache, directResearch: directResearch as never, acquire: acquire as never, extract: extract as never });
+    const result = await runGroundedResearchShadow(shadowInput(), { environment: { NODE_ENV: "test" as const, D7_RESEARCH_SHADOW_ENABLED: "1", D7_RESEARCH_EVIDENCE_CACHE_ENABLED: "1" }, evidenceCache: cache, directResearch: directResearch as never, acquire: acquire as never, extract: extract as never });
     expect(directResearch).not.toHaveBeenCalled(); expect(acquire).not.toHaveBeenCalled(); expect(extract).not.toHaveBeenCalled();
     expect(result.results[0]).toMatchObject({ researchStatus: "cache_hit", hypotheticalEffect: "would_satisfy_must" });
     expect(result.transparency[0]).toMatchObject({ cacheStatus: "hit", stageStatus: "completed", decisionStatus: "supported", citationCount: 1 });
@@ -43,7 +43,7 @@ describe("D7-R5C shadow cache and transparency", () => {
     const acquire = vi.fn(async () => ({ status: "packet_ready", packet: { citations: [citation] }, warnings: [], telemetry: {} }));
     const extract = vi.fn(async () => ({ status: "claims_extracted", providerId: "groq", claims: [claim], decision, provenance: currentEntry().extractionProvenance, assessments: [], telemetry: {}, warnings: [] }));
     const setSpy = vi.spyOn(cache, "set");
-    const dependencies = { environment: { D7_RESEARCH_SHADOW_ENABLED: "1", D7_RESEARCH_EVIDENCE_CACHE_ENABLED: "1" }, evidenceCache: cache, directResearch: directResearch as never, acquire: acquire as never, extract: extract as never, now: () => new Date("2026-08-08T10:00:00.000Z") };
+    const dependencies = { environment: { NODE_ENV: "test" as const, D7_RESEARCH_SHADOW_ENABLED: "1", D7_RESEARCH_EVIDENCE_CACHE_ENABLED: "1" }, evidenceCache: cache, directResearch: directResearch as never, acquire: acquire as never, extract: extract as never, now: () => new Date("2026-08-08T10:00:00.000Z") };
     const first = await runGroundedResearchShadow(shadowInput("first"), dependencies);
     const second = await runGroundedResearchShadow(shadowInput("second"), dependencies);
     expect(first.transparency[0].cacheStatus).toBe("miss"); expect(second.transparency[0].cacheStatus).toBe("hit");
@@ -56,7 +56,7 @@ describe("D7-R5C shadow cache and transparency", () => {
     const cache = new MemoryResearchEvidenceCache();
     let release!: () => void; const gate = new Promise<void>((resolve) => { release = resolve; });
     const directResearch = vi.fn(async () => { await gate; return { status: "identity_not_found", documents: [], citations: [], telemetry: {}, warnings: [] }; });
-    const dependencies = { environment: { D7_RESEARCH_SHADOW_ENABLED: "1", D7_RESEARCH_EVIDENCE_CACHE_ENABLED: "1" }, evidenceCache: cache, directResearch: directResearch as never };
+    const dependencies = { environment: { NODE_ENV: "test" as const, D7_RESEARCH_SHADOW_ENABLED: "1", D7_RESEARCH_EVIDENCE_CACHE_ENABLED: "1" }, evidenceCache: cache, directResearch: directResearch as never };
     const first = runGroundedResearchShadow(shadowInput("coalesce-a"), dependencies);
     const second = runGroundedResearchShadow(shadowInput("coalesce-b"), dependencies);
     await vi.waitFor(() => expect(directResearch).toHaveBeenCalledTimes(1)); release();
@@ -71,7 +71,7 @@ describe("D7-R5C shadow cache and transparency", () => {
     const acquire = vi.fn(async () => ({ status: "packet_ready", packet: { citations: [citation] }, warnings: [], telemetry: {} }));
     const extract = vi.fn(async () => ({ status: "rate_limited", providerId: "groq", claims: [], assessments: [], telemetry: {}, warnings: [] }));
     const baseline = Object.freeze({ recommendations: ["authoritative"] });
-    const result = await runGroundedResearchShadow(shadowInput(), { environment: { D7_RESEARCH_SHADOW_ENABLED: "1", D7_RESEARCH_EVIDENCE_CACHE_ENABLED: "1" }, evidenceCache: cache, directResearch: directResearch as never, acquire: acquire as never, extract: extract as never });
+    const result = await runGroundedResearchShadow(shadowInput(), { environment: { NODE_ENV: "test" as const, D7_RESEARCH_SHADOW_ENABLED: "1", D7_RESEARCH_EVIDENCE_CACHE_ENABLED: "1" }, evidenceCache: cache, directResearch: directResearch as never, acquire: acquire as never, extract: extract as never });
     expect(result.transparency[0].cacheStatus).toBe("bypassed"); expect(cache.size).toBe(0); expect(baseline).toEqual({ recommendations: ["authoritative"] });
   });
 });

@@ -5,8 +5,8 @@ import { providerUserAgent } from "@/lib/api/provider-identity";
 describe("D8 staging target safety", () => {
   it("fails closed without explicit staging gates and rejects equal refs", async () => {
     const { resolveSafeStagingTarget } = await import("../scripts/d8-staging-target.mjs");
-    expect(() => resolveSafeStagingTarget({})).toThrow("safety gate closed");
-    expect(() => resolveSafeStagingTarget({
+    expect(() => resolveSafeStagingTarget({ NODE_ENV: "test" })).toThrow("safety gate closed");
+    expect(() => resolveSafeStagingTarget({ NODE_ENV: "test" as const,
       D8_STAGING_CUTOVER_ENABLED: "1",
       D8_STAGING_PROJECT_REF: "same-project",
       D8_PRODUCTION_PROJECT_REF: "same-project",
@@ -16,14 +16,14 @@ describe("D8 staging target safety", () => {
 
   it("accepts only a database host bound to the explicit non-production ref", async () => {
     const { resolveSafeStagingTarget } = await import("../scripts/d8-staging-target.mjs");
-    expect(() => resolveSafeStagingTarget({
+    expect(() => resolveSafeStagingTarget({ NODE_ENV: "test" as const,
       D8_STAGING_CUTOVER_ENABLED: "1",
       D8_STAGING_PROJECT_REF: "stage-project",
       D8_PRODUCTION_PROJECT_REF: "prod-project",
       D8_STAGING_DATABASE_URL: "postgresql://user:secret@prod-project.example.test/db",
     })).toThrow("not bound");
 
-    expect(resolveSafeStagingTarget({
+    expect(resolveSafeStagingTarget({ NODE_ENV: "test" as const,
       D8_STAGING_CUTOVER_ENABLED: "1",
       D8_STAGING_MIGRATION_ALLOWED: "1",
       D8_STAGING_PROJECT_REF: "stage-project",

@@ -221,7 +221,8 @@ describe("D7-R2A pinned HTTPS, redirect ve retry", () => {
     const pinned = await new Promise<{ address: string; family: number }>((resolve, reject) => {
       lookup("ignored.example", { family: 0 }, (error, address, family) => {
         if (error) reject(error);
-        else resolve({ address, family });
+        else if (typeof address === "string" && typeof family === "number") resolve({ address, family });
+        else reject(new Error("expected_single_pinned_address"));
       });
     });
     expect(pinned).toEqual(PUBLIC[0]);

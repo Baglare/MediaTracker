@@ -39,7 +39,7 @@ const log = (mediaId: string, createdAt: string): ProgressLog => ({
   mediaType: "tv",
   action: "increment",
   amount: 1,
-  unit: "bölüm",
+  unit: "episode",
   previousProgress: 0,
   newProgress: 1,
   createdAt,

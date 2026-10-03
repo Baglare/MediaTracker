@@ -90,7 +90,7 @@ class MemoryStorage implements IntegrityRepairStorage {
   }
 }
 
-function media(overrides: Partial<MediaItem> = {}): MediaItem {
+function media(overrides: Partial<MediaItem> & { metadata?: Record<string, unknown> } = {}): MediaItem {
   return ensureMediaIdentity({
     id: "media-1",
     title: "Example",

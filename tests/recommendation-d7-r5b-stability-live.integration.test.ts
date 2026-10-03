@@ -82,7 +82,7 @@ describe.skipIf(!LIVE)("D7-R5B conditional coverage and Groq stability live", ()
     const httpClient = new SecureResearchHttpClientImpl();
     const prepared = await acquirePacket({ identity, aspectId: "romance", httpClient, requestId: "d7-r5b-steins-packet" });
     expect(prepared.direct.status).toBe("document_ready");
-    if (!("acquired" in prepared) || prepared.acquired.status !== "packet_ready" || !prepared.direct.wikimediaIdentity) throw new Error("r5b_steins_packet_unavailable");
+    if (!prepared.acquired || prepared.acquired.status !== "packet_ready" || !prepared.acquired.packet || !prepared.direct.wikimediaIdentity) throw new Error("r5b_steins_packet_unavailable");
     const steinsUnits = await buildGroundedEvidenceUnits({ packet: prepared.acquired.packet, maxUnits: 64 });
     const steinsResults: ExtractionRun[] = [];
     for (let index = 0; index < 3; index += 1) {
@@ -106,7 +106,8 @@ describe.skipIf(!LIVE)("D7-R5B conditional coverage and Groq stability live", ()
       const direct = prepared.direct;
       let passages = 0;
       let units = 0;
-      if ("acquired" in prepared && prepared.acquired.status === "packet_ready") {
+      if (prepared.acquired && prepared.acquired.status === "packet_ready") {
+        if (!prepared.acquired.packet) throw new Error("r5b_coverage_packet_unavailable");
         passages = prepared.acquired.packet.passages.length;
         units = (await buildGroundedEvidenceUnits({ packet: prepared.acquired.packet, maxUnits: 64 })).eligibleUnits.length;
       }

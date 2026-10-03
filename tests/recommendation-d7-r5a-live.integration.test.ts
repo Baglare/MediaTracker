@@ -68,7 +68,7 @@ describe.skipIf(!LIVE)("D7-R5A bounded evidence-gap acceptance", () => {
 
     const acquired = await acquireResearchSources({ version: 1, candidateIdentity: identity, versionScope, wikimediaIdentity: direct.wikimediaIdentity, aspectId: "romance", role: "must", minimumLevel: "significant", directDocuments: [{ document: direct.documents[0], citation: direct.citations[0] }], discoveredSources: [], maxDocuments: 2, maxPassages: 8, maxPacketCharacters: 10_000, requestId: `d7-r5a-acquire-${Date.now()}`, researchPolicyVersion: RESEARCH_POLICY_VERSION, sourceRegistryVersion: RESEARCH_SOURCE_REGISTRY_VERSION, acquisitionPolicyVersion: RESEARCH_ACQUISITION_POLICY_VERSION }, { httpClient, environment: process.env });
     expect(acquired.status).toBe("packet_ready");
-    if (acquired.status !== "packet_ready") throw new Error("r5a_packet_unavailable");
+    if (acquired.status !== "packet_ready" || !acquired.packet) throw new Error("r5a_packet_unavailable");
     const relevantPassages = acquired.packet.passages.filter((passage) => diagnostic(passage.text).evidencePresent);
     expect(relevantPassages.length).toBeGreaterThan(0);
     const request = await createGroundedExtractionRequest({ packet: acquired.packet, requestId: `d7-r5a-extract-${Date.now()}` });

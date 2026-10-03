@@ -17,15 +17,15 @@ function handoff() {
 }
 
 function response(recommendations: unknown[] = []) {
-  return { assistantMessage: "ok", recommendations, transparencySummary: "bounded", engineStatus: { provider: "deterministic_v2" }, debug: { provider: "deterministic_v2" } } as never;
+  return { assistantMessage: "ok", recommendations, transparencySummary: "bounded", engineStatus: { provider: "deterministic_v2" }, debug: { provider: "deterministic_v2" } };
 }
 
 describe("D7-R6A1 active research integration", () => {
   it("rollout mode default disabled, legacy shadow compatible ve conflict fail-closed", () => {
-    expect(resolveResearchRolloutConfig({} as NodeJS.ProcessEnv).mode).toBe("disabled");
-    expect(resolveResearchRolloutConfig({ D7_RESEARCH_SHADOW_ENABLED: "1" } as NodeJS.ProcessEnv).mode).toBe("shadow");
-    expect(resolveResearchRolloutConfig({ D7_RESEARCH_ROLLOUT_MODE: "active" } as NodeJS.ProcessEnv).mode).toBe("active");
-    expect(resolveResearchRolloutConfig({ D7_RESEARCH_ROLLOUT_MODE: "active", D7_RESEARCH_SHADOW_ENABLED: "1" } as NodeJS.ProcessEnv)).toMatchObject({ mode: "disabled", conflict: true });
+    expect(resolveResearchRolloutConfig({ NODE_ENV: "test" } as NodeJS.ProcessEnv).mode).toBe("disabled");
+    expect(resolveResearchRolloutConfig({ NODE_ENV: "test" as const, D7_RESEARCH_SHADOW_ENABLED: "1" } as NodeJS.ProcessEnv).mode).toBe("shadow");
+    expect(resolveResearchRolloutConfig({ NODE_ENV: "test" as const, D7_RESEARCH_ROLLOUT_MODE: "active" } as NodeJS.ProcessEnv).mode).toBe("active");
+    expect(resolveResearchRolloutConfig({ NODE_ENV: "test" as const, D7_RESEARCH_ROLLOUT_MODE: "active", D7_RESEARCH_SHADOW_ENABLED: "1" } as NodeJS.ProcessEnv)).toMatchObject({ mode: "disabled", conflict: true });
   });
 
   it("validated handoff mevcut mapper ile must override ve bounded evidence üretir", () => {

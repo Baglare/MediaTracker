@@ -111,7 +111,7 @@ describe("D6-5.3 registry-driven core genre calibration", () => {
   it("provider support seviyesini uygular ve Open Library subject'i genre saymaz", () => {
     expect(aggregateAspectEvidence({ snapshot: snapshot({ id: "tmdb", aspectId: "fantasy", provider: "tmdb", genre: true }) }).get("fantasy")).toMatchObject({ level: "significant", confidence: "medium" });
     expect(aggregateAspectEvidence({ snapshot: snapshot({ id: "omdb", aspectId: "fantasy", provider: "omdb", genre: true }) }).get("fantasy")?.level).toBe("incidental");
-    const openLibrary = adaptOpenLibraryEvidence({ externalId: "/works/OL1W", workId: "/works/OL1W", type: "book", title: "Synthetic Fantasy", subjects: ["Fantasy"] });
+    const openLibrary = adaptOpenLibraryEvidence({ externalSource: "openlibrary", totalProgress: 1, externalId: "/works/OL1W", workId: "/works/OL1W", type: "book", title: "Synthetic Fantasy", subjects: ["Fantasy"] });
     expect(openLibrary.rawEvidenceClaims[0]?.sourceKind).toBe("provider_keyword");
     expect(openLibrary.rawEvidenceClaims[0]?.field).toBe("subjects");
     expect(openLibrary.objectiveMetadata).toMatchObject({ subjects: ["Fantasy"] });

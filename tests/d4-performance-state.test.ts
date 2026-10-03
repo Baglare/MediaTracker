@@ -95,7 +95,7 @@ describe("D4 world metric semantics", () => {
       level: 3,
       currentLevelStartXp: 400,
       nextLevelStartXp: 900,
-      selectedTitle: null,
+      selectedTitle: undefined,
       worlds: [
         { key: "east", xp: 100, level: 2, tier: "basic", title: "Doğu" },
         { key: "screen", xp: 120, level: 2, tier: "basic", title: "Kadraj" },

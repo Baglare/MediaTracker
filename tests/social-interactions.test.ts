@@ -17,5 +17,5 @@ describe("social interaction domain",()=>{
   it.each([
     ["pending","none","accept",true],["deferred","none","accept",true],["accepted","none","withdraw",false],["accepted","none","linked",true],["accepted","linked","started",true],["accepted","started","completed",true],["rejected","none","accept",false],
   ] as const)("validates %s/%s -> %s",(response,progress,action,expected)=>expect(isRecommendationTransitionAllowed(response,progress,action)).toBe(expected));
-  it("builds safe notification destinations",()=>{expect(notificationHref({entityType:"recommendation",entityId:"id"})).toBe("/recommendations#id");expect(notificationHref({entityType:"activity",entityId:"id"})).toBe("/feed#id");expect(notificationHref({entityType:"profile",actor:{id:"x",username:"ada",displayName:"Ada"}})).toBe("/u/ada");});
+  it("builds safe notification destinations",()=>{expect(notificationHref({entityType:"recommendation",entityId:"id",actor:undefined,payload:{}})).toBe("/recommendations#id");expect(notificationHref({entityType:"activity",entityId:"id",actor:undefined,payload:{}})).toBe("/feed#id");expect(notificationHref({entityType:"profile",entityId:undefined,payload:{},actor:{id:"x",username:"ada",displayName:"Ada"}})).toBe("/u/ada");});
 });

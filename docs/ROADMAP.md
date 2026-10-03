@@ -47,7 +47,8 @@
 | D8-4A.5C3 — Final Preview polish | Tamamlandı (kullanıcı smoke kabulü) | Owner-safe asset/cache, banner delete, provider 90 gün/manual Calendar navigasyonu ayrımı, stale copy ve first-release AI disabled yüzeyi kabul edildi. |
 | D8-4A.5D — First-release hardening | Tamamlandı (code-side) | Signup UI/action kapalı, AI/cache/service-role fail-closed, SQL/RLS/Storage source audit ve factual privacy/env/runbook konsolidasyonu tamam; D8-4B için beş manuel/external kapı kanonik tabloda açık. |
 | D8-4A.5E — Advisor/privacy/final preflight | Tamamlandı (Production untouched) | 123-warning Production CSV'si sınıflandırıldı; additive grant/RLS/search-path migrationı Staging/live regresyondan, `/privacy` fresh Preview smoke'undan ve full validation'dan geçti. Production Advisor current export'u değişmedi. |
-| D8-4B — Production cutover | Başlamadı | Beş gerçek manuel kapı kapanmadan; backup/target/change-window, production env, migration ve post-deploy smoke başlamaz ([kabul](D8_RELEASE_CANDIDATE_ACCEPTANCE.md#d8-4a5d-kanonik-production-hold-tablosu), [runbook](D8_PRODUCTION_CUTOVER_RUNBOOK.md)). |
+| D8-4B — Production cutover | FROZEN (2026-10-03) | August RC `3a847701…` historical evidence; current hardening baseline `657cfba…`, yeni immutable RC henüz yok. Yeni RC acceptance ve fresh Production preflight olmadan cutover başlamaz ([kabul](D8_RELEASE_CANDIDATE_ACCEPTANCE.md#current-release-state--2026-10-03), [runbook](D8_PRODUCTION_CUTOVER_RUNBOOK.md)). |
+| V1-HARDENING-01 / 01A / 01B | COMPLETE_WITH_DOCUMENTED_DEV_EXCEPTION (yerel) | [01B security baseline](V1_HARDENING_01B.md): test/type integrity doğrulandı, runtime audit temiz; unpatched dev braces için süreli V1-SEC-EXCEPTION-001, review 2026-11-03. Yeni immutable RC/CI/Preview/Production kabulü değildir. |
 
 ## Opsiyonel backlog
 

@@ -34,6 +34,8 @@ class MemoryStorage implements Storage {
 }
 
 const scope = createUserOwnerScope("11111111-1111-4111-8111-111111111111");
+if (scope.kind !== "user") throw new Error("expected_user_scope");
+const userId = scope.userId;
 
 function media(): MediaItem {
   return {
@@ -86,7 +88,7 @@ function queueItem(
     createdAt: "2026-07-28T10:00:00.000Z",
     retryCount: 0,
     ownerScope: scope.key,
-    userId: scope.userId,
+    userId: userId,
     ...overrides,
   };
 }
@@ -108,7 +110,7 @@ describe("Cloud Media V2 client adapter", () => {
   });
 
   it("maps MediaItem identity separately from record id", () => {
-    const payload = buildCloudMediaV2Payload(scope.userId, media());
+    const payload = buildCloudMediaV2Payload(userId, media());
     expect(payload).toMatchObject({
       canonical_version: 2,
       canonical_key: "v2:tmdb:movie:123",
@@ -126,7 +128,7 @@ describe("Cloud Media V2 client adapter", () => {
   });
 
   it("maps progress with the exact D2B.1 payload names", () => {
-    expect(buildCloudProgressV2Payload(scope.userId, progress())).toEqual({
+    expect(buildCloudProgressV2Payload(userId, progress())).toEqual({
       media_id: "media-1",
       media_title: "V2 Movie",
       media_type: "movie",
@@ -160,7 +162,7 @@ describe("Cloud Media V2 client adapter", () => {
           : null,
       });
       const result = await dispatchCloudMediaV2QueueItem(
-        scope.userId,
+        userId,
         item,
         client,
       );
@@ -193,7 +195,7 @@ describe("Cloud Media V2 client adapter", () => {
       revision: 1,
       deletedAt: null,
     });
-    await dispatchCloudMediaV2QueueItem(scope.userId, item, client);
+    await dispatchCloudMediaV2QueueItem(userId, item, client);
     expect(rpc).toHaveBeenCalledWith(
       "apply_progress_log_sync_operation",
       expect.objectContaining({
@@ -271,8 +273,8 @@ describe("Cloud Media V2 client adapter", () => {
       deletedAt: null,
     };
     const { client, rpc } = rpcClient(response);
-    await dispatchCloudMediaV2QueueItem(scope.userId, item, client);
-    await dispatchCloudMediaV2QueueItem(scope.userId, item, client);
+    await dispatchCloudMediaV2QueueItem(userId, item, client);
+    await dispatchCloudMediaV2QueueItem(userId, item, client);
     expect(rpc).toHaveBeenCalledTimes(2);
     expect(rpc.mock.calls[0][1]).toEqual(rpc.mock.calls[1][1]);
   });
@@ -285,7 +287,7 @@ describe("Cloud Media V2 client adapter", () => {
       }),
     } as CloudMediaV2RpcClient;
     await expect(
-      dispatchCloudMediaV2QueueItem(scope.userId, queueItem(), networkClient),
+      dispatchCloudMediaV2QueueItem(userId, queueItem(), networkClient),
     ).resolves.toEqual({
       kind: "retryable-error",
       error: "network request failed",
@@ -307,7 +309,7 @@ describe("Cloud Media V2 client adapter", () => {
         createdAt: "2026-07-28T10:00:00.000Z",
         retryCount: 0,
         ownerScope: scope.key,
-        userId: scope.userId,
+        userId: userId,
       },
     ]));
     expect(loadSyncQueue(scope, storage)).toMatchObject([

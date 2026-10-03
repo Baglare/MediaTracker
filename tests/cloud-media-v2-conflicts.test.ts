@@ -21,6 +21,8 @@ class MemoryStorage implements Storage {
 }
 
 const scope = createUserOwnerScope("user-a");
+if (scope.kind !== "user") throw new Error("expected_user_scope");
+const userId = scope.userId;
 
 function blockedItem(
   reason: CloudMediaV2ConflictReason,
@@ -48,7 +50,7 @@ function blockedItem(
     retryCount: 0,
     dispatchStartedAt: "2026-07-28T10:00:01.000Z",
     ownerScope: scope.key,
-    userId: scope.userId,
+    userId: userId,
     blockedConflict: {
       reason,
       serverRevision: 4,
@@ -118,7 +120,7 @@ describe("Cloud Media V2 conflict presentation", () => {
       describeCloudV2Conflict(blockedItem("revision_mismatch")),
     );
     expect(serialized).not.toContain("must not leak");
-    expect(serialized).not.toContain(scope.userId);
+    expect(serialized).not.toContain(userId);
     expect(serialized).toContain("Safe title");
   });
 
@@ -126,6 +128,7 @@ describe("Cloud Media V2 conflict presentation", () => {
     const storage = new MemoryStorage();
     saveSyncQueue(scope, [blockedItem("revision_mismatch")], storage);
     const userB = createUserOwnerScope("user-b");
+if (userB.kind !== "user") throw new Error("expected_user_scope");
     expect(listCloudV2Conflicts(scope, storage)).toHaveLength(1);
     expect(listCloudV2Conflicts(userB, storage)).toEqual([]);
     expect(listCloudV2Conflicts(GUEST_OWNER_SCOPE, storage)).toEqual([]);

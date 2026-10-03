@@ -101,7 +101,7 @@ describe("D6-2 recommendation provider pipeline", () => {
     vi.stubGlobal("fetch", fetchSpy);
     try {
       const result = await searchCandidatesWithDebug({
-        intent: { kind: "general", references: [], targetTypes: ["anime"], sourceTypes: [], mood: [], avoid: [], needsLibraryProfile: false, needsCandidateSearch: true, needsWebResearch: false },
+        intent: { kind: "general_recommendation", references: [], targetTypes: ["anime"], sourceTypes: [], mood: [], avoid: [], needsLibraryProfile: false, needsCandidateSearch: true, needsWebResearch: false },
         retrievalPlan: {
           taskType: "general", interpretation: "anime", targetMediaTypes: ["anime"], sourceTypes: [], preferenceSignals: [], avoidSignals: [], needsClarification: false,
           searchPlans: [{ source: "tvmaze", mediaType: "tv", queries: ["anime"], reason: "invalid provider plan" }],
