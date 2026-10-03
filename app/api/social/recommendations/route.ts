@@ -1,3 +1,4 @@
+import { validateAuthenticatedMutationRequest } from "@/lib/api/request-security";
 import { isRecommendationTransitionAllowed } from "@/lib/social/interactions";
 import { loadSocialRecommendationDetail, loadSocialRecommendations } from "@/lib/social/interactions-server";
 import { safeSocialText, socialRecord, validateCursor, validateRecommendationProgressStatus, validateRecommendationResponseStatus, validateSocialMediaSnapshot, validateUuid } from "@/lib/social/interactions-validation";
@@ -28,6 +29,9 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const boundaryError = validateAuthenticatedMutationRequest(request);
+  if (boundaryError) return boundaryError;
+
   const body = socialRecord(await readJsonBody(request));
   if (body?.action === "message") {
     const recommendation = validateUuid(body.recommendationId, "Öneri");
@@ -60,6 +64,9 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
+  const boundaryError = validateAuthenticatedMutationRequest(request);
+  if (boundaryError) return boundaryError;
+
   const body = socialRecord(await readJsonBody(request));
   const recommendation = validateUuid(body?.recommendationId, "Öneri");
   const action = String(body?.action ?? "");

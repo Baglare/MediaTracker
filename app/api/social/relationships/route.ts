@@ -1,3 +1,4 @@
+import { validateAuthenticatedMutationRequest } from "@/lib/api/request-security";
 import { NextResponse } from "next/server";
 
 import { validateUserId } from "@/lib/social/validation";
@@ -10,6 +11,8 @@ export async function POST(request: Request) {
   if (!client) return NextResponse.json({ ok: false, message: "Sosyal sistem yapılandırılmamış." }, { status: 503 });
   const { data: auth } = await client.auth.getUser();
   if (!auth.user) return NextResponse.json({ ok: false, message: "Bu işlem için giriş yapmalısın." }, { status: 401 });
+  const boundaryError = validateAuthenticatedMutationRequest(request);
+  if (boundaryError) return boundaryError;
   let body: unknown;
   try { body = await request.json(); } catch { return NextResponse.json({ ok: false, message: "İstek geçersiz." }, { status: 400 }); }
   if (!body || typeof body !== "object" || Array.isArray(body)) return NextResponse.json({ ok: false, message: "İstek geçersiz." }, { status: 400 });

@@ -77,6 +77,7 @@ import {
   apiError,
   enforceRateLimit,
   readStrictJsonObject,
+  validateAuthenticatedMutationRequest,
 } from "@/lib/api/request-security";
 
 export const runtime = "nodejs";
@@ -1242,6 +1243,10 @@ export async function POST(req: NextRequest) {
   const researchMode = (body as { researchMode?: string }).researchMode || "library-only";
   if (researchMode !== "library-only" && !entitlement.canUseServerProviders) {
     return apiError("ai_server_provider_forbidden", 403);
+  }
+  if (researchMode !== "library-only") {
+    const boundaryError = validateAuthenticatedMutationRequest(req);
+    if (boundaryError) return boundaryError;
   }
   const scopeMode = (body as { scopeMode?: string }).scopeMode as
     | "mixed"

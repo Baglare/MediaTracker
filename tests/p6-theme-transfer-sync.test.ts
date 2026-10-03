@@ -319,6 +319,7 @@ describe("P6.1 cloud API", () => {
   it("validates saves and never accepts a client user id", async () => {
     const invalid = await PUT(new Request("http://localhost/api/personalization/themes/sync", {
       method: "PUT",
+      headers: { Origin: "http://localhost" },
       body: JSON.stringify({
         expectedRevision: 0,
         userId: "other-user",
@@ -334,6 +335,7 @@ describe("P6.1 cloud API", () => {
     });
     const response = await PUT(new Request("http://localhost/api/personalization/themes/sync", {
       method: "PUT",
+      headers: { Origin: "http://localhost" },
       body: JSON.stringify({
         expectedRevision: 0,
         activeThemeSelection: { kind: "custom", id: "ct_12345678" },
@@ -352,6 +354,7 @@ describe("P6.1 cloud API", () => {
     });
     const response = await PUT(new Request("http://localhost/api/personalization/themes/sync", {
       method: "PUT",
+      headers: { Origin: "http://localhost" },
       body: JSON.stringify({
         expectedRevision: 3,
         activeThemeSelection: { kind: "custom", id: "ct_12345678" },
@@ -367,7 +370,7 @@ describe("P6.1 cloud API", () => {
 
   it("deletes only through the authenticated RPC boundary", async () => {
     serverMocks.rpc.mockResolvedValue({ data: { ok: true, deleted: true }, error: null });
-    const response = await DELETE();
+    const response = await DELETE(new Request("http://localhost/api/personalization/themes/sync", { method: "DELETE", headers: { Origin: "http://localhost" } }));
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ok: true, deleted: true });
     expect(serverMocks.rpc).toHaveBeenCalledWith("delete_theme_sync_state");

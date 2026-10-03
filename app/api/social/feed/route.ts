@@ -1,3 +1,4 @@
+import { validateAuthenticatedMutationRequest } from "@/lib/api/request-security";
 import { loadSocialFeed } from "@/lib/social/interactions-server";
 import { PRIVATE_NO_STORE_HEADERS, readJsonBody, safeSocialRouteError } from "@/lib/social/route-response";
 import { socialRecord, safeSocialText, validateActivityType, validateActivityVisibility, validateCursor, validateSocialMediaSnapshot, validateUuid } from "@/lib/social/interactions-validation";
@@ -12,6 +13,9 @@ export async function GET(request:Request){
 }
 
 export async function POST(request:Request){
+  const boundaryError = validateAuthenticatedMutationRequest(request);
+  if (boundaryError) return boundaryError;
+
   const body=socialRecord(await readJsonBody(request));if(!body)return Response.json({message:"Aktivite verisi geçersiz."},{status:400,headers:PRIVATE_NO_STORE_HEADERS});
   try{
     const client=await getSupabaseServerClient();if(!client)throw new Error("social_not_configured");

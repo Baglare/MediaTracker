@@ -18,6 +18,18 @@ export type Json =
 export interface Database {
   public: {
     Tables: {
+      social_activity_preferences: {
+        Row: { user_id: string; share_completed: boolean; share_started: boolean; share_rating: boolean; share_favorite: boolean; share_recommendation_completed: boolean; default_visibility: string; updated_at: string };
+        Insert: { user_id: string; share_completed?: boolean; share_started?: boolean; share_rating?: boolean; share_favorite?: boolean; share_recommendation_completed?: boolean; default_visibility?: string; updated_at?: string };
+        Update: { share_completed?: boolean; share_started?: boolean; share_rating?: boolean; share_favorite?: boolean; share_recommendation_completed?: boolean; default_visibility?: string; updated_at?: string };
+        Relationships: [];
+      };
+      social_notification_preferences: {
+        Row: { user_id: string; follow_notifications: boolean; comment_notifications: boolean; reaction_notifications: boolean; recommendation_received: boolean; recommendation_accepted: boolean; recommendation_started: boolean; recommendation_completed: boolean; recommendation_rejected: boolean; recommendation_withdrawn: boolean; updated_at: string };
+        Insert: { user_id: string; follow_notifications?: boolean; comment_notifications?: boolean; reaction_notifications?: boolean; recommendation_received?: boolean; recommendation_accepted?: boolean; recommendation_started?: boolean; recommendation_completed?: boolean; recommendation_rejected?: boolean; recommendation_withdrawn?: boolean; updated_at?: string };
+        Update: { follow_notifications?: boolean; comment_notifications?: boolean; reaction_notifications?: boolean; recommendation_received?: boolean; recommendation_accepted?: boolean; recommendation_started?: boolean; recommendation_completed?: boolean; recommendation_rejected?: boolean; recommendation_withdrawn?: boolean; updated_at?: string };
+        Relationships: [];
+      };
       user_theme_preferences: {
         Row: {
           user_id: string;

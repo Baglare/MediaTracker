@@ -155,7 +155,7 @@ describe("social avatar boundary", () => {
     form.set("kind", "avatar");
     form.set("file", new File([new Uint8Array([1, 2, 3])], "avatar.webp", { type: "image/webp" }));
 
-    const response = await uploadAsset({ formData: async () => form } as Request);
+    const response = await uploadAsset(new Request("http://localhost/api/social/assets", { method: "POST", headers: { Origin: "http://localhost" }, body: form }));
 
     expect(response.status).toBe(500);
     expect(update).not.toHaveBeenCalled();

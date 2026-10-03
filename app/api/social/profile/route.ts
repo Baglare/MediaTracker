@@ -1,3 +1,4 @@
+import { validateAuthenticatedMutationRequest } from "@/lib/api/request-security";
 import { NextResponse } from "next/server";
 
 import { loadOwnSocialEditorData, toShowcaseJson } from "@/lib/social/server";
@@ -37,6 +38,8 @@ export async function GET() {
 export async function POST(request: Request) {
   const auth = await context();
   if (!auth) return failure("Bu işlem için giriş yapmalısın.", 401);
+  const boundaryError = validateAuthenticatedMutationRequest(request);
+  if (boundaryError) return boundaryError;
   let body: unknown;
   try { body = await request.json(); } catch { return failure("İstek verisi geçersiz."); }
   if (!body || typeof body !== "object" || Array.isArray(body)) return failure("İstek verisi geçersiz.");

@@ -1,3 +1,4 @@
+import { validateAuthenticatedMutationRequest } from "@/lib/api/request-security";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import type { Json } from "@/lib/supabase/types";
 import {
@@ -54,6 +55,8 @@ export async function PUT(request: Request): Promise<Response> {
   try {
     const auth = await context();
     if (!auth) return failure("Tema senkronizasyonu için giriş yapmalısın.", 401);
+    const boundaryError = validateAuthenticatedMutationRequest(request);
+    if (boundaryError) return boundaryError;
     let body: unknown;
     try {
       body = await request.json();
@@ -98,10 +101,12 @@ export async function PUT(request: Request): Promise<Response> {
   }
 }
 
-export async function DELETE(): Promise<Response> {
+export async function DELETE(request: Request): Promise<Response> {
   try {
     const auth = await context();
     if (!auth) return failure("Tema senkronizasyonu için giriş yapmalısın.", 401);
+    const boundaryError = validateAuthenticatedMutationRequest(request);
+    if (boundaryError) return boundaryError;
     const { data, error } = await auth.client.rpc("delete_theme_sync_state");
     if (error) throw new Error(error.message);
     return Response.json({

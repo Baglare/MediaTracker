@@ -1,3 +1,4 @@
+import { validateAuthenticatedMutationRequest } from "@/lib/api/request-security";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import type { Json } from "@/lib/supabase/types";
 import { validateMediaStateBatch } from "@/lib/xp/validation";
@@ -40,6 +41,8 @@ export async function POST(request: Request): Promise<Response> {
   try {
     const auth = await context();
     if (!auth) return failure("Bu işlem için giriş yapmalısın.", 401);
+    const boundaryError = validateAuthenticatedMutationRequest(request);
+    if (boundaryError) return boundaryError;
     let body: unknown;
     try { body = await request.json(); } catch { return failure("İstek verisi geçersiz."); }
     if (!body || typeof body !== "object" || Array.isArray(body)) return failure("İstek verisi geçersiz.");

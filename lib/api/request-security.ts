@@ -31,6 +31,26 @@ export function validateSameOrigin(request: Request): NextResponse | null {
   return apiError("invalid_origin", 403);
 }
 
+/** Cookie-authenticated writes require an explicit, canonical same-origin boundary. */
+export function validateAuthenticatedMutationRequest(request: Request): NextResponse | null {
+  const origin = request.headers.get("origin");
+  try {
+    // Origin is a serialized HTTP(S) origin, never a URL with credentials/path/query.
+    if (!origin || !/^https?:\/\/[^/?#\\\s]+$/i.test(origin)) return apiError("invalid_origin", 403);
+    const source = new URL(origin);
+    const target = new URL(request.url);
+    if (source.username || source.password || source.origin !== target.origin) {
+      return apiError("invalid_origin", 403);
+    }
+  } catch {
+    return apiError("invalid_origin", 403);
+  }
+  const fetchSite = request.headers.get("sec-fetch-site");
+  // Legacy/non-browser clients may omit Fetch Metadata, but never Origin.
+  if (fetchSite !== null && fetchSite !== "same-origin") return apiError("invalid_origin", 403);
+  return null;
+}
+
 export async function readStrictJsonObject(
   request: Request,
   allowedFields: ReadonlySet<string>,

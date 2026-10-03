@@ -107,7 +107,24 @@ export async function loadSocialNotifications(cursor?:{createdAt?:string;id?:str
 }
 
 export async function loadSocialPreferences():Promise<SocialPreferences>{
-  const client=await getSupabaseServerClient();if(!client)return{configured:false,recommendationPermission:"mutual",activity:DEFAULT_ACTIVITY_PREFERENCES,notifications:DEFAULT_NOTIFICATION_PREFERENCES};
-  const {data,error}=await client.rpc("social_get_preferences",{});if(error)throw new Error(error.message);const root=socialRecord(data);const permission=validateRecommendationPermission(root?.recommendationPermission??"mutual");const activity=validateActivityPreferences(root?.activity??DEFAULT_ACTIVITY_PREFERENCES);const notifications=validateNotificationPreferences(root?.notifications??DEFAULT_NOTIFICATION_PREFERENCES);
-  return{configured:root?.configured===true,recommendationPermission:permission.ok?permission.value:"mutual",activity:activity.ok?activity.value:DEFAULT_ACTIVITY_PREFERENCES,notifications:notifications.ok?notifications.value:DEFAULT_NOTIFICATION_PREFERENCES};
+  const defaults: SocialPreferences = {configured:false,recommendationPermission:"mutual",activity:DEFAULT_ACTIVITY_PREFERENCES,notifications:DEFAULT_NOTIFICATION_PREFERENCES};
+  const client=await getSupabaseServerClient();if(!client)return defaults;
+  const {data:auth,error:authError}=await client.auth.getUser();
+  if(authError||!auth.user)throw new Error("authentication_required");
+  const owner=auth.user.id;
+  const {data:profile,error:profileError}=await client.from("profiles").select("username,recommendation_permission").eq("id",owner).is("deleted_at",null).maybeSingle();
+  if(profileError)throw new Error(profileError.message);
+  if(!profile||profile.username===null)return defaults;
+  // RLS-scoped reads only: missing rows are virtual defaults until a user saves.
+  const [activityResult,notificationResult]=await Promise.all([
+    client.from("social_activity_preferences").select("share_completed,share_started,share_rating,share_favorite,share_recommendation_completed,default_visibility").eq("user_id",owner).maybeSingle(),
+    client.from("social_notification_preferences").select("follow_notifications,comment_notifications,reaction_notifications,recommendation_received,recommendation_accepted,recommendation_started,recommendation_completed,recommendation_rejected,recommendation_withdrawn").eq("user_id",owner).maybeSingle(),
+  ]);
+  if(activityResult.error)throw new Error(activityResult.error.message);
+  if(notificationResult.error)throw new Error(notificationResult.error.message);
+  const a=activityResult.data;const n=notificationResult.data;
+  const permission=validateRecommendationPermission(profile.recommendation_permission);
+  const activity=validateActivityPreferences(a?{shareCompleted:a.share_completed,shareStarted:a.share_started,shareRating:a.share_rating,shareFavorite:a.share_favorite,shareRecommendationCompleted:a.share_recommendation_completed,defaultVisibility:a.default_visibility}:DEFAULT_ACTIVITY_PREFERENCES);
+  const notifications=validateNotificationPreferences(n?{follow:n.follow_notifications,comments:n.comment_notifications,reactions:n.reaction_notifications,recommendationReceived:n.recommendation_received,recommendationAccepted:n.recommendation_accepted,recommendationStarted:n.recommendation_started,recommendationCompleted:n.recommendation_completed,recommendationRejected:n.recommendation_rejected,recommendationWithdrawn:n.recommendation_withdrawn}:DEFAULT_NOTIFICATION_PREFERENCES);
+  return{configured:true,recommendationPermission:permission.ok?permission.value:"mutual",activity:activity.ok?activity.value:DEFAULT_ACTIVITY_PREFERENCES,notifications:notifications.ok?notifications.value:DEFAULT_NOTIFICATION_PREFERENCES};
 }

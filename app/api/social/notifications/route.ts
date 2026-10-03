@@ -1,3 +1,4 @@
+import { validateAuthenticatedMutationRequest } from "@/lib/api/request-security";
 import { loadSocialNotifications } from "@/lib/social/interactions-server";
 import { socialRecord, validateCursor, validateUuid } from "@/lib/social/interactions-validation";
 import { PRIVATE_NO_STORE_HEADERS, readJsonBody, safeSocialRouteError } from "@/lib/social/route-response";
@@ -14,6 +15,9 @@ export async function GET(request: Request) {
 }
 
 export async function PATCH(request: Request) {
+  const boundaryError = validateAuthenticatedMutationRequest(request);
+  if (boundaryError) return boundaryError;
+
   const body = socialRecord(await readJsonBody(request));
   const action = String(body?.action ?? "");
   const notification = body?.notificationId ? validateUuid(body.notificationId, "Bildirim") : null;
