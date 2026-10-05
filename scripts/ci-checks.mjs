@@ -5,6 +5,7 @@ import { pathToFileURL } from "node:url";
 import ts from "typescript";
 import yaml from "js-yaml";
 import { exception } from "./ci-audit.mjs";
+import { checkOperationalSources } from "./ops/verify-source.mjs";
 
 export const criticalMigrations = {
   "20261004120000_application_rate_limit_v1.sql": "08e2c5b6798df8200820df3e2687a8f649fd45ae8a1ab775f735133bdd060ff9",
@@ -116,10 +117,12 @@ export function checkFile(path, text) {
     function visit(node) {
       if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) {
         const name = node.moduleSpecifier?.text;
+        requireContract(!name?.includes("scripts/ops") && !name?.includes("scripts/privacy-"), "Ops tooling imported by runtime");
         requireContract(!exception.chain.some((pkg) => name === pkg || name?.startsWith(`${pkg}/`)), "Dev advisory chain imported by runtime");
       }
       if (ts.isCallExpression(node) && ["require", "import"].includes(node.expression.getText(source))) {
         const name = node.arguments[0]?.text;
+        requireContract(!name?.includes("scripts/ops") && !name?.includes("scripts/privacy-"), "Ops tooling imported by runtime");
         requireContract(!exception.chain.some((pkg) => name === pkg || name?.startsWith(`${pkg}/`)), "Dev advisory chain imported by runtime");
       }
       ts.forEachChild(node, visit);
@@ -167,7 +170,7 @@ function git(...args) {
 export function checkEnvironment(names, environment) {
   requireContract(names.every((name) => !/^\.env(?:\.|$)/.test(name) || name === ".env.example"),
     "Use a clean checkout without local env files for CI validation");
-  requireContract(Object.keys(environment).every((name) => !/^(?:SUPABASE_|NEXT_PUBLIC_SUPABASE_|D8_STAGING_|RATE_LIMIT_|D7_|D6_PROVIDER_LIVE_SMOKE|AI_SERVER_|MEDIA_TRACKER_|OPENAI_|GROQ_|GEMINI_|OPENROUTER_|TMDB_|OMDB_|DATABASE_URL|PGPASSWORD|VERCEL_TOKEN)/.test(name)),
+  requireContract(Object.keys(environment).every((name) => !/^(?:SUPABASE_|NEXT_PUBLIC_SUPABASE_|D8_STAGING_|RATE_LIMIT_|D7_|D6_PROVIDER_LIVE_SMOKE|AI_SERVER_|MEDIA_TRACKER_|OPENAI_|GROQ_|GEMINI_|OPENROUTER_|TMDB_|OMDB_|DATABASE_URL|PGPASSWORD|VERCEL_TOKEN|PRIVACY_(?!TEST_BASELINE_REPO$)|MEDIATRACKER_DR_)/.test(name)),
     "Unexpected application/live/credential environment in CI validation");
 }
 
@@ -201,6 +204,7 @@ function main() {
   checkWorkflow(readFileSync(".github/workflows/ci.yml", "utf8"));
   checkMigrations(readdirSync("supabase/migrations"), (name) => readFileSync(`supabase/migrations/${name}`, "utf8"),
     migrationDocs.map((path) => readFileSync(path, "utf8")));
+  checkOperationalSources();
   // CI must not inherit local credentials/flags or let Next load populated local env files.
   if (!process.argv.includes("--repository-only")) checkEnvironment(readdirSync("."), process.env);
   console.log("PASS: workflow, hygiene, test integrity, runtime dependency boundary, migrations");

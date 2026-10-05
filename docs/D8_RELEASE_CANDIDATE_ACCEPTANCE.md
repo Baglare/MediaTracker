@@ -1,3 +1,5 @@
+> HISTORICAL_EVIDENCE — FROZEN (2026-10-06). Commands, August RC/epochs/fingerprints/counts and hosted settings below are historical, not current execution authority. Current canonical source procedure: [06D](V1_HARDENING_06D_RELEASE_OPERATIONS.md); single current master gate matrix: [06E](V1_HARDENING_06E_OPERATIONAL_RELEASE_GATE.md). Do not execute historical commands or infer current remote state.
+
 # D8 release-candidate acceptance
 
 Current TMDB v1 policy — 2026-10-05: [V1-HARDENING-04B.4](V1_HARDENING_04B4.md) sets `TMDB_V1_LIVE_ACCESS = HARD_DISABLED` in LOCAL/DEVELOPMENT/CI/PREVIEW/PRODUCTION. Mode/token/logo cannot enable it. Historical live/UAT evidence below is retained, not current enablement authority. Offline/legacy compatibility remains; future legal/provider, retention, AI isolation and branding reviews, a separate source change and release acceptance are required.

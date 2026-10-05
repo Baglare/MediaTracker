@@ -246,7 +246,7 @@ test("ops import graph and credentials remain outside application/browser module
     const text = readFileSync(file, "utf8");
     assert.ok(!/privacy-(?:account-(?:ops|model|sql)|disposable-adapter)|PRIVACY_DISPOSABLE_SERVICE_ROLE_KEY|auth\.admin\.deleteUser/.test(text), file);
   }
-  assert.match(readFileSync("next.config.ts", "utf8"), /outputFileTracingExcludes: \{ "\/\*": \["\.\/scripts\/privacy-\*\.mjs"\] \}/);
+  assert.match(readFileSync("next.config.ts", "utf8"), /outputFileTracingExcludes: \{ "\/\*": \["\.\/scripts\/privacy-\*\.mjs", "\.\/scripts\/ops\/\*\*"\] \}/);
 });
 
 test("privacy page and retention keep factual limits; no lock orphan or new retention period", () => {

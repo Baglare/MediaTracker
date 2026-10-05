@@ -1,3 +1,5 @@
+> HISTORICAL_EVIDENCE — FROZEN (2026-10-06). Commands, August RC/epochs/fingerprints/counts and hosted settings below are historical, not current execution authority. Current canonical source procedure: [06D](V1_HARDENING_06D_RELEASE_OPERATIONS.md); single current master gate matrix: [06E](V1_HARDENING_06E_OPERATIONAL_RELEASE_GATE.md). Do not execute historical commands or infer current remote state.
+
 # D8 release environment matrix
 
 Current gate (2026-10-03): D8-4B is **FROZEN until new RC acceptance**. The exact Production value plan and `d8-v1-3a847701` epoch below are historical August evidence, not values to apply now. Hardening baseline is `657cfba66167c8a8493768614ed9348d14563967`; a new immutable RC/epoch has not been accepted. Revalidate the final matrix and runtime in fresh Production preflight; no remote env changes are authorized here.

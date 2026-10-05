@@ -1,0 +1,395 @@
+{
+  "classification": "CURRENT_SOURCE_FACT",
+  "productionPending": "LIVE_UNVERIFIED",
+  "migrations": [
+    {
+      "path": "supabase/migrations/20260721100000_core_cloud_baseline.sql",
+      "version": "20260721100000",
+      "sha256LF": "f301530bddfedc9da34afe1541cb9a3d8d8ac5b351fbe48c56925cc324879d22",
+      "purpose": "core cloud baseline",
+      "classification": [
+        "ADDITIVE_WITH_RUNTIME_DEPENDENCY"
+      ],
+      "dependency": "platform prerequisites",
+      "precondition": "Ledger is an exact ordered prefix; inspect prerequisite definitions, grants and data invariants",
+      "failureSignal": "SQL error, drift, lock budget exceeded or failed owner/privacy postcheck",
+      "rollback": "Transaction abort before commit; after commit no blind down migration",
+      "failForward": "Contain affected writes; capture definitions/ACLs; reviewed append-only repair",
+      "maintenance": "Affected subsystem containment required"
+    },
+    {
+      "path": "supabase/migrations/20260721110000_social_profile_foundation.sql",
+      "version": "20260721110000",
+      "sha256LF": "aaf74a007014430a166699ba5f2120082f96bf8d9fe8222ea71dd540a4875a73",
+      "purpose": "social profile foundation",
+      "classification": [
+        "ADDITIVE_WITH_RUNTIME_DEPENDENCY"
+      ],
+      "dependency": "20260721100000",
+      "precondition": "Ledger is an exact ordered prefix; inspect prerequisite definitions, grants and data invariants",
+      "failureSignal": "SQL error, drift, lock budget exceeded or failed owner/privacy postcheck",
+      "rollback": "Transaction abort before commit; after commit no blind down migration",
+      "failForward": "Contain affected writes; capture definitions/ACLs; reviewed append-only repair",
+      "maintenance": "Affected subsystem containment required"
+    },
+    {
+      "path": "supabase/migrations/20260721120000_social_profile_live_smoke_fixes.sql",
+      "version": "20260721120000",
+      "sha256LF": "d6de0ecd3985ecf86416b0bc028f02a3b5b2613e9437872b27adab77f88bb80d",
+      "purpose": "social profile live smoke fixes",
+      "classification": [
+        "ADDITIVE_WITH_RUNTIME_DEPENDENCY"
+      ],
+      "dependency": "20260721110000",
+      "precondition": "Ledger is an exact ordered prefix; inspect prerequisite definitions, grants and data invariants",
+      "failureSignal": "SQL error, drift, lock budget exceeded or failed owner/privacy postcheck",
+      "rollback": "Transaction abort before commit; after commit no blind down migration",
+      "failForward": "Contain affected writes; capture definitions/ACLs; reviewed append-only repair",
+      "maintenance": "Affected subsystem containment required"
+    },
+    {
+      "path": "supabase/migrations/20260721121000_social_profile_protected_visibility_fix_v2.sql",
+      "version": "20260721121000",
+      "sha256LF": "c27e77fbaefd34fceb32e81b15bdd3ba2e58f46dc440a30ebb41dafa812918f3",
+      "purpose": "social profile protected visibility fix v2",
+      "classification": [
+        "ADDITIVE_WITH_RUNTIME_DEPENDENCY",
+        "SECURITY_CRITICAL"
+      ],
+      "dependency": "20260721120000",
+      "precondition": "Ledger is an exact ordered prefix; inspect prerequisite definitions, grants and data invariants",
+      "failureSignal": "SQL error, drift, lock budget exceeded or failed owner/privacy postcheck",
+      "rollback": "Transaction abort before commit; after commit no blind down migration",
+      "failForward": "Contain affected writes; capture definitions/ACLs; reviewed append-only repair",
+      "maintenance": "Affected subsystem containment required"
+    },
+    {
+      "path": "supabase/migrations/20260721130000_social_interactions_recommendations.sql",
+      "version": "20260721130000",
+      "sha256LF": "7717b815512d1a92816b0beac0a6d47632910171a328a90b888770fc4a8780c9",
+      "purpose": "social interactions recommendations",
+      "classification": [
+        "ADDITIVE_WITH_RUNTIME_DEPENDENCY"
+      ],
+      "dependency": "20260721121000",
+      "precondition": "Ledger is an exact ordered prefix; inspect prerequisite definitions, grants and data invariants",
+      "failureSignal": "SQL error, drift, lock budget exceeded or failed owner/privacy postcheck",
+      "rollback": "Transaction abort before commit; after commit no blind down migration",
+      "failForward": "Contain affected writes; capture definitions/ACLs; reviewed append-only repair",
+      "maintenance": "Affected subsystem containment required"
+    },
+    {
+      "path": "supabase/migrations/20260721133000_recommendation_feedback_notification_ux.sql",
+      "version": "20260721133000",
+      "sha256LF": "0bf4b58a62441368657fe3343b39f6ab4e2459330de881c6a9f60301dd503c61",
+      "purpose": "recommendation feedback notification ux",
+      "classification": [
+        "ADDITIVE_WITH_RUNTIME_DEPENDENCY"
+      ],
+      "dependency": "20260721130000",
+      "precondition": "Ledger is an exact ordered prefix; inspect prerequisite definitions, grants and data invariants",
+      "failureSignal": "SQL error, drift, lock budget exceeded or failed owner/privacy postcheck",
+      "rollback": "Transaction abort before commit; after commit no blind down migration",
+      "failForward": "Contain affected writes; capture definitions/ACLs; reviewed append-only repair",
+      "maintenance": "Affected subsystem containment required"
+    },
+    {
+      "path": "supabase/migrations/20260721134500_recommendation_listing_regression_fix.sql",
+      "version": "20260721134500",
+      "sha256LF": "6ea1175b90a94309117891e389ca70657a041869882ed2fdb5fa7f046bd46be6",
+      "purpose": "recommendation listing regression fix",
+      "classification": [
+        "ADDITIVE_WITH_RUNTIME_DEPENDENCY"
+      ],
+      "dependency": "20260721133000",
+      "precondition": "Ledger is an exact ordered prefix; inspect prerequisite definitions, grants and data invariants",
+      "failureSignal": "SQL error, drift, lock budget exceeded or failed owner/privacy postcheck",
+      "rollback": "Transaction abort before commit; after commit no blind down migration",
+      "failForward": "Contain affected writes; capture definitions/ACLs; reviewed append-only repair",
+      "maintenance": "Affected subsystem containment required"
+    },
+    {
+      "path": "supabase/migrations/20260721140000_xp_v2_progression.sql",
+      "version": "20260721140000",
+      "sha256LF": "8bd95cd9a02c08df11fea2c28920c44e0d9f0d84dde86c18776ca7fa883dd8b7",
+      "purpose": "xp v2 progression",
+      "classification": [
+        "ADDITIVE_WITH_RUNTIME_DEPENDENCY"
+      ],
+      "dependency": "20260721134500",
+      "precondition": "Ledger is an exact ordered prefix; inspect prerequisite definitions, grants and data invariants",
+      "failureSignal": "SQL error, drift, lock budget exceeded or failed owner/privacy postcheck",
+      "rollback": "Transaction abort before commit; after commit no blind down migration",
+      "failForward": "Contain affected writes; capture definitions/ACLs; reviewed append-only repair",
+      "maintenance": "Affected subsystem containment required"
+    },
+    {
+      "path": "supabase/migrations/20260721143000_xp_reversible_local_state.sql",
+      "version": "20260721143000",
+      "sha256LF": "8411bcf2be914f711b159157339a0d57eb9ae4790b94f89db3cdd412730b793e",
+      "purpose": "xp reversible local state",
+      "classification": [
+        "ADDITIVE_WITH_RUNTIME_DEPENDENCY"
+      ],
+      "dependency": "20260721140000",
+      "precondition": "Ledger is an exact ordered prefix; inspect prerequisite definitions, grants and data invariants",
+      "failureSignal": "SQL error, drift, lock budget exceeded or failed owner/privacy postcheck",
+      "rollback": "Transaction abort before commit; after commit no blind down migration",
+      "failForward": "Contain affected writes; capture definitions/ACLs; reviewed append-only repair",
+      "maintenance": "Affected subsystem containment required"
+    },
+    {
+      "path": "supabase/migrations/20260722110000_unified_profile_presentation.sql",
+      "version": "20260722110000",
+      "sha256LF": "b74dbf2705ab84c8758002a1e0019809fe97d5814458dce976ad56b8d6d84972",
+      "purpose": "unified profile presentation",
+      "classification": [
+        "ADDITIVE_WITH_RUNTIME_DEPENDENCY"
+      ],
+      "dependency": "20260721143000",
+      "precondition": "Ledger is an exact ordered prefix; inspect prerequisite definitions, grants and data invariants",
+      "failureSignal": "SQL error, drift, lock budget exceeded or failed owner/privacy postcheck",
+      "rollback": "Transaction abort before commit; after commit no blind down migration",
+      "failForward": "Contain affected writes; capture definitions/ACLs; reviewed append-only repair",
+      "maintenance": "Affected subsystem containment required"
+    },
+    {
+      "path": "supabase/migrations/20260722120000_profile_image_transforms.sql",
+      "version": "20260722120000",
+      "sha256LF": "ac62e41be41e2b447c38d5af7a6b0d574eb5b57ec831672be7ab39fa14b53826",
+      "purpose": "profile image transforms",
+      "classification": [
+        "ADDITIVE_WITH_RUNTIME_DEPENDENCY"
+      ],
+      "dependency": "20260722110000",
+      "precondition": "Ledger is an exact ordered prefix; inspect prerequisite definitions, grants and data invariants",
+      "failureSignal": "SQL error, drift, lock budget exceeded or failed owner/privacy postcheck",
+      "rollback": "Transaction abort before commit; after commit no blind down migration",
+      "failForward": "Contain affected writes; capture definitions/ACLs; reviewed append-only repair",
+      "maintenance": "Affected subsystem containment required"
+    },
+    {
+      "path": "supabase/migrations/20260722130000_theme_cloud_sync.sql",
+      "version": "20260722130000",
+      "sha256LF": "3ad9c01674b79bcdc0b9236862a5e64654363cefc5b31a7d7f9de41434810c93",
+      "purpose": "theme cloud sync",
+      "classification": [
+        "ADDITIVE_WITH_RUNTIME_DEPENDENCY"
+      ],
+      "dependency": "20260722120000",
+      "precondition": "Ledger is an exact ordered prefix; inspect prerequisite definitions, grants and data invariants",
+      "failureSignal": "SQL error, drift, lock budget exceeded or failed owner/privacy postcheck",
+      "rollback": "Transaction abort before commit; after commit no blind down migration",
+      "failForward": "Contain affected writes; capture definitions/ACLs; reviewed append-only repair",
+      "maintenance": "Affected subsystem containment required"
+    },
+    {
+      "path": "supabase/migrations/20260726120000_progress_log_relation_repair.sql",
+      "version": "20260726120000",
+      "sha256LF": "d37062a3ab6e1badcafae1acc203eb96a6c4f8dfb27a54909dfdf829a4a51aa8",
+      "purpose": "progress log relation repair",
+      "classification": [
+        "NON_ADDITIVE",
+        "SECURITY_CRITICAL"
+      ],
+      "dependency": "20260722130000",
+      "precondition": "Ledger is an exact ordered prefix; inspect prerequisite definitions, grants and data invariants",
+      "failureSignal": "SQL error, drift, lock budget exceeded or failed owner/privacy postcheck",
+      "rollback": "Transaction abort before commit; after commit no blind down migration",
+      "failForward": "Contain affected writes; capture definitions/ACLs; reviewed append-only repair",
+      "maintenance": "Affected subsystem containment required"
+    },
+    {
+      "path": "supabase/migrations/20260727120000_cloud_media_schema_v2_additive.sql",
+      "version": "20260727120000",
+      "sha256LF": "5f8ab49cddcdeae2060e87a3434f5b5e81f87a80c7fa1294b626e21869a3e200",
+      "purpose": "cloud media schema v2 additive",
+      "classification": [
+        "ADDITIVE_WITH_RUNTIME_DEPENDENCY"
+      ],
+      "dependency": "20260726120000",
+      "precondition": "Ledger is an exact ordered prefix; inspect prerequisite definitions, grants and data invariants",
+      "failureSignal": "SQL error, drift, lock budget exceeded or failed owner/privacy postcheck",
+      "rollback": "Transaction abort before commit; after commit no blind down migration",
+      "failForward": "Contain affected writes; capture definitions/ACLs; reviewed append-only repair",
+      "maintenance": "Affected subsystem containment required"
+    },
+    {
+      "path": "supabase/migrations/20260728120000_owner_scoped_primary_key_enforcement.sql",
+      "version": "20260728120000",
+      "sha256LF": "5538fe5285bc3e08e9d9b54e376da9246d12de4c3ec994a2d793b892ddd1647b",
+      "purpose": "owner scoped primary key enforcement",
+      "classification": [
+        "NON_ADDITIVE",
+        "SECURITY_CRITICAL"
+      ],
+      "dependency": "20260727120000",
+      "precondition": "Ledger is an exact ordered prefix; inspect prerequisite definitions, grants and data invariants",
+      "failureSignal": "SQL error, drift, lock budget exceeded or failed owner/privacy postcheck",
+      "rollback": "Transaction abort before commit; after commit no blind down migration",
+      "failForward": "Contain affected writes; capture definitions/ACLs; reviewed append-only repair",
+      "maintenance": "Full affected-write freeze required"
+    },
+    {
+      "path": "supabase/migrations/20260803120000_goal_cloud_v1_additive.sql",
+      "version": "20260803120000",
+      "sha256LF": "f889b356c479bde4d39588070814a415dad287cdceb86564cf062ce22b843474",
+      "purpose": "goal cloud v1 additive",
+      "classification": [
+        "ADDITIVE_WITH_RUNTIME_DEPENDENCY"
+      ],
+      "dependency": "20260728120000",
+      "precondition": "Ledger is an exact ordered prefix; inspect prerequisite definitions, grants and data invariants",
+      "failureSignal": "SQL error, drift, lock budget exceeded or failed owner/privacy postcheck",
+      "rollback": "Transaction abort before commit; after commit no blind down migration",
+      "failForward": "Contain affected writes; capture definitions/ACLs; reviewed append-only repair",
+      "maintenance": "Affected subsystem containment required"
+    },
+    {
+      "path": "supabase/migrations/20260809120000_d8_public_profile_theme.sql",
+      "version": "20260809120000",
+      "sha256LF": "98d42e65bdc9c15ddbf46d9346278a44ec03f3ea21f1693a0ac1260ab3037136",
+      "purpose": "d8 public profile theme",
+      "classification": [
+        "ADDITIVE_WITH_RUNTIME_DEPENDENCY"
+      ],
+      "dependency": "20260803120000",
+      "precondition": "Ledger is an exact ordered prefix; inspect prerequisite definitions, grants and data invariants",
+      "failureSignal": "SQL error, drift, lock budget exceeded or failed owner/privacy postcheck",
+      "rollback": "Transaction abort before commit; after commit no blind down migration",
+      "failForward": "Contain affected writes; capture definitions/ACLs; reviewed append-only repair",
+      "maintenance": "Affected subsystem containment required"
+    },
+    {
+      "path": "supabase/migrations/20260810120000_d8_profile_asset_visibility_hardening.sql",
+      "version": "20260810120000",
+      "sha256LF": "e8e38ae173d344acc8e2c00eff9ff472d416ae734ceb917958e9651468f87ef9",
+      "purpose": "d8 profile asset visibility hardening",
+      "classification": [
+        "ADDITIVE_WITH_RUNTIME_DEPENDENCY",
+        "SECURITY_CRITICAL"
+      ],
+      "dependency": "20260809120000",
+      "precondition": "Ledger is an exact ordered prefix; inspect prerequisite definitions, grants and data invariants",
+      "failureSignal": "SQL error, drift, lock budget exceeded or failed owner/privacy postcheck",
+      "rollback": "Transaction abort before commit; after commit no blind down migration",
+      "failForward": "Contain affected writes; capture definitions/ACLs; reviewed append-only repair",
+      "maintenance": "Affected subsystem containment required"
+    },
+    {
+      "path": "supabase/migrations/20260811120000_d8_security_advisor_hardening.sql",
+      "version": "20260811120000",
+      "sha256LF": "ec47da7d12512fcd325643eba468ce02441795e3e23d48d2d88a838ea7bd843b",
+      "purpose": "d8 security advisor hardening",
+      "classification": [
+        "ADDITIVE_WITH_RUNTIME_DEPENDENCY",
+        "SECURITY_CRITICAL"
+      ],
+      "dependency": "20260810120000",
+      "precondition": "Ledger is an exact ordered prefix; inspect prerequisite definitions, grants and data invariants",
+      "failureSignal": "SQL error, drift, lock budget exceeded or failed owner/privacy postcheck",
+      "rollback": "Transaction abort before commit; after commit no blind down migration",
+      "failForward": "Contain affected writes; capture definitions/ACLs; reviewed append-only repair",
+      "maintenance": "Affected subsystem containment required"
+    },
+    {
+      "path": "supabase/migrations/20261004120000_application_rate_limit_v1.sql",
+      "version": "20261004120000",
+      "sha256LF": "08e2c5b6798df8200820df3e2687a8f649fd45ae8a1ab775f735133bdd060ff9",
+      "purpose": "application rate limit v1",
+      "classification": [
+        "ADDITIVE_WITH_RUNTIME_DEPENDENCY",
+        "SECURITY_CRITICAL"
+      ],
+      "dependency": "20260811120000",
+      "precondition": "Ledger is an exact ordered prefix; inspect prerequisite definitions, grants and data invariants",
+      "failureSignal": "SQL error, drift, lock budget exceeded or failed owner/privacy postcheck",
+      "rollback": "Transaction abort before commit; after commit no blind down migration",
+      "failForward": "Contain affected writes; capture definitions/ACLs; reviewed append-only repair",
+      "maintenance": "Affected subsystem containment required"
+    },
+    {
+      "path": "supabase/migrations/20261004123000_application_rate_limit_forward_fix_v1.sql",
+      "version": "20261004123000",
+      "sha256LF": "7163173c55cfb9764d95929f83b8e3cae659414d5fa5e44d647535b740339d79",
+      "purpose": "application rate limit forward fix v1",
+      "classification": [
+        "ADDITIVE_WITH_RUNTIME_DEPENDENCY",
+        "SECURITY_CRITICAL"
+      ],
+      "dependency": "20261004120000",
+      "precondition": "Ledger is an exact ordered prefix; inspect prerequisite definitions, grants and data invariants",
+      "failureSignal": "SQL error, drift, lock budget exceeded or failed owner/privacy postcheck",
+      "rollback": "Transaction abort before commit; after commit no blind down migration",
+      "failForward": "Contain affected writes; capture definitions/ACLs; reviewed append-only repair",
+      "maintenance": "Affected subsystem containment required"
+    },
+    {
+      "path": "supabase/migrations/20261004124000_application_rate_limit_reserve_alias_fix_v1.sql",
+      "version": "20261004124000",
+      "sha256LF": "27fc11b118013897b913efecc62f382499416c2bf4ffb83f8d6386e98c027834",
+      "purpose": "application rate limit reserve alias fix v1",
+      "classification": [
+        "ADDITIVE_WITH_RUNTIME_DEPENDENCY",
+        "SECURITY_CRITICAL"
+      ],
+      "dependency": "20261004123000",
+      "precondition": "Ledger is an exact ordered prefix; inspect prerequisite definitions, grants and data invariants",
+      "failureSignal": "SQL error, drift, lock budget exceeded or failed owner/privacy postcheck",
+      "rollback": "Transaction abort before commit; after commit no blind down migration",
+      "failForward": "Contain affected writes; capture definitions/ACLs; reviewed append-only repair",
+      "maintenance": "Affected subsystem containment required"
+    },
+    {
+      "path": "supabase/migrations/20261005120000_privacy_xp_ops_cleanup.sql",
+      "version": "20261005120000",
+      "sha256LF": "d971df752a05425073c6ccdad12c456d7f2aff0a96947ab8ccacc643f72613b7",
+      "purpose": "privacy xp ops cleanup",
+      "classification": [
+        "NON_ADDITIVE",
+        "PRIVACY_CRITICAL",
+        "SECURITY_CRITICAL"
+      ],
+      "dependency": "20261004124000",
+      "precondition": "Ledger is an exact ordered prefix; inspect prerequisite definitions, grants and data invariants",
+      "failureSignal": "SQL error, drift, lock budget exceeded or failed owner/privacy postcheck",
+      "rollback": "Transaction abort before commit; after commit no blind down migration",
+      "failForward": "Keep erasure locks and reconcile erased identities; reviewed forward fix only",
+      "maintenance": "Full affected-write freeze required"
+    },
+    {
+      "path": "supabase/migrations/20261005130000_account_privacy_write_barrier.sql",
+      "version": "20261005130000",
+      "sha256LF": "8819d0d7974be3e67da11aa8eccc08532258fa4ab33f9abc594473dfa68bf5f1",
+      "purpose": "account privacy write barrier",
+      "classification": [
+        "NON_ADDITIVE",
+        "PRIVACY_CRITICAL",
+        "SECURITY_CRITICAL"
+      ],
+      "dependency": "20261005120000",
+      "precondition": "Ledger is an exact ordered prefix; inspect prerequisite definitions, grants and data invariants",
+      "failureSignal": "SQL error, drift, lock budget exceeded or failed owner/privacy postcheck",
+      "rollback": "Transaction abort before commit; after commit no blind down migration",
+      "failForward": "Keep erasure locks and reconcile erased identities; reviewed forward fix only",
+      "maintenance": "Full affected-write freeze required"
+    },
+    {
+      "path": "supabase/migrations/20261005140000_privacy_participant_detachment.sql",
+      "version": "20261005140000",
+      "sha256LF": "390cae0ae0b939f7eafef1b62718bef3da0ecb3aef01bd4c2d60650061fd1529",
+      "purpose": "privacy participant detachment",
+      "classification": [
+        "NON_ADDITIVE",
+        "PRIVACY_CRITICAL",
+        "SECURITY_CRITICAL"
+      ],
+      "dependency": "20261005130000",
+      "precondition": "Ledger is an exact ordered prefix; inspect prerequisite definitions, grants and data invariants",
+      "failureSignal": "SQL error, drift, lock budget exceeded or failed owner/privacy postcheck",
+      "rollback": "Transaction abort before commit; after commit no blind down migration",
+      "failForward": "Keep erasure locks and reconcile erased identities; reviewed forward fix only",
+      "maintenance": "Full affected-write freeze required"
+    }
+  ]
+}

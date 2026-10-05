@@ -3,7 +3,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   // Ops scripts have no runtime caller. Development annotation filesystem
   // tracing must not package privileged privacy tooling into server output.
-  outputFileTracingExcludes: { "/*": ["./scripts/privacy-*.mjs"] },
+  outputFileTracingExcludes: { "/*": ["./scripts/privacy-*.mjs", "./scripts/ops/**"] },
 	allowedDevOrigins: ["172.26.192.1", "192.168.1.196"],
   async headers() {
     return [{

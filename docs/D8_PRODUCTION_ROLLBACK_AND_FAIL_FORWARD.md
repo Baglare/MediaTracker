@@ -1,3 +1,5 @@
+> HISTORICAL_EVIDENCE — FROZEN (2026-10-06). Commands, August RC/epochs/fingerprints/counts and hosted settings below are historical, not current execution authority. Current canonical source procedure: [06D](V1_HARDENING_06D_RELEASE_OPERATIONS.md); single current master gate matrix: [06E](V1_HARDENING_06E_OPERATIONAL_RELEASE_GATE.md). Do not execute historical commands or infer current remote state.
+
 # D8 production rollback ve fail-forward
 
 ## Genel karar sırası
