@@ -1,3 +1,4 @@
+import { checkAccountWriteAllowed, accountWriteLockedResponse } from "@/lib/api/account-write-barrier";
 import { enforceDistributedRateLimit } from "@/lib/api/distributed-rate-limit";
 import { runSafeApiRoute } from "@/lib/api/safe-route";
 import { validateAuthenticatedMutationRequest } from "@/lib/api/request-security";
@@ -22,6 +23,8 @@ export async function POST(request: Request) {
   if (!auth) return NextResponse.json({ ok: false, message: "Bu işlem için giriş yapmalısın." }, { status: 401 });
   const boundaryError = validateAuthenticatedMutationRequest(request);
   if (boundaryError) return boundaryError;
+  const accountBarrier = await checkAccountWriteAllowed();
+  if (accountBarrier) return accountBarrier;
   const rateLimit = await enforceDistributedRateLimit(request, "asset_write");
   if (rateLimit) return rateLimit;
   let form: FormData;
@@ -37,8 +40,10 @@ export async function POST(request: Request) {
   const oldPath = kind === "avatar" ? current?.avatar_path ?? null : current?.banner_path ?? null;
   const path = `${auth.user.id}/${kind}/${crypto.randomUUID()}.${EXTENSIONS[fileValue.type]}`;
   const { error: uploadError } = await auth.client.storage.from("profile-assets").upload(path, fileValue, { contentType: fileValue.type, upsert: false });
+  if (uploadError) { const locked = accountWriteLockedResponse(uploadError); if (locked) return locked; }
   if (uploadError) return NextResponse.json({ ok: false, message: "Görsel yüklenemedi; mevcut görsel korunuyor." }, { status: 500 });
   const { error: updateError } = await auth.client.from("profiles").update(kind === "avatar" ? { avatar_path: path } : { banner_path: path }).eq("id", auth.user.id);
+  if (updateError) { const locked = accountWriteLockedResponse(updateError); if (locked) return locked; }
   if (updateError) {
     await auth.client.storage.from("profile-assets").remove([path]);
     return NextResponse.json({ ok: false, message: "Profil görseli güncellenemedi; mevcut görsel korunuyor." }, { status: 500 });
@@ -57,6 +62,8 @@ export async function DELETE(request: Request) {
   if (!auth) return NextResponse.json({ ok: false, message: "Bu işlem için giriş yapmalısın." }, { status: 401 });
   const boundaryError = validateAuthenticatedMutationRequest(request);
   if (boundaryError) return boundaryError;
+  const accountBarrier = await checkAccountWriteAllowed();
+  if (accountBarrier) return accountBarrier;
   const rateLimit = await enforceDistributedRateLimit(request, "asset_write");
   if (rateLimit) return rateLimit;
   const kind = new URL(request.url).searchParams.get("kind");
@@ -65,6 +72,7 @@ export async function DELETE(request: Request) {
   if (!data) return NextResponse.json({ ok: false, message: "Sosyal profil bulunamadı." }, { status: 404 });
   const path = kind === "avatar" ? data?.avatar_path ?? null : data?.banner_path ?? null;
   const { error } = await auth.client.from("profiles").update(kind === "avatar" ? { avatar_path: null } : { banner_path: null }).eq("id", auth.user.id);
+  if (error) { const locked = accountWriteLockedResponse(error); if (locked) return locked; }
   if (error) return NextResponse.json({ ok: false, message: "Görsel kaldırılamadı." }, { status: 500 });
   const cleanup = path ? await auth.client.storage.from("profile-assets").remove([path]) : null;
   invalidateSignedSocialAssetUrl(path);

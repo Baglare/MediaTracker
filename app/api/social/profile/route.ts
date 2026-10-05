@@ -1,3 +1,4 @@
+import { checkAccountWriteAllowed, accountWriteLockedResponse } from "@/lib/api/account-write-barrier";
 import { enforceDistributedRateLimit } from "@/lib/api/distributed-rate-limit";
 import { runSafeApiRoute } from "@/lib/api/safe-route";
 import { validateAuthenticatedMutationRequest } from "@/lib/api/request-security";
@@ -48,6 +49,8 @@ export async function POST(request: Request) {
   if (!auth) return failure("Bu işlem için giriş yapmalısın.", 401);
   const boundaryError = validateAuthenticatedMutationRequest(request);
   if (boundaryError) return boundaryError;
+  const accountBarrier = await checkAccountWriteAllowed();
+  if (accountBarrier) return accountBarrier;
   const rateLimit = await enforceDistributedRateLimit(request, "social_write");
   if (rateLimit) return rateLimit;
   let body: unknown;
@@ -90,6 +93,7 @@ export async function POST(request: Request) {
       p_public_theme_preset: profile.themeSharing.publicPreset ?? "",
       p_public_theme_snapshot: (publicThemeSnapshot ?? null) as Json,
     });
+    if (error) { const locked = accountWriteLockedResponse(error); if (locked) return locked; }
     return error ? failure("Profil kaydedilemedi. Kullanıcı adı veya değişiklik süresi kuralını kontrol et.", 409) : NextResponse.json(data);
   }
 
@@ -109,6 +113,7 @@ export async function POST(request: Request) {
       config: module.config,
     }));
     const { error } = await auth.client.from("profile_modules").upsert(rows, { onConflict: "user_id,module_key" });
+    if (error) { const locked = accountWriteLockedResponse(error); if (locked) return locked; }
     return error ? failure("Profil düzeni kaydedilemedi.", 500) : NextResponse.json({ ok: true });
   }
 
@@ -122,6 +127,7 @@ export async function POST(request: Request) {
     const keys = new Set(items.map((item) => `${item.externalSource ?? ""}:${item.externalId ?? ""}:${item.mediaType}:${item.title.toLowerCase()}`));
     if (keys.size !== items.length) return failure("Aynı medya vitrinde iki kez kullanılamaz.");
     const { data, error } = await auth.client.rpc("social_replace_showcase", { p_kind: kind, p_items: toShowcaseJson(items) });
+    if (error) { const locked = accountWriteLockedResponse(error); if (locked) return locked; }
     return error ? failure("Vitrin kaydedilemedi.", 500) : NextResponse.json(data);
   }
 
@@ -130,6 +136,7 @@ export async function POST(request: Request) {
     if (!validated.ok) return failure(validated.error);
     const item = validated.value;
     const { error } = await auth.client.from("profile_stats_snapshots").upsert({ user_id: auth.user.id, total_media: item.totalMedia, completed: item.completed, active: item.active, planning: item.planning, favorites: item.favorites, rated: item.rated, world_counts: item.worldCounts, snapshot_at: item.snapshotAt });
+    if (error) { const locked = accountWriteLockedResponse(error); if (locked) return locked; }
     return error ? failure("İstatistik snapshot kaydedilemedi.", 500) : NextResponse.json({ ok: true });
   }
 
@@ -138,6 +145,7 @@ export async function POST(request: Request) {
     if (!validated.ok) return failure(validated.error);
     const item = validated.value;
     const { error } = await auth.client.from("profile_progression_snapshots").upsert({ user_id: auth.user.id, version: item.version, total_xp: item.totalXp, level: item.level, title: item.title, tier: item.tier, dominant_world: item.dominantWorld, progress_percent: item.progressPercent, world_counts: item.worldCounts, snapshot_at: item.snapshotAt });
+    if (error) { const locked = accountWriteLockedResponse(error); if (locked) return locked; }
     return error ? failure("Progression snapshot kaydedilemedi.", 500) : NextResponse.json({ ok: true });
   }
 
@@ -146,6 +154,7 @@ export async function POST(request: Request) {
     if (!validated.ok) return failure(validated.error);
     const note = validated.value;
     const { data, error } = await auth.client.rpc("social_share_note", { p_media_title: note.mediaTitle, p_media_type: note.mediaType, p_external_source: note.externalSource ?? "", p_external_id: note.externalId ?? "", p_content: note.content, p_contains_spoiler: note.containsSpoiler, p_visibility: note.visibility, p_confirmed: note.confirmed });
+    if (error) { const locked = accountWriteLockedResponse(error); if (locked) return locked; }
     return error ? failure("Not snapshot paylaşılamadı.", 500) : NextResponse.json(data);
   }
 
@@ -153,6 +162,7 @@ export async function POST(request: Request) {
     const id = validateUserId(input.noteId);
     if (!id.ok) return failure(id.error);
     const { data, error } = await auth.client.rpc("social_unshare_note", { p_note: id.value });
+    if (error) { const locked = accountWriteLockedResponse(error); if (locked) return locked; }
     return error ? failure("Paylaşım kaldırılamadı.", 500) : NextResponse.json(data);
   }
 

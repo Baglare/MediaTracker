@@ -1,3 +1,4 @@
+import { checkAccountWriteAllowed, accountWriteLockedResponse } from "@/lib/api/account-write-barrier";
 import { enforceDistributedRateLimit } from "@/lib/api/distributed-rate-limit";
 import { runSafeApiRoute } from "@/lib/api/safe-route";
 import { validateAuthenticatedMutationRequest } from "@/lib/api/request-security";
@@ -16,6 +17,8 @@ export async function POST(request: Request) {
   if (!auth.user) return NextResponse.json({ ok: false, message: "Bu işlem için giriş yapmalısın." }, { status: 401 });
   const boundaryError = validateAuthenticatedMutationRequest(request);
   if (boundaryError) return boundaryError;
+  const accountBarrier = await checkAccountWriteAllowed();
+  if (accountBarrier) return accountBarrier;
   const rateLimit = await enforceDistributedRateLimit(request, "social_write");
   if (rateLimit) return rateLimit;
   let body: unknown;
@@ -30,6 +33,7 @@ export async function POST(request: Request) {
   else if (input.action === "unblock") result = await client.rpc("social_unblock", { p_target: target.value });
   else if (typeof input.action === "string" && FOLLOW_ACTIONS.has(input.action)) result = await client.rpc("social_follow_action", { p_action: input.action, p_other: target.value });
   else return NextResponse.json({ ok: false, message: "İlişki işlemi geçersiz." }, { status: 400 });
+  if (result.error) { const locked = accountWriteLockedResponse(result.error); if (locked) return locked; }
   if (result.error) return NextResponse.json({ ok: false, message: "İşlem uygulanamadı veya profil kullanılamıyor." }, { status: 409 });
   return NextResponse.json(result.data);
 

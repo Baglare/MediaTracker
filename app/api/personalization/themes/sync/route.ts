@@ -26,6 +26,7 @@ async function context() {
 }
 
 function safeError(error: unknown): Response {
+  if (error instanceof Error && error.message === "account_write_locked") return Response.json({ code: "account_write_locked" }, { status: 423, headers: HEADERS });
   const raw = error instanceof Error ? error.message : "";
   if (raw.includes("authentication_required")) {
     return failure("Tema senkronizasyonu için giriş yapmalısın.", 401);

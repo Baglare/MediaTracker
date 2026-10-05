@@ -334,6 +334,7 @@ export interface Database {
     };
     Views: Record<string, never>;
     Functions: {
+      assert_account_write_allowed: { Args: Record<string, never>; Returns: undefined };
       consume_application_rate_limit_v1: { Args: { p_envelope: string; p_signature_hex: string }; Returns: Json };
       report_provider_cooldown_v1: { Args: { p_envelope: string; p_signature_hex: string }; Returns: Json };
       get_theme_sync_state: { Args: Record<string, never>; Returns: Json };

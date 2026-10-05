@@ -119,7 +119,9 @@ test("migration timestamps, source hashes and documentation references consisten
   checkMigrations(names, (name) => read(name).replace(/\r?\n/g, "\r\n"), []);
   assert.throws(() => checkMigrations([...names, "20261004120000_duplicate.sql"], read, []));
   assert.throws(() => checkMigrations([...names, "20261301120000_invalid.sql"], read, []));
-  assert.throws(() => checkMigrations(names.slice(0, -1), read, []));
+  // A new forward migration can be last; remove the required migration by
+  // identity so this negative case continues testing applied-history integrity.
+  assert.throws(() => checkMigrations(names.filter((name) => name !== Object.keys(criticalMigrations).at(-1)), read, []));
   assert.throws(() => checkMigrations(names, (name) => read(name) + "--changed", []));
   assert.throws(() => checkMigrations(names, read, ["20261005120000_missing.sql"]));
 });

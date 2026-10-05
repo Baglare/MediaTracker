@@ -6,6 +6,7 @@ import type {
   SyncQueueItem,
 } from "./types";
 import { getSupabaseBrowserClient } from "./supabase/client";
+import { supabaseApplicationError } from "./supabase/safe-error";
 import { toMediaRow, toProgressLogRow } from "./supabase/mapping";
 
 export const CLOUD_MEDIA_V2_FEATURE_FLAG =
@@ -247,7 +248,7 @@ export async function dispatchCloudMediaV2QueueItem(
     p_payload: payload,
   });
   if (error) {
-    return { kind: "retryable-error", error: "cloud_operation_failed" };
+    return { kind: "retryable-error", error: supabaseApplicationError(error).message === "account_write_locked" ? "account_write_locked" : "cloud_operation_failed" };
   }
   return decodeCloudMediaV2Result(data, item);
 }

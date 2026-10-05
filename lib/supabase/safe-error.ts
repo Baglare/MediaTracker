@@ -1,5 +1,6 @@
 /** Translate an SDK error to a closed application code; never propagate SQL/details/hint. */
 const APPLICATION_CODES = new Set([
+  "account_write_locked",
   "authentication_required",
   "social_not_configured",
   "social_profile_required",

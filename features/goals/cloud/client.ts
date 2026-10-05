@@ -1,4 +1,5 @@
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { supabaseApplicationError } from "@/lib/supabase/safe-error";
 import { goalFromCloudDefinition, goalToCloudDefinition } from "./mapping";
 import type { GoalCloudQueueItem, GoalCloudRpcSnapshot, GoalCloudResultStatus } from "./types";
 import type { RemoteGoalSnapshot } from "./manual-transfer";
@@ -67,7 +68,7 @@ export async function dispatchGoalCloudQueueItem(
       : null,
     p_delete: item.operation === "tombstone",
   });
-  if (error) return { kind: "retryable", error: "goal_cloud_operation_failed" };
+  if (error) return { kind: "retryable", error: supabaseApplicationError(error).message === "account_write_locked" ? "account_write_locked" : "goal_cloud_operation_failed" };
   const decoded = decodeGoalCloudRpcSnapshot(data, item.goalId);
   return decoded.ok
     ? { kind: "result", snapshot: decoded.snapshot }
