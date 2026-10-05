@@ -35,7 +35,7 @@ describe("D8 first-release public privacy route", () => {
       "dışa aktar",
       "Mock verilere sıfırla",
       "self-service hesap silme",
-      "public yeni hesap kaydı kapalıdır",
+      "v1 arayüzünde yeni hesap oluşturma akışı sunulmaz",
     ]) expect(page.toLocaleLowerCase("tr-TR"), phrase).toContain(phrase.toLocaleLowerCase("tr-TR"));
   });
 
@@ -45,6 +45,8 @@ describe("D8 first-release public privacy route", () => {
     const emails = page.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) ?? [];
     expect(new Set(emails)).toEqual(new Set(["mediatracker.contact@gmail.com"]));
     expect(page).not.toMatch(/KVKK compliant|GDPR compliant|KVKK uyumlu|GDPR uyumlu/i);
-    expect(page).not.toMatch(/postal|telefon|vergi|KEP|şirket adresi/i);
+    expect(page).not.toMatch(/\bpostal\b|\bvergi\b|\bKEP\b|şirket adresi|href=["']tel:|\+90[\s\d()-]+/i);
+    // Applicant notification details are not an invented operator phone channel.
+    expect(page).toContain("varsa bildirim e-postası/telefon");
   });
 });
