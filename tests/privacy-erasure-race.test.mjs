@@ -1,10 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { fixture, USER_A } from "../scripts/privacy-synthetic-fixture.mjs";
 
 test("05C baseline: same pre-erasure identity can recreate Cloud before Auth deletion", async () => {
-  const baseline = execFileSync("git", ["show", "2edd8af879bccbad64530abeb5b7c7f891bba0ac:supabase/migrations/20260728120000_owner_scoped_primary_key_enforcement.sql"], { encoding: "utf8" });
+  const baseline = readFileSync(new URL("../supabase/migrations/20260728120000_owner_scoped_primary_key_enforcement.sql", import.meta.url), "utf8");
   assert.match(baseline, /security definer/i);
   assert.match(baseline, /auth.uid\(\)/);
   assert.match(baseline, /insert into public.media_items/i);
