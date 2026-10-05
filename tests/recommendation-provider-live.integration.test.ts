@@ -1,13 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { queryableProviderRetrievalMapping } from "@/features/recommendations/domain/aspect-registry";
-import { adaptAniListEvidence } from "@/features/recommendations/providers/anilist-adapter";
 import {
   fetchWithProviderRequestPolicy,
   type ProviderRequestTelemetry,
 } from "@/features/recommendations/providers/request-policy";
 import { classifyTvmazeAnime } from "@/features/recommendations/providers/tvmaze-anime-classifier";
 import type { RecommendationProvider } from "@/features/recommendations/domain/types";
-import type { AniListRawTag } from "@/lib/anilist-types";
 
 const LIVE = process.env.D6_PROVIDER_LIVE_SMOKE === "1";
 
@@ -19,33 +16,6 @@ async function liveFetch(provider: RecommendationProvider, url: string, init?: R
   expect(result.response.ok, `${provider} canlı sözleşme çağrısı başarısız oldu (${result.response.status}).`).toBe(true);
   return result.response;
 }
-
-interface AniListLiveMedia {
-  id?: number;
-  type?: "ANIME" | "MANGA";
-  genres?: string[];
-  tags?: AniListRawTag[];
-}
-
-async function queryAniList(query: string, variables: Record<string, unknown>): Promise<AniListLiveMedia[]> {
-  const response = await liveFetch("anilist", "https://graphql.anilist.co", {
-    method: "POST",
-    headers: { "content-type": "application/json", accept: "application/json" },
-    body: JSON.stringify({ query, variables }),
-  });
-  const body = await response.json() as { data?: { Page?: { media?: unknown } }; errors?: unknown };
-  expect(body.errors).toBeUndefined();
-  expect(Array.isArray(body.data?.Page?.media)).toBe(true);
-  return (body.data?.Page?.media ?? []) as AniListLiveMedia[];
-}
-
-const ANILIST_PAGE_QUERY = `query ($genreIn: [String], $tagIn: [String], $minimumTagRank: Int) {
-  Page(page: 1, perPage: 8) {
-    media(type: ANIME, genre_in: $genreIn, tag_in: $tagIn, minimumTagRank: $minimumTagRank, sort: [POPULARITY_DESC, ID], isAdult: false) {
-      id type genres tags { id name rank category isGeneralSpoiler isMediaSpoiler }
-    }
-  }
-}`;
 
 interface TvmazeShow {
   id?: number;
@@ -76,46 +46,6 @@ function tvmazeDecision(show: TvmazeShow) {
 }
 
 describe.skipIf(!LIVE)("D6.6-2 conditional live provider contract", () => {
-  it("AniList exact taxonomy identity ve genre evidence invariant'ını doğrular", async () => {
-    const media = await queryAniList(ANILIST_PAGE_QUERY, { genreIn: ["Fantasy"] });
-    const candidate = media.find((item) => (
-      Number.isInteger(item.id)
-      && item.type === "ANIME"
-      && item.genres?.includes("Fantasy")
-    ));
-    expect(candidate).toBeDefined();
-    const snapshot = adaptAniListEvidence({
-      externalSource: "anilist",
-      externalId: String(candidate?.id),
-      type: "anime",
-      title: "bounded-live-snapshot",
-      totalProgress: 1,
-      genres: candidate?.genres,
-      tags: [],
-    });
-    expect(snapshot.candidateIdentity).toMatchObject({ verified: true, primaryProvider: "anilist" });
-    expect(snapshot.rawEvidenceClaims.some((claim) => claim.mappedAspectIds.includes("fantasy") && claim.sourceKind === "provider_genre")).toBe(true);
-  });
-
-  it("AniList canonical Politics ve Revenge strict/relaxed retrieval sözleşmelerini doğrular", async () => {
-    for (const aspectId of ["political_intrigue", "revenge"] as const) {
-      const mapping = queryableProviderRetrievalMapping(aspectId, "anilist", "anime");
-      const canonicalTag = mapping?.canonicalTags?.[0];
-      expect(canonicalTag).toBeTruthy();
-      for (const minimumTagRank of [mapping?.minimumRankPolicy?.strict ?? 40, mapping?.minimumRankPolicy?.relaxed ?? 20]) {
-        const media = await queryAniList(ANILIST_PAGE_QUERY, { tagIn: [canonicalTag], minimumTagRank });
-        const matches = media.filter((item) => item.id !== undefined && item.tags?.some((tag) => (
-          tag.name === canonicalTag
-          && typeof tag.rank === "number"
-          && Number.isFinite(tag.rank)
-          && tag.rank >= minimumTagRank
-          && tag.rank <= 100
-        )));
-        expect(matches.length, `AniList ${canonicalTag} için ${minimumTagRank}+ canlı coverage döndürmedi.`).toBeGreaterThan(0);
-      }
-    }
-  });
-
   it("TVMaze search sonuçlarından anime, Batı animasyonu ve live-action ayrımını doğrular", async () => {
     const animeResults = await searchTvmaze("One Piece");
     const westernResults = await searchTvmaze("The Simpsons");

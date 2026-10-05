@@ -1,5 +1,7 @@
 # D8 production cutover runbook
 
+Current AniList v1 policy — 2026-10-05: [V1-HARDENING-04B.3](V1_HARDENING_04B3.md) hard-disables live access in every runtime, including Preview/development/CI. Historical live/UAT evidence below remains historical; `preview_test` and `authorized` env values are ignored. Legacy/offline support remains. Future enablement requires written authorization, a separate source change and release acceptance.
+
 ## Current execution gate — 2026-10-03
 
 **FROZEN until new RC acceptance. Do not execute the historical commands below.** `3a847701e5161186cfb16ade0e625666120c5e29` is historical August RC/evidence only. Current hardening baseline: `657cfba66167c8a8493768614ed9348d14563967`, branch `release/v1-hardening`; new immutable RC: **none**. All approved/current/exact-RC statements, deployment epochs, target fingerprints, backup and migration/asset counts below describe the August snapshot, not current authorization or October truth. Fresh Production read-only preflight and separate cutover authorization must establish and update these values before this runbook becomes executable again. See [current acceptance state](D8_RELEASE_CANDIDATE_ACCEPTANCE.md#current-release-state--2026-10-03).

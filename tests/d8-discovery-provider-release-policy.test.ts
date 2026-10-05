@@ -57,10 +57,13 @@ describe("D8-4A.5C1 provider release policy", () => {
     expect(invalid.providers.tmdb.enabled).toBe(false);
   });
 
-  it("allows AniList preview_test only outside Vercel production and accepts explicit authorized mode", () => {
-    expect(resolvePublicProviderCapabilities({ VERCEL_ENV: "preview", NODE_ENV: "production", MEDIA_TRACKER_ANILIST_MODE: "preview_test" } as NodeJS.ProcessEnv).providers.anilist.enabled).toBe(true);
-    expect(resolvePublicProviderCapabilities({ VERCEL_ENV: "production", NODE_ENV: "production", MEDIA_TRACKER_ANILIST_MODE: "preview_test" } as NodeJS.ProcessEnv).providers.anilist).toEqual({ enabled: false, reason: "authorization_required" });
-    expect(resolvePublicProviderCapabilities({ VERCEL_ENV: "production", NODE_ENV: "production", MEDIA_TRACKER_ANILIST_MODE: "authorized" } as NodeJS.ProcessEnv).providers.anilist.enabled).toBe(true);
+  it.each([undefined, "disabled", "preview_test", "authorized", "arbitrary"])("hard-disables AniList regardless of mode %s", (mode) => {
+    for (const NODE_ENV of ["development", "production", "test"]) {
+      for (const VERCEL_ENV of [undefined, "preview", "production", "development"]) {
+        expect(resolvePublicProviderCapabilities({ NODE_ENV, VERCEL_ENV, MEDIA_TRACKER_ANILIST_MODE: mode } as NodeJS.ProcessEnv).providers.anilist)
+          .toEqual({ enabled: false, reason: "authorization_required" });
+      }
+    }
   });
 
   it("requires TMDB mode, token and approved logo contract together", () => {

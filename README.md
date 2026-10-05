@@ -35,7 +35,7 @@ Ayrıntılı sıra ve sonraki aşamalar: [`docs/ROADMAP.md`](docs/ROADMAP.md).
 - Versioned JSON import/export, kontrollü additive import, checksum, rollback/undo ve portable backup akışı.
 - Supabase auth, manuel Cloud aktarım, owner-scoped sync queue, V2 revision/idempotency/tombstone ve conflict akışı.
 - Local-first kütüphaneden ayrılmış cloud sosyal profil, kullanıcı arama ve takip/engel temeli.
-- TVMaze ve contact/User-Agent kapısı sağlanırsa Open Library ile aktif; TMDB/AniList için fail-closed izin kapılı, OMDb için yalnız legacy kayıt uyumlu normalize medya modeli.
+- TVMaze ve contact/User-Agent kapısı sağlanırsa Open Library ile aktif; TMDB için fail-closed izin kapılı, AniList v1 live erişimi tüm ortamlarda hard-disabled, OMDb için yalnız legacy kayıt uyumlu normalize medya modeli.
 - AI Recommendation V2 için structured provider evidence, deterministik eligibility/ranking ve unresolved hard constraint'lerde optional source-grounded research; LLM final sıralama yapmaz.
 - Ana sayfada medya domain durumu, kalıcı kullanıcı tercihleri ve sekme render orkestrasyonu ayrıştırılmış modüler yapı.
 - React/Next.js state yönetimi, TypeScript tip güvenliği ve responsive dashboard tasarımı.
@@ -75,7 +75,7 @@ Ayrıntılı sıra ve sonraki aşamalar: [`docs/ROADMAP.md`](docs/ROADMAP.md).
   - Global arama paneli
   - Dizi için TVMaze; kitap için geçerli contact/User-Agent yapılandırmasıyla Open Library
   - Film için TMDB yalnız non-commercial + approved logo/attribution kapısı tamamlandığında
-  - Anime/manga/manhwa/manhua/novel için AniList yalnız explicit Preview testi veya yazılı production izniyle
+  - V1'de live AniList erişimi tüm ortamlarda hard-disabled; legacy kayıtlar desteklenir. Yazılı izin sonrası ayrı post-release source-code enablement ve release gate gerekir.
   - OMDb yeni public arama/fallback zincirinde kapalı; mevcut legacy kayıtlar desteklenir
 - Veri yönetimi:
   - Versioned portable JSON yedeği ve SHA-256 bütünlük kontrolü
@@ -237,7 +237,6 @@ Temel yerel kullanım için hiçbir değişken zorunlu değildir. Provider anaht
 | `SUPABASE_SERVICE_ROLE_KEY` | Hayır | İlk release normal web runtime için gerekmez; ops/script ve ayrı gated geliştirme yolları içindir |
 | `MEDIA_TRACKER_TMDB_MODE` | Hayır | `disabled` veya tüm attribution kapıları tamamlandığında `noncommercial` |
 | `TMDB_READ_ACCESS_TOKEN` | Hayır | TMDB mode/attribution kapıları hazırsa server-side token |
-| `MEDIA_TRACKER_ANILIST_MODE` | Hayır | `disabled`, Preview için `preview_test`, yazılı izin sonrası `authorized` |
 | `OMDB_API_KEY` | Hayır | Yalnız legacy/local teşhis; public search/fallback açmaz |
 | `AI_SERVER_ACCESS_MODE` | Hayır | Eksik/geçersiz değer `disabled`; ilk Production release'te `disabled` |
 | `MEDIA_TRACKER_PROVIDER_USER_AGENT` | Open Library için | Gerçek contact içeren MediaTracker User-Agent; eksikse provider kapalı |
@@ -404,7 +403,7 @@ Next.js tarafı `MEDIA_TRACKER_ML_SERVICE_URL` doluysa bu servisi kullanır. Ser
 - D2C.1 owner-scoped fiziksel primary key enforcement ve production cutover D8 aşamasındadır.
 - Cloud'dan otomatik realtime pull yoktur; download/merge kullanıcı aksiyonudur.
 - Release Calendar otomatik provider ufku 90 gündür. Push/e-posta, ICS/Google Calendar ve streaming availability zorunlu kapsamda değildir.
-- TMDB ve AniList production kapıları tamamlanana kadar fail-closed kapalıdır; provider erişilemezse diğer kaynaklar ve geçerli stale Release Calendar cache'i korunur.
+- TMDB mevcut policy ile kapalıdır; AniList v1 live erişimi env'den bağımsız tüm ortamlarda hard-disabled kalır; provider erişilemezse diğer kaynaklar ve geçerli stale Release Calendar cache'i korunur.
 - Contract/unit testleri canlı Supabase, RLS veya production deployment kanıtı değildir.
 
 ## Roadmap Özeti

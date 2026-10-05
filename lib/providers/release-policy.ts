@@ -15,18 +15,9 @@ export function resolvePublicProviderCapabilities(
   env: NodeJS.ProcessEnv = process.env,
   options: { tmdbApprovedLogoAvailable?: boolean } = {},
 ): PublicProviderCapabilities {
-  const vercelEnvironment = env.VERCEL_ENV;
-  const production = vercelEnvironment === "production";
-  const previewOrDevelopment = vercelEnvironment === "preview" || (!vercelEnvironment && env.NODE_ENV === "development");
-
-  const anilistMode = env.MEDIA_TRACKER_ANILIST_MODE;
-  let anilist: PublicProviderCapability = disabled("disabled_by_policy");
-  if (anilistMode === "authorized") anilist = enabled();
-  else if (anilistMode === "preview_test") {
-    anilist = previewOrDevelopment && !production ? enabled() : disabled("authorization_required");
-  } else if (anilistMode && anilistMode !== "disabled") {
-    anilist = disabled("disabled_by_policy");
-  }
+  // ANILIST_LIVE_ACCESS = DISABLED_PENDING_WRITTEN_AUTHORIZATION in every v1 runtime.
+  // Future authorization requires a reviewed source change and release gate; no env bypass.
+  const anilist = disabled("authorization_required");
 
   const tmdbMode = env.MEDIA_TRACKER_TMDB_MODE;
   let tmdb: PublicProviderCapability = disabled("disabled_by_policy");

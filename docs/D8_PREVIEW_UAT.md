@@ -1,5 +1,7 @@
 # D8 Preview manual UAT
 
+Current AniList v1 policy — 2026-10-05: [V1-HARDENING-04B.3](V1_HARDENING_04B3.md) hard-disables live access in every runtime, including Preview/development/CI. Historical live/UAT evidence below remains historical; `preview_test` and `authorized` env values are ignored. Legacy/offline support remains. Future enablement requires written authorization, a separate source change and release acceptance.
+
 Bu paket D8-4A staging PASS sonrasındaki Vercel Preview kullanıcı kabulünü yönetir. Preview yalnız staging Supabase ile çalışır; production DB/Auth/Storage veya Vercel Production bu belgenin kapsamında değildir.
 
 ## Release sınıflandırması

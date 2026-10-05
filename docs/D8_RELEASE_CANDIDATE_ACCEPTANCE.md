@@ -1,5 +1,7 @@
 # D8 release-candidate acceptance
 
+Current AniList v1 policy — 2026-10-05: [V1-HARDENING-04B.3](V1_HARDENING_04B3.md) hard-disables live access in every runtime, including Preview/development/CI. Historical live/UAT evidence below remains historical; `preview_test` and `authorized` env values are ignored. Legacy/offline support remains. Future enablement requires written authorization, a separate source change and release acceptance.
+
 ## Current release state — 2026-10-03
 
 **D8-4B Production cutover: FROZEN until new RC acceptance.** Historical August RC `3a847701e5161186cfb16ade0e625666120c5e29` and the evidence below are retained for history only; they are not current deployment authority. V1-HARDENING-01 starts on `release/v1-hardening` from main baseline `657cfba66167c8a8493768614ed9348d14563967`. A new immutable RC does not yet exist. Fresh Production preflight must remeasure targets, migration ledger/pending set, backup capability and asset counts; August measurements are not October truth. The historical hold table below remains the single hold inventory and requires fresh evidence before cutover.
@@ -79,7 +81,7 @@ Bu tablo tek kanonik hold kaynağıdır. Durumlar yalnız `CLOSED`, `BLOCKED_EXT
 | TVMaze technical attribution/provenance | `CLOSED` | Hayır | `IMPLEMENTATION_CLOSED`; safe show source URL, advanced/saved/Calendar/public cards ve Portable v3 provenance; [04B.1](V1_HARDENING_04B1.md). Önceki About/global-link kanıtı yukarıda korunur |
 | TVMaze ShareAlike interpretation | `BLOCKED_MANUAL` | Evet | `TVMAZE_SHAREALIKE_INTERPRETATION = MANUAL_LEGAL_GATE`; persisted/transformed metadata ve export notice/kapsamı için ayrı manuel/hukuki değerlendirme |
 | OMDb yeni public kullanım | `CLOSED` | Hayır | Search/fallback disabled; legacy `externalSource: "omdb"` decode/import/display korunur |
-| AniList Production enablement | `POST_RELEASE_GATE` | Hayır | Disabled kalır; yazılı izin sonrası ayrı enablement |
+| AniList live enablement (all v1 runtimes) | `POST_RELEASE_GATE` | Hayır | `ANILIST_V1_LIVE_ACCESS = BLOCKED_EXTERNAL_AUTHORIZATION`; env ve live-test bypass `CLOSED`. [04B.3](V1_HARDENING_04B3.md): legacy destekli, hard-disabled; yazılı izin sonrası ayrı source-code enablement ve release gate |
 | TMDB Production enablement | `POST_RELEASE_GATE` | Hayır | Disabled kalır; approved logo/notice/non-commercial readiness sonrası ayrı enablement |
 | Production AI key/budget/monitoring | `POST_RELEASE_GATE` | Hayır | İlk sürümde key provision edilmez; AI enablement ayrı release gate'idir |
 | Canonical admin claim ve MFA/AAL2 | `POST_RELEASE_GATE` | Hayır | Aktif v1 privileged kullanıcı yüzeyi yok; AI/admin enablement öncesi ele alınır |

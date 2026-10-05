@@ -5,6 +5,11 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
+// Dormant route contracts are fixture-only: every fetch is mocked below.
+vi.mock("@/lib/providers/release-policy", () => ({
+  publicProviderCapability: () => ({ enabled: true, reason: "enabled" }),
+}));
+
 import { POST as searchAniList } from "@/app/api/anilist/search/route";
 import {
   anilistDiagnosticMessage,
@@ -55,10 +60,7 @@ function rawMedia(overrides: Partial<AniListRawMedia> = {}): AniListRawMedia {
 }
 
 describe("global AniList search diagnostics", () => {
-  beforeEach(() => {
-    vi.stubEnv("MEDIA_TRACKER_ANILIST_MODE", "authorized");
-  });
-
+  beforeEach(() => vi.stubGlobal("fetch", vi.fn(() => { throw new Error("Fixture transport required"); })));
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();

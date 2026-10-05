@@ -2,6 +2,11 @@ import "./helpers/admitted-rate-limit";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
+// Dormant route contracts are fixture-only: every fetch is mocked below.
+vi.mock("@/lib/providers/release-policy", () => ({
+  publicProviderCapability: () => ({ enabled: true, reason: "enabled" }),
+}));
+
 import { POST as searchAniListRoute } from "@/app/api/anilist/search/route";
 import {
   ASPECT_IDS,
@@ -118,7 +123,7 @@ function requestBody(init?: RequestInit) {
 }
 
 describe("D6.6-1R provider retrieval mapping and route", () => {
-  beforeEach(() => vi.stubEnv("MEDIA_TRACKER_ANILIST_MODE", "authorized"));
+  beforeEach(() => vi.stubGlobal("fetch", vi.fn(() => { throw new Error("Fixture transport required"); })));
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();
