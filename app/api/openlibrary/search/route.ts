@@ -1,3 +1,4 @@
+import { enforceDistributedRateLimit, reportProviderCooldown } from "@/lib/api/distributed-rate-limit";
 import { runSafeApiRoute } from "@/lib/api/safe-route";
 // ============================================
 // Open Library Kitap Arama API Route'u
@@ -14,7 +15,7 @@ import {
   OpenLibraryRawDoc,
   OpenLibraryNormalizedResult,
 } from "@/lib/openlibrary-types";
-import { SEARCH_REQUEST_MAX_BYTES, apiError, enforceRateLimit, fetchWithTimeout, noStoreJson, parseSearchQuery, readStrictJsonObject, resolveRateLimitIdentity } from "@/lib/api/request-security";
+import { SEARCH_REQUEST_MAX_BYTES, apiError, fetchWithTimeout, noStoreJson, parseSearchQuery, readStrictJsonObject } from "@/lib/api/request-security";
 import { providerUserAgent } from "@/lib/api/provider-identity";
 import { publicProviderCapability } from "@/lib/providers/release-policy";
 
@@ -71,10 +72,10 @@ export async function POST(request: NextRequest) {
   if (!parsed.ok) return parsed.response;
   const query = parseSearchQuery(parsed.value.query);
   if (!query.ok) return apiError("search_query_invalid", 400);
-  const rateLimit = enforceRateLimit("search:openlibrary", await resolveRateLimitIdentity(request), 60, 60_000);
-  if (rateLimit) return rateLimit;
   const capability = publicProviderCapability("openlibrary");
   if (!capability.enabled) return noStoreJson({ results: [], code: "provider_unavailable", reason: capability.reason }, { status: 503 });
+  const rateLimit = await enforceDistributedRateLimit(request, "openlibrary_search");
+  if (rateLimit) return rateLimit;
 
   // 2) Open Library API'sine istek at
   try {
@@ -95,6 +96,8 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    const cooldown = await reportProviderCooldown(request, "openlibrary_search", olResponse);
+    if (cooldown) return cooldown;
     if (!olResponse.ok) {
       return noStoreJson({ code: "upstream_error" }, { status: 502 });
     }

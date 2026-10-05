@@ -1,3 +1,4 @@
+import { enforceDistributedRateLimit } from "@/lib/api/distributed-rate-limit";
 import { supabaseApplicationError } from "@/lib/supabase/safe-error";
 import { runSafeApiRoute } from "@/lib/api/safe-route";
 import { validateAuthenticatedMutationRequest } from "@/lib/api/request-security";
@@ -11,6 +12,8 @@ export const dynamic="force-dynamic";export const revalidate=0;
 
 export async function GET(request:Request){
   return runSafeApiRoute("/api/social/feed", "GET", async () => {
+  const rateLimit = await enforceDistributedRateLimit(request, "social_read");
+  if (rateLimit) return rateLimit;
   const cursor=validateCursor(new URL(request.url).searchParams);if(!cursor.ok)return Response.json({message:cursor.error},{status:400,headers:PRIVATE_NO_STORE_HEADERS});
   try{return Response.json(await loadSocialFeed(cursor.value),{headers:PRIVATE_NO_STORE_HEADERS});}catch(error){return safeSocialRouteError(error);}
 
@@ -21,6 +24,8 @@ export async function POST(request:Request){
   return runSafeApiRoute("/api/social/feed", "POST", async () => {
   const boundaryError = validateAuthenticatedMutationRequest(request);
   if (boundaryError) return boundaryError;
+  const rateLimit = await enforceDistributedRateLimit(request, "social_write");
+  if (rateLimit) return rateLimit;
 
   const body=socialRecord(await readJsonBody(request));if(!body)return Response.json({message:"Aktivite verisi geçersiz."},{status:400,headers:PRIVATE_NO_STORE_HEADERS});
   try{

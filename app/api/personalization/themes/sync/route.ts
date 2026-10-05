@@ -1,3 +1,4 @@
+import { enforceDistributedRateLimit } from "@/lib/api/distributed-rate-limit";
 import { supabaseApplicationError } from "@/lib/supabase/safe-error";
 import { runSafeApiRoute } from "@/lib/api/safe-route";
 import { validateAuthenticatedMutationRequest } from "@/lib/api/request-security";
@@ -39,8 +40,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-export async function GET(): Promise<Response> {
+export async function GET(request: Request = new Request("http://localhost")): Promise<Response> {
   return runSafeApiRoute("/api/personalization/themes/sync", "GET", async () => {
+  const rateLimit = await enforceDistributedRateLimit(request, "social_read");
+  if (rateLimit) return rateLimit;
   try {
     const auth = await context();
     if (!auth) return failure("Tema senkronizasyonu için giriş yapmalısın.", 401);
@@ -63,6 +66,8 @@ export async function PUT(request: Request): Promise<Response> {
     if (!auth) return failure("Tema senkronizasyonu için giriş yapmalısın.", 401);
     const boundaryError = validateAuthenticatedMutationRequest(request);
     if (boundaryError) return boundaryError;
+    const rateLimit = await enforceDistributedRateLimit(request, "settings_write");
+    if (rateLimit) return rateLimit;
     let body: unknown;
     try {
       body = await request.json();
@@ -116,6 +121,8 @@ export async function DELETE(request: Request): Promise<Response> {
     if (!auth) return failure("Tema senkronizasyonu için giriş yapmalısın.", 401);
     const boundaryError = validateAuthenticatedMutationRequest(request);
     if (boundaryError) return boundaryError;
+    const rateLimit = await enforceDistributedRateLimit(request, "settings_write");
+    if (rateLimit) return rateLimit;
     const { data, error } = await auth.client.rpc("delete_theme_sync_state");
     if (error) throw supabaseApplicationError(error);
     return Response.json({

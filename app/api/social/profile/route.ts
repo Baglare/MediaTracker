@@ -1,3 +1,4 @@
+import { enforceDistributedRateLimit } from "@/lib/api/distributed-rate-limit";
 import { runSafeApiRoute } from "@/lib/api/safe-route";
 import { validateAuthenticatedMutationRequest } from "@/lib/api/request-security";
 import { NextResponse } from "next/server";
@@ -30,8 +31,10 @@ async function context() {
   return data.user ? { client, user: data.user } : null;
 }
 
-export async function GET() {
+export async function GET(request: Request = new Request("http://localhost")) {
   return runSafeApiRoute("/api/social/profile", "GET", async () => {
+  const rateLimit = await enforceDistributedRateLimit(request, "social_read");
+  if (rateLimit) return rateLimit;
   return NextResponse.json(await loadOwnSocialEditorData(), {
     headers: { "Cache-Control": "private, no-store, max-age=0" },
   });
@@ -45,6 +48,8 @@ export async function POST(request: Request) {
   if (!auth) return failure("Bu işlem için giriş yapmalısın.", 401);
   const boundaryError = validateAuthenticatedMutationRequest(request);
   if (boundaryError) return boundaryError;
+  const rateLimit = await enforceDistributedRateLimit(request, "social_write");
+  if (rateLimit) return rateLimit;
   let body: unknown;
   try { body = await request.json(); } catch { return failure("İstek verisi geçersiz."); }
   if (!body || typeof body !== "object" || Array.isArray(body)) return failure("İstek verisi geçersiz.");

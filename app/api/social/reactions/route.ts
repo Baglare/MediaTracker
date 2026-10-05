@@ -1,3 +1,4 @@
+import { enforceDistributedRateLimit } from "@/lib/api/distributed-rate-limit";
 import { supabaseApplicationError } from "@/lib/supabase/safe-error";
 import { runSafeApiRoute } from "@/lib/api/safe-route";
 import { validateAuthenticatedMutationRequest } from "@/lib/api/request-security";
@@ -11,6 +12,8 @@ export async function POST(request:Request){
   return runSafeApiRoute("/api/social/reactions", "POST", async () => {
   const boundaryError = validateAuthenticatedMutationRequest(request);
   if (boundaryError) return boundaryError;
+  const rateLimit = await enforceDistributedRateLimit(request, "social_write");
+  if (rateLimit) return rateLimit;
 
   const body=socialRecord(await readJsonBody(request));const reaction=validateReactionType(body?.reaction);const activity=body?.activityId?validateUuid(body.activityId):null;const comment=body?.commentId?validateUuid(body.commentId):null;
   if(!body||!reaction.ok||(activity&&!activity.ok)||(comment&&!comment.ok)||Number(Boolean(activity))+Number(Boolean(comment))!==1)return Response.json({message:!reaction.ok?reaction.error:"Tepki hedefi geçersiz."},{status:400,headers:PRIVATE_NO_STORE_HEADERS});

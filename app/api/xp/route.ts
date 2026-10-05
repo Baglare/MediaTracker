@@ -1,3 +1,4 @@
+import { enforceDistributedRateLimit } from "@/lib/api/distributed-rate-limit";
 import { supabaseApplicationError } from "@/lib/supabase/safe-error";
 import { runSafeApiRoute } from "@/lib/api/safe-route";
 import { validateAuthenticatedMutationRequest } from "@/lib/api/request-security";
@@ -29,8 +30,10 @@ function safeError(error: unknown): Response {
   return failure("XP işlemi tamamlanamadı.", 500);
 }
 
-export async function GET(): Promise<Response> {
+export async function GET(request: Request = new Request("http://localhost")): Promise<Response> {
   return runSafeApiRoute("/api/xp", "GET", async () => {
+  const rateLimit = await enforceDistributedRateLimit(request, "social_read");
+  if (rateLimit) return rateLimit;
   try {
     const auth = await context();
     if (!auth) return failure("Bu işlem için giriş yapmalısın.", 401);
@@ -49,6 +52,8 @@ export async function POST(request: Request): Promise<Response> {
     if (!auth) return failure("Bu işlem için giriş yapmalısın.", 401);
     const boundaryError = validateAuthenticatedMutationRequest(request);
     if (boundaryError) return boundaryError;
+    const rateLimit = await enforceDistributedRateLimit(request, "xp_sync");
+    if (rateLimit) return rateLimit;
     let body: unknown;
     try { body = await request.json(); } catch { return failure("İstek verisi geçersiz."); }
     if (!body || typeof body !== "object" || Array.isArray(body)) return failure("İstek verisi geçersiz.");

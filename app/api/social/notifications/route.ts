@@ -1,3 +1,4 @@
+import { enforceDistributedRateLimit } from "@/lib/api/distributed-rate-limit";
 import { supabaseApplicationError } from "@/lib/supabase/safe-error";
 import { runSafeApiRoute } from "@/lib/api/safe-route";
 import { validateAuthenticatedMutationRequest } from "@/lib/api/request-security";
@@ -11,6 +12,8 @@ export const revalidate = 0;
 
 export async function GET(request: Request) {
   return runSafeApiRoute("/api/social/notifications", "GET", async () => {
+  const rateLimit = await enforceDistributedRateLimit(request, "social_read");
+  if (rateLimit) return rateLimit;
   const cursor = validateCursor(new URL(request.url).searchParams);
   if (!cursor.ok) return Response.json({ message: cursor.error }, { status: 400, headers: PRIVATE_NO_STORE_HEADERS });
   try { return Response.json(await loadSocialNotifications(cursor.value), { headers: PRIVATE_NO_STORE_HEADERS }); }
@@ -23,6 +26,8 @@ export async function PATCH(request: Request) {
   return runSafeApiRoute("/api/social/notifications", "PATCH", async () => {
   const boundaryError = validateAuthenticatedMutationRequest(request);
   if (boundaryError) return boundaryError;
+  const rateLimit = await enforceDistributedRateLimit(request, "social_write");
+  if (rateLimit) return rateLimit;
 
   const body = socialRecord(await readJsonBody(request));
   const action = String(body?.action ?? "");

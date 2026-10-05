@@ -1,3 +1,4 @@
+import "./helpers/admitted-rate-limit";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DEFAULT_PROFILE_PREFERENCES } from "@/lib/profile-preferences";

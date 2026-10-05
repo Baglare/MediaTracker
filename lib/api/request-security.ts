@@ -11,6 +11,7 @@ type JsonObjectResult =
   | { ok: true; value: Record<string, unknown> }
   | { ok: false; response: NextResponse };
 
+// BEST_EFFORT_SMOOTHING only. Never a distributed/provider authorization boundary.
 const rateLimitBuckets = new Map<string, { count: number; resetAt: number }>();
 
 export function apiError(code: string, status: number, headers?: HeadersInit) {
@@ -103,10 +104,9 @@ export function parseSearchQuery(value: unknown, required = true) {
 }
 
 function fallbackIpKey(request: Request) {
-  const forwarded = request.headers.get("x-forwarded-for")?.split(",", 1)[0].trim();
-  const realIp = request.headers.get("x-real-ip")?.trim();
-  const candidate = forwarded || realIp;
-  return candidate && /^[0-9a-f:.]{3,64}$/i.test(candidate) ? `ip:${candidate}` : "ip:unknown";
+  void request;
+  // Legacy disabled-provider smoothing only; never trusts client IP headers.
+  return "legacy:unavailable";
 }
 
 export async function resolveRateLimitIdentity(request: Request) {
@@ -132,6 +132,10 @@ export function enforceRateLimit(
   const key = `${bucket}:${identity}`;
   const current = rateLimitBuckets.get(key);
   if (!current || current.resetAt <= now) {
+    if (rateLimitBuckets.size >= 10_000) {
+      for (const [storedKey, stored] of rateLimitBuckets) if (stored.resetAt <= now) rateLimitBuckets.delete(storedKey);
+      if (!current && rateLimitBuckets.size >= 10_000) return apiError("rate_limit_unavailable", 503, { "Retry-After": "5" });
+    }
     rateLimitBuckets.set(key, { count: 1, resetAt: now + windowMs });
     return null;
   }

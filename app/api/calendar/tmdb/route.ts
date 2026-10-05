@@ -1,3 +1,4 @@
+import { enforceDistributedRateLimit } from "@/lib/api/distributed-rate-limit";
 import { runSafeApiRoute } from "@/lib/api/safe-route";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -41,6 +42,8 @@ export async function GET(request: NextRequest) {
   }
   const capability = publicProviderCapability("tmdb");
   if (!capability.enabled) return NextResponse.json({ events: [], code: "provider_unavailable", reason: capability.reason }, { status: 503, headers: { "Cache-Control": "no-store" } });
+  const rateLimit = await enforceDistributedRateLimit(request, "tmdb_calendar");
+  if (rateLimit) return rateLimit;
   const token = process.env.TMDB_READ_ACCESS_TOKEN;
   if (!token) {
     return NextResponse.json({ error: "TMDB yapılandırılmadı." }, { status: 503 });

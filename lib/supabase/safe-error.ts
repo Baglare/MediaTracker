@@ -18,6 +18,8 @@ const APPLICATION_CODES = new Set([
   "duplicate_recommendation",
   "recipient_open_limit",
   "rate_limit",
+  "rate_limited",
+  "rate_limit_unavailable",
   "duplicate_comment",
   "already_reported",
   "invalid_filter",

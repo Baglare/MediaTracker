@@ -1,3 +1,4 @@
+import { enforceDistributedRateLimit } from "@/lib/api/distributed-rate-limit";
 import { supabaseApplicationError } from "@/lib/supabase/safe-error";
 import { runSafeApiRoute } from "@/lib/api/safe-route";
 import { validateAuthenticatedMutationRequest } from "@/lib/api/request-security";
@@ -11,6 +12,8 @@ export async function POST(request:Request){
   return runSafeApiRoute("/api/social/comments", "POST", async () => {
   const boundaryError = validateAuthenticatedMutationRequest(request);
   if (boundaryError) return boundaryError;
+  const rateLimit = await enforceDistributedRateLimit(request, "social_write");
+  if (rateLimit) return rateLimit;
 
   const body=socialRecord(await readJsonBody(request));const activity=validateUuid(body?.activityId,"Aktivite kimliği");const parent=body?.parentCommentId?validateUuid(body.parentCommentId,"Yorum kimliği"):null;const text=safeSocialText(body?.body,1000,true);const dedupe=safeSocialText(body?.dedupeKey,220,true);
   if(!body||!activity.ok||(parent&&!parent.ok)||!text.ok||!text.value||!dedupe.ok||!dedupe.value||typeof body.spoiler!=="boolean")return Response.json({message:!activity.ok?activity.error:parent&&!parent.ok?parent.error:!text.ok?text.error:!dedupe.ok?dedupe.error:"Yorum verisi geçersiz."},{status:400,headers:PRIVATE_NO_STORE_HEADERS});
@@ -23,6 +26,8 @@ export async function PATCH(request:Request){
   return runSafeApiRoute("/api/social/comments", "PATCH", async () => {
   const boundaryError = validateAuthenticatedMutationRequest(request);
   if (boundaryError) return boundaryError;
+  const rateLimit = await enforceDistributedRateLimit(request, "social_write");
+  if (rateLimit) return rateLimit;
 
   const body=socialRecord(await readJsonBody(request));const comment=validateUuid(body?.commentId,"Yorum kimliği");if(!body||!comment.ok||!["edit","delete","hide"].includes(String(body.action)))return Response.json({message:comment.ok?"Yorum aksiyonu geçersiz.":comment.error},{status:400,headers:PRIVATE_NO_STORE_HEADERS});
   const text=body.action==="edit"?safeSocialText(body.body,1000,true):{ok:true as const,value:undefined};if(!text.ok||body.action==="edit"&&typeof body.spoiler!=="boolean")return Response.json({message:text.ok?"Spoiler değeri geçersiz.":text.error},{status:400,headers:PRIVATE_NO_STORE_HEADERS});

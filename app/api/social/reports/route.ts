@@ -1,3 +1,4 @@
+import { enforceDistributedRateLimit } from "@/lib/api/distributed-rate-limit";
 import { supabaseApplicationError } from "@/lib/supabase/safe-error";
 import { runSafeApiRoute } from "@/lib/api/safe-route";
 import { validateAuthenticatedMutationRequest } from "@/lib/api/request-security";
@@ -10,6 +11,8 @@ export async function POST(request:Request){
   return runSafeApiRoute("/api/social/reports", "POST", async () => {
   const boundaryError = validateAuthenticatedMutationRequest(request);
   if (boundaryError) return boundaryError;
+  const rateLimit = await enforceDistributedRateLimit(request, "social_write");
+  if (rateLimit) return rateLimit;
 const body=socialRecord(await readJsonBody(request));const activity=body?.activityId?validateUuid(body.activityId):null;const comment=body?.commentId?validateUuid(body.commentId):null;const category=validateReportCategory(body?.category);const note=safeSocialText(body?.note,500);if(!body||Number(Boolean(activity))+Number(Boolean(comment))!==1||(activity&&!activity.ok)||(comment&&!comment.ok)||!category.ok||!note.ok)return Response.json({message:!category.ok?category.error:!note.ok?note.error:"Rapor hedefi geçersiz."},{status:400,headers:PRIVATE_NO_STORE_HEADERS});try{const client=await getSupabaseServerClient();if(!client)throw new Error("social_not_configured");const {data,error}=await client.rpc("social_report",{p_activity:activity?.ok?activity.value:null,p_comment:comment?.ok?comment.value:null,p_category:category.value,p_note:note.value??null});if(error)throw supabaseApplicationError(error);return Response.json(data,{headers:PRIVATE_NO_STORE_HEADERS});}catch(error){return safeSocialRouteError(error);}
   });
 }

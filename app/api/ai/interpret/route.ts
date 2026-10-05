@@ -1,3 +1,4 @@
+import { enforceDistributedRateLimit } from "@/lib/api/distributed-rate-limit";
 import { runSafeApiRoute } from "@/lib/api/safe-route";
 import { analyzeIntent } from "@/lib/ai/intent-analyzer";
 import { DEFAULT_AI_SETTINGS } from "@/lib/ai/local-state";
@@ -10,7 +11,6 @@ import { availableSemanticVerifierModes } from "@/features/recommendations/evide
 import { resolveAiEntitlement } from "@/lib/ai/entitlement";
 import {
   AI_REQUEST_MAX_BYTES,
-  enforceRateLimit,
   readStrictJsonObject,
   apiError,
   noStoreJson,
@@ -44,7 +44,7 @@ export async function POST(request: Request) {
   if (!parsed.ok) return parsed.response;
   const body = parsed.value;
   const entitlement = await resolveAiEntitlement(request);
-  const rateLimit = enforceRateLimit("ai:interpret", entitlement.rateLimitIdentity, 30, 60_000);
+  const rateLimit = await enforceDistributedRateLimit(request, "interpret");
   if (rateLimit) return rateLimit;
   const message = typeof body.message === "string" ? body.message.trim() : "";
   if (!message || message.length > RECOMMENDATION_REQUEST_LIMITS.queryText) return apiError("interpret_message_invalid", 400);

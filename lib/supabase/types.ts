@@ -334,6 +334,8 @@ export interface Database {
     };
     Views: Record<string, never>;
     Functions: {
+      consume_application_rate_limit_v1: { Args: { p_envelope: string; p_signature_hex: string }; Returns: Json };
+      report_provider_cooldown_v1: { Args: { p_envelope: string; p_signature_hex: string }; Returns: Json };
       get_theme_sync_state: { Args: Record<string, never>; Returns: Json };
       save_theme_sync_state: { Args: { p_expected_revision: number; p_active_theme_selection: Json; p_custom_themes: Json }; Returns: Json };
       delete_theme_sync_state: { Args: Record<string, never>; Returns: Json };

@@ -1,3 +1,4 @@
+import { enforceDistributedRateLimit } from "@/lib/api/distributed-rate-limit";
 import { runSafeApiRoute } from "@/lib/api/safe-route";
 // ============================================
 // AniList Detay API Route'u
@@ -98,6 +99,8 @@ export async function GET(request: NextRequest) {
   }
   const capability = publicProviderCapability("anilist");
   if (!capability.enabled) return NextResponse.json({ result: null, code: "provider_unavailable", reason: capability.reason }, { status: 503, headers: { "Cache-Control": "no-store" } });
+  const rateLimit = await enforceDistributedRateLimit(request, "anilist_details");
+  if (rateLimit) return rateLimit;
 
   try {
     const response = await fetch(ANILIST_URL, {

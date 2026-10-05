@@ -1,3 +1,4 @@
+import { enforceDistributedRateLimit } from "@/lib/api/distributed-rate-limit";
 import { runSafeApiRoute } from "@/lib/api/safe-route";
 // ============================================
 // AniList Arama API Route'u
@@ -27,7 +28,7 @@ import {
   rankAniListSearchResults,
 } from "@/lib/anilist";
 import { providerRetrievalAllowlist } from "@/features/recommendations/domain/aspect-registry";
-import { SEARCH_REQUEST_MAX_BYTES, apiError, enforceRateLimit, fetchWithTimeout, noStoreJson, parseSearchQuery, readStrictJsonObject, resolveRateLimitIdentity } from "@/lib/api/request-security";
+import { SEARCH_REQUEST_MAX_BYTES, apiError, fetchWithTimeout, noStoreJson, parseSearchQuery, readStrictJsonObject } from "@/lib/api/request-security";
 import { publicProviderCapability } from "@/lib/providers/release-policy";
 
 // ---- GraphQL Sorgu Metinleri ----
@@ -319,10 +320,10 @@ export async function POST(request: NextRequest) {
   if (!trimmedQuery && !hasStructuredFilter) {
     return apiError("search_query_or_filter_required", 400);
   }
-  const rateLimit = enforceRateLimit("search:anilist", await resolveRateLimitIdentity(request), 60, 60_000);
-  if (rateLimit) return rateLimit;
   const capability = publicProviderCapability("anilist");
   if (!capability.enabled) return noStoreJson({ results: [], code: "provider_unavailable", reason: capability.reason }, { status: 503 });
+  const rateLimit = await enforceDistributedRateLimit(request, "anilist_search");
+  if (rateLimit) return rateLimit;
 
   try {
     let results: AniListRawMedia[] = [];

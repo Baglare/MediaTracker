@@ -1,3 +1,4 @@
+import { enforceDistributedRateLimit } from "@/lib/api/distributed-rate-limit";
 import { runSafeApiRoute } from "@/lib/api/safe-route";
 import { NextResponse } from "next/server";
 
@@ -5,13 +6,15 @@ import { loadSocialPersonSummary, searchSocialPeople } from "@/lib/social/server
 import { validateSearchQuery } from "@/lib/social/validation";
 import { validateUuid } from "@/lib/social/interactions-validation";
 import { PRIVATE_NO_STORE_HEADERS } from "@/lib/social/route-response";
-import { SEARCH_REQUEST_MAX_BYTES, apiError, enforceRateLimit, readStrictJsonObject, resolveRateLimitIdentity } from "@/lib/api/request-security";
+import { SEARCH_REQUEST_MAX_BYTES, apiError, readStrictJsonObject } from "@/lib/api/request-security";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export async function GET(request: Request) {
   return runSafeApiRoute("/api/social/people", "GET", async () => {
+  const rateLimit = await enforceDistributedRateLimit(request, "social_read");
+  if (rateLimit) return rateLimit;
   const url = new URL(request.url);
   const idValue = url.searchParams.get("id");
   if (!idValue || [...url.searchParams.keys()].some((key) => key !== "id")) return apiError("people_id_invalid", 400);
@@ -33,7 +36,7 @@ export async function POST(request: Request) {
   if (typeof offset !== "number" || !Number.isInteger(offset) || offset < 0 || offset > 10_000 || offset % 20 !== 0) {
     return apiError("people_offset_invalid", 400);
   }
-  const rateLimit = enforceRateLimit("search:social-people", await resolveRateLimitIdentity(request), 60, 60_000);
+  const rateLimit = await enforceDistributedRateLimit(request, "social_read");
   if (rateLimit) return rateLimit;
   return NextResponse.json({ ok: true, results: await searchSocialPeople(query.value, offset), offset }, { headers: PRIVATE_NO_STORE_HEADERS });
 

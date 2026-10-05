@@ -1,3 +1,4 @@
+import "./helpers/admitted-rate-limit";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

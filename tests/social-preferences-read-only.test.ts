@@ -1,3 +1,4 @@
+import "./helpers/admitted-rate-limit";
 import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_ACTIVITY_PREFERENCES, DEFAULT_NOTIFICATION_PREFERENCES } from "@/lib/social/interactions";

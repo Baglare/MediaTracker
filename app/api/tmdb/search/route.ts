@@ -1,3 +1,4 @@
+import { enforceDistributedRateLimit } from "@/lib/api/distributed-rate-limit";
 import { runSafeApiRoute } from "@/lib/api/safe-route";
 // ============================================
 // TMDB Arama API Route'u (Server-Side)
@@ -19,12 +20,10 @@ import { TmdbRawResult, TmdbNormalizedResult } from "@/lib/tmdb-types";
 import {
   SEARCH_REQUEST_MAX_BYTES,
   apiError,
-  enforceRateLimit,
   fetchWithTimeout,
   noStoreJson,
   parseSearchQuery,
   readStrictJsonObject,
-  resolveRateLimitIdentity,
 } from "@/lib/api/request-security";
 import { publicProviderCapability } from "@/lib/providers/release-policy";
 
@@ -103,10 +102,10 @@ export async function POST(request: NextRequest) {
     return apiError("search_filter_invalid", 400);
   }
   const requestedMediaType = parsed.value.mediaType === "tv" ? "tv" : "movie";
-  const rateLimit = enforceRateLimit("search:tmdb", await resolveRateLimitIdentity(request), 60, 60_000);
-  if (rateLimit) return rateLimit;
   const capability = publicProviderCapability("tmdb");
   if (!capability.enabled) return noStoreJson({ results: [], code: "provider_unavailable", reason: capability.reason }, { status: 503 });
+  const rateLimit = await enforceDistributedRateLimit(request, "tmdb_search");
+  if (rateLimit) return rateLimit;
 
   const token = process.env.TMDB_READ_ACCESS_TOKEN;
   if (!token) {

@@ -1,3 +1,4 @@
+import "./helpers/admitted-rate-limit";
 import { describe, expect, it } from "vitest";
 import { normalizeAniListMedia } from "@/lib/anilist";
 import { normalizeSearchResult as normalizeTvmazeSearchResult } from "@/app/api/tvmaze/search/route";

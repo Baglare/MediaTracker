@@ -1,3 +1,4 @@
+import { enforceDistributedRateLimit } from "@/lib/api/distributed-rate-limit";
 import { supabaseApplicationError } from "@/lib/supabase/safe-error";
 import { runSafeApiRoute } from "@/lib/api/safe-route";
 import { validateAuthenticatedMutationRequest } from "@/lib/api/request-security";
@@ -13,6 +14,8 @@ export const revalidate = 0;
 
 export async function GET(request: Request) {
   return runSafeApiRoute("/api/social/recommendations", "GET", async () => {
+  const rateLimit = await enforceDistributedRateLimit(request, "social_read");
+  if (rateLimit) return rateLimit;
   const search = new URL(request.url).searchParams;
   const detailId = search.get("recommendationId");
   if (detailId) {
@@ -37,6 +40,8 @@ export async function POST(request: Request) {
   return runSafeApiRoute("/api/social/recommendations", "POST", async () => {
   const boundaryError = validateAuthenticatedMutationRequest(request);
   if (boundaryError) return boundaryError;
+  const rateLimit = await enforceDistributedRateLimit(request, "social_write");
+  if (rateLimit) return rateLimit;
 
   const body = socialRecord(await readJsonBody(request));
   if (body?.action === "message") {
@@ -75,6 +80,8 @@ export async function PATCH(request: Request) {
   return runSafeApiRoute("/api/social/recommendations", "PATCH", async () => {
   const boundaryError = validateAuthenticatedMutationRequest(request);
   if (boundaryError) return boundaryError;
+  const rateLimit = await enforceDistributedRateLimit(request, "social_write");
+  if (rateLimit) return rateLimit;
 
   const body = socialRecord(await readJsonBody(request));
   const recommendation = validateUuid(body?.recommendationId, "Öneri");

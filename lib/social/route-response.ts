@@ -7,6 +7,11 @@ const SAFE_ERRORS:Record<string,{status:number;message:string}>={
 export const PRIVATE_NO_STORE_HEADERS={"Cache-Control":"private, no-store, max-age=0"};
 
 export function safeSocialRouteError(error:unknown):Response{
+  const limiterCode = error instanceof Error ? error.message : "";
+  if (limiterCode === "rate_limited" || limiterCode === "rate_limit_unavailable") {
+    return Response.json({ code: limiterCode }, { status: limiterCode === "rate_limited" ? 429 : 503,
+      headers: { ...PRIVATE_NO_STORE_HEADERS, "Retry-After": limiterCode === "rate_limited" ? "60" : "5" } });
+  }
   const raw=error instanceof Error?error.message:"";const key=Object.keys(SAFE_ERRORS).find((entry)=>raw.includes(entry));const safe=key?SAFE_ERRORS[key]:{status:500,message:"Sosyal işlem tamamlanamadı."};
   return Response.json({message:safe.message},{status:safe.status,headers:PRIVATE_NO_STORE_HEADERS});
 }

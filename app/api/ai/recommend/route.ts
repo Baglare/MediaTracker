@@ -1,3 +1,4 @@
+import { enforceDistributedRateLimit } from "@/lib/api/distributed-rate-limit";
 import { runSafeApiRoute } from "@/lib/api/safe-route";
 // ============================================
 // POST /api/ai/recommend
@@ -76,7 +77,6 @@ import { resolveAiEntitlement } from "@/lib/ai/entitlement";
 import {
   AI_REQUEST_MAX_BYTES,
   apiError,
-  enforceRateLimit,
   readStrictJsonObject,
   validateAuthenticatedMutationRequest,
 } from "@/lib/api/request-security";
@@ -1184,8 +1184,6 @@ export async function POST(req: NextRequest) {
   if (!parsed.ok) return parsed.response;
   const body = parsed.value as unknown as AiRecommendRequest;
   const entitlement = await resolveAiEntitlement(req);
-  const rateLimit = enforceRateLimit("ai:recommend", entitlement.rateLimitIdentity, 20, 60_000);
-  if (rateLimit) return rateLimit;
 
   const message = (body.message || "").trim();
   if (!message || message.length > RECOMMENDATION_REQUEST_LIMITS.queryText) {
@@ -1250,6 +1248,8 @@ export async function POST(req: NextRequest) {
     const boundaryError = validateAuthenticatedMutationRequest(req);
     if (boundaryError) return boundaryError;
   }
+  const rateLimit = await enforceDistributedRateLimit(req, researchMode !== "library-only" || settings.useOpenAIProvider ? "funded_ai" : "recommend");
+  if (rateLimit) return rateLimit;
   const scopeMode = (body as { scopeMode?: string }).scopeMode as
     | "mixed"
     | "east"

@@ -1,3 +1,4 @@
+import { enforceDistributedRateLimit } from "@/lib/api/distributed-rate-limit";
 import { runSafeApiRoute } from "@/lib/api/safe-route";
 import { validateAuthenticatedMutationRequest } from "@/lib/api/request-security";
 import { NextResponse } from "next/server";
@@ -15,6 +16,8 @@ export async function POST(request: Request) {
   if (!auth.user) return NextResponse.json({ ok: false, message: "Bu işlem için giriş yapmalısın." }, { status: 401 });
   const boundaryError = validateAuthenticatedMutationRequest(request);
   if (boundaryError) return boundaryError;
+  const rateLimit = await enforceDistributedRateLimit(request, "social_write");
+  if (rateLimit) return rateLimit;
   let body: unknown;
   try { body = await request.json(); } catch { return NextResponse.json({ ok: false, message: "İstek geçersiz." }, { status: 400 }); }
   if (!body || typeof body !== "object" || Array.isArray(body)) return NextResponse.json({ ok: false, message: "İstek geçersiz." }, { status: 400 });

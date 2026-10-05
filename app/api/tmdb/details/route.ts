@@ -1,3 +1,4 @@
+import { enforceDistributedRateLimit } from "@/lib/api/distributed-rate-limit";
 import { runSafeApiRoute } from "@/lib/api/safe-route";
 // ============================================
 // TMDB Detay API Route'u (Server-Side) — R21.2
@@ -98,6 +99,8 @@ export async function GET(request: NextRequest) {
   }
   const capability = publicProviderCapability("tmdb");
   if (!capability.enabled) return NextResponse.json({ result: null, code: "provider_unavailable", reason: capability.reason }, { status: 503, headers: { "Cache-Control": "no-store" } });
+  const rateLimit = await enforceDistributedRateLimit(request, "tmdb_details");
+  if (rateLimit) return rateLimit;
 
   const token = process.env.TMDB_READ_ACCESS_TOKEN;
   if (!token) {

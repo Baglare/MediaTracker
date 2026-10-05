@@ -1,3 +1,4 @@
+import { enforceDistributedRateLimit } from "@/lib/api/distributed-rate-limit";
 import { runSafeApiRoute } from "@/lib/api/safe-route";
 import { validateAuthenticatedMutationRequest } from "@/lib/api/request-security";
 import { NextResponse } from "next/server";
@@ -21,6 +22,8 @@ export async function POST(request: Request) {
   if (!auth) return NextResponse.json({ ok: false, message: "Bu işlem için giriş yapmalısın." }, { status: 401 });
   const boundaryError = validateAuthenticatedMutationRequest(request);
   if (boundaryError) return boundaryError;
+  const rateLimit = await enforceDistributedRateLimit(request, "asset_write");
+  if (rateLimit) return rateLimit;
   let form: FormData;
   try { form = await request.formData(); } catch { return NextResponse.json({ ok: false, message: "Dosya isteği geçersiz." }, { status: 400 }); }
   const kindValue = form.get("kind");
@@ -54,6 +57,8 @@ export async function DELETE(request: Request) {
   if (!auth) return NextResponse.json({ ok: false, message: "Bu işlem için giriş yapmalısın." }, { status: 401 });
   const boundaryError = validateAuthenticatedMutationRequest(request);
   if (boundaryError) return boundaryError;
+  const rateLimit = await enforceDistributedRateLimit(request, "asset_write");
+  if (rateLimit) return rateLimit;
   const kind = new URL(request.url).searchParams.get("kind");
   if (kind !== "avatar" && kind !== "banner") return NextResponse.json({ ok: false, message: "Görsel türü geçersiz." }, { status: 400 });
   const { data } = await auth.client.from("profiles").select("avatar_path,banner_path").eq("id", auth.user.id).maybeSingle();

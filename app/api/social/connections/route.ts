@@ -1,3 +1,4 @@
+import { enforceDistributedRateLimit } from "@/lib/api/distributed-rate-limit";
 import { runSafeApiRoute } from "@/lib/api/safe-route";
 import { NextResponse } from "next/server";
 
@@ -6,6 +7,8 @@ import { getSupabaseServerClient } from "@/lib/supabase/server";
 
 export async function GET(request: Request) {
   return runSafeApiRoute("/api/social/connections", "GET", async () => {
+  const rateLimit = await enforceDistributedRateLimit(request, "social_read");
+  if (rateLimit) return rateLimit;
   const client = await getSupabaseServerClient();
   if (!client) return NextResponse.json({ ok: false, message: "Sosyal sistem yapılandırılmamış.", results: [] }, { status: 503 });
   const url = new URL(request.url);

@@ -1,3 +1,4 @@
+import { enforceDistributedRateLimit } from "@/lib/api/distributed-rate-limit";
 import { runSafeApiRoute } from "@/lib/api/safe-route";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -40,6 +41,8 @@ export async function GET(request: NextRequest) {
   }
   const capability = publicProviderCapability("anilist");
   if (!capability.enabled) return NextResponse.json({ events: [], code: "provider_unavailable", reason: capability.reason }, { status: 503, headers: { "Cache-Control": "no-store" } });
+  const rateLimit = await enforceDistributedRateLimit(request, "anilist_calendar");
+  if (rateLimit) return rateLimit;
 
   try {
     const nowSeconds = Math.floor(Date.now() / 1000);

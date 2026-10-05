@@ -1,3 +1,4 @@
+import "./helpers/admitted-rate-limit";
 import { randomBytes } from "node:crypto";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";

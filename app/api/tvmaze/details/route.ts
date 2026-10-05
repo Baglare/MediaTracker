@@ -1,3 +1,5 @@
+import { fetchWithTimeout } from "@/lib/api/request-security";
+import { enforceDistributedRateLimit, reportProviderCooldown } from "@/lib/api/distributed-rate-limit";
 import { runSafeApiRoute } from "@/lib/api/safe-route";
 // ============================================
 // TVmaze Dizi Detay API Route'u
@@ -58,18 +60,25 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  const rateLimit = await enforceDistributedRateLimit(request, "tvmaze_details");
+  if (rateLimit) return rateLimit;
+
   try {
     const userAgent = providerUserAgent();
     // 2) İki isteği paralel olarak at (daha hızlı!)
     const [showResponse, episodesResponse] = await Promise.all([
-      fetch(`https://api.tvmaze.com/shows/${showId}`, {
+      fetchWithTimeout(`https://api.tvmaze.com/shows/${showId}`, {
         headers: { accept: "application/json", ...(userAgent ? { "User-Agent": userAgent } : {}) },
       }),
-      fetch(`https://api.tvmaze.com/shows/${showId}/episodes`, {
+      fetchWithTimeout(`https://api.tvmaze.com/shows/${showId}/episodes`, {
         headers: { accept: "application/json", ...(userAgent ? { "User-Agent": userAgent } : {}) },
       }),
     ]);
 
+    for (const upstream of [showResponse, episodesResponse]) {
+      const cooldown = await reportProviderCooldown(request, "tvmaze_details", upstream);
+      if (cooldown) return cooldown;
+    }
     // Show verisi kontrolü
     if (!showResponse.ok) {
       return NextResponse.json(

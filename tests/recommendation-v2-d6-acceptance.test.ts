@@ -1,3 +1,4 @@
+import "./helpers/admitted-rate-limit";
 import type { MediaItem } from "@/lib/types";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";

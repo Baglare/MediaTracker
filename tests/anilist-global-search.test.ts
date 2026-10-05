@@ -1,3 +1,4 @@
+import "./helpers/admitted-rate-limit";
 import fs from "node:fs";
 import path from "node:path";
 

@@ -1,3 +1,4 @@
+import { enforceDistributedRateLimit, reportProviderCooldown } from "@/lib/api/distributed-rate-limit";
 import { runSafeApiRoute } from "@/lib/api/safe-route";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -54,6 +55,9 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  const rateLimit = await enforceDistributedRateLimit(request, "tvmaze_calendar");
+  if (rateLimit) return rateLimit;
+
   try {
     const userAgent = providerUserAgent();
     const response = await fetch(`https://api.tvmaze.com/shows/${showId}/episodes`, {
@@ -61,6 +65,8 @@ export async function GET(request: NextRequest) {
       cache: "no-store",
       signal: releaseRouteSignal(),
     });
+    const cooldown = await reportProviderCooldown(request, "tvmaze_calendar", response);
+    if (cooldown) return cooldown;
     if (!response.ok) return upstreamFailure(response);
     const payload = await response.json() as unknown;
     if (!Array.isArray(payload)) {

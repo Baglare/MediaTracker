@@ -8,6 +8,20 @@ Sınıflar: `R` required, `O` optional, `F` forbidden, `S` platform/system manag
 
 ## Core, Auth ve Cloud
 
+### V1-HARDENING-02D distributed limiter — provisioned separately, not by 02D.2
+
+| Env | LOCAL | PREVIEW | PRODUCTION | Allowed/default | Visibility | Owner / failure / scope |
+| --- | --- | --- | --- | --- | --- | --- |
+| `RATE_LIMIT_IDENTITY_HMAC_KEY` | O local-only; R distributed | R isolated Preview | R before cutover | >=32 characters; independent key; unset | server/secret | Security ops; scoped daily HMAC; provider/write admission unavailable without it |
+| `RATE_LIMIT_RPC_SIGNING_KEY` | O local-only; R distributed | R isolated Preview | R before cutover | >=32 characters; distinct from identity keys; unset | server/secret | Security ops; same signing version in target Vault; missing/invalid = 503, zero upstream |
+| `RATE_LIMIT_RPC_KEY_VERSION` | R distributed | R | R | `[a-zA-Z0-9_-]{1,32}`; unset | server/non-secret | Security ops; matches at most two accepted DB key versions |
+| `RATE_LIMIT_RPC_AUDIENCE` | R distributed | R isolated audience | R isolated audience | `[a-zA-Z0-9:_-]{1,96}`; unset | server/non-secret | Security ops; project/environment scoped; DB secret refs enforce exact match |
+| `RATE_LIMIT_IDENTITY_HMAC_PREVIOUS_KEY` | O rotation | O rotation | O rotation | Previous >=32-character identity key only; unset | server/secret | Security ops; dual-reserve both keys during rolling rotation; remove only after old writers drain plus 60s |
+| `RATE_LIMIT_LOCAL_TEST_IP` | O explicit synthetic adapter | F | F | Valid IPv4/IPv6; unset | server/non-secret | Test/local ops; never reads client headers off-platform; ignored in production runtime |
+| `VERCEL` | F manual spoof | S | S | Platform-managed `1` | server/non-secret | Platform ingress trust prerequisite; SDK `ipAddress(request)`; hosting topology still LIVE UNVERIFIED |
+
+No value was provisioned in 02D.2. Existing release holds remain authoritative. The migration is create-only; deploying these routes before approved migration/keys causes provider/write 503s. Identity-key rotation changes pseudonyms; old buckets expire naturally. All new instances must retain and debit the previous key while old instances run, then for at least one maximum window after they drain. DB-internal helpers check both active identity refs. Signing rotation accepts at most two versions; retire the old version after old writers drain plus envelope lifetime/skew (15s). A leak requires admission suspension and separately authorized rotation. See [V1_HARDENING_02D.md](V1_HARDENING_02D.md).
+
 | Env | LOCAL | PREVIEW | PRODUCTION | Allowed/default | Visibility | Owner ve fail-closed davranış |
 | --- | --- | --- | --- | --- | --- | --- |
 | `NEXT_PUBLIC_SUPABASE_URL` | O | R staging | R production | HTTPS Supabase origin; unset | public | Auth/Cloud; eksikse local mode, hedef karışırsa deploy durur |
