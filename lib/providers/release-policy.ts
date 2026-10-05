@@ -1,8 +1,6 @@
 import type { PublicProviderCapabilities, PublicProviderCapability, PublicProviderId } from "@/lib/providers/types";
 import { isValidProviderUserAgent } from "@/lib/api/provider-identity";
 
-const TMDB_APPROVED_LOGO_AVAILABLE = false;
-
 function disabled(reason: PublicProviderCapability["reason"]): PublicProviderCapability {
   return { enabled: false, reason };
 }
@@ -13,19 +11,14 @@ function enabled(): PublicProviderCapability {
 
 export function resolvePublicProviderCapabilities(
   env: NodeJS.ProcessEnv = process.env,
-  options: { tmdbApprovedLogoAvailable?: boolean } = {},
 ): PublicProviderCapabilities {
   // ANILIST_LIVE_ACCESS = DISABLED_PENDING_WRITTEN_AUTHORIZATION in every v1 runtime.
   // Future authorization requires a reviewed source change and release gate; no env bypass.
   const anilist = disabled("authorization_required");
 
-  const tmdbMode = env.MEDIA_TRACKER_TMDB_MODE;
-  let tmdb: PublicProviderCapability = disabled("disabled_by_policy");
-  if (tmdbMode === "noncommercial") {
-    if (!env.TMDB_READ_ACCESS_TOKEN) tmdb = disabled("missing_configuration");
-    else if (!(options.tmdbApprovedLogoAvailable ?? TMDB_APPROVED_LOGO_AVAILABLE)) tmdb = disabled("attribution_required");
-    else tmdb = enabled();
-  }
+  // TMDB_V1_LIVE_ACCESS = HARD_DISABLED in every v1 runtime.
+  // Future legal/retention/AI/branding review requires a separate source change and acceptance.
+  const tmdb = disabled("disabled_by_policy");
 
   return {
     version: 1,

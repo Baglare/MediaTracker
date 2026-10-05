@@ -66,14 +66,15 @@ describe("D8-4A.5C1 provider release policy", () => {
     }
   });
 
-  it("requires TMDB mode, token and approved logo contract together", () => {
-    const withoutLogo = resolvePublicProviderCapabilities({ NODE_ENV: "production", MEDIA_TRACKER_TMDB_MODE: "noncommercial", TMDB_READ_ACCESS_TOKEN: "test-token" } as NodeJS.ProcessEnv);
-    expect(withoutLogo.providers.tmdb).toEqual({ enabled: false, reason: "attribution_required" });
-    const ready = resolvePublicProviderCapabilities(
-      { NODE_ENV: "production", MEDIA_TRACKER_TMDB_MODE: "noncommercial", TMDB_READ_ACCESS_TOKEN: "test-token" } as NodeJS.ProcessEnv,
-      { tmdbApprovedLogoAvailable: true },
-    );
-    expect(ready.providers.tmdb.enabled).toBe(true);
+  it.each([undefined, "disabled", "noncommercial", "arbitrary"])("hard-disables TMDB regardless of mode %s", (mode) => {
+    for (const NODE_ENV of ["development", "production", "test"]) {
+      for (const VERCEL_ENV of [undefined, "preview", "production", "development"]) {
+        for (const token of [undefined, "synthetic-test-token"]) {
+          expect(resolvePublicProviderCapabilities({ NODE_ENV, VERCEL_ENV, MEDIA_TRACKER_TMDB_MODE: mode, TMDB_READ_ACCESS_TOKEN: token } as NodeJS.ProcessEnv).providers.tmdb)
+            .toEqual({ enabled: false, reason: "disabled_by_policy" });
+        }
+      }
+    }
   });
 
   it("requires a bounded MediaTracker User-Agent with contact for Open Library", () => {

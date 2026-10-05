@@ -1,5 +1,8 @@
 # AI Recommendation V2 Provider Enrichment
 
+Current TMDB v1 policy — 2026-10-05: [V1-HARDENING-04B.4](V1_HARDENING_04B4.md) sets `TMDB_V1_LIVE_ACCESS = HARD_DISABLED` in LOCAL/DEVELOPMENT/CI/PREVIEW/PRODUCTION. Mode/token/logo cannot enable it. Historical live/UAT evidence below is retained, not current enablement authority. Offline/legacy compatibility remains; future legal/provider, retention, AI isolation and branding reviews, a separate source change and release acceptance are required.
+
+
 > Durum: D6-2 tamamlandı. Bu katman provider kimliği, ham yapılandırılmış evidence, recommendation-only TVMaze anime filtresi, exact-ID linking ve bounded public metadata cache sağlar. D6-3 consumer/aggregation ve final ranking de uygulanmıştır.
 
 D6-5 regresyon sonucu için [D6 Kabul Raporu](AI_RECOMMENDATION_V2_ACCEPTANCE.md), ölçüm sınırı için [Evaluation Contract](AI_RECOMMENDATION_EVALUATION_CONTRACT.md) belgesine bakın.

@@ -42,13 +42,14 @@ Supabase Auth **Allow new users to sign up** bir env değildir. İlk release Pro
 
 ## Public provider policy
 
+TMDB v1: `TMDB_V1_LIVE_ACCESS = HARD_DISABLED` tüm LOCAL/DEVELOPMENT/CI/PREVIEW/PRODUCTION runtime'larında. `MEDIA_TRACKER_TMDB_MODE` retired/ignored; active enablement variable değildir. Token ve logo seçeneği erişim açamaz. [04B.4](V1_HARDENING_04B4.md) future legal/provider, retention, AI isolation, branding, ayrı source-code değişikliği ve release acceptance gerektirir.
+
 AniList v1: `ANILIST_LIVE_ACCESS = DISABLED_PENDING_WRITTEN_AUTHORIZATION` tüm LOCAL/PREVIEW/PRODUCTION/CI runtime'ları için geçerlidir. `MEDIA_TRACKER_ANILIST_MODE` active contract'tan kaldırıldı; eski değerler ignored, hiçbir değer live erişim açmaz. Legacy kayıtlar/cover/domain desteği korunur. [04B.3](V1_HARDENING_04B3.md): yazılı izin sonrası ayrı source-code değişikliği ve release acceptance gerekir.
 
 | Env | LOCAL | PREVIEW | PRODUCTION | Allowed/default | Visibility | Owner ve fail-closed davranış |
 | --- | --- | --- | --- | --- | --- | --- |
 | `MEDIA_TRACKER_PROVIDER_USER_AGENT` | O | R | R | Exact value class: `MediaTracker/1.0 (mediatracker.contact@gmail.com)` | server/non-secret | Provider ops; Preview smoke PASS. Aynı değer Production scope'una yalnız D8-4B env adımında atanır; eksik/geçersizse Open Library çağrılmaz |
-| `MEDIA_TRACKER_TMDB_MODE` | O | O | R | `disabled`/`noncommercial`; default disabled | server/non-secret | Production v1 exact `disabled`; logo/notice/token hazır değilse deny |
-| `TMDB_READ_ACCESS_TOKEN` | O | O | F v1 | Token | server/secret | TMDB disabled iken provision edilmez |
+| `TMDB_READ_ACCESS_TOKEN` | Gereksiz/unset | F v1 | F v1 | Unset; CI forbidden/unset | server/secret | Provider ops; v1 hiçbir ortamda provision edilmez, capability source-level disabled |
 | `OMDB_API_KEY` | O legacy diagnosis | F | F | Key | server/secret | Yeni public search/fallback policy ile daima kapalı; legacy data okunur |
 
 TVMaze için enable env yoktur; mevcut central release policy ile açıktır. [04B.1 technical attribution/provenance](V1_HARDENING_04B1.md) `IMPLEMENTATION_CLOSED`; `TVMAZE_SHAREALIKE_INTERPRETATION = MANUAL_LEGAL_GATE` persisted/transformed metadata ve export için açıktır. Bu ayrım provider enablement veya env değerlerini değiştirmez. Open Library contact/Preview geçmişi korunur; [04B.2](V1_HARDENING_04B2.md) shared UA validator printable 8..256 ASCII, MediaTracker/version ve geçerli email contact gerektirir; runtime/capability aynı sonucu verir. V1 metadata Search-only, automated Work enrichment yok; 64-entry/5-minute process cache kalıcı cache env gerektirmez. `OPEN_LIBRARY_APPLICATION_REGISTRATION = MANUAL_EXTERNAL_GATE` açık; Production Vercel env uygulaması D8-4B final env operasyonunun parçasıdır.
@@ -94,9 +95,9 @@ Araştırma adapter/model env'lerinin tamamı LOCAL conditional test dışında 
 
 ## Production v1 fixed set
 
-Production review şu exact değer sınıfını doğrular: `AI_SERVER_ACCESS_MODE=disabled`, `D7_RESEARCH_ROLLOUT_MODE=disabled`, `D7_RESEARCH_SHADOW_ENABLED=0`, `D7_RESEARCH_PUBLIC_CITATIONS_ENABLED=0`, `D7_RESEARCH_EVIDENCE_CACHE_ENABLED=0`, `MEDIA_TRACKER_PERSISTENT_EMBEDDING_CACHE=off`, `MEDIA_TRACKER_TMDB_MODE=disabled`. Paid AI/provider keys, `SUPABASE_SERVICE_ROLE_KEY`, test/staging/fixture/local-ML/live-smoke env'leri bulunmaz.
+Production review şu exact değer sınıfını doğrular: `AI_SERVER_ACCESS_MODE=disabled`, `D7_RESEARCH_ROLLOUT_MODE=disabled`, `D7_RESEARCH_SHADOW_ENABLED=0`, `D7_RESEARCH_PUBLIC_CITATIONS_ENABLED=0`, `D7_RESEARCH_EVIDENCE_CACHE_ENABLED=0`, `MEDIA_TRACKER_PERSISTENT_EMBEDDING_CACHE=off`. Paid AI/provider keys, `SUPABASE_SERVICE_ROLE_KEY`, test/staging/fixture/local-ML/live-smoke env'leri bulunmaz.
 
-Çelişkili kombinasyonlarda feature açılmaz: unknown AI/signup/provider mode, Cloud stage/flag mismatch, research conflict, missing Open Library contact, TMDB readiness eksikliği fail-closed'dur. AniList live erişimi bütün v1 ortamlarda source policy ile hard-disabled'dır; env-only enablement yoktur.
+Çelişkili kombinasyonlarda feature açılmaz: unknown AI/signup/provider mode, Cloud stage/flag mismatch, research conflict, missing Open Library contact fail-closed'dur. TMDB live erişimi bütün v1 ortamlarda source-level hard-disabled'dır. AniList live erişimi bütün v1 ortamlarda source policy ile hard-disabled'dır; env-only enablement yoktur.
 
 ### D8-4B exact Production value planı
 
@@ -115,7 +116,6 @@ Bu tablo final maintenance-off Production durumudur. Tüm satırların Vercel sc
 | `NEXT_PUBLIC_CLOUD_MEDIA_DEPLOYMENT_EPOCH` | `d8-v1-3a847701` | Approved RC SHA `3a847701…`; deterministic bounded release epoch | public, build-time | maintenance-on deploy; üç deploy boyunca değişmez |
 | `NEXT_PUBLIC_CLOUD_MEDIA_MINIMUM_CLIENT_VERSION` | `d2c2` | `CLOUD_MEDIA_CLIENT_VERSION` in `lib/cloud-rollout.ts` | public, build-time | maintenance-on deploy |
 | `MEDIA_TRACKER_PROVIDER_USER_AGENT` | `MediaTracker/1.0 (mediatracker.contact@gmail.com)` | Approved operator/provider contact | server non-secret, deployment runtime | maintenance-on deploy öncesi |
-| `MEDIA_TRACKER_TMDB_MODE` | `disabled` | First-release provider policy | server non-secret, deployment runtime | maintenance-on deploy öncesi |
 | `AI_SERVER_ACCESS_MODE` | `disabled` | First-release AI policy | server non-secret, deployment runtime | maintenance-on deploy öncesi |
 | `D7_RESEARCH_ROLLOUT_MODE` | `disabled` | First-release Research policy | server non-secret, deployment runtime | maintenance-on deploy öncesi |
 | `D7_RESEARCH_SHADOW_ENABLED` | `0` | First-release Research policy | server non-secret, deployment runtime | maintenance-on deploy öncesi |

@@ -73,20 +73,6 @@ describe.skipIf(!LIVE)("D6.6-2 conditional live provider contract", () => {
     }
   });
 
-  it.skipIf(!process.env.TMDB_READ_ACCESS_TOKEN)("TMDB movie/TV exact identity, genres, keywords ve external IDs", async () => {
-    const token = process.env.TMDB_READ_ACCESS_TOKEN as string;
-    for (const [mediaType, externalId] of [["movie", "550"], ["tv", "1399"]] as const) {
-      const headers = { accept: "application/json", authorization: `Bearer ${token}` };
-      const details = await (await liveFetch("tmdb", `https://api.themoviedb.org/3/${mediaType}/${externalId}?language=en-US`, { headers })).json() as { id?: number; genres?: unknown };
-      const keywords = await (await liveFetch("tmdb", `https://api.themoviedb.org/3/${mediaType}/${externalId}/keywords`, { headers })).json() as Record<string, unknown>;
-      const external = await (await liveFetch("tmdb", `https://api.themoviedb.org/3/${mediaType}/${externalId}/external_ids`, { headers })).json() as { imdb_id?: unknown };
-      expect(String(details.id)).toBe(externalId);
-      expect(Array.isArray(details.genres)).toBe(true);
-      expect(Array.isArray(keywords.keywords ?? keywords.results)).toBe(true);
-      if (external.imdb_id != null) expect(external.imdb_id).toMatch(/^tt\d+$/);
-    }
-  });
-
   it.skipIf(!process.env.OMDB_API_KEY)("OMDb exact IMDb identity ve partial metadata", async () => {
     const response = await liveFetch("omdb", `https://www.omdbapi.com/?apikey=${encodeURIComponent(process.env.OMDB_API_KEY as string)}&i=tt0137523&plot=short&r=json`);
     const body = await response.json() as { Response?: string; imdbID?: string; Genre?: string };

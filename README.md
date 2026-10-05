@@ -4,6 +4,8 @@ MediaTracker; film, dizi, anime, manga, manhwa, manhua, novel ve kitap takibi i�
 
 Uygulamanın ana veri kaynağı tarayıcıdaki owner-scoped yerel depolamadır. Supabase yapılandırılırsa hesap, kontrollü Cloud aktarımı ve kuyruk tabanlı senkronizasyon devreye girer; yapılandırılmazsa uygulama yerel modda çalışmaya devam eder. Repository kayıtlarında D8-4A.5E code/Staging/Preview hazırlığı tamamlanmış, D8-4B Production cutover başlamamıştır; canlı Production durumu bu dokümanla doğrulanmış sayılmaz.
 
+TMDB v1 env contract: `MEDIA_TRACKER_TMDB_MODE` retired/ignored; `TMDB_READ_ACCESS_TOKEN` normal LOCAL runtime için gereksiz, CI/PREVIEW/PRODUCTION için forbidden/unset. Legacy poster CDN compatibility live metadata API enablement değildir.
+
 ## Mevcut Durum
 
 - App Router sayfaları ile sekmeli ana uygulamayı birleştiren Next.js uygulaması.
@@ -35,7 +37,7 @@ Ayrıntılı sıra ve sonraki aşamalar: [`docs/ROADMAP.md`](docs/ROADMAP.md).
 - Versioned JSON import/export, kontrollü additive import, checksum, rollback/undo ve portable backup akışı.
 - Supabase auth, manuel Cloud aktarım, owner-scoped sync queue, V2 revision/idempotency/tombstone ve conflict akışı.
 - Local-first kütüphaneden ayrılmış cloud sosyal profil, kullanıcı arama ve takip/engel temeli.
-- TVMaze ve contact/User-Agent kapısı sağlanırsa Open Library ile aktif; TMDB için fail-closed izin kapılı, AniList v1 live erişimi tüm ortamlarda hard-disabled, OMDb için yalnız legacy kayıt uyumlu normalize medya modeli.
+- TVMaze ve contact/User-Agent kapısı sağlanırsa Open Library ile aktif; TMDB v1 live erişimi tüm ortamlarda hard-disabled, AniList v1 live erişimi tüm ortamlarda hard-disabled, OMDb için yalnız legacy kayıt uyumlu normalize medya modeli.
 - AI Recommendation V2 için structured provider evidence, deterministik eligibility/ranking ve unresolved hard constraint'lerde optional source-grounded research; LLM final sıralama yapmaz.
 - Ana sayfada medya domain durumu, kalıcı kullanıcı tercihleri ve sekme render orkestrasyonu ayrıştırılmış modüler yapı.
 - React/Next.js state yönetimi, TypeScript tip güvenliği ve responsive dashboard tasarımı.
@@ -74,7 +76,7 @@ Ayrıntılı sıra ve sonraki aşamalar: [`docs/ROADMAP.md`](docs/ROADMAP.md).
 - Keşfet:
   - Global arama paneli
   - Dizi için TVMaze; kitap için geçerli contact/User-Agent yapılandırmasıyla Open Library
-  - Film için TMDB yalnız non-commercial + approved logo/attribution kapısı tamamlandığında
+  - Film için TMDB live erişimi v1'de hard-disabled; manuel film ve legacy kayıt desteği korunur
   - V1'de live AniList erişimi tüm ortamlarda hard-disabled; legacy kayıtlar desteklenir. Yazılı izin sonrası ayrı post-release source-code enablement ve release gate gerekir.
   - OMDb yeni public arama/fallback zincirinde kapalı; mevcut legacy kayıtlar desteklenir
 - Veri yönetimi:
@@ -235,8 +237,6 @@ Temel yerel kullanım için hiçbir değişken zorunlu değildir. Provider anaht
 | `NEXT_PUBLIC_CLOUD_MEDIA_DEPLOYMENT_EPOCH` | Hayır | Açık istemcilerde deployment değişimini ve kontrollü reload gereksinimini tanımlar |
 | `NEXT_PUBLIC_CLOUD_MEDIA_MINIMUM_CLIENT_VERSION` | Hayır | Minimum uyumlu istemci sözleşmesini tanımlar |
 | `SUPABASE_SERVICE_ROLE_KEY` | Hayır | İlk release normal web runtime için gerekmez; ops/script ve ayrı gated geliştirme yolları içindir |
-| `MEDIA_TRACKER_TMDB_MODE` | Hayır | `disabled` veya tüm attribution kapıları tamamlandığında `noncommercial` |
-| `TMDB_READ_ACCESS_TOKEN` | Hayır | TMDB mode/attribution kapıları hazırsa server-side token |
 | `OMDB_API_KEY` | Hayır | Yalnız legacy/local teşhis; public search/fallback açmaz |
 | `AI_SERVER_ACCESS_MODE` | Hayır | Eksik/geçersiz değer `disabled`; ilk Production release'te `disabled` |
 | `MEDIA_TRACKER_PROVIDER_USER_AGENT` | Open Library için | Gerçek contact içeren MediaTracker User-Agent; eksikse provider kapalı |
@@ -403,7 +403,7 @@ Next.js tarafı `MEDIA_TRACKER_ML_SERVICE_URL` doluysa bu servisi kullanır. Ser
 - D2C.1 owner-scoped fiziksel primary key enforcement ve production cutover D8 aşamasındadır.
 - Cloud'dan otomatik realtime pull yoktur; download/merge kullanıcı aksiyonudur.
 - Release Calendar otomatik provider ufku 90 gündür. Push/e-posta, ICS/Google Calendar ve streaming availability zorunlu kapsamda değildir.
-- TMDB mevcut policy ile kapalıdır; AniList v1 live erişimi env'den bağımsız tüm ortamlarda hard-disabled kalır; provider erişilemezse diğer kaynaklar ve geçerli stale Release Calendar cache'i korunur.
+- TMDB v1 live erişimi env/token değerlerinden bağımsız hard-disabled; AniList v1 live erişimi env'den bağımsız tüm ortamlarda hard-disabled kalır; provider erişilemezse diğer kaynaklar ve geçerli stale Release Calendar cache'i korunur.
 - Contract/unit testleri canlı Supabase, RLS veya production deployment kanıtı değildir.
 
 ## Roadmap Özeti
@@ -429,7 +429,7 @@ Bu normaldir. Supabase değişkenleri boşsa uygulama sadece tarayıcı verisini
 
 ### Film araması sonuç vermiyor
 
-İlk public release'te TMDB approved logo/attribution ve non-commercial kapısı tamamlanmadan film araması kapalıdır. OMDb yeni arama fallback'i değildir.
+TMDB live erişimi v1'de LOCAL/DEVELOPMENT/CI/PREVIEW/PRODUCTION için source-level hard-disabled. Env/token/logo tek başına erişim açamaz; future enablement ayrı legal/provider, retention, AI isolation, attribution/branding review, source-code değişikliği ve release acceptance gerektirir. OMDb yeni arama fallback'i değildir.
 
 ### AI Danışman gerçek provider kullanmıyor
 

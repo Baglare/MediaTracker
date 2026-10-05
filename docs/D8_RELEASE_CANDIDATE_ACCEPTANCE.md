@@ -1,5 +1,8 @@
 # D8 release-candidate acceptance
 
+Current TMDB v1 policy — 2026-10-05: [V1-HARDENING-04B.4](V1_HARDENING_04B4.md) sets `TMDB_V1_LIVE_ACCESS = HARD_DISABLED` in LOCAL/DEVELOPMENT/CI/PREVIEW/PRODUCTION. Mode/token/logo cannot enable it. Historical live/UAT evidence below is retained, not current enablement authority. Offline/legacy compatibility remains; future legal/provider, retention, AI isolation and branding reviews, a separate source change and release acceptance are required.
+
+
 Current AniList v1 policy — 2026-10-05: [V1-HARDENING-04B.3](V1_HARDENING_04B3.md) hard-disables live access in every runtime, including Preview/development/CI. Historical live/UAT evidence below remains historical; `preview_test` and `authorized` env values are ignored. Legacy/offline support remains. Future enablement requires written authorization, a separate source change and release acceptance.
 
 ## Current release state — 2026-10-03
@@ -82,7 +85,7 @@ Bu tablo tek kanonik hold kaynağıdır. Durumlar yalnız `CLOSED`, `BLOCKED_EXT
 | TVMaze ShareAlike interpretation | `BLOCKED_MANUAL` | Evet | `TVMAZE_SHAREALIKE_INTERPRETATION = MANUAL_LEGAL_GATE`; persisted/transformed metadata ve export notice/kapsamı için ayrı manuel/hukuki değerlendirme |
 | OMDb yeni public kullanım | `CLOSED` | Hayır | Search/fallback disabled; legacy `externalSource: "omdb"` decode/import/display korunur |
 | AniList live enablement (all v1 runtimes) | `POST_RELEASE_GATE` | Hayır | `ANILIST_V1_LIVE_ACCESS = BLOCKED_EXTERNAL_AUTHORIZATION`; env ve live-test bypass `CLOSED`. [04B.3](V1_HARDENING_04B3.md): legacy destekli, hard-disabled; yazılı izin sonrası ayrı source-code enablement ve release gate |
-| TMDB Production enablement | `POST_RELEASE_GATE` | Hayır | Disabled kalır; approved logo/notice/non-commercial readiness sonrası ayrı enablement |
+| TMDB live enablement (all v1 runtimes) | `POST_RELEASE_GATE` | Hayır | `TMDB_V1_LIVE_ACCESS = HARD_DISABLED`; env enablement/live-test bypass `CLOSED`. [04B.4](V1_HARDENING_04B4.md): retention, AI isolation, attribution/branding ve provider/legal review post-release prerequisites; ayrı source change ve release acceptance gerekir |
 | Production AI key/budget/monitoring | `POST_RELEASE_GATE` | Hayır | İlk sürümde key provision edilmez; AI enablement ayrı release gate'idir |
 | Canonical admin claim ve MFA/AAL2 | `POST_RELEASE_GATE` | Hayır | Aktif v1 privileged kullanıcı yüzeyi yok; AI/admin enablement öncesi ele alınır |
 | Leaked-password protection | `POST_RELEASE_GATE` | Hayır | Free-plan capability yoksa `ACCEPTED_PLATFORM_LIMITATION`; signup disabled + güçlü benzersiz existing credentials; capability açıldığında etkinleştir |

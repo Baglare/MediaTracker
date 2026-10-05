@@ -1,5 +1,8 @@
 # AI Provider Evidence Matrix
 
+Current TMDB v1 policy — 2026-10-05: [V1-HARDENING-04B.4](V1_HARDENING_04B4.md) sets `TMDB_V1_LIVE_ACCESS = HARD_DISABLED` in LOCAL/DEVELOPMENT/CI/PREVIEW/PRODUCTION. Mode/token/logo cannot enable it. Historical live/UAT evidence below is retained, not current enablement authority. Offline/legacy compatibility remains; future legal/provider, retention, AI isolation and branding reviews, a separate source change and release acceptance are required.
+
+
 > Durum: D6-0 karar sözleşmesi; D6-2 adapter'ları raw claim üretir, D6-3 aggregator bu claim'leri bounded provider-support policy ile tüketir. D6 kabulü [AI_RECOMMENDATION_V2_ACCEPTANCE.md](AI_RECOMMENDATION_V2_ACCEPTANCE.md), D7 snapshot/label sınırı [AI_RECOMMENDATION_EVALUATION_CONTRACT.md](AI_RECOMMENDATION_EVALUATION_CONTRACT.md) içindedir. Bu belge canlı provider doğrulaması değildir.
 
 ## Kaynak sahipliği

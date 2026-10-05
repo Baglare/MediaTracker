@@ -1,5 +1,8 @@
 # D8 production cutover runbook
 
+Current TMDB v1 policy — 2026-10-05: [V1-HARDENING-04B.4](V1_HARDENING_04B4.md) sets `TMDB_V1_LIVE_ACCESS = HARD_DISABLED` in LOCAL/DEVELOPMENT/CI/PREVIEW/PRODUCTION. Mode/token/logo cannot enable it. Historical live/UAT evidence below is retained, not current enablement authority. Offline/legacy compatibility remains; future legal/provider, retention, AI isolation and branding reviews, a separate source change and release acceptance are required.
+
+
 Current AniList v1 policy — 2026-10-05: [V1-HARDENING-04B.3](V1_HARDENING_04B3.md) hard-disables live access in every runtime, including Preview/development/CI. Historical live/UAT evidence below remains historical; `preview_test` and `authorized` env values are ignored. Legacy/offline support remains. Future enablement requires written authorization, a separate source change and release acceptance.
 
 ## Current execution gate — 2026-10-03

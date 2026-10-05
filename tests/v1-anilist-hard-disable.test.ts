@@ -126,19 +126,19 @@ describe("V1 AniList hard-disable", () => {
     expect(fetcher).not.toHaveBeenCalled();
   });
 
-  it("runs the live integration source with D6_PROVIDER_LIVE_SMOKE=1 using an isolated fixture transport and zero AniList invocations", async () => {
+  it("runs the live integration source with D6_PROVIDER_LIVE_SMOKE=1 using an isolated fixture transport and zero AniList/TMDB invocations", async () => {
     const cases: Array<() => unknown> = [];
     const register = Object.assign((_name: string, callback: () => unknown) => { cases.push(callback); }, { skipIf: (skip: boolean) => skip ? () => {} : (_name: string, callback: () => unknown) => { cases.push(callback); } });
     const invocations: string[] = [];
     const transport = vi.fn(async ({ provider, url }: { provider: string; url: string }) => {
       invocations.push(provider);
       expect(provider).not.toBe("anilist");
+      expect(provider).not.toBe("tmdb");
       let body: unknown;
       if (provider === "tvmaze") {
         const anime = url.includes("One%20Piece");
         body = [{ show: { id: 1, type: anime || url.includes("Simpsons") ? "Animation" : "Scripted", language: anime ? "Japanese" : "English", network: { country: { code: anime ? "JP" : "US" } } } }];
       } else if (provider === "openlibrary") body = { docs: [{ key: "/works/OL1W", author_name: ["Fixture"], subject: ["Fantasy"] }] };
-      else if (provider === "tmdb") body = { id: url.includes("/550") ? 550 : 1399, genres: [], keywords: [], results: [], imdb_id: "tt0137523" };
       else if (provider === "omdb") body = { Response: "True", imdbID: "tt0137523", Genre: "Drama" };
       else throw new Error("Unexpected provider");
       return { response: Response.json(body), telemetry: { provider, attemptCount: 1, requestCount: 1 } };
@@ -155,10 +155,11 @@ describe("V1 AniList hard-disable", () => {
         throw new Error(`Unapproved live test import: ${id}`);
       },
     });
-    expect(cases).toHaveLength(5);
+    expect(cases).toHaveLength(4);
     for (const callback of cases) await callback();
-    expect(new Set(invocations)).toEqual(new Set(["tvmaze", "openlibrary", "tmdb", "omdb"]));
+    expect(new Set(invocations)).toEqual(new Set(["tvmaze", "openlibrary", "omdb"]));
     expect(invocations.filter((provider) => provider === "anilist")).toHaveLength(0);
+    expect(invocations.filter((provider) => provider === "tmdb")).toHaveLength(0);
   });
 
   it("allows endpoint literals only in the three dormant gated routes, never executable tests or tooling", () => {

@@ -1,7 +1,7 @@
 // ============================================
-// Online Arama (TMDB) Bileşeni — Geçici Devre Dışı
+// Online Arama (TMDB) Bileşeni — V1 Devre Dışı
 // ============================================
-// TMDB erişim/token problemi nedeniyle şimdilik pasif.
+// TMDB live erişimi v1 policy ile kapalı; future enablement ayrı review gerektirir.
 // Kod silinmedi, ileride geri döndürülebilir.
 
 "use client";
@@ -22,7 +22,7 @@ export default function OnlineSearch() {
             </span>
             <p className="text-[11px] text-zinc-600 flex items-center gap-1">
               <AlertTriangle className="w-3 h-3" />
-              Geçici olarak devre dışı — erişim problemi çözülünce aktif olacak
+              TMDB canlı araması v1’de kapalı; gelecekte açılması ayrı inceleme gerektirir
             </p>
           </div>
         </div>
