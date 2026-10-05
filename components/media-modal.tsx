@@ -25,6 +25,7 @@
 
 import { useState } from "react";
 import { safeExternalUrl } from "@/lib/safe-external-url";
+import { tvmazeSourceUrl } from "@/lib/providers/tvmaze-source-url";
 import {
   X,
   Plus,
@@ -220,7 +221,9 @@ export default function MediaModal({ isOpen, editingItem, onSave, onClose }: Med
   if (!isOpen) return null;
 
   const isEditMode = editingItem !== null;
-  const sourceUrl = safeExternalUrl(editingItem?.siteUrl);
+  const sourceUrl = editingItem?.externalSource === "tvmaze"
+    ? tvmazeSourceUrl(editingItem)
+    : safeExternalUrl(editingItem?.siteUrl);
   const isMovie = type === "movie";
   const isTV = type === "tv";
   const isAnime = type === "anime";
@@ -911,6 +914,7 @@ export default function MediaModal({ isOpen, editingItem, onSave, onClose }: Med
                 {sourceUrl && (
                   <a
                     href={sourceUrl}
+                    aria-label={`${sourceLabel} kaynak sayfasını aç`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="ml-auto text-[12px] font-medium text-[var(--w-primary-strong)] hover:underline cursor-pointer"

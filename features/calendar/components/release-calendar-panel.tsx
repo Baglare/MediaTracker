@@ -20,7 +20,7 @@ import {
   hideProviderReleaseEvent,
   restoreProviderReleaseEvent,
 } from "@/features/calendar/domain/manual-release-calendar";
-import type { ReleaseEvent } from "@/features/calendar/domain/release-calendar";
+import { tvmazeReleaseSourceUrl, type ReleaseEvent } from "@/features/calendar/domain/release-calendar";
 import {
   addReleaseCalendarDays,
   buildReleaseMonthGrid,
@@ -126,6 +126,7 @@ function AgendaGroup({
       <div className="space-y-2">
         {items.map((viewItem) => {
           const { event, media, stale } = viewItem;
+          const sourceUrl = tvmazeReleaseSourceUrl(event, media);
           const manualEvent = event.origin.kind === "manual"
             ? media.releaseCalendar?.manualEvents.find((entry) => entry.id === event.id)
             : undefined;
@@ -160,7 +161,7 @@ function AgendaGroup({
                 {formatReleaseDate(event)}
               </span>
               <span className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] text-[var(--app-text-muted)]">
-                <span>{providerLabel(event)}</span>
+                {!sourceUrl && <span>{providerLabel(event)}</span>}
                 {event.metadata?.region && <span>· {event.metadata.region}</span>}
                 {stale && (
                   <span className="rounded bg-amber-500/10 px-1 py-0.5 text-amber-400">
@@ -176,6 +177,7 @@ function AgendaGroup({
               </span>
             </button>
             <span className="flex shrink-0 flex-col gap-1">
+              {sourceUrl && <a href={sourceUrl} target="_blank" rel="noopener noreferrer" aria-label={`${media.title} TVMaze kaynak sayfasını aç`} className="rounded text-[10px] text-[var(--app-text-secondary)] underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-focus)]">TVMaze</a>}
               {event.origin.kind === "provider" && onHide && (
                 <button
                   type="button"

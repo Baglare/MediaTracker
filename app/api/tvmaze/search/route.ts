@@ -1,3 +1,4 @@
+import { tvmazeSourceUrl } from "@/lib/providers/tvmaze-source-url";
 import { enforceDistributedRateLimit, reportProviderCooldown } from "@/lib/api/distributed-rate-limit";
 import { runSafeApiRoute } from "@/lib/api/safe-route";
 // ============================================
@@ -78,7 +79,7 @@ export function normalizeSearchResult(
     theTvdbId: typeof show.externals?.thetvdb === "number" ? String(show.externals.thetvdb) : undefined,
     premiered: show.premiered || undefined,
     ended: show.ended || undefined,
-    siteUrl: show.url || `https://www.tvmaze.com/shows/${show.id}`,
+    siteUrl: tvmazeSourceUrl({ externalSource: "tvmaze", externalId: String(show.id), siteUrl: show.url }),
   };
 }
 

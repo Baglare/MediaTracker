@@ -19,6 +19,10 @@ auth UID veya domain codec ayrıntısı bilmez.
 Additive plan/executor/journal sınırı `lib/portable-additive-import.ts` içindedir.
 Panel yalnız dry-run seçeneklerini ve açık kullanıcı onayını iletir.
 
+## TVMaze source provenance (2026-10-05)
+
+[04B.1](V1_HARDENING_04B1.md) uses the existing MediaItem `siteUrl` field without a version/schema bump. Export preserves validated TVMaze show URLs and derives missing legacy provenance from a positive show or season external ID. Unsafe TVMaze URLs are replaced by the safe fallback or omitted; decoded copies are used without mutating source items. Other providers are unchanged. The strict manifest gains no license field. CC BY-SA/ShareAlike scope and export-notice interpretation remain `TVMAZE_SHAREALIKE_INTERPRETATION = MANUAL_LEGAL_GATE`.
+
 ## Format
 
 Kök obje yalnız `manifest` ve `data` alanlarını taşır. Format adı

@@ -129,6 +129,7 @@ export default function TvmazeSearch({
             tvmazeStatus: result.tvmazeStatus,
             networkName: result.networkName,
             language: result.language,
+            siteUrl: result.siteUrl,
           };
           onAddToLibrary(fallbackDetail);
           return;

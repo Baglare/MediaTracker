@@ -6,6 +6,8 @@
 
 **Current local security baseline: `V1-HARDENING-01 COMPLETE_WITH_DOCUMENTED_DEV_EXCEPTION`.** [01B audit and canonical exception](V1_HARDENING_01B.md) supersede the earlier local test/type failures and unconditional full-audit High gate: runtime Critical/High must be zero; full audit remains reported with exact approved-exception enforcement. `V1-SEC-EXCEPTION-001` is an accepted temporary dev-tooling exception, not a fixed vulnerability, with review/expiry no later than 2026-11-03. New/adapted/expired exceptions, reachable unreviewed Critical/High and unapplied available patches block release. Future CI controls are documented requirements, not an implemented workflow. This working-tree validation does not accept an immutable RC or remote deployment.
 
+Current TVMaze status — 2026-10-05: [V1-HARDENING-04B.1](V1_HARDENING_04B1.md) closes technical attribution/provenance (`IMPLEMENTATION_CLOSED`). The earlier attribution `CLOSED` statement covered the About notice and global result/source link only; it did not prove saved, advanced, Calendar, public-card or export coverage, nor full license compliance. `TVMAZE_SHAREALIKE_INTERPRETATION = MANUAL_LEGAL_GATE` remains open for persisted/transformed metadata and exports. Provider policy remains unchanged.
+
 Durum tarihi: 2026-08-11. Sonuç: **PASS — D8-4A.5E code/Staging/Preview hazırlığı tamamlandı; D8-4B manuel Production kapıları açık.** Production veritabanı, Auth, Storage, env veya deploy hedefinde mutation yapılmadı.
 
 ## D8-4A.5 release freeze
@@ -70,7 +72,8 @@ Bu tablo tek kanonik hold kaynağıdır. Durumlar yalnız `CLOSED`, `BLOCKED_EXT
 | Open Library contact ve Preview smoke | `CLOSED` | Hayır | `mediatracker.contact@gmail.com`; `MediaTracker/1.0 (mediatracker.contact@gmail.com)`; Preview Dune + attribution PASS. Production env uygulaması final env gate'indedir |
 | Production final env review | `BLOCKED_MANUAL` | Evet | İki kişi review; fixed disabled flags, Open Library UA ve Cloud stage/value class; service-role/AI/test/staging secrets absent |
 | Production exact target, backup ve change-window | `BLOCKED_MANUAL` | Evet | Exact Vercel/Supabase targets ve deployed SHA, DB/PITR+Storage planı, ledger, operator/onaylı pencere |
-| TVMaze attribution | `CLOSED` | Hayır | CC BY-SA notice ve canonical result/source link mevcut |
+| TVMaze technical attribution/provenance | `CLOSED` | Hayır | `IMPLEMENTATION_CLOSED`; safe show source URL, advanced/saved/Calendar/public cards ve Portable v3 provenance; [04B.1](V1_HARDENING_04B1.md). Önceki About/global-link kanıtı yukarıda korunur |
+| TVMaze ShareAlike interpretation | `BLOCKED_MANUAL` | Evet | `TVMAZE_SHAREALIKE_INTERPRETATION = MANUAL_LEGAL_GATE`; persisted/transformed metadata ve export notice/kapsamı için ayrı manuel/hukuki değerlendirme |
 | OMDb yeni public kullanım | `CLOSED` | Hayır | Search/fallback disabled; legacy `externalSource: "omdb"` decode/import/display korunur |
 | AniList Production enablement | `POST_RELEASE_GATE` | Hayır | Disabled kalır; yazılı izin sonrası ayrı enablement |
 | TMDB Production enablement | `POST_RELEASE_GATE` | Hayır | Disabled kalır; approved logo/notice/non-commercial readiness sonrası ayrı enablement |
@@ -79,7 +82,7 @@ Bu tablo tek kanonik hold kaynağıdır. Durumlar yalnız `CLOSED`, `BLOCKED_EXT
 | Leaked-password protection | `POST_RELEASE_GATE` | Hayır | Free-plan capability yoksa `ACCEPTED_PLATFORM_LIMITATION`; signup disabled + güçlü benzersiz existing credentials; capability açıldığında etkinleştir |
 | Admin/Ops panel | `NOT_APPLICABLE` | Hayır | v1 kararı yeni panel yapmamak; explicit ops scriptleri ve dashboard kullanılır |
 
-**D8-4B öncesi gerçek blocker sayısı: 5.** Bunlar Production direct signup deny; approved security migration + Advisor rerun; privacy paketinin manuel hukuki incelemesi; final Production env review; exact target + backup/Storage + change-window kapılarıdır. Open Library artık bağımsız blocker değildir.
+**2026-10-05 itibarıyla D8-4B öncesi gerçek blocker sayısı: 6.** TVMaze ShareAlike manual/legal gate mevcut beş kapıya eklenmiştir. Bunlar Production direct signup deny; approved security migration + Advisor rerun; privacy paketinin manuel hukuki incelemesi; final Production env review; exact target + backup/Storage + change-window kapılarıdır. Open Library artık bağımsız blocker değildir.
 
 ## D8-4A.5E security/privacy/preflight closeout
 

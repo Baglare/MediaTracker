@@ -1,3 +1,4 @@
+import { tvmazeSourceUrl } from "@/lib/providers/tvmaze-source-url";
 import {
   getCanonicalMediaIdentity,
   parseCanonicalMediaKeyV2,
@@ -75,6 +76,14 @@ export interface ReleaseEvent {
   seasonIdentity?: TvSeasonIdentity;
   episodeNumber?: number;
   metadata?: ReleaseEventMetadata;
+}
+
+export function tvmazeReleaseSourceUrl(event: ReleaseEvent, media: MediaItem): string | undefined {
+  if (event.origin.kind !== "provider" || event.origin.provider !== "tvmaze") return undefined;
+  // providerEventId identifies an episode, never a show.
+  return tvmazeSourceUrl({ externalSource: "tvmaze", siteUrl: media.siteUrl })
+    ?? tvmazeSourceUrl({ externalSource: "tvmaze", externalId: event.seasonIdentity?.providerShowId })
+    ?? tvmazeSourceUrl(media);
 }
 
 export type ReleaseEligibilityReason =

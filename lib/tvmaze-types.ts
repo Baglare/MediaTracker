@@ -84,6 +84,7 @@ export interface TvmazeNormalizedResult {
 
 /** Normalize edilmiş TVmaze detay sonucu (listeye eklerken kullanılır) */
 export interface TvmazeNormalizedDetail {
+  siteUrl?: string;
   externalSource: "tvmaze";
   externalId: string;
   type: "tv";

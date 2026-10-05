@@ -50,7 +50,7 @@ Supabase Auth **Allow new users to sign up** bir env değildir. İlk release Pro
 | `TMDB_READ_ACCESS_TOKEN` | O | O | F v1 | Token | server/secret | TMDB disabled iken provision edilmez |
 | `OMDB_API_KEY` | O legacy diagnosis | F | F | Key | server/secret | Yeni public search/fallback policy ile daima kapalı; legacy data okunur |
 
-TVMaze için enable env yoktur; attribution/source-link code contract'ıyla açıktır. Open Library contact kararı ve Preview smoke'u `CLOSED`; Production Vercel env uygulaması D8-4B final env operasyonunun parçasıdır.
+TVMaze için enable env yoktur; mevcut central release policy ile açıktır. [04B.1 technical attribution/provenance](V1_HARDENING_04B1.md) `IMPLEMENTATION_CLOSED`; `TVMAZE_SHAREALIKE_INTERPRETATION = MANUAL_LEGAL_GATE` persisted/transformed metadata ve export için açıktır. Bu ayrım provider enablement veya env değerlerini değiştirmez. Open Library contact kararı ve Preview smoke'u `CLOSED`; Production Vercel env uygulaması D8-4B final env operasyonunun parçasıdır.
 
 ## AI, Research ve cache
 

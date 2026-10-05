@@ -1,3 +1,4 @@
+import { tvmazeSourceUrl } from "@/lib/providers/tvmaze-source-url";
 import { validateBackupPayload } from "./backup";
 import {
   decodeMediaItems,
@@ -330,6 +331,11 @@ function sanitizeMediaItems(
       delete safe.metadata;
       delete safe.providerPayload;
       delete safe.rawProviderPayload;
+      if (safe.externalSource === "tvmaze") {
+        const sourceUrl = tvmazeSourceUrl(safe);
+        if (sourceUrl) safe.siteUrl = sourceUrl;
+        else delete safe.siteUrl;
+      }
       if (!includePersonalNotes) delete safe.personalNotes;
       return safe;
     })

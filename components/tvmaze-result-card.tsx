@@ -7,6 +7,7 @@
 
 "use client";
 
+import { tvmazeSourceUrl } from "@/lib/providers/tvmaze-source-url";
 import Image from "next/image";
 import { Plus, Check, Tv, Loader2 } from "lucide-react";
 import { TvmazeNormalizedResult } from "@/lib/tvmaze-types";
@@ -25,6 +26,7 @@ export default function TvmazeResultCard({
   isAdding,
   onAdd,
 }: TvmazeResultCardProps) {
+  const sourceUrl = tvmazeSourceUrl(result);
   return (
     <div className="flex min-w-0 gap-4 overflow-hidden rounded-xl border border-[var(--app-border)] bg-[var(--app-card-bg)] p-4 transition-colors hover:bg-[var(--app-card-hover)]">
       {/* Sol: Poster görseli */}
@@ -79,6 +81,10 @@ export default function TvmazeResultCard({
             </span>
           )}
         </div>
+
+        <p className="mt-1 text-[11px] text-[var(--app-text-secondary)]">
+          {sourceUrl ? <a href={sourceUrl} target="_blank" rel="noopener noreferrer" aria-label="TVMaze kaynak sayfasını aç" className="underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-focus)]">Kaynak: TVMaze</a> : "Kaynak: TVMaze"}
+        </p>
 
         {/* Türler */}
         {result.genres && result.genres.length > 0 && (

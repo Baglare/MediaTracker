@@ -1,3 +1,4 @@
+import { tvmazeSourceUrl } from "@/lib/providers/tvmaze-source-url";
 import type { AniListNormalizedResult } from "@/lib/anilist-types";
 import type { OmdbNormalizedResult } from "@/lib/omdb-types";
 import type { OpenLibraryNormalizedResult } from "@/lib/openlibrary-types";
@@ -21,6 +22,7 @@ export function mapTvmazeDetail(detail: TvmazeNormalizedDetail): {
     coverImage: detail.coverUrl || "/placeholders/tv.svg",
     currentProgress: 0,
     externalSource: "tvmaze" as const,
+    siteUrl: tvmazeSourceUrl(detail),
     overview: detail.overview,
     releaseYear: detail.releaseYear,
     numberOfSeasons: detail.numberOfSeasons,

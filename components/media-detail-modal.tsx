@@ -23,6 +23,7 @@
 
 "use client";
 
+import { tvmazeSourceUrl } from "@/lib/providers/tvmaze-source-url";
 import React, { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { safeExternalUrl } from "@/lib/safe-external-url";
@@ -126,6 +127,7 @@ function sourceLabelOf(source: MediaItem["externalSource"]): string {
 }
 
 function resolveSourceLink(media: MediaItem): string | undefined {
+  if (media.externalSource === "tvmaze") return tvmazeSourceUrl(media);
   if (media.siteUrl) return media.siteUrl;
   if (media.externalSource === "openlibrary" && media.externalId) {
     return `https://openlibrary.org${media.externalId}`;
@@ -838,6 +840,7 @@ export default function MediaDetailModal({
                   {sourceLink && (
                     <a
                       href={sourceLink}
+                      aria-label={`${sourceLabel} kaynak sayfasını aç`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="ml-auto inline-flex items-center gap-1.5 px-2.5 h-8 rounded-lg text-[12px] font-medium ring-1 transition-colors cursor-pointer"

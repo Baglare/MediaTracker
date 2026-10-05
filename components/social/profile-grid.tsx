@@ -1,3 +1,4 @@
+import { tvmazeSourceUrl } from "@/lib/providers/tvmaze-source-url";
 import Image from "next/image";
 import type { CSSProperties } from "react";
 
@@ -10,7 +11,7 @@ const SPANS = ["", "md:col-span-1", "md:col-span-2", "md:col-span-3", "md:col-sp
 const STARTS = ["md:col-start-1", "md:col-start-2", "md:col-start-3", "md:col-start-4", "md:col-start-5", "md:col-start-6", "md:col-start-7", "md:col-start-8", "md:col-start-9", "md:col-start-10", "md:col-start-11", "md:col-start-12"];
 
 function MediaCards({ items }: { items: SocialProfilePayload["favorites"] }) {
-  return <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{items.map((item) => <article key={`${item.externalSource}:${item.externalId}:${item.title}`} className="min-w-0"><div className="relative aspect-[2/3] overflow-hidden rounded-lg bg-[var(--app-surface-3)]">{item.coverUrl ? <Image src={item.coverUrl} alt="" fill sizes="160px" unoptimized className="object-cover" /> : <div className="grid h-full place-items-center text-2xl text-[var(--app-text-muted)]" aria-hidden="true">◆</div>}</div><p className="mt-1 truncate text-xs text-[var(--app-text-secondary)]">{item.title}</p></article>)}</div>;
+  return <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{items.map((item) => <article key={`${item.externalSource}:${item.externalId}:${item.title}`} className="min-w-0"><div className="relative aspect-[2/3] overflow-hidden rounded-lg bg-[var(--app-surface-3)]">{item.coverUrl ? <Image src={item.coverUrl} alt="" fill sizes="160px" unoptimized className="object-cover" /> : <div className="grid h-full place-items-center text-2xl text-[var(--app-text-muted)]" aria-hidden="true">◆</div>}</div><p className="mt-1 truncate text-xs text-[var(--app-text-secondary)]">{item.title}</p>{item.externalSource === "tvmaze" && <p className="mt-1 text-[10px] text-[var(--app-text-secondary)]">{tvmazeSourceUrl(item) ? <a href={tvmazeSourceUrl(item)} target="_blank" rel="noopener noreferrer" aria-label={`${item.title} TVMaze kaynak sayfasını aç`} className="underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-focus)]">TVMaze</a> : "TVMaze"}</p>}</article>)}</div>;
 }
 
 function XpProgression({ xp }: { xp: PublicXpSummary }) {

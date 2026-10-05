@@ -1,3 +1,4 @@
+import { tvmazeSourceUrl } from "@/lib/providers/tvmaze-source-url";
 import { fetchWithTimeout } from "@/lib/api/request-security";
 import { enforceDistributedRateLimit, reportProviderCooldown } from "@/lib/api/distributed-rate-limit";
 import { runSafeApiRoute } from "@/lib/api/safe-route";
@@ -145,6 +146,7 @@ export async function GET(request: NextRequest) {
     const result: TvmazeNormalizedDetail = {
       externalSource: "tvmaze",
       externalId: String(show.id),
+      siteUrl: tvmazeSourceUrl({ externalSource: "tvmaze", externalId: String(show.id), siteUrl: show.url }),
       type: "tv",
       title: show.name,
       overview,
