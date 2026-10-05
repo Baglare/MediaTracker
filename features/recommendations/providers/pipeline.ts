@@ -9,7 +9,7 @@ import { adaptAniListEvidence } from "./anilist-adapter";
 import { evaluateExactIdentityLink, selectPrimaryIdentity } from "./candidate-identity";
 import { providerEvidenceCache, providerEvidenceCacheKey } from "./evidence-cache";
 import { adaptOmdbEvidence } from "./omdb-adapter";
-import { adaptOpenLibraryEvidence, fetchOpenLibraryWorkEvidence } from "./openlibrary-adapter";
+import { adaptOpenLibraryEvidence } from "./openlibrary-adapter";
 import { adaptTmdbEvidence, fetchTmdbEvidenceDetail } from "./tmdb-adapter";
 import { adaptTvmazeRecommendationEvidence, countTvmazeDecision } from "./tvmaze-adapter";
 import type { CandidateProviderEvidenceSnapshot, ProviderEvidenceTelemetry } from "./types";
@@ -104,7 +104,7 @@ export async function prepareProviderEvidencePipeline(input: {
     kept.push(candidate); snapshots.set(candidate, snapshot);
   }
 
-  const enrichable = kept.filter((candidate) => candidate.source === "tmdb" || candidate.source === "openlibrary").slice(0, PROVIDER_ENRICHMENT_MAX_CANDIDATES);
+  const enrichable = kept.filter((candidate) => candidate.source === "tmdb").slice(0, PROVIDER_ENRICHMENT_MAX_CANDIDATES);
   await mapBounded(enrichable, async (candidate) => {
     const base = snapshots.get(candidate);
     if (!base) return;
@@ -112,9 +112,7 @@ export async function prepareProviderEvidencePipeline(input: {
     try {
       const loaded = await providerEvidenceCache.getOrLoadWithStatus(
         key,
-        () => candidate.source === "tmdb"
-          ? fetchTmdbEvidenceDetail({ baseUrl: input.baseUrl, externalId: candidate.externalId, mediaType: candidate.type as "movie" | "tv", fetchImpl: input.fetchImpl, timeoutMs: PROVIDER_ENRICHMENT_TIMEOUT_MS })
-          : fetchOpenLibraryWorkEvidence({ result: candidate.globalSearch?.raw as OpenLibraryNormalizedResult, fetchImpl: input.fetchImpl, timeoutMs: PROVIDER_ENRICHMENT_TIMEOUT_MS }),
+        () => fetchTmdbEvidenceDetail({ baseUrl: input.baseUrl, externalId: candidate.externalId, mediaType: candidate.type as "movie" | "tv", fetchImpl: input.fetchImpl, timeoutMs: PROVIDER_ENRICHMENT_TIMEOUT_MS }),
         TTL_MS[base.candidateIdentity.primaryProvider],
       );
       if (loaded.source === "cache") telemetry.cacheHits += 1;

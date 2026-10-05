@@ -1,4 +1,5 @@
 import type { PublicProviderCapabilities, PublicProviderCapability, PublicProviderId } from "@/lib/providers/types";
+import { isValidProviderUserAgent } from "@/lib/api/provider-identity";
 
 const TMDB_APPROVED_LOGO_AVAILABLE = false;
 
@@ -8,14 +9,6 @@ function disabled(reason: PublicProviderCapability["reason"]): PublicProviderCap
 
 function enabled(): PublicProviderCapability {
   return { enabled: true, reason: "enabled" };
-}
-
-function hasProviderContact(value: string | undefined): boolean {
-  const normalized = value?.trim() ?? "";
-  return normalized.length >= 8
-    && normalized.length <= 256
-    && /mediatracker/i.test(normalized)
-    && (/@/.test(normalized) || /https?:\/\//i.test(normalized));
 }
 
 export function resolvePublicProviderCapabilities(
@@ -47,7 +40,7 @@ export function resolvePublicProviderCapabilities(
     version: 1,
     providers: {
       tvmaze: enabled(),
-      openlibrary: hasProviderContact(env.MEDIA_TRACKER_PROVIDER_USER_AGENT)
+      openlibrary: isValidProviderUserAgent(env.MEDIA_TRACKER_PROVIDER_USER_AGENT)
         ? enabled()
         : disabled("missing_configuration"),
       anilist,

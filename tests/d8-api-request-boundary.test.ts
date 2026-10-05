@@ -21,11 +21,13 @@ function post(path: string, body: unknown, headers: HeadersInit = { "Content-Typ
 
 describe("D8-1 search POST JSON boundary", () => {
   beforeEach(() => {
+    vi.stubEnv("MEDIA_TRACKER_PROVIDER_USER_AGENT", "MediaTracker/1.0 (mediatracker.contact@gmail.com)");
     resetRateLimitsForTests();
     process.env.TMDB_READ_ACCESS_TOKEN = "token";
     process.env.OMDB_API_KEY = "key";
   });
   afterEach(() => {
+    vi.unstubAllEnvs();
     vi.unstubAllGlobals();
     delete process.env.TMDB_READ_ACCESS_TOKEN;
     delete process.env.OMDB_API_KEY;
@@ -40,7 +42,7 @@ describe("D8-1 search POST JSON boundary", () => {
         : Response.json({ Response: "True", imdbID: "tt1", Title: "Movie" });
       if (url.hostname.includes("tvmaze")) return Response.json([{ show: { id: 2, name: "Show" } }]);
       if (url.hostname.includes("anilist")) return Response.json({ data: { Page: { media: [{ id: 3, type: "ANIME", title: { english: "Anime" } }] } } });
-      return Response.json({ numFound: 1, docs: [{ key: "/works/1", title: "Book" }] });
+      return Response.json({ numFound: 1, docs: [{ key: "/works/OL1W", title: "Book" }] });
     });
     vi.stubGlobal("fetch", fetcher);
     const secretQuery = "private search text";

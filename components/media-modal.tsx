@@ -25,6 +25,7 @@
 
 import { useState } from "react";
 import { safeExternalUrl } from "@/lib/safe-external-url";
+import { openLibrarySourceUrl } from "@/lib/providers/openlibrary-source-url";
 import { tvmazeSourceUrl } from "@/lib/providers/tvmaze-source-url";
 import {
   X,
@@ -223,7 +224,9 @@ export default function MediaModal({ isOpen, editingItem, onSave, onClose }: Med
   const isEditMode = editingItem !== null;
   const sourceUrl = editingItem?.externalSource === "tvmaze"
     ? tvmazeSourceUrl(editingItem)
-    : safeExternalUrl(editingItem?.siteUrl);
+    : editingItem?.externalSource === "openlibrary"
+      ? openLibrarySourceUrl(editingItem)
+      : safeExternalUrl(editingItem?.siteUrl);
   const isMovie = type === "movie";
   const isTV = type === "tv";
   const isAnime = type === "anime";

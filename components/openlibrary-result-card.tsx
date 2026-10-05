@@ -7,6 +7,7 @@
 
 "use client";
 
+import { openLibrarySourceUrl } from "@/lib/providers/openlibrary-source-url";
 import Image from "next/image";
 import { Plus, Check, BookOpen, Loader2, User } from "lucide-react";
 import { OpenLibraryNormalizedResult } from "@/lib/openlibrary-types";
@@ -24,6 +25,7 @@ export default function OpenLibraryResultCard({
   isAdding,
   onAdd,
 }: OpenLibraryResultCardProps) {
+  const sourceUrl = openLibrarySourceUrl(result);
   return (
     <div className="flex min-w-0 gap-4 overflow-hidden rounded-xl border border-[var(--app-border)] bg-[var(--app-card-bg)] p-4 transition-colors hover:bg-[var(--app-card-hover)]">
       {/* Sol: Kapak görseli */}
@@ -49,6 +51,14 @@ export default function OpenLibraryResultCard({
         <h4 className="font-semibold text-sm text-[var(--app-text-primary)] truncate">
           {result.title}
         </h4>
+
+        <div className="mt-1 text-[11px] text-zinc-400">
+          Kaynak: {sourceUrl ? (
+            <a href={sourceUrl} target="_blank" rel="noopener noreferrer"
+              aria-label={`${result.title}: Open Library kaynak sayfasını aç`}
+              className="underline underline-offset-2">Open Library</a>
+          ) : "Open Library"}
+        </div>
 
         {/* Yazar(lar) */}
         {result.authors && result.authors.length > 0 && (

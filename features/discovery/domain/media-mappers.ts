@@ -1,3 +1,4 @@
+import { openLibrarySourceUrl } from "@/lib/providers/openlibrary-source-url";
 import { tvmazeSourceUrl } from "@/lib/providers/tvmaze-source-url";
 import type { AniListNormalizedResult } from "@/lib/anilist-types";
 import type { OmdbNormalizedResult } from "@/lib/omdb-types";
@@ -73,6 +74,7 @@ export function mapOpenLibraryResult(result: OpenLibraryNormalizedResult): Media
     currentProgress: 0,
     totalProgress: result.totalProgress,
     externalSource: "openlibrary",
+    siteUrl: openLibrarySourceUrl(result),
     externalId: result.externalId,
     releaseYear: result.releaseYear,
     authors: result.authors,

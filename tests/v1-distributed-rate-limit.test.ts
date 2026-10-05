@@ -31,6 +31,7 @@ function request(ip = "192.0.2.10", body = { query: "show" }) {
 function envelope(index = 0) { return JSON.parse(mocks.rpc.mock.calls[index][1].p_envelope); }
 
 beforeEach(() => {
+  vi.stubEnv("MEDIA_TRACKER_PROVIDER_USER_AGENT", "MediaTracker/1.0 (mediatracker.contact@gmail.com)");
   vi.stubEnv("VERCEL", "1");
   vi.stubEnv("RATE_LIMIT_IDENTITY_HMAC_KEY", identityKey);
   vi.stubEnv("RATE_LIMIT_RPC_SIGNING_KEY", signingKey);
@@ -177,6 +178,22 @@ describe("bounded transport, failure and routes", () => {
   it("cooldown failure returns unavailable rather than silently losing shared backoff",async()=>{
     mocks.abortSignal.mockResolvedValue({data:null,error:{message:"offline"}});
     expect((await reportProviderCooldown(request(),"tvmaze_search",new Response(null,{status:429})))?.status).toBe(503);
+  });
+  it("Open Library 429 reports bounded shared cooldown and the next search cannot fetch", async () => {
+    const fetcher = vi.fn(async () => new Response("raw private error", { status: 429, headers: { "Retry-After": "99999999999999" } }));
+    vi.stubGlobal("fetch", fetcher);
+    mocks.abortSignal.mockResolvedValueOnce({ data: { allowed: true, reason: "allowed", retry_after_seconds: 0 }, error: null })
+      .mockResolvedValueOnce({ data: { allowed: false, reason: "limited", retry_after_seconds: 86400 }, error: null })
+      .mockResolvedValue({ data: { allowed: false, reason: "limited", retry_after_seconds: 86400 }, error: null });
+    const response = await openlibrary(request());
+    expect(response.status).toBe(429);
+    expect(response.headers.get("retry-after")).toBe("86400");
+    expect(await response.json()).toEqual({ code: "rate_limited" });
+    expect(mocks.rpc.mock.calls[1][0]).toBe("report_provider_cooldown_v1");
+    expect(envelope(1)).toMatchObject({ policy_id: "openlibrary_search", operation: "cooldown", cooldown: 86400 });
+    expect((await openlibrary(request())).status).toBe(429);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(envelope(2)).toMatchObject({ policy_id: "openlibrary_search", operation: "consume" });
   });
 });
 

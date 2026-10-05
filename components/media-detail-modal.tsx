@@ -23,6 +23,7 @@
 
 "use client";
 
+import { openLibrarySourceUrl } from "@/lib/providers/openlibrary-source-url";
 import { tvmazeSourceUrl } from "@/lib/providers/tvmaze-source-url";
 import React, { useEffect, useRef, useState } from "react";
 import Image from "next/image";
@@ -128,10 +129,8 @@ function sourceLabelOf(source: MediaItem["externalSource"]): string {
 
 function resolveSourceLink(media: MediaItem): string | undefined {
   if (media.externalSource === "tvmaze") return tvmazeSourceUrl(media);
+  if (media.externalSource === "openlibrary") return openLibrarySourceUrl(media);
   if (media.siteUrl) return media.siteUrl;
-  if (media.externalSource === "openlibrary" && media.externalId) {
-    return `https://openlibrary.org${media.externalId}`;
-  }
   if (media.externalSource === "omdb" && media.externalId) {
     return `https://www.imdb.com/title/${media.externalId}/`;
   }

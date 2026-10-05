@@ -1,6 +1,4 @@
 import type { OpenLibraryNormalizedResult } from "@/lib/openlibrary-types";
-import { providerUserAgent } from "@/lib/api/provider-identity";
-import { publicProviderCapability } from "@/lib/providers/release-policy";
 import { createVerifiedCandidateIdentity } from "./candidate-identity";
 import { mapProviderMetadataClaim, mapProviderSubjectClaims } from "./evidence-mappers";
 import type { CandidateProviderEvidenceSnapshot, SecondaryIdentity } from "./types";
@@ -22,45 +20,4 @@ export function adaptOpenLibraryEvidence(result: OpenLibraryNormalizedResult, fe
     missingFields: [!result.subjects?.length && "subjects", !result.overview && "description", !result.pageCount && "pageCount"].filter((x): x is string => Boolean(x)),
     fetchedAt, cacheStatus: "not_cacheable", warnings: ["openlibrary_subject_is_not_aspect_strength"],
   };
-}
-
-interface OpenLibraryWorkResponse {
-  key?: string;
-  description?: string | { value?: string };
-  subjects?: string[];
-}
-
-export async function fetchOpenLibraryWorkEvidence(input: {
-  result: OpenLibraryNormalizedResult;
-  fetchImpl?: typeof fetch;
-  timeoutMs?: number;
-}): Promise<CandidateProviderEvidenceSnapshot> {
-  const capability = publicProviderCapability("openlibrary");
-  if (!capability.enabled) throw new Error(`openlibrary_evidence_unavailable:${capability.reason}`);
-  const base = adaptOpenLibraryEvidence(input.result);
-  const workId = input.result.workId || input.result.externalId;
-  if (!/^\/works\/OL[A-Za-z0-9]+W$/.test(workId)) throw new Error("openlibrary_work_id_invalid");
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), input.timeoutMs ?? 2500);
-  try {
-    const userAgent = providerUserAgent();
-    const response = await (input.fetchImpl ?? fetch)(`https://openlibrary.org${workId}.json`, {
-      headers: { accept: "application/json", ...(userAgent ? { "User-Agent": userAgent } : {}) }, signal: controller.signal,
-    });
-    if (!response.ok) throw new Error(`openlibrary_evidence_unavailable:${response.status}`);
-    const work = (await response.json()) as OpenLibraryWorkResponse;
-    const description = typeof work.description === "string" ? work.description : work.description?.value;
-    const descriptionClaim = description?.trim()
-      ? mapProviderMetadataClaim({ provider: "openlibrary", field: "description", value: description.trim().slice(0, 1000), reliability: 0.55 })
-      : null;
-    return {
-      ...base,
-      rawEvidenceClaims: descriptionClaim ? [...base.rawEvidenceClaims, descriptionClaim] : base.rawEvidenceClaims,
-      missingFields: base.missingFields.filter((field) => field !== "description" || !descriptionClaim),
-      providerCoverage: { openlibrary: descriptionClaim ? "available" : "partial" },
-      warnings: [...base.warnings, "openlibrary_description_requires_d6_3_semantic_mapping"],
-    };
-  } finally {
-    clearTimeout(timeout);
-  }
 }
