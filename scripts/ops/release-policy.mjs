@@ -2,6 +2,7 @@ import { requireSafe } from "./recovery.mjs";
 import { isValidProviderUserAgent } from "../../lib/api/provider-identity.ts";
 import { resolveBackendProvider } from "../../lib/backend/provider.ts";
 import { nativeConfig } from "../../lib/backend/native-config.ts";
+import { nativeDeploymentConfig, nativeDeploymentVariables } from "../../lib/backend/deployment-config.mjs";
 
 // Source contract, not an env export or hosted-setting assertion.
 const fixed = {
@@ -16,8 +17,16 @@ const core = ["NEXT_PUBLIC_SUPABASE_URL","NEXT_PUBLIC_SUPABASE_ANON_KEY","NEXT_P
   "NEXT_PUBLIC_CLOUD_MEDIA_MINIMUM_CLIENT_VERSION","RATE_LIMIT_IDENTITY_HMAC_KEY",
   "RATE_LIMIT_RPC_SIGNING_KEY","RATE_LIMIT_RPC_KEY_VERSION","RATE_LIMIT_RPC_AUDIENCE"];
 const optional=["MEDIA_TRACKER_PROVIDER_USER_AGENT","RATE_LIMIT_IDENTITY_HMAC_PREVIOUS_KEY","MEDIA_TRACKER_EMBEDDING_CACHE"];
-const nativeVariables=["DATABASE_URL","DATABASE_SSL_MODE","DATABASE_POOL_MAX","BETTER_AUTH_SECRET","BETTER_AUTH_URL"];
+const nativeVariables=["DATABASE_URL","DATABASE_SSL_MODE","DATABASE_POOL_MAX","BETTER_AUTH_SECRET","BETTER_AUTH_URL",...nativeDeploymentVariables];
 const nativeAllowed={DATABASE_URL:"postgresql URL; mt_runtime login; no query/hash; server secret",
+  NATIVE_STORAGE_ROOT:"absolute private persistent directory outside source/release/public/build; no symlinks",
+  TRUSTED_INGRESS_MODE:"passenger or unconfigured; no trusted header by default; explicit reviewed P4 tuple required",
+  TRUSTED_INGRESS_HEADER:"optional x-* lowercase single-IP header; verified overwrite + direct-access denial required",
+  TRUSTED_INGRESS_PROOF_SHA256:"optional 64 lowercase hex; fingerprint of independently reviewed P4 proxy proof, not proof by itself",
+  TRUSTED_INGRESS_DIRECT_ACCESS_BLOCKED:"optional 1 only with complete reviewed P4 ingress tuple; external fact not verified by source",
+  DATABASE_CONNECTION_TIMEOUT_MS:"integer 250-5000 ms; default 3000; bounds pool acquisition",
+  DATABASE_IDLE_TIMEOUT_MS:"integer 1000-30000 ms; default 10000",
+  DATABASE_STATEMENT_TIMEOUT_MS:"integer 250-5000 ms; default 5000; client query deadline +1000 ms",
   DATABASE_SSL_MODE:"disable (LOCAL only) or verify-full; hosted requires verify-full",
   DATABASE_POOL_MAX:"integer 1-5 per process; default 2; aggregate runtime role limit 5",
   BETTER_AUTH_SECRET:">=32 chars; independent high-entropy server secret",
@@ -25,11 +34,13 @@ const nativeAllowed={DATABASE_URL:"postgresql URL; mt_runtime login; no query/ha
   BACKEND_PROVIDER:"supabase or native; explicit hosted selector; local missing defaults supabase"};
 export const forbidden = /^(?:SUPABASE_SERVICE_ROLE_KEY|SUPABASE_TEST_.*|SUPABASE_PRODUCTION_URL|D8_.*|PRIVACY_.*|MEDIATRACKER_DR_.*|.*LIVE_SMOKE.*|.*FIXTURE.*|RATE_LIMIT_LOCAL_TEST_IP|(?:OPENAI|GROQ|GEMINI|OPENROUTER)_.*|TMDB_.*|ANILIST_.*|OMDB_.*|AI_PROVIDER|AI_.*SEMANTIC.*|MEDIA_TRACKER_ML_.*|MEDIA_TRACKER_EMBEDDING_MODEL|MEDIA_TRACKER_WIKIMEDIA_.*|MEDIA_TRACKER_RESEARCH_.*|D7_ANNOTATION_.*|D7_(?:OPENAI|GROQ|OPENROUTER)_.*|D7_RESEARCH_(?:DISCOVERY|EXTRACTION)_.*|DATABASE_URL|PG.*|VERCEL_TOKEN|NEXT_PUBLIC_.*(?:SECRET|PASSWORD|SERVICE_ROLE|HMAC|SIGNING).*)$/;
 export function environmentContract() {
+  const nativeOptional=['DATABASE_POOL_MAX','DATABASE_CONNECTION_TIMEOUT_MS','DATABASE_IDLE_TIMEOUT_MS','DATABASE_STATEMENT_TIMEOUT_MS',
+    'TRUSTED_INGRESS_HEADER','TRUSTED_INGRESS_PROOF_SHA256','TRUSTED_INGRESS_DIRECT_ACCESS_BLOCKED'];
   return [...core,...Object.keys(fixed),...optional,"BACKEND_PROVIDER",...nativeVariables].map(name => ({name,
     LOCAL:nativeVariables.includes(name)?"required only for native; pool max optional; isolated disposable target":"optional isolated offline/local; explicit values required for enabled Cloud/distributed mode",
     CI:"absent: credential-free offline suite",
-    PREVIEW:nativeVariables.includes(name)?"native only; pool max optional; forbidden in supabase":optional.includes(name)?"optional":"required isolated approved target",
-    PRODUCTION:nativeVariables.includes(name)?"native only; DATABASE_POOL_MAX optional; forbidden in supabase":optional.includes(name)?"optional":"required independently verified target",
+    PREVIEW:nativeVariables.includes(name)?`native only; ${nativeOptional.includes(name)?'optional':'required'}; forbidden in supabase`:name.startsWith('NEXT_PUBLIC_SUPABASE_')?'required supabase only; forbidden native':optional.includes(name)?"optional":"required isolated approved target",
+    PRODUCTION:nativeVariables.includes(name)?`native only; ${nativeOptional.includes(name)?'optional':'required'}; forbidden in supabase`:name.startsWith('NEXT_PUBLIC_SUPABASE_')?'required supabase only; forbidden native':optional.includes(name)?"optional":"required independently verified target",
     allowed:nativeAllowed[name] ?? fixed[name] ?? (name.includes("HMAC") || name.includes("SIGNING") ? ">=32 chars; independent; secret never recorded"
       : name.includes("SCHEMA_STAGE") ? "matches verified ledger" : "source-validated value class; see 06D"),
     visibility:name.startsWith("NEXT_PUBLIC_")?"public build-time":/(?:KEY|SECRET)$/.test(name) || name==="DATABASE_URL"?"server secret":"server non-secret",
@@ -46,6 +57,10 @@ export function validateReleaseEnvironment(env,scope) {
   if(provider==="native") {
     try { nativeConfig({...env,NODE_ENV:hosted?"production":"development"}); }
     catch { errors.push({name:"native",reason:"invalid native contract"}); }
+    if(hosted) {
+      try { nativeDeploymentConfig({...env,NODE_ENV:'production'}); }
+      catch { errors.push({name:'native_deployment',reason:'invalid native deployment contract'}); }
+    }
     for(const name of core.filter(n=>n.startsWith("NEXT_PUBLIC_SUPABASE_"))) if(env[name]) errors.push({name,reason:"native mode forbids Supabase target"});
     if(env.NEXT_PUBLIC_CLOUD_MEDIA_V2_ENABLED==='true' && env.NEXT_PUBLIC_CLOUD_MEDIA_SCHEMA_STAGE!=='d2c1')
       errors.push({name:'NEXT_PUBLIC_CLOUD_MEDIA_SCHEMA_STAGE',reason:'native V2 requires translated d2c1 schema'});

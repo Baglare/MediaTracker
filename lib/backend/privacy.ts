@@ -8,7 +8,9 @@ export async function exportNativeAccount() {
   if(!user?.email)throw new Error('authentication_required');
   return withAuthenticatedTransaction(async tx=>{
     if(tx.userId!==user.id)throw new Error('owner_context_changed');
-    const snapshot=(await tx.query('SELECT app.native_account_export_snapshot() AS result')).rows[0]?.result;
+    const snapshot=(await tx.query(`WITH snapshot AS MATERIALIZED (SELECT app.native_account_export_snapshot() AS data)
+      SELECT CASE WHEN pg_column_size(data)<=16777216 THEN data ELSE NULL END AS result FROM snapshot`)).rows[0]?.result;
+    if(!snapshot)throw new Error('privacy_export_capacity');
     return accountExport(snapshot,user.id,user.email,new Date().toISOString());
   });
 }

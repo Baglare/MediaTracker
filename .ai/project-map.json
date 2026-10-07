@@ -219,18 +219,26 @@
         "README.md",
         "docs/ROADMAP.md",
         "docs/D8_RELEASE_CANDIDATE_ACCEPTANCE.md",
-        "docs/D8_PRODUCTION_CUTOVER_RUNBOOK.md"
+        "docs/D8_PRODUCTION_CUTOVER_RUNBOOK.md",
+        "docs/NATIVE_BACKEND_P3_DEPLOYMENT.md",
+        "docs/NATIVE_HOSTING_DEPLOYMENT_RUNBOOK.md"
       ],
       "name": "release-validation",
       "paths": [
         "scripts",
         "package.json",
-        "vitest.config.ts"
+        "vitest.config.ts",
+        "instrumentation.ts",
+        "app/api/health"
       ],
       "rule_ids": [],
       "subtree": null,
       "symbols": [],
-      "tests": []
+      "tests": [
+        "tests/native-deployment.test.ts",
+        "tests/native-deployment-ops.test.mjs",
+        "tests/native-password-capacity.test.ts"
+      ]
     }
   ],
   "project_id": "media-tracker",

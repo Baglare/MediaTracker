@@ -7,6 +7,7 @@ export const nativeMigrationFiles = [
   '003_account_admission.sql', '004_cloud_goals.sql',
   '005_social_xp_themes.sql', '006_distributed_limiter.sql',
   '007_filesystem_assets.sql', '008_privacy_lifecycle.sql',
+  '009_deployment_operations.sql',
 ];
 export function nativeMigrationManifest() {
   return nativeMigrationFiles.map(name => {

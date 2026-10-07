@@ -1,0 +1,38 @@
+[
+  {
+    "name": "001_security_foundation.sql",
+    "checksum": "53c02d90f692e567a7c7dc1793cf4ec28bdb3bdc15635cac64496577d5f7f827"
+  },
+  {
+    "name": "002_better_auth.sql",
+    "checksum": "34c295f12cf32fe863280b73a217d61e108dab42546e32ef4891e56af50d797c"
+  },
+  {
+    "name": "003_account_admission.sql",
+    "checksum": "845da86244af493b967b7a0611c2b6b9f7200205de1d8515862833517a8cbbc4"
+  },
+  {
+    "name": "004_cloud_goals.sql",
+    "checksum": "afc00555be79b367f302f82acba760b40fe2f294f5013227c8f90e514efba20f"
+  },
+  {
+    "name": "005_social_xp_themes.sql",
+    "checksum": "9134a3174ca19f88b1f7c4e129d809d938396a570d40d334f187f8bcb5396999"
+  },
+  {
+    "name": "006_distributed_limiter.sql",
+    "checksum": "acaf43a60cb9db1f46fb293e5e1508bf60eefd06411b710248657163d14d55ca"
+  },
+  {
+    "name": "007_filesystem_assets.sql",
+    "checksum": "1b5d7682a28441d3c67cb4e8570c0355ee5b533a9d17e1c58913689b0968dfad"
+  },
+  {
+    "name": "008_privacy_lifecycle.sql",
+    "checksum": "3e9845279f8a9da345b6b58073c1c30d984f7c6f911652ddcc613111d114598b"
+  },
+  {
+    "name": "009_deployment_operations.sql",
+    "checksum": "1ef1bc2b3072ccb2bb163d9d2ed2cc8880ae64b6a0922870b587568b6d1ee53a"
+  }
+]

@@ -11,8 +11,8 @@ export function getNativePool(): Pool {
     const config = nativeConfig(process.env);
     const pool = new Pool({ connectionString: config.databaseUrl, max: config.max,
       ssl: config.ssl ? { rejectUnauthorized: true } : false,
-      connectionTimeoutMillis: 3000, idleTimeoutMillis: 10000,
-      statement_timeout: 5000, query_timeout: 6000, idle_in_transaction_session_timeout: 10000,
+      connectionTimeoutMillis: config.connectionTimeoutMillis, idleTimeoutMillis: config.idleTimeoutMillis,
+      statement_timeout: config.statementTimeout, query_timeout: config.statementTimeout + 1000, idle_in_transaction_session_timeout: 10000,
       options: '-c search_path=native_auth,pg_catalog', application_name: 'mediatracker-native',
       onConnect: async client => {
         try {
@@ -22,6 +22,7 @@ export function getNativePool(): Pool {
             AND NOT pg_has_role(current_user, 'mt_owner', 'MEMBER')
             AND NOT pg_has_role(current_user, 'mt_auth_owner', 'MEMBER')
             AND NOT pg_has_role(current_user, 'mt_privacy_operator', 'MEMBER')
+            AND NOT EXISTS (SELECT FROM pg_roles WHERE rolname='mt_limiter' AND pg_has_role(current_user,oid,'MEMBER'))
             AND NOT has_schema_privilege(current_user, 'app', 'CREATE')
             AND NOT has_schema_privilege(current_user, 'native_auth', 'CREATE')
             AND NOT has_schema_privilege(current_user, 'public', 'CREATE')

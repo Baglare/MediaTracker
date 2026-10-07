@@ -1,7 +1,5 @@
 import "server-only";
 import { createHmac, randomBytes, randomUUID } from "node:crypto";
-import { createClient } from "@supabase/supabase-js";
-import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { getSupabaseEnv } from "@/lib/supabase/status";
 import { enforceRateLimit } from "./request-security";
 import { canonicalRateLimitIp, identityEpochs, subjectDigest, trustedRateLimitIp, type LimiterIdentity } from "./rate-limit-identity";
@@ -87,6 +85,7 @@ async function signedRpc(operation: "consume" | "cooldown", policy: RateLimitPol
       return {allowed:data.allowed,retryAfterSeconds:data.retry_after_seconds,source:'distributed'};
     }
     // Independent public-key client: limiter transport never refreshes a cookie session or retries.
+    const { createClient } = await import('@supabase/supabase-js');
     const client = createClient(env!.url, env!.anonKey, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
     const { data, error } = await client.rpc(operation === "consume" ? "consume_application_rate_limit_v1" : "report_provider_cooldown_v1", payload).abortSignal(controller.signal);
     if (error || !data || typeof data !== "object" || Array.isArray(data)) return unavailable();
@@ -113,7 +112,7 @@ async function consumeWithinDeadline(request: Request, policy: RateLimitPolicy, 
       const user=await getCurrentUser();
       if(user)identity={kind:'user',value:user.id.toLowerCase()};
     }
-    const client = native?null:await getSupabaseServerClient();
+    const client = native?null:await (await import('@/lib/supabase/server')).getSupabaseServerClient();
     if (client) {
       const { data, error } = await client.auth.getUser();
       if (!error && data.user?.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(data.user.id)) identity = { kind: "user", value: data.user.id.toLowerCase() };

@@ -1,11 +1,23 @@
 import { expect, it, vi, beforeEach } from 'vitest';
 vi.mock('server-only', () => ({}));
-const mocks=vi.hoisted(()=>({create:vi.fn(),on:vi.fn()}));
-vi.mock('pg',()=>({Pool:class {constructor(options:unknown){mocks.create(options);} on=mocks.on;}}));
+const mocks=vi.hoisted(()=>({create:vi.fn(),on:vi.fn(),query:vi.fn()}));
+vi.mock('pg',()=>({Pool:class {constructor(options:unknown){mocks.create(options);} on=mocks.on;query=mocks.query;}}));
 import { getNativePool } from '@/lib/backend/postgres';
+import { nativeDatabaseReady } from '@/lib/backend/transaction';
 beforeEach(()=>{
   vi.stubEnv('BACKEND_PROVIDER','native');vi.stubEnv('DATABASE_URL','postgresql://mt_runtime:synthetic@127.0.0.1/test');
   vi.stubEnv('DATABASE_SSL_MODE','disable');vi.stubEnv('BETTER_AUTH_URL','http://localhost:3000');vi.stubEnv('BETTER_AUTH_SECRET','s'.repeat(40));
+});
+it('readiness rejects drift, future/incomplete history, freeze and DB errors without leaking diagnostics',async()=>{
+  const expected=[{name:'001_example.sql',checksum:'a'.repeat(64)}];
+  mocks.query.mockResolvedValue({rows:[{ready:true,state:[{checksum:expected[0].checksum,name:expected[0].name}]}]});
+  expect(await nativeDatabaseReady(expected)).toBe(true);
+  for(const state of [[],[{...expected[0],checksum:'b'.repeat(64)}],[...expected,...expected]]) {
+    mocks.query.mockResolvedValue({rows:[{ready:true,state}]});expect(await nativeDatabaseReady(expected)).toBe(false);
+  }
+  mocks.query.mockResolvedValue({rows:[{ready:false,state:expected}]});expect(await nativeDatabaseReady(expected)).toBe(false);
+  mocks.query.mockRejectedValue(new Error('password DATABASE_URL SQL'));expect(await nativeDatabaseReady(expected)).toBe(false);
+  vi.unstubAllEnvs();
 });
 it('reuses one bounded process pool and verifies actual role before handing out connections',async()=>{
   expect(getNativePool()).toBe(getNativePool());expect(mocks.create).toHaveBeenCalledTimes(1);

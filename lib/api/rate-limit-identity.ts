@@ -37,7 +37,14 @@ export function resolveTrustedIngress(request: Request,
     platform = 'vercel';
     if (env.VERCEL === '1') ip = canonicalRateLimitIp(ipAddress(request));
   } else if (mode === 'passenger') {
-    platform = 'passenger'; // No assumed x-forwarded-for/x-real-ip contract.
+    platform = 'passenger';
+    // Operator configuration references real P4 evidence, never a request flag.
+    // Default denies all headers. Single overwritten IP + inaccessible direct
+    // listener must be proved externally before configuring this adapter.
+    const header=env.TRUSTED_INGRESS_HEADER;
+    if(header && /^x-[a-z0-9-]{1,60}$/.test(header)
+      && /^[a-f0-9]{64}$/.test(env.TRUSTED_INGRESS_PROOF_SHA256??'')
+      && env.TRUSTED_INGRESS_DIRECT_ACCESS_BLOCKED==='1') ip=canonicalRateLimitIp(request.headers.get(header)??undefined);
   } else if (mode === 'local-test' || (mode === undefined && env.RATE_LIMIT_LOCAL_TEST_IP)) {
     platform = 'local-test';
     if (env.NODE_ENV !== 'production') ip = canonicalRateLimitIp(env.RATE_LIMIT_LOCAL_TEST_IP);

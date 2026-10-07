@@ -4,6 +4,8 @@ import { validateReleaseEnvironment } from '../scripts/ops/release-policy.mjs';
 import { checkFile, checkEnvironment } from '../scripts/ci-checks.mjs';
 const env={BACKEND_PROVIDER:'native',DATABASE_URL:'postgresql://mt_runtime:synthetic@localhost/mt_test',DATABASE_SSL_MODE:'verify-full',
   BETTER_AUTH_URL:'https://app.example.invalid',BETTER_AUTH_SECRET:'s'.repeat(40),NEXT_PUBLIC_APP_URL:'https://app.example.invalid',
+  NATIVE_STORAGE_ROOT:process.platform==='win32'?'C:\\mt-native-data':'/var/lib/mt-native-data',TRUSTED_INGRESS_MODE:'passenger',
+  RATE_LIMIT_IDENTITY_HMAC_KEY:'h'.repeat(40),RATE_LIMIT_RPC_SIGNING_KEY:'k'.repeat(40),RATE_LIMIT_RPC_KEY_VERSION:'v1',RATE_LIMIT_RPC_AUDIENCE:'mt-native',
   AI_SERVER_ACCESS_MODE:'disabled',D7_RESEARCH_ROLLOUT_MODE:'disabled',D7_RESEARCH_SHADOW_ENABLED:'0',
   D7_RESEARCH_PUBLIC_CITATIONS_ENABLED:'0',D7_RESEARCH_EVIDENCE_CACHE_ENABLED:'0',MEDIA_TRACKER_PERSISTENT_EMBEDDING_CACHE:'off'};
 test('native production env requires reviewed selector, native secrets and safe transport',()=>{

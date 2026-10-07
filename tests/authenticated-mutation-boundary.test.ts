@@ -167,6 +167,6 @@ it("inventories every exported unsafe handler, separating reads and local dev wr
     const path = file.replaceAll("\\", "/").replace(/^app\/api\//, "").replace(/\/route.ts$/, "");
     for (const match of readFileSync(file, "utf8").matchAll(/export\s+(?:async\s+)?function\s+(POST|PUT|PATCH|DELETE)\s*\(/g)) actual.push(`${path}:${match[1]}`);
   }
-  expect(files).toHaveLength(38); // Native authorized asset delivery adds one read-only route.
+  expect(files).toHaveLength(40); // Native asset delivery and two P3 read-only health routes.
   expect(actual.sort()).toEqual([...protectedMethods, ...exempt].sort());
 });

@@ -5,6 +5,15 @@ import { getCurrentUser } from '../auth/current-user';
 import { supabaseApplicationError } from '../supabase/safe-error';
 
 const contexts = new WeakSet<object>();
+/** Infrastructure-only read probe; no user context, mutation or raw errors. */
+export async function nativeDatabaseReady(expected: { name: string; checksum: string }[]): Promise<boolean> {
+  try {
+    const result = await getNativePool().query('SELECT app.native_migration_state() AS state, app.native_runtime_ready() AS ready');
+    const state = result.rows[0]?.state;
+    return result.rows[0]?.ready === true && Array.isArray(state) && state.length === expected.length && state.every((row, i) =>
+      row.name === expected[i].name && row.checksum === expected[i].checksum);
+  } catch { return false; }
+}
 const externalWork = new WeakMap<object,Set<Promise<unknown>>>();
 export interface AuthenticatedTransaction {
   readonly userId: string;
