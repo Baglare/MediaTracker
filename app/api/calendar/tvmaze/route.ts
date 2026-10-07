@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from "@/lib/api/request-security";
 import { enforceDistributedRateLimit, reportProviderCooldown } from "@/lib/api/distributed-rate-limit";
 import { runSafeApiRoute } from "@/lib/api/safe-route";
 import { NextRequest, NextResponse } from "next/server";
@@ -60,7 +61,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const userAgent = providerUserAgent();
-    const response = await fetch(`https://api.tvmaze.com/shows/${showId}/episodes`, {
+    const response = await fetchWithTimeout(`https://api.tvmaze.com/shows/${showId}/episodes`, {
       headers: { accept: "application/json", ...(userAgent ? { "User-Agent": userAgent } : {}) },
       cache: "no-store",
       signal: releaseRouteSignal(),

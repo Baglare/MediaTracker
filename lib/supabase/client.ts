@@ -16,9 +16,9 @@ let cachedClient: SupabaseClient<Database> | null = null;
  * Env eksikse null döner; çağıran tarafın null kontrolü yapması gerekir.
  */
 export function getSupabaseBrowserClient(): SupabaseClient<Database> | null {
-  if (cachedClient) return cachedClient;
   const env = getSupabaseEnv();
   if (!env) return null;
+  if (cachedClient) return cachedClient;
   cachedClient = createBrowserClient<Database>(env.url, env.anonKey);
   return cachedClient;
 }

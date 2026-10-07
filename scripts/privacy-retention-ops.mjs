@@ -1,6 +1,8 @@
 // Ops-only synthetic proof of the existing limiter cleanup eligibility/budget.
 // The SQL implementation remains private_rate_limit.cleanup_v1; no scheduler.
 import { pathToFileURL } from "node:url";
+import { readFileSync, readdirSync } from "node:fs";
+import path from "node:path";
 import { domains, ownerlessTables } from "./privacy-account-model.mjs";
 import { parseOptions, requireSyntheticTarget } from "./privacy-account-ops.mjs";
 
@@ -18,11 +20,28 @@ export const retentionInventory = Object.freeze({
   "private_rate_limit.global_state": { class: "FEATURE_LIFETIME", automaticCleanup: false },
   "private_rate_limit.secret_refs": { class: "LEGAL_HOLD_OR_REVIEW", automaticCleanup: false },
   "private_privacy_ops.xp_cleanup_context": { class: "SHORT_OPERATIONAL_TTL", automaticCleanup: false, rationale: "Candidate transaction context; helper deletes it before return, failure rolls back insertion; no scheduler" },
+  "private_privacy_ops.xp_detach_context": { class: "SHORT_OPERATIONAL_TTL", automaticCleanup: false, rationale: "Transaction-only detachment context; explicit delete before return or rollback; no legal period" },
+  "private_privacy_ops.account_lifecycle": { class: "ACCOUNT_LIFETIME", automaticCleanup: false, rationale: "Fail-closed lifecycle, erasure context and stage state; Auth deletion cascade after verified cleanup" },
+  "private_privacy_ops.release_write_state": { class: "FEATURE_LIFETIME", automaticCleanup: false, rationale: "Global singleton control/revision, no account content; no age purge" },
   browser: { class: "USER_CONTROLLED", automaticCleanup: false },
   recovery: { class: "LEGAL_HOLD_OR_REVIEW", automaticCleanup: false },
   mailbox: { class: "LEGAL_HOLD_OR_REVIEW", automaticCleanup: false },
   vendors: { class: "VENDOR_CONTROLLED", automaticCleanup: false },
 });
+
+export function checkRetentionCompleteness(repository = process.cwd()) {
+  const created = new Set();
+  for (const file of readdirSync(path.join(repository,"supabase/migrations")).filter(n => n.endsWith(".sql"))) {
+    const sql = readFileSync(path.join(repository,"supabase/migrations",file),"utf8").replace(/--[^\n]*|\/\*[\s\S]*?\*\//g," ");
+    for (const match of sql.matchAll(/\bcreate\s+table\s+(?:if\s+not\s+exists\s+)?([a-z_][\w]*)\.([a-z_][\w]*)/gi)) {
+      const [,schema,table]=match;
+      created.add(schema.toLowerCase()==="public" ? table.toLowerCase() : `${schema.toLowerCase()}.${table.toLowerCase()}`);
+    }
+  }
+  const missing=[...created].filter(table => !Object.hasOwn(retentionInventory,table)).sort();
+  if (missing.length) throw new Error(`Unclassified source tables: ${missing.join(",")}`);
+  return {createdTables:[...created].sort(),classification:"SOURCE_ONLY"};
+}
 
 export function retentionFixture() {
   return { buckets: [

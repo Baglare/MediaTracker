@@ -1,4 +1,6 @@
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { getCloudRpcClient, readNativeCloudRows } from "@/lib/backend/cloud-browser";
+import { getBackendProvider } from "@/lib/backend/provider";
 import { supabaseApplicationError } from "@/lib/supabase/safe-error";
 import { goalFromCloudDefinition, goalToCloudDefinition } from "./mapping";
 import type { GoalCloudQueueItem, GoalCloudRpcSnapshot, GoalCloudResultStatus } from "./types";
@@ -52,7 +54,7 @@ export function decodeGoalCloudRpcSnapshot(value: unknown, expectedGoalId: strin
 
 export async function dispatchGoalCloudQueueItem(
   item: GoalCloudQueueItem,
-  client: GoalCloudRpcClient | null = getSupabaseBrowserClient() as unknown as GoalCloudRpcClient | null,
+  client: GoalCloudRpcClient | null = getCloudRpcClient(item.userId) as unknown as GoalCloudRpcClient | null,
 ): Promise<
   | { kind: "result"; snapshot: GoalCloudRpcSnapshot }
   | { kind: "retryable"; error: string }
@@ -83,7 +85,11 @@ export interface GoalCloudQueryClient {
 
 export async function fetchGoalCloudSnapshots(
   client: GoalCloudQueryClient | null = getSupabaseBrowserClient() as unknown as GoalCloudQueryClient | null,
+  expectedUserId?: string,
 ): Promise<{ ok: true; snapshots: RemoteGoalSnapshot[] } | { ok: false; error: string }> {
+  if (getBackendProvider() === 'native' && !client && expectedUserId) {
+    client = { from: () => ({ select: () => readNativeCloudRows(expectedUserId, 'goals', true) }) };
+  }
   if (!client) return { ok: false, error: "Goal Cloud yapılandırılmadı." };
   const { data, error } = await client.from("goals").select("id,definition,revision,deleted_at");
   if (error) return { ok: false, error: "Hedef Cloud snapshot alınamadı." };

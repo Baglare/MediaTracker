@@ -2,7 +2,7 @@ import "server-only";
 
 import { cache } from "react";
 
-import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { getApplicationServerClient as getSupabaseServerClient } from "@/lib/backend/application-server";
 
 export interface CurrentServerAuth {
   configured: boolean;

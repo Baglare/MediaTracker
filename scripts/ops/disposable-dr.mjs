@@ -1,3 +1,4 @@
+import { releaseFreezeSql } from "./release-freeze.mjs";
 import { spawnSync } from "node:child_process";
 import { validateDisposableProof } from "../privacy-disposable-adapter.mjs";
 import { hash, requireSafe, schemas } from "./recovery.mjs";
@@ -32,8 +33,8 @@ export const verificationSql = `begin transaction isolation level repeatable rea
 select jsonb_build_object(
  'managedBindings',coalesce((select jsonb_agg(pg_get_triggerdef(t.oid) order by n.nspname,c.relname,t.tgname)
    from pg_trigger t join pg_class c on c.oid=t.tgrelid join pg_namespace n on n.oid=c.relnamespace
-   where ((n.nspname='auth' and c.relname='users' and t.tgname='privacy_initialize_account')
-      or (n.nspname='storage' and c.relname='objects' and t.tgname='a_privacy_storage')) and t.tgenabled='O'),'[]'::jsonb),
+   where ((n.nspname='auth' and c.relname='users' and t.tgname in ('privacy_initialize_account','a_release_auth'))
+      or (n.nspname='storage' and c.relname='objects' and t.tgname in ('a_privacy_storage','a_release_storage','a_release_storage_truncate'))) and t.tgenabled='O'),'[]'::jsonb),
  'tables',coalesce((select jsonb_agg(jsonb_build_object('schema',n.nspname,'name',c.relname,'rls',c.relrowsecurity,
    'forceRls',c.relforcerowsecurity,'acl',c.relacl::text,'owner',pg_get_userbyid(c.relowner),
    'columns',(select jsonb_agg(jsonb_build_array(a.attname,format_type(a.atttypid,a.atttypmod),a.attnotnull,
@@ -107,6 +108,7 @@ export function createDisposableDrAdapter() {
         'extensions',(select jsonb_agg(jsonb_build_array(e.extname,e.extversion,n.nspname) order by e.extname) from pg_extension e join pg_namespace n on n.oid=e.extnamespace)); rollback;`);
     },
     async inspect() { return sql(verificationSql); },
+    async releaseControl(mode,revision) { return sql(releaseFreezeSql(mode,revision)); },
     async versions() {
       requireSafe(proven);
       return Object.fromEntries(["pg_dump","pg_restore","psql"].map(tool => {
@@ -126,7 +128,7 @@ export function createDisposableDrAdapter() {
         `--section=${section}`,"-U","postgres","-d",database],dump);
     },
     async restoreBindings(bindings) {
-      requireSafe(proven && Array.isArray(bindings) && bindings.length===2
+      requireSafe(proven && Array.isArray(bindings) && bindings.length===5
         && bindings.every(s=>typeof s==="string" && s.startsWith("CREATE TRIGGER ") && !s.includes(";")));
       docker(["exec","-i",boundContainer,"psql","-Xq","-v","ON_ERROR_STOP=1","-U","postgres","-d",database],
         Buffer.from(`begin;\n${bindings.join(";\n")};\ncommit;`));

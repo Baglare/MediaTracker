@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { cleanupPlan, cleanupSynthetic, retentionClasses, retentionFixture, retentionInventory, main } from "../scripts/privacy-retention-ops.mjs";
+import { checkRetentionCompleteness, cleanupPlan, cleanupSynthetic, retentionClasses, retentionFixture, retentionInventory, main } from "../scripts/privacy-retention-ops.mjs";
 import { domains } from "../scripts/privacy-account-model.mjs";
 const policy = { cutoff: "2026-10-05T00:00:00.000Z", now: "2026-10-05T00:00:00.000Z", batchSize: 1 };
 test("all account/ownerless/private/vendor/device categories have valid retention classes; no active-content cleanup", () => {
@@ -9,7 +9,7 @@ test("all account/ownerless/private/vendor/device categories have valid retentio
     assert.ok(retentionClasses.includes(value.class), table);
     if (domains[table]) assert.equal(value.automaticCleanup, false, table);
   }
-  assert.equal(Object.keys(retentionInventory).length, 50);
+  for (const table of checkRetentionCompleteness().createdTables) assert.ok(retentionInventory[table], table);
   assert.equal(retentionInventory.mailbox.automaticCleanup, false);
 });
 test("cutoff preview is expiry-based and shared batch budget bounds both security tables", () => {

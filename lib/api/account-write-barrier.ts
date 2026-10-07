@@ -1,5 +1,5 @@
 import "server-only";
-import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { getApplicationServerClient as getSupabaseServerClient } from "@/lib/backend/application-server";
 import { supabaseApplicationError } from "@/lib/supabase/safe-error";
 
 export function accountWriteLockedResponse(error: unknown): Response | null {

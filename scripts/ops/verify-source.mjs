@@ -3,8 +3,10 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { root, migrationManifest, requireSafe } from "./recovery.mjs";
 import { environmentContract } from "./release-policy.mjs";
+import { checkRetentionCompleteness } from "../privacy-retention-ops.mjs";
 
 export function checkOperationalSources(repository=root) {
+  checkRetentionCompleteness(repository);
   const read=(name)=>readFileSync(path.join(repository,name),"utf8");
   const migrations=JSON.parse(read("docs/V1_HARDENING_06_MIGRATIONS.json"));
   requireSafe(migrations.classification==="CURRENT_SOURCE_FACT" && migrations.productionPending==="LIVE_UNVERIFIED"

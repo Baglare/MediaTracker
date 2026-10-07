@@ -1,5 +1,7 @@
 import { requireSafe } from "./recovery.mjs";
 import { isValidProviderUserAgent } from "../../lib/api/provider-identity.ts";
+import { resolveBackendProvider } from "../../lib/backend/provider.ts";
+import { nativeConfig } from "../../lib/backend/native-config.ts";
 
 // Source contract, not an env export or hosted-setting assertion.
 const fixed = {
@@ -14,33 +16,52 @@ const core = ["NEXT_PUBLIC_SUPABASE_URL","NEXT_PUBLIC_SUPABASE_ANON_KEY","NEXT_P
   "NEXT_PUBLIC_CLOUD_MEDIA_MINIMUM_CLIENT_VERSION","RATE_LIMIT_IDENTITY_HMAC_KEY",
   "RATE_LIMIT_RPC_SIGNING_KEY","RATE_LIMIT_RPC_KEY_VERSION","RATE_LIMIT_RPC_AUDIENCE"];
 const optional=["MEDIA_TRACKER_PROVIDER_USER_AGENT","RATE_LIMIT_IDENTITY_HMAC_PREVIOUS_KEY","MEDIA_TRACKER_EMBEDDING_CACHE"];
+const nativeVariables=["DATABASE_URL","DATABASE_SSL_MODE","DATABASE_POOL_MAX","BETTER_AUTH_SECRET","BETTER_AUTH_URL"];
+const nativeAllowed={DATABASE_URL:"postgresql URL; mt_runtime login; no query/hash; server secret",
+  DATABASE_SSL_MODE:"disable (LOCAL only) or verify-full; hosted requires verify-full",
+  DATABASE_POOL_MAX:"integer 1-5 per process; default 2; aggregate runtime role limit 5",
+  BETTER_AUTH_SECRET:">=32 chars; independent high-entropy server secret",
+  BETTER_AUTH_URL:"canonical HTTP(S) origin equal to app URL; hosted requires HTTPS",
+  BACKEND_PROVIDER:"supabase or native; explicit hosted selector; local missing defaults supabase"};
 export const forbidden = /^(?:SUPABASE_SERVICE_ROLE_KEY|SUPABASE_TEST_.*|SUPABASE_PRODUCTION_URL|D8_.*|PRIVACY_.*|MEDIATRACKER_DR_.*|.*LIVE_SMOKE.*|.*FIXTURE.*|RATE_LIMIT_LOCAL_TEST_IP|(?:OPENAI|GROQ|GEMINI|OPENROUTER)_.*|TMDB_.*|ANILIST_.*|OMDB_.*|AI_PROVIDER|AI_.*SEMANTIC.*|MEDIA_TRACKER_ML_.*|MEDIA_TRACKER_EMBEDDING_MODEL|MEDIA_TRACKER_WIKIMEDIA_.*|MEDIA_TRACKER_RESEARCH_.*|D7_ANNOTATION_.*|D7_(?:OPENAI|GROQ|OPENROUTER)_.*|D7_RESEARCH_(?:DISCOVERY|EXTRACTION)_.*|DATABASE_URL|PG.*|VERCEL_TOKEN|NEXT_PUBLIC_.*(?:SECRET|PASSWORD|SERVICE_ROLE|HMAC|SIGNING).*)$/;
 export function environmentContract() {
-  return [...core,...Object.keys(fixed),...optional].map(name => ({name,
-    LOCAL:"optional isolated offline/local; explicit values required for enabled Cloud/distributed mode",
+  return [...core,...Object.keys(fixed),...optional,"BACKEND_PROVIDER",...nativeVariables].map(name => ({name,
+    LOCAL:nativeVariables.includes(name)?"required only for native; pool max optional; isolated disposable target":"optional isolated offline/local; explicit values required for enabled Cloud/distributed mode",
     CI:"absent: credential-free offline suite",
-    PREVIEW:optional.includes(name)?"optional":"required isolated approved target",
-    PRODUCTION:optional.includes(name)?"optional":"required independently verified target",
-    allowed:fixed[name] ?? (name.includes("HMAC") || name.includes("SIGNING") ? ">=32 chars; independent; secret never recorded"
+    PREVIEW:nativeVariables.includes(name)?"native only; pool max optional; forbidden in supabase":optional.includes(name)?"optional":"required isolated approved target",
+    PRODUCTION:nativeVariables.includes(name)?"native only; DATABASE_POOL_MAX optional; forbidden in supabase":optional.includes(name)?"optional":"required independently verified target",
+    allowed:nativeAllowed[name] ?? fixed[name] ?? (name.includes("HMAC") || name.includes("SIGNING") ? ">=32 chars; independent; secret never recorded"
       : name.includes("SCHEMA_STAGE") ? "matches verified ledger" : "source-validated value class; see 06D"),
-    visibility:name.startsWith("NEXT_PUBLIC_")?"public build-time":/(?:KEY)$/.test(name)?"server secret":"server non-secret",
+    visibility:name.startsWith("NEXT_PUBLIC_")?"public build-time":/(?:KEY|SECRET)$/.test(name) || name==="DATABASE_URL"?"server secret":"server non-secret",
     owner:/RATE_LIMIT/.test(name)?"security operator":/PROVIDER/.test(name)?"provider operator":"release operator",
     failure:"unset/invalid keeps capability disabled or blocks acceptance; no substitute target"}));
 }
 export function validateReleaseEnvironment(env,scope) {
   requireSafe(["LOCAL","CI","PREVIEW","PRODUCTION"].includes(scope) && env && typeof env === "object" && !Array.isArray(env));
   const errors=[];
-  const allowed=new Set([...core,...Object.keys(fixed),...optional,"VERCEL","VERCEL_URL","VERCEL_ENV","NODE_ENV","CI","GITHUB_ACTIONS","NEXT_TELEMETRY_DISABLED"]);
+  const hosted=["PREVIEW","PRODUCTION"].includes(scope);
+  let provider;
+  try { provider=resolveBackendProvider(env.BACKEND_PROVIDER,hosted); }
+  catch { errors.push({name:"BACKEND_PROVIDER",reason:"missing or invalid provider"}); }
+  if(provider==="native") {
+    try { nativeConfig({...env,NODE_ENV:hosted?"production":"development"}); }
+    catch { errors.push({name:"native",reason:"invalid native contract"}); }
+    for(const name of core.filter(n=>n.startsWith("NEXT_PUBLIC_SUPABASE_"))) if(env[name]) errors.push({name,reason:"native mode forbids Supabase target"});
+    if(env.NEXT_PUBLIC_CLOUD_MEDIA_V2_ENABLED==='true' && env.NEXT_PUBLIC_CLOUD_MEDIA_SCHEMA_STAGE!=='d2c1')
+      errors.push({name:'NEXT_PUBLIC_CLOUD_MEDIA_SCHEMA_STAGE',reason:'native V2 requires translated d2c1 schema'});
+  }
+  const allowed=new Set([...core,...Object.keys(fixed),...optional,"BACKEND_PROVIDER",...(provider==="native"?nativeVariables:[]),"VERCEL","VERCEL_URL","VERCEL_ENV","NODE_ENV","CI","GITHUB_ACTIONS","NEXT_TELEMETRY_DISABLED"]);
   for(const [name,value] of Object.entries(env)) {
     requireSafe(/^[A-Z][A-Z0-9_]*$/.test(name) && typeof value==="string");
-    if(forbidden.test(name)) errors.push({name,reason:"forbidden"});
+    if((forbidden.test(name) && !(provider==="native" && name==="DATABASE_URL"))
+      || (provider!=="native" && nativeVariables.includes(name))) errors.push({name,reason:"forbidden"});
     if(scope==="CI" && !["CI","GITHUB_ACTIONS","NEXT_TELEMETRY_DISABLED","NODE_ENV"].includes(name)) errors.push({name,reason:"CI requires absence"});
     if(!allowed.has(name)) errors.push({name,reason:"unreviewed variable"});
   }
-  const hosted=["PREVIEW","PRODUCTION"].includes(scope);
   if(hosted) {
-    for(const name of [...core,...Object.keys(fixed)]) if(!env[name]) errors.push({name,reason:"required"});
+    for(const name of [...(provider==="native"?["NEXT_PUBLIC_APP_URL"]:core),...Object.keys(fixed)]) if(!env[name]) errors.push({name,reason:"required"});
   }
+  if(provider==="native" && env.NEXT_PUBLIC_APP_URL && env.NEXT_PUBLIC_APP_URL!==env.BETTER_AUTH_URL) errors.push({name:"BETTER_AUTH_URL",reason:"must match application origin"});
   for(const [name,value] of Object.entries(fixed)) if(env[name] !== undefined && env[name]!==value) errors.push({name,reason:"v1 disabled policy"});
   for(const name of ["NEXT_PUBLIC_SUPABASE_URL","NEXT_PUBLIC_APP_URL"]) if(env[name]) {
     try {

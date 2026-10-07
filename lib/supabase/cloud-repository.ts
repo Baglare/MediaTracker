@@ -7,6 +7,9 @@ import { safeLog } from "@/lib/security/safe-logging";
 
 import type { MediaItem, ProgressLog } from "../types";
 import { getSupabaseBrowserClient } from "./client";
+import { getBackendProvider } from "../backend/provider";
+import { readNativeCloudRows } from "../backend/cloud-browser";
+import { writeNativeCloudRows, deleteNativeCloudMedia } from "../backend/cloud-transfer";
 import {
   fromMediaRow,
   fromProgressLogRow,
@@ -58,6 +61,7 @@ export async function uploadMediaItems(
   userId: string,
   items: MediaItem[]
 ): Promise<CloudResult<{ count: number }>> {
+  if (getBackendProvider() === 'native') return writeNativeCloudRows(userId, 'media_items', items);
   const ctx = ensure(userId);
   if (!ctx.ok) return { ok: false, error: ctx.error };
   if (items.length === 0) return { ok: true, data: { count: 0 } };
@@ -80,6 +84,7 @@ export async function uploadProgressLogs(
   userId: string,
   logs: ProgressLog[]
 ): Promise<CloudResult<{ count: number }>> {
+  if (getBackendProvider() === 'native') return writeNativeCloudRows(userId, 'progress_logs', logs);
   const ctx = ensure(userId);
   if (!ctx.ok) return { ok: false, error: ctx.error };
   if (logs.length === 0) return { ok: true, data: { count: 0 } };
@@ -105,6 +110,11 @@ export async function uploadProgressLogs(
 export async function fetchCloudMediaItems(
   userId: string
 ): Promise<CloudResult<MediaItem[]>> {
+  if (getBackendProvider() === 'native') {
+    const result = await readNativeCloudRows(userId, 'media_items');
+    if (result.error || !Array.isArray(result.data)) return { ok: false, error: ERR_FETCH_FAILED };
+    return { ok: true, data: result.data.map(row => fromMediaRow(row as Parameters<typeof fromMediaRow>[0])) };
+  }
   const ctx = ensure(userId);
   if (!ctx.ok) return { ok: false, error: ctx.error };
 
@@ -124,6 +134,11 @@ export async function fetchCloudMediaItems(
 export async function fetchCloudProgressLogs(
   userId: string
 ): Promise<CloudResult<ProgressLog[]>> {
+  if (getBackendProvider() === 'native') {
+    const result = await readNativeCloudRows(userId, 'progress_logs');
+    if (result.error || !Array.isArray(result.data)) return { ok: false, error: ERR_FETCH_FAILED };
+    return { ok: true, data: result.data.map(row => fromProgressLogRow(row as Parameters<typeof fromProgressLogRow>[0])) };
+  }
   const ctx = ensure(userId);
   if (!ctx.ok) return { ok: false, error: ctx.error };
 
@@ -147,6 +162,11 @@ export async function fetchCloudProgressLogs(
 export async function fetchCloudMediaCount(
   userId: string
 ): Promise<CloudResult<number>> {
+  if (getBackendProvider() === 'native') {
+    const result = await readNativeCloudRows(userId, 'media_items');
+    return result.error || !Array.isArray(result.data) ? { ok: false, error: ERR_FETCH_FAILED }
+      : { ok: true, data: result.data.length };
+  }
   const ctx = ensure(userId);
   if (!ctx.ok) return { ok: false, error: ctx.error };
   const { count, error } = await ctx.client
@@ -164,6 +184,11 @@ export async function fetchCloudMediaCount(
 export async function fetchCloudProgressLogCount(
   userId: string
 ): Promise<CloudResult<number>> {
+  if (getBackendProvider() === 'native') {
+    const result = await readNativeCloudRows(userId, 'progress_logs');
+    return result.error || !Array.isArray(result.data) ? { ok: false, error: ERR_FETCH_FAILED }
+      : { ok: true, data: result.data.length };
+  }
   const ctx = ensure(userId);
   if (!ctx.ok) return { ok: false, error: ctx.error };
   const { count, error } = await ctx.client
@@ -185,6 +210,7 @@ export async function deleteMediaItem(
   userId: string,
   id: string
 ): Promise<CloudResult<{ count: number }>> {
+  if (getBackendProvider() === 'native') return deleteNativeCloudMedia(userId, id);
   const ctx = ensure(userId);
   if (!ctx.ok) return { ok: false, error: ctx.error };
   const { error } = await ctx.client
@@ -206,6 +232,8 @@ export async function deleteMediaItem(
 export async function clearCloudData(
   userId: string
 ): Promise<CloudResult<{ media: number; logs: number }>> {
+  // Native immutable progress has no physical-delete transport.
+  if (getBackendProvider() === 'native') return { ok: false, error: 'cloud_clear_requires_privacy_operator' };
   const ctx = ensure(userId);
   if (!ctx.ok) return { ok: false, error: ctx.error };
 

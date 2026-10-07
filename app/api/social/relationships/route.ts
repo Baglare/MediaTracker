@@ -1,3 +1,4 @@
+import { readBoundedJson } from "@/lib/api/bounded-body";
 import { checkAccountWriteAllowed, accountWriteLockedResponse } from "@/lib/api/account-write-barrier";
 import { enforceDistributedRateLimit } from "@/lib/api/distributed-rate-limit";
 import { runSafeApiRoute } from "@/lib/api/safe-route";
@@ -5,7 +6,7 @@ import { validateAuthenticatedMutationRequest } from "@/lib/api/request-security
 import { NextResponse } from "next/server";
 
 import { validateUserId } from "@/lib/social/validation";
-import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { getApplicationServerClient as getSupabaseServerClient } from "@/lib/backend/application-server";
 
 const FOLLOW_ACTIONS = new Set(["unfollow", "cancel", "accept", "reject", "remove_follower"]);
 
@@ -22,7 +23,7 @@ export async function POST(request: Request) {
   const rateLimit = await enforceDistributedRateLimit(request, "social_write");
   if (rateLimit) return rateLimit;
   let body: unknown;
-  try { body = await request.json(); } catch { return NextResponse.json({ ok: false, message: "İstek geçersiz." }, { status: 400 }); }
+  try { body = await readBoundedJson(request, 16_384); } catch { return NextResponse.json({ ok: false, message: "İstek geçersiz." }, { status: 400 }); }
   if (!body || typeof body !== "object" || Array.isArray(body)) return NextResponse.json({ ok: false, message: "İstek geçersiz." }, { status: 400 });
   const input = body as Record<string, unknown>;
   const target = validateUserId(input.targetId);

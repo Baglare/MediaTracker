@@ -3,7 +3,7 @@ import { runSafeApiRoute } from "@/lib/api/safe-route";
 import { NextResponse } from "next/server";
 
 import { validateUserId } from "@/lib/social/validation";
-import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { getApplicationServerClient as getSupabaseServerClient } from "@/lib/backend/application-server";
 
 export async function GET(request: Request) {
   return runSafeApiRoute("/api/social/connections", "GET", async () => {

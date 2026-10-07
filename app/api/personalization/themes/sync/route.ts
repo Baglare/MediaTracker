@@ -1,8 +1,9 @@
+import { readBoundedJson } from "@/lib/api/bounded-body";
 import { enforceDistributedRateLimit } from "@/lib/api/distributed-rate-limit";
 import { supabaseApplicationError } from "@/lib/supabase/safe-error";
 import { runSafeApiRoute } from "@/lib/api/safe-route";
 import { validateAuthenticatedMutationRequest } from "@/lib/api/request-security";
-import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { getApplicationServerClient as getSupabaseServerClient } from "@/lib/backend/application-server";
 import type { Json } from "@/lib/supabase/types";
 import {
   normalizeCanonicalThemeSyncPayload,
@@ -71,7 +72,7 @@ export async function PUT(request: Request): Promise<Response> {
     if (rateLimit) return rateLimit;
     let body: unknown;
     try {
-      body = await request.json();
+      body = await readBoundedJson(request, 1_048_576);
     } catch {
       return failure("Tema senkronizasyon verisi geçersiz.", 400);
     }

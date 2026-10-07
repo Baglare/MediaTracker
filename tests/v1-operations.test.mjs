@@ -22,6 +22,9 @@ function sourceReport() {
     functions:[{name:"assert_account_write_allowed"},{name:"consume_application_rate_limit_v1"}],
     roles:["anon","authenticated","postgres"],extensions:[["pgcrypto","1.3","extensions"]],authIdentityHash:hash("synthetic identities"),unsafePrivateGrants:false,
     managedBindings:["CREATE TRIGGER privacy_initialize_account AFTER INSERT ON auth.users FOR EACH ROW EXECUTE FUNCTION private_privacy_ops.initialize_account_v1()",
+      "CREATE TRIGGER a_release_auth BEFORE INSERT ON auth.users FOR EACH STATEMENT EXECUTE FUNCTION private_privacy_ops.guard_release_mutation_v1()",
+      "CREATE TRIGGER a_release_storage_truncate BEFORE TRUNCATE ON storage.objects FOR EACH STATEMENT EXECUTE FUNCTION private_privacy_ops.guard_release_mutation_v1()",
+      "CREATE TRIGGER a_release_storage BEFORE INSERT ON storage.objects FOR EACH ROW EXECUTE FUNCTION private_privacy_ops.guard_release_mutation_v1()",
       "CREATE TRIGGER a_privacy_storage BEFORE INSERT ON storage.objects FOR EACH ROW EXECUTE FUNCTION private_privacy_ops.guard_storage_v1()"]};
 }
 async function withPackage(fn) {
@@ -90,7 +93,7 @@ test("backup output cannot land in repository or overwrite an existing directory
 });
 test("encrypted package verifies critical artifacts, migrations, relative path hashes",async()=>withPackage(({directory,manifestHash})=>{
   const m=verifyPackage(directory,manifestHash);
-  assert.equal(m.migrations.length,25);assert.equal(m.storage.binariesIncluded,0);
+  assert.equal(m.migrations.length,migrations.length);assert.equal(m.storage.binariesIncluded,0);
   assert.equal(m.target.classification,"disposable");
   assert.equal(m.artifacts.some(a=>a.path.startsWith("operations/")),true);
 }));
@@ -151,7 +154,7 @@ test("unproven Docker adapter cannot inspect, dump or restore a database",async(
   await assert.rejects(adapter.inspect());await assert.rejects(adapter.dump());await assert.rejects(adapter.restore("data",Buffer.from("PGDMP")));
   assert.ok(verificationSql.includes("read only"));assert.ok(verificationSql.includes("pg_constraint"));assert.ok(verificationSql.includes("pg_policy"));
 });
-function hostedEnv() {return {NEXT_PUBLIC_SUPABASE_URL:"https://synthetic.supabase.co",NEXT_PUBLIC_SUPABASE_ANON_KEY:"synthetic-public",NEXT_PUBLIC_APP_URL:"https://release.example.invalid",
+function hostedEnv() {return {BACKEND_PROVIDER:"supabase",NEXT_PUBLIC_SUPABASE_URL:"https://synthetic.supabase.co",NEXT_PUBLIC_SUPABASE_ANON_KEY:"synthetic-public",NEXT_PUBLIC_APP_URL:"https://release.example.invalid",
   NEXT_PUBLIC_CLOUD_MEDIA_SCHEMA_STAGE:"d2c1",NEXT_PUBLIC_CLOUD_MEDIA_V2_ENABLED:"true",NEXT_PUBLIC_CLOUD_GOALS_SCHEMA_STAGE:"v1",NEXT_PUBLIC_CLOUD_GOALS_V1_ENABLED:"true",
   NEXT_PUBLIC_CLOUD_MEDIA_MAINTENANCE:"false",NEXT_PUBLIC_CLOUD_MEDIA_DEPLOYMENT_EPOCH:"v1-012345abcdef",NEXT_PUBLIC_CLOUD_MEDIA_MINIMUM_CLIENT_VERSION:"d2c2",
   RATE_LIMIT_IDENTITY_HMAC_KEY:"i".repeat(32),RATE_LIMIT_RPC_SIGNING_KEY:"s".repeat(32),RATE_LIMIT_RPC_KEY_VERSION:"v1",RATE_LIMIT_RPC_AUDIENCE:"synthetic:preview",

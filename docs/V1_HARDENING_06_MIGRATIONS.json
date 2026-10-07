@@ -390,6 +390,23 @@
       "rollback": "Transaction abort before commit; after commit no blind down migration",
       "failForward": "Keep erasure locks and reconcile erased identities; reviewed forward fix only",
       "maintenance": "Full affected-write freeze required"
+    },
+    {
+      "path": "supabase/migrations/20261006120000_release_write_containment.sql",
+      "version": "20261006120000",
+      "sha256LF": "0880c0b2dec0ea0ef6ac4f189f6bdfed39638ce4d96f2c86be717e04bec089a0",
+      "purpose": "release write containment",
+      "classification": [
+        "NON_ADDITIVE",
+        "PRIVACY_CRITICAL",
+        "SECURITY_CRITICAL"
+      ],
+      "dependency": "20261005140000",
+      "precondition": "Ledger is an exact ordered prefix; inspect prerequisite definitions, grants and data invariants",
+      "failureSignal": "SQL error, drift, lock budget exceeded or failed owner/privacy postcheck",
+      "rollback": "Transaction abort before commit; after commit no blind down migration",
+      "failForward": "Contain affected writes; capture definitions/ACLs; reviewed append-only repair",
+      "maintenance": "Full affected-write freeze required"
     }
   ]
 }

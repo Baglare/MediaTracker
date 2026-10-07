@@ -1,11 +1,22 @@
 import { NextResponse } from "next/server";
-import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { getApplicationServerClient as getSupabaseServerClient } from "@/lib/backend/application-server";
+import { BodyLimitError, readBoundedBytes, readBoundedText } from "./bounded-body";
 
 export const API_NO_STORE_HEADERS = { "Cache-Control": "no-store" } as const;
 export const SEARCH_QUERY_MAX_LENGTH = 200;
 export const SEARCH_REQUEST_MAX_BYTES = 4_096;
 export const AI_REQUEST_MAX_BYTES = 1_048_576;
 export const UPSTREAM_TIMEOUT_MS = 8_000;
+
+export function providerResponseMaxBytes(input: RequestInfo | URL) {
+  const url = new URL(input instanceof Request ? input.url : String(input));
+  if (url.hostname === "api.tvmaze.com") {
+    if (url.pathname.endsWith("/episodes")) return 8 * 1024 * 1024;
+    return url.pathname === "/search/shows" ? 2 * 1024 * 1024 : 1024 * 1024;
+  }
+  if (url.hostname === "openlibrary.org") return 2 * 1024 * 1024;
+  return 4 * 1024 * 1024; // disabled AniList/TMDB adapter compatibility
+}
 
 type JsonObjectResult =
   | { ok: true; value: Record<string, unknown> }
@@ -71,12 +82,10 @@ export async function readStrictJsonObject(
 
   let text: string;
   try {
-    text = await request.text();
-  } catch {
+    text = await readBoundedText(request, maxBytes);
+  } catch (error) {
+    if (error instanceof BodyLimitError) return { ok: false, response: apiError("request_too_large", 413) };
     return { ok: false, response: apiError("invalid_json", 400) };
-  }
-  if (new TextEncoder().encode(text).byteLength > maxBytes) {
-    return { ok: false, response: apiError("request_too_large", 413) };
   }
 
   let parsed: unknown;
@@ -152,13 +161,22 @@ export async function fetchWithTimeout(
   input: RequestInfo | URL,
   init: RequestInit = {},
   timeoutMs = UPSTREAM_TIMEOUT_MS,
+  maxBytes = providerResponseMaxBytes(input),
 ) {
   const controller = new AbortController();
   const abort = () => controller.abort();
   init.signal?.addEventListener("abort", abort, { once: true });
   const timer = setTimeout(abort, timeoutMs);
   try {
-    return await fetch(input, { ...init, signal: controller.signal });
+    if (init.signal?.aborted) controller.abort();
+    const response = await fetch(input, { ...init, signal: controller.signal });
+    // Error bodies are never needed for status/cooldown decisions.
+    if (!response.ok) {
+      void response.body?.cancel().catch(() => {});
+      return new Response(null, { status: response.status, statusText: response.statusText, headers: response.headers });
+    }
+    const bytes = await readBoundedBytes(response, maxBytes, controller.signal);
+    return new Response(bytes, { status: response.status, statusText: response.statusText, headers: response.headers });
   } finally {
     clearTimeout(timer);
     init.signal?.removeEventListener("abort", abort);

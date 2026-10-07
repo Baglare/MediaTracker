@@ -5,6 +5,7 @@ import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { getSupabaseEnv } from "@/lib/supabase/status";
 import { enforceRateLimit } from "./request-security";
 import { canonicalRateLimitIp, identityEpochs, subjectDigest, trustedRateLimitIp, type LimiterIdentity } from "./rate-limit-identity";
+import { getBackendProvider } from '../backend/provider';
 
 // Policy values belong to SQL. HTTP input never chooses policy, cost, limits or windows.
 export const RATE_LIMIT_POLICIES = {
@@ -61,8 +62,9 @@ export function signRateLimitEnvelope(envelope: object, key: string) {
 
 async function signedRpc(operation: "consume" | "cooldown", policy: RateLimitPolicy, identity: LimiterIdentity, ip: string | null, cooldown = 0, deadlineMs = 750): Promise<RateLimitDecision> {
   const config = configuration();
-  const env = getSupabaseEnv();
-  if (!config || !env) return unavailable();
+  const native=getBackendProvider()==='native';
+  const env = native?null:getSupabaseEnv();
+  if (!config || (!native && !env)) return unavailable();
   const now = Date.now();
   const epochs = identityEpochs(now);
   const keys = config.previousKey ? [config.previousKey, config.identityKey] : [config.identityKey];
@@ -75,8 +77,17 @@ async function signedRpc(operation: "consume" | "cooldown", policy: RateLimitPol
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), Math.max(1, deadlineMs));
   try {
+    if(native) {
+      const { nativeSignedLimiter }=await import('../backend/limiter');
+      const data=await nativeSignedLimiter(operation,payload,config,identity);
+      if(!data || typeof data.allowed!=='boolean' || !['allowed','limited','capacity','replay'].includes(data.reason)
+        || data.allowed!==(data.reason==='allowed') || ['capacity','replay'].includes(data.reason)
+        || !Number.isInteger(data.retry_after_seconds) || data.retry_after_seconds<0 || data.retry_after_seconds>86400
+        || (!data.allowed && data.retry_after_seconds<1))return unavailable();
+      return {allowed:data.allowed,retryAfterSeconds:data.retry_after_seconds,source:'distributed'};
+    }
     // Independent public-key client: limiter transport never refreshes a cookie session or retries.
-    const client = createClient(env.url, env.anonKey, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
+    const client = createClient(env!.url, env!.anonKey, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
     const { data, error } = await client.rpc(operation === "consume" ? "consume_application_rate_limit_v1" : "report_provider_cooldown_v1", payload).abortSignal(controller.signal);
     if (error || !data || typeof data !== "object" || Array.isArray(data)) return unavailable();
     const result = data as Record<string, unknown>;
@@ -93,9 +104,16 @@ async function signedRpc(operation: "consume" | "cooldown", policy: RateLimitPol
 async function consumeWithinDeadline(request: Request, policy: RateLimitPolicy, deadline: number): Promise<RateLimitDecision> {
   if (!Object.hasOwn(RATE_LIMIT_POLICIES, policy)) return unavailable();
   const ip = trustedRateLimitIp(request);
+  const native=getBackendProvider()==='native';
+  if(native && !ip)return unavailable();
   let identity: LimiterIdentity | null = null;
   try {
-    const client = await getSupabaseServerClient();
+    if(native) {
+      const {getCurrentUser}=await import('../auth/current-user');
+      const user=await getCurrentUser();
+      if(user)identity={kind:'user',value:user.id.toLowerCase()};
+    }
+    const client = native?null:await getSupabaseServerClient();
     if (client) {
       const { data, error } = await client.auth.getUser();
       if (!error && data.user?.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(data.user.id)) identity = { kind: "user", value: data.user.id.toLowerCase() };
@@ -105,6 +123,7 @@ async function consumeWithinDeadline(request: Request, policy: RateLimitPolicy, 
   if (!identity) return unavailable();
   if (performance.now() >= deadline) return unavailable();
   const decision = await signedRpc("consume", policy, identity, ip, 0, deadline - performance.now());
+  if(native)return decision;
   if (decision.source !== "unavailable" || (policy !== "interpret" && policy !== "recommend")) return decision;
   // Only bounded deterministic library work may fail soft. This is BEST_EFFORT_SMOOTHING.
   const now = Date.now();

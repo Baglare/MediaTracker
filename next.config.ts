@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
+import { resolveBackendProvider } from "./lib/backend/provider";
 
 const nextConfig: NextConfig = {
+  // Only the selector is public; DB/auth secrets never enter the client bundle.
+  env: { NEXT_PUBLIC_BACKEND_PROVIDER: resolveBackendProvider(process.env.BACKEND_PROVIDER, process.env.NODE_ENV === "production") },
   // Ops scripts have no runtime caller. Development annotation filesystem
   // tracing must not package privileged privacy tooling into server output.
   outputFileTracingExcludes: { "/*": ["./scripts/privacy-*.mjs", "./scripts/ops/**"] },

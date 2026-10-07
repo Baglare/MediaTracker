@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from "@/lib/api/request-security";
 import { enforceDistributedRateLimit } from "@/lib/api/distributed-rate-limit";
 import { runSafeApiRoute } from "@/lib/api/safe-route";
 import { NextRequest, NextResponse } from "next/server";
@@ -49,7 +50,7 @@ export async function GET(request: NextRequest) {
     const limitSeconds = nowSeconds + 90 * 24 * 60 * 60;
     const schedules: AniListSchedule[] = [];
     for (let page = 1; page <= 3; page += 1) {
-      const response = await fetch(ANILIST_URL, {
+      const response = await fetchWithTimeout(ANILIST_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

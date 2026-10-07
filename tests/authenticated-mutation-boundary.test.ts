@@ -156,6 +156,8 @@ it("inventories every exported unsafe handler, separating reads and local dev wr
   const exempt = new Set(["anilist/search:POST", "tmdb/search:POST", "omdb/search:POST", "tvmaze/search:POST", "openlibrary/search:POST", "social/people:POST", "ai/interpret:POST", "dev/recommendation-annotation:POST"]);
   const protectedMethods = new Set(endpoints.map(([path, method]) => `${path}:${method}`));
   protectedMethods.add("ai/recommend:POST");
+  protectedMethods.add("auth/[...all]:POST"); // Native auth has dedicated origin/admission tests.
+  protectedMethods.add("backend/cloud:POST"); // Native Cloud has dedicated admission tests.
   function walk(dir: string): string[] {
     return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => entry.isDirectory() ? walk(join(dir, entry.name)) : entry.name === "route.ts" ? [join(dir, entry.name)] : []);
   }
@@ -165,6 +167,6 @@ it("inventories every exported unsafe handler, separating reads and local dev wr
     const path = file.replaceAll("\\", "/").replace(/^app\/api\//, "").replace(/\/route.ts$/, "");
     for (const match of readFileSync(file, "utf8").matchAll(/export\s+(?:async\s+)?function\s+(POST|PUT|PATCH|DELETE)\s*\(/g)) actual.push(`${path}:${match[1]}`);
   }
-  expect(files).toHaveLength(35);
+  expect(files).toHaveLength(38); // Native authorized asset delivery adds one read-only route.
   expect(actual.sort()).toEqual([...protectedMethods, ...exempt].sort());
 });

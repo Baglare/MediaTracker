@@ -20,7 +20,7 @@ TMDB v1 env contract: `MEDIA_TRACKER_TMDB_MODE` retired/ignored; `TMDB_READ_ACCE
 | --- | --- |
 | D1 — Veri bütünlüğü ve portable backup | Tamamlandı |
 | D2 — Cloud Sync geliştirme ve testleri | Tamamlandı |
-| D2B.0 / D2B.1 production veritabanı | Uygulandı |
+| D2B.0 / D2B.1 production veritabanı | Tarihsel kayıt; güncel hosted ledger LIVE_UNVERIFIED |
 | D2C.1 production cutover | D8 release aşamasına bırakıldı |
 | D3 — Release Calendar | Tamamlandı |
 | D4 — Product Polish / Performance / UX Reliability | Tamamlandı |
@@ -225,7 +225,7 @@ http://127.0.0.1:8001/health
 
 ## Ortam Değişkenleri
 
-Temel yerel kullanım için hiçbir değişken zorunlu değildir. Provider anahtarları tek başına yetki veya release gate açmaz. İlk Production release sözleşmesi `AI_SERVER_ACCESS_MODE=disabled`, research kapalı ve persistent embedding cache `off` değerlerini gerektirir; ayrıntılar [env matrisi](docs/D8_RELEASE_ENV_MATRIX.md) içindedir.
+Temel yerel kullanım için hiçbir değişken zorunlu değildir. Provider anahtarları tek başına yetki veya release gate açmaz. İlk Production release sözleşmesi `AI_SERVER_ACCESS_MODE=disabled`, research kapalı ve persistent embedding cache `off` değerlerini gerektirir; ayrıntılar [güncel release/env authority](docs/V1_HARDENING_06D_RELEASE_OPERATIONS.md) ve [gate matrisi](docs/V1_HARDENING_06E_OPERATIONAL_RELEASE_GATE.md) içindedir.
 
 | Değişken | Zorunlu mu? | Kullanım |
 | --- | --- | --- |
@@ -240,29 +240,29 @@ Temel yerel kullanım için hiçbir değişken zorunlu değildir. Provider anaht
 | `OMDB_API_KEY` | Hayır | Yalnız legacy/local teşhis; public search/fallback açmaz |
 | `AI_SERVER_ACCESS_MODE` | Hayır | Eksik/geçersiz değer `disabled`; ilk Production release'te `disabled` |
 | `MEDIA_TRACKER_PROVIDER_USER_AGENT` | Open Library için | Gerçek contact içeren MediaTracker User-Agent; eksikse provider kapalı |
-| `AI_PROVIDER` | Hayır | `mock`, `auto`, `openai`, `gemini`, `openrouter`, `groq` |
-| `OPENAI_API_KEY` | Hayır | OpenAI uyumlu provider |
-| `OPENAI_MODEL` | Hayır | Varsayılan: `gpt-5.4-mini` |
-| `GEMINI_API_KEY` | Hayır | Gemini provider |
-| `GEMINI_MODEL` | Hayır | Varsayılan: `gemini-2.0-flash` |
-| `OPENROUTER_API_KEY` | Hayır | OpenRouter provider |
-| `OPENROUTER_MODEL` | Hayır | Varsayılan: `openrouter/free` |
-| `GROQ_API_KEY` | Hayır | Groq provider |
-| `GROQ_MODEL` | Hayır | Varsayılan: `llama-3.1-8b-instant` |
+| `AI_PROVIDER` | Production v1 yasak; yalnız ayrı local geliştirme | `mock`, `auto`, `openai`, `gemini`, `openrouter`, `groq` |
+| `OPENAI_API_KEY` | Production v1 yasak; yalnız ayrı local geliştirme | OpenAI uyumlu provider |
+| `OPENAI_MODEL` | Production v1 yasak; yalnız ayrı local geliştirme | Varsayılan: `gpt-5.4-mini` |
+| `GEMINI_API_KEY` | Production v1 yasak; yalnız ayrı local geliştirme | Gemini provider |
+| `GEMINI_MODEL` | Production v1 yasak; yalnız ayrı local geliştirme | Varsayılan: `gemini-2.0-flash` |
+| `OPENROUTER_API_KEY` | Production v1 yasak; yalnız ayrı local geliştirme | OpenRouter provider |
+| `OPENROUTER_MODEL` | Production v1 yasak; yalnız ayrı local geliştirme | Varsayılan: `openrouter/free` |
+| `GROQ_API_KEY` | Production v1 yasak; yalnız ayrı local geliştirme | Groq provider |
+| `GROQ_MODEL` | Production v1 yasak; yalnız ayrı local geliştirme | Varsayılan: `llama-3.1-8b-instant` |
 | `NEXT_PUBLIC_APP_URL` | Hayır | OpenRouter header bilgisi için |
-| `MEDIA_TRACKER_ML_SERVICE_URL` | Hayır | Python embedding servisi URL'si. Örnek: `http://127.0.0.1:8001` |
-| `MEDIA_TRACKER_EMBEDDING_MODEL` | Hayır | Varsayılan: `sentence-transformers/all-MiniLM-L6-v2` |
+| `MEDIA_TRACKER_ML_SERVICE_URL` | Production v1 yasak; yalnız ayrı local geliştirme | Python embedding servisi URL'si. Örnek: `http://127.0.0.1:8001` |
+| `MEDIA_TRACKER_EMBEDDING_MODEL` | Production v1 yasak; yalnız ayrı local geliştirme | Varsayılan: `sentence-transformers/all-MiniLM-L6-v2` |
 | `MEDIA_TRACKER_EMBEDDING_CACHE` | Hayır | `off` verilirse embedding cache kapanır |
 | `MEDIA_TRACKER_PERSISTENT_EMBEDDING_CACHE` | Hayır | `off` verilirse Supabase tabanlı embedding cache kapanır |
 
-Güvenlik notu: İlk release normal web runtime service-role veya paid AI anahtarı gerektirmez. Persistent embedding cache kapalıdır. Ayrı yetkili operasyonlarda kullanılan secret hiçbir client component, API yanıtı veya loga eklenmemeli ve `NEXT_PUBLIC_` prefix'i almamalıdır. `.env.local` ve gerçek anahtarlar Git'e gönderilmemelidir.
+Güvenlik notu: Production v1 normal web runtime içinde service-role ve paid AI anahtarları yasaktır. Persistent embedding cache kapalıdır. Ayrı yetkili operasyonlarda kullanılan secret hiçbir client component, API yanıtı veya loga eklenmemeli ve `NEXT_PUBLIC_` prefix'i almamalıdır. `.env.local` ve gerçek anahtarlar Git'e gönderilmemelidir.
 
 ## Supabase Kurulumu
 
 Cloud özelliklerini kullanmak istiyorsan:
 
 1. Supabase projesi oluştur.
-2. Yeni yerel/disposable kurulumda repository migration zincirini kendi izole ortamında doğrula. Production veritabanında D2B.0 ve D2B.1 uygulanmıştır; D2C.1 enforcement/cutover yapılmamıştır ve D8'e bırakılmıştır. Production işlemleri README kapsamı değildir; operasyonel sıra için [`docs/PRODUCTION_CLOUD_V2_CUTOVER.md`](docs/PRODUCTION_CLOUD_V2_CUTOVER.md) kullanılır.
+2. Yeni yerel/disposable kurulumda repository migration zincirini kendi izole ortamında doğrula. Eski D2B/D2C ledger ifadeleri tarihsel kanıttır; güncel hosted durum LIVE_UNVERIFIED. Production işlemleri README kapsamı değildir; güncel authority [06D release operations](docs/V1_HARDENING_06D_RELEASE_OPERATIONS.md) ve [06E release gates](docs/V1_HARDENING_06E_OPERATIONAL_RELEASE_GATE.md) içindedir. D8 dokümanları yalnız tarihsel kanıttır.
 3. Supabase Project Settings -> API bölümünden URL ve anon key değerlerini al.
 4. `.env.local` içine şunları ekle:
 

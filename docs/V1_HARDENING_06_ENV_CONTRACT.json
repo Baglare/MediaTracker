@@ -251,5 +251,71 @@
     "visibility": "server non-secret",
     "owner": "release operator",
     "failure": "unset/invalid keeps capability disabled or blocks acceptance; no substitute target"
+  },
+  {
+    "name": "BACKEND_PROVIDER",
+    "LOCAL": "optional isolated offline/local; explicit values required for enabled Cloud/distributed mode",
+    "CI": "absent: credential-free offline suite",
+    "PREVIEW": "required isolated approved target",
+    "PRODUCTION": "required independently verified target",
+    "allowed": "supabase or native; explicit hosted selector; local missing defaults supabase",
+    "visibility": "server non-secret",
+    "owner": "provider operator",
+    "failure": "unset/invalid keeps capability disabled or blocks acceptance; no substitute target"
+  },
+  {
+    "name": "DATABASE_URL",
+    "LOCAL": "required only for native; pool max optional; isolated disposable target",
+    "CI": "absent: credential-free offline suite",
+    "PREVIEW": "native only; pool max optional; forbidden in supabase",
+    "PRODUCTION": "native only; DATABASE_POOL_MAX optional; forbidden in supabase",
+    "allowed": "postgresql URL; mt_runtime login; no query/hash; server secret",
+    "visibility": "server secret",
+    "owner": "release operator",
+    "failure": "unset/invalid keeps capability disabled or blocks acceptance; no substitute target"
+  },
+  {
+    "name": "DATABASE_SSL_MODE",
+    "LOCAL": "required only for native; pool max optional; isolated disposable target",
+    "CI": "absent: credential-free offline suite",
+    "PREVIEW": "native only; pool max optional; forbidden in supabase",
+    "PRODUCTION": "native only; DATABASE_POOL_MAX optional; forbidden in supabase",
+    "allowed": "disable (LOCAL only) or verify-full; hosted requires verify-full",
+    "visibility": "server non-secret",
+    "owner": "release operator",
+    "failure": "unset/invalid keeps capability disabled or blocks acceptance; no substitute target"
+  },
+  {
+    "name": "DATABASE_POOL_MAX",
+    "LOCAL": "required only for native; pool max optional; isolated disposable target",
+    "CI": "absent: credential-free offline suite",
+    "PREVIEW": "native only; pool max optional; forbidden in supabase",
+    "PRODUCTION": "native only; DATABASE_POOL_MAX optional; forbidden in supabase",
+    "allowed": "integer 1-5 per process; default 2; aggregate runtime role limit 5",
+    "visibility": "server non-secret",
+    "owner": "release operator",
+    "failure": "unset/invalid keeps capability disabled or blocks acceptance; no substitute target"
+  },
+  {
+    "name": "BETTER_AUTH_SECRET",
+    "LOCAL": "required only for native; pool max optional; isolated disposable target",
+    "CI": "absent: credential-free offline suite",
+    "PREVIEW": "native only; pool max optional; forbidden in supabase",
+    "PRODUCTION": "native only; DATABASE_POOL_MAX optional; forbidden in supabase",
+    "allowed": ">=32 chars; independent high-entropy server secret",
+    "visibility": "server secret",
+    "owner": "release operator",
+    "failure": "unset/invalid keeps capability disabled or blocks acceptance; no substitute target"
+  },
+  {
+    "name": "BETTER_AUTH_URL",
+    "LOCAL": "required only for native; pool max optional; isolated disposable target",
+    "CI": "absent: credential-free offline suite",
+    "PREVIEW": "native only; pool max optional; forbidden in supabase",
+    "PRODUCTION": "native only; DATABASE_POOL_MAX optional; forbidden in supabase",
+    "allowed": "canonical HTTP(S) origin equal to app URL; hosted requires HTTPS",
+    "visibility": "server non-secret",
+    "owner": "release operator",
+    "failure": "unset/invalid keeps capability disabled or blocks acceptance; no substitute target"
   }
 ]

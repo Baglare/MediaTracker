@@ -103,7 +103,7 @@ export default function CloudV2ConflictPanel({
   const refreshRemote = async (card: CloudV2ConflictCard) => {
     const requestedOwner = ownerScope.key;
     setBusyItemId(card.itemId);
-    const result = await fetchCloudV2RemoteSummary(card);
+    const result = await fetchCloudV2RemoteSummary(card,ownerScope.userId);
     if (ownerKeyRef.current !== requestedOwner) return;
     setBusyItemId(null);
     if (!result.ok) {

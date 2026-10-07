@@ -1,3 +1,4 @@
+import { readBoundedJson } from "@/lib/api/bounded-body";
 import "server-only";
 import { accountWriteLockedResponse } from "@/lib/api/account-write-barrier";
 
@@ -20,5 +21,5 @@ export function safeSocialRouteError(error:unknown):Response{
 }
 
 export async function readJsonBody(request:Request):Promise<unknown>{
-  try{return await request.json();}catch{return null;}
+  try{return await readBoundedJson(request, 16_384);}catch{return null;}
 }

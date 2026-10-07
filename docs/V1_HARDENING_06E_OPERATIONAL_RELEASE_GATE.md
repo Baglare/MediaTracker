@@ -6,7 +6,7 @@ Baseline: `release/v1-hardening`, HEAD `b48f5ee1fa2c9a9277ce3b0852e49a1e9de9830e
 
 | Gate | Status | Evidence / exact closure requirement |
 | --- | --- | --- |
-| Dependency/runtime hardening | CLOSED | 01/01B source + baseline CI; runtime High/Critical zero; dev exception V1-SEC-EXCEPTION-001 not a fix, expiry 2026-11-03 |
+| Dependency/runtime hardening | CLOSED | 08 authorized lock-only source-map-js 1.2.1 → 1.2.2; runtime audit zero vulnerabilities (High=0/Critical=0); full verifier PASS with only five existing dev-only braces-chain entries. Existing braces exception unchanged, review/expiry 2026-11-03 UTC. Renewed full local tests/typecheck/lint/offline build PASS; immutable RC/live gates remain open; user prohibits commit/push/deploy |
 | CSRF/origin | CLOSED | 02A source contract retained; exact same-origin boundary; fresh hosted smoke still required |
 | CSP/XSS | CLOSED | 02B nonce/URL source retained; fresh hosted browser acceptance remains |
 | Safe logging | CLOSED | 02C allowlist/correlation retained; platform retention separately open |
@@ -15,8 +15,8 @@ Baseline: `release/v1-hardening`, HEAD `b48f5ee1fa2c9a9277ce3b0852e49a1e9de9830e
 | CI | CLOSED | Exact baseline SHA Actions success; candidates need own clean SHA after user commit/publication |
 | Provider source gates | CLOSED | TVMaze attribution, conditional Open Library, AniList/TMDB/OMDb hard-disabled; no policy change |
 | Privacy notice technical representation | SOURCE_READY | 05A/05B facts; final operator/legal sufficiency unapproved |
-| Privacy export/erasure source work | SOURCE_READY | ACCOUNT_WRITE_BARRIER / ACCOUNT_ERASURE_WORKFLOW source complete; 05F synthetic proof only |
-| Phase 5 real disposable DB/Auth/Storage proof | BLOCKED_ENVIRONMENT | LIVE_DISPOSABLE_DB_PROOF remains unproven; grants/concurrency/deferred XP/participant/Auth-last execution required |
+| Privacy export/erasure source work | SOURCE_READY | ACCOUNT_WRITE_BARRIER / ACCOUNT_ERASURE_WORKFLOW source complete; 08 retained activity CHECK repair, source/synthetic proof only; real proof open |
+| Phase 5 real disposable DB/Auth/Storage proof | BLOCKED_ENVIRONMENT | GAP-007 discovery 2026-10-06: Docker 29.6.2 client present, Linux daemon pipe absent; no proven LOCAL_DISPOSABLE target. 26 migrations present / 0 applied; 71 targeted offline tests + 40 CI policy tests PASS, not live evidence. [Focused evidence and exact environment requirements](V1_GAP_007_DISPOSABLE_EVIDENCE.md); grants/concurrency/deferred XP/participant/Auth-last execution remains required |
 | Backup tooling | SOURCE_READY | 06A disposable encrypted DB packaging/plan/integrity; actual hosted transport and Storage/Auth recovery excluded |
 | Restore tooling | SOURCE_READY | 06A default plan, exact local proof, empty prerequisites, stop-on-error DB verifier; DB-only success never full DR |
 | Disposable restore rehearsal | BLOCKED_ENVIRONMENT | NOT_RUN_ENVIRONMENT_BLOCKED: Docker daemon unavailable, no safe fixture established |
@@ -27,7 +27,7 @@ Baseline: `release/v1-hardening`, HEAD `b48f5ee1fa2c9a9277ce3b0852e49a1e9de9830e
 | Staging acceptance | LIVE_VALIDATION_REQUIRED | Separate future authorization/target proof/current migration/security/privacy/owner smoke |
 | Production read-only preflight | LIVE_VALIDATION_REQUIRED | Future explicit read-only authorization; exact target/ledger/config/Advisor/backup capability |
 | Backup before cutover | LIVE_VALIDATION_REQUIRED | Fresh authorized encrypted DB/private/ledger + separate Storage + supported Auth recovery, independent manifest pin |
-| Full affected-write freeze | BLOCKED_MANUAL | Media maintenance does not cover all direct RPC/Goals/social/XP/Storage/Auth writes; positive freeze proof required |
+| Full affected-write freeze | SOURCE_READY | 08 DB singleton/table-RPC/Auth/Storage/privacy containment + ops plans, postcheck-bound unfreeze; LIVE_VALIDATION_REQUIRED for hosted locks/managed services and bootstrap/data-migration containment |
 | Article 9 | MANUAL_LEGAL_GATE | Recipient/transfer mechanism evidence and legal approval; no filing/contact by this task |
 | VERBIS | BLOCKED_MANUAL | Operator/legal exemption/registration determination; no assumed exemption |
 | Legal basis / Article 10 final notice | MANUAL_LEGAL_GATE | Provisional matrix requires real controller/bases/recipients and approval |

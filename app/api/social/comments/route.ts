@@ -4,7 +4,7 @@ import { runSafeApiRoute } from "@/lib/api/safe-route";
 import { validateAuthenticatedMutationRequest } from "@/lib/api/request-security";
 import { PRIVATE_NO_STORE_HEADERS, readJsonBody, safeSocialRouteError } from "@/lib/social/route-response";
 import { safeSocialText, socialRecord, validateUuid } from "@/lib/social/interactions-validation";
-import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { getApplicationServerClient as getSupabaseServerClient } from "@/lib/backend/application-server";
 
 export const dynamic="force-dynamic";export const revalidate=0;
 

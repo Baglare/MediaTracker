@@ -5,7 +5,7 @@ import { validateAuthenticatedMutationRequest } from "@/lib/api/request-security
 import { loadSocialPreferences } from "@/lib/social/interactions-server";
 import { PRIVATE_NO_STORE_HEADERS, readJsonBody, safeSocialRouteError } from "@/lib/social/route-response";
 import { socialRecord, validateActivityPreferences, validateNotificationPreferences, validateRecommendationPermission } from "@/lib/social/interactions-validation";
-import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { getApplicationServerClient as getSupabaseServerClient } from "@/lib/backend/application-server";
 import type { Json } from "@/lib/supabase/types";
 
 export const dynamic="force-dynamic";export const revalidate=0;

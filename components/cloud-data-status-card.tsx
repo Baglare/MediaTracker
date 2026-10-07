@@ -9,7 +9,7 @@
 // Hiçbir aksiyon otomatik tetiklenmez — hepsi confirm dialog ister.
 
 import { useEffect, useRef, useState } from "react";
-import type { User } from "@supabase/supabase-js";
+import type { ApplicationUser } from "@/lib/auth/identity";
 import {
   ArrowDownToLine,
   ArrowUpFromLine,
@@ -34,7 +34,7 @@ import type { LocalOwnerScope } from "@/lib/local-owner-scope";
 import { GoalCloudManualTransferPanel } from "@/features/goals/components/goal-cloud-manual-transfer-panel";
 
 interface CloudDataStatusCardProps {
-  user: User | null;
+  user: ApplicationUser | null;
   configured: boolean;
   ownerScope: LocalOwnerScope | null;
   mediaItems: MediaItem[];

@@ -5,6 +5,8 @@ import {
 } from "./sync-queue";
 import { getSupabaseBrowserClient } from "./supabase/client";
 import { fetchCloudMediaItems } from "./supabase/cloud-repository";
+import { getBackendProvider } from './backend/provider';
+import { nativeCloudRequest } from './backend/cloud-browser';
 import type {
   CloudMediaV2ConflictReason,
   MediaItem,
@@ -193,16 +195,18 @@ interface RemoteQueryClient {
 
 export async function fetchCloudV2RemoteSummary(
   card: CloudV2ConflictCard,
+  expectedUserId?:string,
 ): Promise<CloudV2RemoteSummaryResult> {
-  const client = getSupabaseBrowserClient() as unknown as RemoteQueryClient | null;
-  if (!client) {
+  const native=getBackendProvider()==='native';
+  const client = native?null:getSupabaseBrowserClient() as unknown as RemoteQueryClient | null;
+  if ((!native && !client) || (native && !expectedUserId)) {
     return { ok: false, message: "Cloud bağlantısı yapılandırılmadı." };
   }
   const table = card.entity === "media_item" ? "media_items" : "progress_logs";
   const columns = card.entity === "media_item"
     ? "id,title,status,current_progress,total_progress,revision,deleted_at"
     : "id,media_title,new_progress,revision,deleted_at";
-  const { data, error } = await client
+  const { data, error } = native?await nativeCloudRequest({action:'summary',expectedUserId,table,recordId:card.recordId}):await client!
     .from(table)
     .select(columns)
     .eq("id", card.recordId)

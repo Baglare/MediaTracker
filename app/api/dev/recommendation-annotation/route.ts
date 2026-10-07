@@ -1,3 +1,4 @@
+import { readBoundedText } from "@/lib/api/bounded-body";
 import { runSafeApiRoute } from "@/lib/api/safe-route";
 import { ANNOTATION_TOOL_LIMITS } from "@/features/recommendations/evaluation/annotation-tool/domain/constants";
 import { annotationApiGuard, annotationJson } from "@/features/recommendations/evaluation/annotation-tool/server/access";
@@ -14,7 +15,7 @@ function service() {
 async function readBoundedJson(request: Request): Promise<Record<string, unknown>> {
   const declared = Number(request.headers.get("content-length"));
   if (Number.isFinite(declared) && declared > ANNOTATION_TOOL_LIMITS.requestBytes) throw new Error("payload_too_large");
-  const raw = await request.text();
+  const raw = await readBoundedText(request, ANNOTATION_TOOL_LIMITS.requestBytes);
   if (Buffer.byteLength(raw, "utf8") > ANNOTATION_TOOL_LIMITS.requestBytes) throw new Error("payload_too_large");
   let parsed: unknown;
   try { parsed = JSON.parse(raw); } catch { throw new Error("malformed_json"); }

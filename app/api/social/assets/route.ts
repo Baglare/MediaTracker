@@ -1,3 +1,4 @@
+import { readBoundedFormData } from "@/lib/api/bounded-body";
 import { checkAccountWriteAllowed, accountWriteLockedResponse } from "@/lib/api/account-write-barrier";
 import { enforceDistributedRateLimit } from "@/lib/api/distributed-rate-limit";
 import { runSafeApiRoute } from "@/lib/api/safe-route";
@@ -5,8 +6,10 @@ import { validateAuthenticatedMutationRequest } from "@/lib/api/request-security
 import { NextResponse } from "next/server";
 
 import { validateImageUpload } from "@/lib/social/validation";
-import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { getApplicationServerClient as getSupabaseServerClient } from "@/lib/backend/application-server";
 import { createSignedSocialAssetUrl, invalidateSignedSocialAssetUrl } from "@/lib/social/server";
+import { getBackendProvider } from '@/lib/backend/provider';
+import { replaceNativeAsset } from '@/lib/backend/filesystem-assets';
 
 const EXTENSIONS: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
 
@@ -28,13 +31,17 @@ export async function POST(request: Request) {
   const rateLimit = await enforceDistributedRateLimit(request, "asset_write");
   if (rateLimit) return rateLimit;
   let form: FormData;
-  try { form = await request.formData(); } catch { return NextResponse.json({ ok: false, message: "Dosya isteği geçersiz." }, { status: 400 }); }
+  try { form = await readBoundedFormData(request, 10 * 1024 * 1024 + 65_536); } catch { return NextResponse.json({ ok: false, message: "Dosya isteği geçersiz." }, { status: 400 }); }
   const kindValue = form.get("kind");
   const fileValue = form.get("file");
   const kind = kindValue === "avatar" || kindValue === "banner" ? kindValue : null;
   if (!kind || !(fileValue instanceof File)) return NextResponse.json({ ok: false, message: "Dosya isteği geçersiz." }, { status: 400 });
   const validation = validateImageUpload(kind, fileValue.type, fileValue.size);
   if (!validation.ok) return NextResponse.json({ ok: false, message: validation.error }, { status: 400 });
+  if(getBackendProvider()==='native') {
+    try{return NextResponse.json(await replaceNativeAsset(kind,fileValue));}
+    catch(error){return accountWriteLockedResponse(error)??NextResponse.json({ok:false,message:'Görsel yüklenemedi; mevcut görsel korunuyor.'},{status:409});}
+  }
   const { data: current } = await auth.client.from("profiles").select("avatar_path,banner_path").eq("id", auth.user.id).maybeSingle();
   if (!current) return NextResponse.json({ ok: false, message: "Önce sosyal profili kaydet." }, { status: 409 });
   const oldPath = kind === "avatar" ? current?.avatar_path ?? null : current?.banner_path ?? null;
@@ -68,6 +75,10 @@ export async function DELETE(request: Request) {
   if (rateLimit) return rateLimit;
   const kind = new URL(request.url).searchParams.get("kind");
   if (kind !== "avatar" && kind !== "banner") return NextResponse.json({ ok: false, message: "Görsel türü geçersiz." }, { status: 400 });
+  if(getBackendProvider()==='native') {
+    try{return NextResponse.json(await replaceNativeAsset(kind,null));}
+    catch(error){return accountWriteLockedResponse(error)??NextResponse.json({ok:false,message:'Görsel kaldırılamadı.'},{status:409});}
+  }
   const { data } = await auth.client.from("profiles").select("avatar_path,banner_path").eq("id", auth.user.id).maybeSingle();
   if (!data) return NextResponse.json({ ok: false, message: "Sosyal profil bulunamadı." }, { status: 404 });
   const path = kind === "avatar" ? data?.avatar_path ?? null : data?.banner_path ?? null;

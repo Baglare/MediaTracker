@@ -20,7 +20,7 @@ export function requireSafe(condition) { if (!condition) throw new Error("Operat
 
 export function classification(name) {
   if (/owner_scoped_primary|progress_log_relation_repair/.test(name)) return ["NON_ADDITIVE", "SECURITY_CRITICAL"];
-  if (/privacy|participant_detachment/.test(name)) return ["NON_ADDITIVE", "PRIVACY_CRITICAL", "SECURITY_CRITICAL"];
+  if (/privacy|participant_detachment|release_write_containment/.test(name)) return ["NON_ADDITIVE", "PRIVACY_CRITICAL", "SECURITY_CRITICAL"];
   if (/application_rate_limit/.test(name)) return ["ADDITIVE_WITH_RUNTIME_DEPENDENCY", "SECURITY_CRITICAL"];
   if (/security_advisor|visibility|protected/.test(name)) return ["ADDITIVE_WITH_RUNTIME_DEPENDENCY", "SECURITY_CRITICAL"];
   return ["ADDITIVE_WITH_RUNTIME_DEPENDENCY"];
@@ -43,7 +43,7 @@ export function migrationManifest(repository = root) {
       rollback: "Transaction abort before commit; after commit no blind down migration",
       failForward: /privacy|participant/.test(name) ? "Keep erasure locks and reconcile erased identities; reviewed forward fix only"
         : "Contain affected writes; capture definitions/ACLs; reviewed append-only repair",
-      maintenance: /primary|privacy|participant/.test(name) ? "Full affected-write freeze required" : "Affected subsystem containment required" };
+      maintenance: /primary|privacy|participant|release_write_containment/.test(name) ? "Full affected-write freeze required" : "Affected subsystem containment required" };
   });
 }
 export function sourceSha(repository = root) {
@@ -133,9 +133,13 @@ export function verifyDatabase(expected, actual, migrations) {
   requireSafe(Array.isArray(actual.functions) && ["assert_account_write_allowed", "consume_application_rate_limit_v1"]
     .every(name => actual.functions.some(f => f.name === name)));
   requireSafe(actual.unsafePrivateGrants === false);
-  requireSafe(Array.isArray(actual.managedBindings) && actual.managedBindings.length === 2
+  requireSafe(Array.isArray(actual.managedBindings) && actual.managedBindings.length === (migrations.some(m => m.version === "20261006120000") ? 5 : 2)
     && actual.managedBindings.some(s => s.includes("privacy_initialize_account") && s.includes("auth.users"))
     && actual.managedBindings.some(s => s.includes("a_privacy_storage") && s.includes("storage.objects")));
+  if (migrations.some(m => m.version === "20261006120000")) requireSafe(
+    actual.managedBindings.some(s => s.includes("a_release_auth") && s.includes("auth.users"))
+    && actual.managedBindings.some(s => s.includes("a_release_storage") && s.includes("storage.objects"))
+    && actual.managedBindings.some(s => s.includes("a_release_storage_truncate") && s.includes("storage.objects")));
   // Sorted catalog projection includes columns, constraints, triggers, policies,
   // function definition hashes, table/function ACLs, roles, row counts/digests.
   requireSafe(JSON.stringify(actual) === JSON.stringify(expected));

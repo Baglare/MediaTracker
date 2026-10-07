@@ -1,1 +1,238 @@
-{"domains":[{"aliases":[],"docs":["docs/LOCAL_DATA_OWNERSHIP_AND_NAMESPACES.md","docs/PORTABLE_BACKUP_FORMAT.md"],"name":"local-data-integrity","paths":["lib/local-data-storage.ts","lib/local-data-ownership.ts","lib/local-data-integrity.ts","lib/portable-backup.ts","lib/media-identity.ts"],"rule_ids":[],"subtree":null,"symbols":[],"tests":["tests/local-data-ownership.test.ts","tests/portable-backup.test.ts"]},{"aliases":[],"docs":["docs/PRODUCTION_CLOUD_V2_CUTOVER.md"],"name":"cloud-sync-auth","paths":["lib/supabase","lib/sync-manager.ts","lib/sync-queue.ts","lib/cloud-media-v2-client.ts","supabase"],"rule_ids":["cloud-authorization-boundary"],"subtree":"supabase","symbols":[],"tests":["tests/cloud-media-v2-sync-manager.test.ts"]},{"aliases":[],"docs":[],"name":"library-dashboard","paths":["features/library","features/dashboard","app/page.tsx"],"rule_ids":[],"subtree":null,"symbols":[],"tests":["tests/p4-library-architecture.test.ts"]},{"aliases":[],"docs":[],"name":"discovery-provider-policy","paths":["features/discovery","lib/providers","app/api"],"rule_ids":[],"subtree":null,"symbols":[],"tests":["tests/d8-discovery-provider-release-policy.test.ts"]},{"aliases":[],"docs":["docs/RELEASE_CALENDAR_ARCHITECTURE.md"],"name":"release-calendar","paths":["features/calendar"],"rule_ids":[],"subtree":null,"symbols":[],"tests":["tests/release-calendar-domain.test.ts","tests/release-calendar-routes.test.ts"]},{"aliases":[],"docs":["docs/GOAL_SYSTEM_ARCHITECTURE.md"],"name":"goals","paths":["features/goals"],"rule_ids":[],"subtree":null,"symbols":[],"tests":["tests/goal-domain.test.ts","tests/goal-policy.test.ts"]},{"aliases":[],"docs":[],"name":"recommendation-ranking","paths":["features/recommendations/domain","features/recommendations/intent","features/recommendations/evidence","features/recommendations/ranking","features/recommendations/orchestration","features/recommendations/providers","features/recommendations/ui"],"rule_ids":[],"subtree":null,"symbols":[],"tests":["tests/recommendation-v2-engine.test.ts"]},{"aliases":[],"docs":["docs/D7_FINAL_ACCEPTANCE.md"],"name":"grounded-research","paths":["features/recommendations/research"],"rule_ids":["grounded-research-security","deterministic-recommendation-authority"],"subtree":"features/recommendations/research","symbols":[],"tests":["tests/recommendation-d7-r6b-final.test.ts"]},{"aliases":[],"docs":["docs/SOCIAL_PROFILE_FOUNDATION.md","docs/XP_V2_PROGRESSION_SYSTEM.md"],"name":"social-xp","paths":["lib/social","lib/xp"],"rule_ids":[],"subtree":null,"symbols":[],"tests":["tests/social-visibility.test.ts","tests/xp-outbox.test.ts"]},{"aliases":[],"docs":["docs/PERSONALIZATION_ARCHITECTURE.md"],"name":"personalization-settings","paths":["lib/personalization","features/settings"],"rule_ids":[],"subtree":null,"symbols":[],"tests":["tests/personalization-runtime.test.ts"]},{"aliases":[],"docs":["README.md","docs/ROADMAP.md","docs/D8_RELEASE_CANDIDATE_ACCEPTANCE.md","docs/D8_PRODUCTION_CUTOVER_RUNBOOK.md"],"name":"release-validation","paths":["scripts","package.json","vitest.config.ts"],"rule_ids":[],"subtree":null,"symbols":[],"tests":[]}],"project_id":"media-tracker","schema":"project-ai-map-v1"}
+{
+  "domains": [
+    {
+      "aliases": [],
+      "docs": [
+        "docs/LOCAL_DATA_OWNERSHIP_AND_NAMESPACES.md",
+        "docs/PORTABLE_BACKUP_FORMAT.md"
+      ],
+      "name": "local-data-integrity",
+      "paths": [
+        "lib/local-data-storage.ts",
+        "lib/local-data-ownership.ts",
+        "lib/local-data-integrity.ts",
+        "lib/portable-backup.ts",
+        "lib/media-identity.ts"
+      ],
+      "rule_ids": [],
+      "subtree": null,
+      "symbols": [],
+      "tests": [
+        "tests/local-data-ownership.test.ts",
+        "tests/portable-backup.test.ts"
+      ]
+    },
+    {
+      "aliases": [],
+      "docs": [
+        "docs/PRODUCTION_CLOUD_V2_CUTOVER.md",
+        "docs/NATIVE_BACKEND_P1_FOUNDATION.md",
+        "docs/NATIVE_BACKEND_P2_MIGRATION.md"
+      ],
+      "name": "cloud-sync-auth",
+      "paths": [
+        "lib/supabase",
+        "lib/sync-manager.ts",
+        "lib/sync-queue.ts",
+        "lib/cloud-media-v2-client.ts",
+        "supabase",
+        "lib/backend",
+        "lib/auth",
+        "hooks/use-auth.ts",
+        "database/native",
+        "app/api/auth",
+        "app/api/backend/cloud",
+        "scripts/native-migrations.mjs",
+        "app/api/backend/assets",
+        "scripts/native-domain-translation.mjs",
+        "scripts/native-privacy-translation.mjs",
+        "scripts/native-privacy-ops.mjs",
+        "scripts/native-assets-maintenance.mjs",
+        "lib/privacy/account-export.mjs"
+      ],
+      "rule_ids": [
+        "cloud-authorization-boundary"
+      ],
+      "subtree": "supabase",
+      "symbols": [],
+      "tests": [
+        "tests/cloud-media-v2-sync-manager.test.ts",
+        "tests/native-backend-foundation.test.ts",
+        "tests/native-auth-boundary.test.ts",
+        "tests/native-postgres-pool.test.ts",
+        "tests/native-postgres-live.integration.test.ts",
+        "tests/native-release-policy.test.mjs",
+        "tests/native-auth-browser-adapter.test.ts",
+        "tests/native-cloud-domain.test.ts",
+        "tests/native-migrations.test.mjs",
+        "tests/native-remaining-domains.test.ts",
+        "tests/native-filesystem.test.ts",
+        "tests/native-asset-workflow.test.ts",
+        "tests/native-domain-schema.test.mjs",
+        "tests/native-privacy-ops.test.mjs"
+      ]
+    },
+    {
+      "aliases": [],
+      "docs": [],
+      "name": "library-dashboard",
+      "paths": [
+        "features/library",
+        "features/dashboard",
+        "app/page.tsx"
+      ],
+      "rule_ids": [],
+      "subtree": null,
+      "symbols": [],
+      "tests": [
+        "tests/p4-library-architecture.test.ts"
+      ]
+    },
+    {
+      "aliases": [],
+      "docs": [],
+      "name": "discovery-provider-policy",
+      "paths": [
+        "features/discovery",
+        "lib/providers",
+        "app/api"
+      ],
+      "rule_ids": [],
+      "subtree": null,
+      "symbols": [],
+      "tests": [
+        "tests/d8-discovery-provider-release-policy.test.ts"
+      ]
+    },
+    {
+      "aliases": [],
+      "docs": [
+        "docs/RELEASE_CALENDAR_ARCHITECTURE.md"
+      ],
+      "name": "release-calendar",
+      "paths": [
+        "features/calendar"
+      ],
+      "rule_ids": [],
+      "subtree": null,
+      "symbols": [],
+      "tests": [
+        "tests/release-calendar-domain.test.ts",
+        "tests/release-calendar-routes.test.ts"
+      ]
+    },
+    {
+      "aliases": [],
+      "docs": [
+        "docs/GOAL_SYSTEM_ARCHITECTURE.md"
+      ],
+      "name": "goals",
+      "paths": [
+        "features/goals"
+      ],
+      "rule_ids": [],
+      "subtree": null,
+      "symbols": [],
+      "tests": [
+        "tests/goal-domain.test.ts",
+        "tests/goal-policy.test.ts"
+      ]
+    },
+    {
+      "aliases": [],
+      "docs": [],
+      "name": "recommendation-ranking",
+      "paths": [
+        "features/recommendations/domain",
+        "features/recommendations/intent",
+        "features/recommendations/evidence",
+        "features/recommendations/ranking",
+        "features/recommendations/orchestration",
+        "features/recommendations/providers",
+        "features/recommendations/ui"
+      ],
+      "rule_ids": [],
+      "subtree": null,
+      "symbols": [],
+      "tests": [
+        "tests/recommendation-v2-engine.test.ts"
+      ]
+    },
+    {
+      "aliases": [],
+      "docs": [
+        "docs/D7_FINAL_ACCEPTANCE.md"
+      ],
+      "name": "grounded-research",
+      "paths": [
+        "features/recommendations/research"
+      ],
+      "rule_ids": [
+        "grounded-research-security",
+        "deterministic-recommendation-authority"
+      ],
+      "subtree": "features/recommendations/research",
+      "symbols": [],
+      "tests": [
+        "tests/recommendation-d7-r6b-final.test.ts"
+      ]
+    },
+    {
+      "aliases": [],
+      "docs": [
+        "docs/SOCIAL_PROFILE_FOUNDATION.md",
+        "docs/XP_V2_PROGRESSION_SYSTEM.md"
+      ],
+      "name": "social-xp",
+      "paths": [
+        "lib/social",
+        "lib/xp"
+      ],
+      "rule_ids": [],
+      "subtree": null,
+      "symbols": [],
+      "tests": [
+        "tests/social-visibility.test.ts",
+        "tests/xp-outbox.test.ts"
+      ]
+    },
+    {
+      "aliases": [],
+      "docs": [
+        "docs/PERSONALIZATION_ARCHITECTURE.md"
+      ],
+      "name": "personalization-settings",
+      "paths": [
+        "lib/personalization",
+        "features/settings"
+      ],
+      "rule_ids": [],
+      "subtree": null,
+      "symbols": [],
+      "tests": [
+        "tests/personalization-runtime.test.ts"
+      ]
+    },
+    {
+      "aliases": [],
+      "docs": [
+        "README.md",
+        "docs/ROADMAP.md",
+        "docs/D8_RELEASE_CANDIDATE_ACCEPTANCE.md",
+        "docs/D8_PRODUCTION_CUTOVER_RUNBOOK.md"
+      ],
+      "name": "release-validation",
+      "paths": [
+        "scripts",
+        "package.json",
+        "vitest.config.ts"
+      ],
+      "rule_ids": [],
+      "subtree": null,
+      "symbols": [],
+      "tests": []
+    }
+  ],
+  "project_id": "media-tracker",
+  "schema": "project-ai-map-v1"
+}

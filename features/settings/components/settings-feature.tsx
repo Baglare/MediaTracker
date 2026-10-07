@@ -1,6 +1,6 @@
 "use client";
 
-import type { User } from "@supabase/supabase-js";
+import type { ApplicationUser } from "@/lib/auth/identity";
 import Link from "next/link";
 import { CloudCog, Home, PanelsTopLeft, Settings as SettingsIcon } from "lucide-react";
 import AuthPanel from "@/components/auth-panel";
@@ -24,7 +24,7 @@ import { useProviderCapabilities } from "@/hooks/use-provider-capabilities";
 type LayoutController = ReturnType<typeof useLayoutPreferences>;
 
 interface SettingsFeatureProps {
-  user: User | null;
+  user: ApplicationUser | null;
   configured: boolean;
   ownerScope: LocalOwnerScope | null;
   mediaList: MediaItem[];

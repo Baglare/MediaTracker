@@ -1,3 +1,4 @@
+import { readBoundedJson } from "@/lib/api/bounded-body";
 import { checkAccountWriteAllowed, accountWriteLockedResponse } from "@/lib/api/account-write-barrier";
 import { enforceDistributedRateLimit } from "@/lib/api/distributed-rate-limit";
 import { runSafeApiRoute } from "@/lib/api/safe-route";
@@ -14,7 +15,7 @@ import {
   validateStatsSnapshot,
   validateUserId,
 } from "@/lib/social/validation";
-import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { getApplicationServerClient as getSupabaseServerClient } from "@/lib/backend/application-server";
 import { buildPublicProfileThemeSnapshot } from "@/lib/personalization/public-profile-theme";
 import type { Json } from "@/lib/supabase/types";
 
@@ -54,7 +55,7 @@ export async function POST(request: Request) {
   const rateLimit = await enforceDistributedRateLimit(request, "social_write");
   if (rateLimit) return rateLimit;
   let body: unknown;
-  try { body = await request.json(); } catch { return failure("İstek verisi geçersiz."); }
+  try { body = await readBoundedJson(request, 16_384); } catch { return failure("İstek verisi geçersiz."); }
   if (!body || typeof body !== "object" || Array.isArray(body)) return failure("İstek verisi geçersiz.");
   const input = body as Record<string, unknown>;
 

@@ -53,7 +53,7 @@ export function GoalCloudManualTransferPanel({ ownerScope, mediaItems, onConfirm
     const requestedOwner = ownerScope.key;
     setBusy(true);
     setFeedback(null);
-    const result = await fetchGoalCloudSnapshots();
+    const result = await fetchGoalCloudSnapshots(undefined, ownerScope.userId);
     if (requestedOwner !== activeOwnerKeyRef.current) return;
     setBusy(false);
     if (!result.ok) {

@@ -56,6 +56,7 @@ jobs:
         run: npm run test:run
       - name: Production build (offline, no credentials)
         env:
+          BACKEND_PROVIDER: supabase
           NODE_OPTIONS: --import=${{ github.workspace }}/scripts/ci-offline.mjs
         run: npm run build
       - name: Lockfile and tracked-source stability

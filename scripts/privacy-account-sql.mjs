@@ -40,7 +40,12 @@ export function inspectSql(user) {
       or e.metadata->>'recommendationId' in (select jsonb_array_elements_text(coalesce(${context}->'referenceIds','[]'::jsonb)))
     union all select jsonb_build_object('table','social_activity_comments','row',to_jsonb(c)) from public.social_activity_comments c
     where c.id::text in (select jsonb_array_elements_text(coalesce(${context}->'replyIds','[]'::jsonb)))
-      and c.body<>'Silinen hesaba verilen yanıt.' and exists(select 1 from jsonb_array_elements_text(coalesce(${context}->'identifiers','[]'::jsonb)) marker where position(marker in c.body)>0)`;
+      and c.body<>'Silinen hesaba verilen yanıt.' and exists(select 1 from jsonb_array_elements_text(coalesce(${context}->'identifiers','[]'::jsonb)) marker where position(marker in c.body)>0)
+    union all select jsonb_build_object('table','social_activity_events','row',to_jsonb(a)) from public.social_activity_events a
+      where a.source_event_id='privacy-detached:'||a.id::text and (
+        length(coalesce(a.media_snapshot->>'canonicalKey','')) not between 3 and 260
+        or exists(select 1 from jsonb_array_elements_text(coalesce(${context}->'identifiers','[]'::jsonb)) marker
+          where position(marker in a.media_snapshot::text)>0))`;
   return `begin isolation level repeatable read read only;
     select jsonb_build_object('schemaVersion',1,'synthetic',false,
       'auth',(select coalesce(jsonb_agg(jsonb_build_object('id',id,'email',email,'created_at',created_at,'email_confirmed_at',email_confirmed_at,'last_sign_in_at',last_sign_in_at)),'[]'::jsonb) from auth.users where id=${u}),
@@ -80,7 +85,8 @@ export function cleanupSql(user) {
     select private_privacy_ops.detach_participant_xp_v1(${u});
     update public.social_activity_events set source_event_id='privacy-detached:'||id::text,
       dedupe_key='privacy-detached:'||id::text,short_text=null,
-      media_snapshot=jsonb_build_object('title','Silinen öneri','mediaType',coalesce(media_snapshot->>'mediaType','movie'))
+      media_snapshot=jsonb_build_object('title','Silinen öneri','mediaType',coalesce(media_snapshot->>'mediaType','movie'),
+        'canonicalKey','privacy-detached-activity:'||id::text)
       where actor_id<>${u} and source_event_id in (select 'recommendation:'||id::text from (${thread}) q);
     delete from public.social_notifications where recipient_id=${u} or actor_id=${u} or entity_id=${u}
       or safe_payload->>'actorId'=${u}::text or safe_payload->>'userId'=${u}::text

@@ -5,7 +5,7 @@ import { validateAuthenticatedMutationRequest } from "@/lib/api/request-security
 import { loadSocialNotifications } from "@/lib/social/interactions-server";
 import { socialRecord, validateCursor, validateUuid } from "@/lib/social/interactions-validation";
 import { PRIVATE_NO_STORE_HEADERS, readJsonBody, safeSocialRouteError } from "@/lib/social/route-response";
-import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { getApplicationServerClient as getSupabaseServerClient } from "@/lib/backend/application-server";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;

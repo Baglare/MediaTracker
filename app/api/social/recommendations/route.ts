@@ -6,7 +6,7 @@ import { isRecommendationTransitionAllowed } from "@/lib/social/interactions";
 import { loadSocialRecommendationDetail, loadSocialRecommendations } from "@/lib/social/interactions-server";
 import { safeSocialText, socialRecord, validateCursor, validateRecommendationProgressStatus, validateRecommendationResponseStatus, validateSocialMediaSnapshot, validateUuid } from "@/lib/social/interactions-validation";
 import { PRIVATE_NO_STORE_HEADERS, readJsonBody, safeSocialRouteError } from "@/lib/social/route-response";
-import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { getApplicationServerClient as getSupabaseServerClient } from "@/lib/backend/application-server";
 import type { Json } from "@/lib/supabase/types";
 
 export const dynamic = "force-dynamic";

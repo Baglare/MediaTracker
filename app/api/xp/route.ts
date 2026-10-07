@@ -1,8 +1,9 @@
+import { readBoundedJson } from "@/lib/api/bounded-body";
 import { enforceDistributedRateLimit } from "@/lib/api/distributed-rate-limit";
 import { supabaseApplicationError } from "@/lib/supabase/safe-error";
 import { runSafeApiRoute } from "@/lib/api/safe-route";
 import { validateAuthenticatedMutationRequest } from "@/lib/api/request-security";
-import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { getApplicationServerClient as getSupabaseServerClient } from "@/lib/backend/application-server";
 import type { Json } from "@/lib/supabase/types";
 import { validateMediaStateBatch } from "@/lib/xp/validation";
 
@@ -56,7 +57,8 @@ export async function POST(request: Request): Promise<Response> {
     const rateLimit = await enforceDistributedRateLimit(request, "xp_sync");
     if (rateLimit) return rateLimit;
     let body: unknown;
-    try { body = await request.json(); } catch { return failure("İstek verisi geçersiz."); }
+    // 1,000 states with bounded title/key/hash fields, including JSON escapes.
+    try { body = await readBoundedJson(request, 4_194_304); } catch { return failure("İstek verisi geçersiz."); }
     if (!body || typeof body !== "object" || Array.isArray(body)) return failure("İstek verisi geçersiz.");
     const input = body as Record<string, unknown>;
     if ("amount" in input || "effect" in input || "allocations" in input || "badge" in input || "beneficiary" in input) return failure("XP miktarı, etkisi ve ödül sahibi client tarafından belirlenemez.");

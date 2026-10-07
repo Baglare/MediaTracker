@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from "@/lib/api/request-security";
 import { enforceDistributedRateLimit } from "@/lib/api/distributed-rate-limit";
 import { runSafeApiRoute } from "@/lib/api/safe-route";
 // ============================================
@@ -103,7 +104,7 @@ export async function GET(request: NextRequest) {
   if (rateLimit) return rateLimit;
 
   try {
-    const response = await fetch(ANILIST_URL, {
+    const response = await fetchWithTimeout(ANILIST_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

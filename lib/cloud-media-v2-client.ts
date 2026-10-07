@@ -5,7 +5,7 @@ import type {
   ProgressLog,
   SyncQueueItem,
 } from "./types";
-import { getSupabaseBrowserClient } from "./supabase/client";
+import { getCloudRpcClient } from "./backend/cloud-browser";
 import { supabaseApplicationError } from "./supabase/safe-error";
 import { toMediaRow, toProgressLogRow } from "./supabase/mapping";
 
@@ -196,7 +196,7 @@ export async function dispatchCloudMediaV2QueueItem(
   userId: string,
   item: SyncQueueItem,
   client: CloudMediaV2RpcClient | null = (
-    getSupabaseBrowserClient() as unknown as CloudMediaV2RpcClient | null
+    getCloudRpcClient(userId) as unknown as CloudMediaV2RpcClient | null
   ),
 ): Promise<CloudMediaV2DispatchResult> {
   if (!client) {

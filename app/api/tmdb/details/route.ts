@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from "@/lib/api/request-security";
 import { enforceDistributedRateLimit } from "@/lib/api/distributed-rate-limit";
 import { runSafeApiRoute } from "@/lib/api/safe-route";
 // ============================================
@@ -115,7 +116,7 @@ export async function GET(request: NextRequest) {
     url.searchParams.set("language", "tr-TR");
     url.searchParams.set("append_to_response", "external_ids,keywords");
 
-    const res = await fetch(url.toString(), {
+    const res = await fetchWithTimeout(url.toString(), {
       headers: {
         Authorization: `Bearer ${token}`,
         accept: "application/json",

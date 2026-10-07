@@ -1,5 +1,5 @@
 import type { User } from "@supabase/supabase-js";
-import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { getApplicationServerClient as getSupabaseServerClient } from "@/lib/backend/application-server";
 
 export interface AiEntitlement {
   authenticated: boolean;

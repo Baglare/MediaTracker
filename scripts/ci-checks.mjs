@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFileSync, readdirSync } from "node:fs";
 import { pathToFileURL } from "node:url";
+import { posix } from "node:path";
 import ts from "typescript";
 import yaml from "js-yaml";
 import { exception } from "./ci-audit.mjs";
@@ -114,14 +115,23 @@ export function checkFile(path, text) {
         && text.includes('process.env.MEDIA_TRACKER_EMBEDDING_CACHE === "off"'), "Unreviewed runtime service-role use");
     }
     const source = ts.createSourceFile(path, text, ts.ScriptTarget.Latest, true);
+    function nativeBoundary(name, typeOnly=false) {
+      if (!name || typeOnly) return;
+      const target=(name.startsWith("@/")?name.slice(2):name.startsWith(".")?posix.normalize(posix.join(posix.dirname(path),name)):name).replace(/\.[cm]?[jt]s$/, "");
+      if (target==="lib/backend/postgres") requireContract(["lib/auth/native.ts","lib/backend/transaction.ts"].includes(path), "Protected repositories require authenticated transaction context, not the native pool");
+      if (name==="pg" || name.startsWith("pg/")) requireContract(path==="lib/backend/postgres.ts", "Native pg belongs only to server infrastructure");
+      if (name==="better-auth" || name.startsWith("better-auth/")) requireContract(path.startsWith("lib/auth/"), "Provider SDK belongs only to the auth adapter");
+    }
     function visit(node) {
       if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) {
         const name = node.moduleSpecifier?.text;
+        nativeBoundary(name,ts.isImportDeclaration(node)?node.importClause?.isTypeOnly:node.isTypeOnly);
         requireContract(!name?.includes("scripts/ops") && !name?.includes("scripts/privacy-"), "Ops tooling imported by runtime");
         requireContract(!exception.chain.some((pkg) => name === pkg || name?.startsWith(`${pkg}/`)), "Dev advisory chain imported by runtime");
       }
       if (ts.isCallExpression(node) && ["require", "import"].includes(node.expression.getText(source))) {
         const name = node.arguments[0]?.text;
+        nativeBoundary(name);
         requireContract(!name?.includes("scripts/ops") && !name?.includes("scripts/privacy-"), "Ops tooling imported by runtime");
         requireContract(!exception.chain.some((pkg) => name === pkg || name?.startsWith(`${pkg}/`)), "Dev advisory chain imported by runtime");
       }
@@ -161,6 +171,7 @@ export function checkWorkflow(text) {
   for (const step of job.steps.filter((step) => /typegen|test:run|run build/.test(step.run ?? ""))) {
     requireContract(step.env?.NODE_OPTIONS === "--import=${{ github.workspace }}/scripts/ci-offline.mjs", "Missing offline network guard");
   }
+  requireContract(job.steps.find(step => step.run === "npm run build")?.env?.BACKEND_PROVIDER === "supabase", "Missing explicit offline build provider");
 }
 
 function git(...args) {
@@ -170,7 +181,7 @@ function git(...args) {
 export function checkEnvironment(names, environment) {
   requireContract(names.every((name) => !/^\.env(?:\.|$)/.test(name) || name === ".env.example"),
     "Use a clean checkout without local env files for CI validation");
-  requireContract(Object.keys(environment).every((name) => !/^(?:SUPABASE_|NEXT_PUBLIC_SUPABASE_|D8_STAGING_|RATE_LIMIT_|D7_|D6_PROVIDER_LIVE_SMOKE|AI_SERVER_|MEDIA_TRACKER_|OPENAI_|GROQ_|GEMINI_|OPENROUTER_|TMDB_|OMDB_|DATABASE_URL|PGPASSWORD|VERCEL_TOKEN|PRIVACY_(?!TEST_BASELINE_REPO$)|MEDIATRACKER_DR_)/.test(name)),
+  requireContract(Object.keys(environment).every((name) => !/^(?:SUPABASE_|NEXT_PUBLIC_SUPABASE_|D8_STAGING_|RATE_LIMIT_|D7_|D6_PROVIDER_LIVE_SMOKE|AI_SERVER_|MEDIA_TRACKER_|OPENAI_|GROQ_|GEMINI_|OPENROUTER_|TMDB_|OMDB_|DATABASE_|PG|BETTER_AUTH_|BACKEND_PROVIDER|NEXT_PUBLIC_BACKEND_PROVIDER|VERCEL_TOKEN|PRIVACY_(?!TEST_BASELINE_REPO$)|MEDIATRACKER_DR_)/.test(name)),
     "Unexpected application/live/credential environment in CI validation");
 }
 

@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from "@/lib/api/request-security";
 import { enforceDistributedRateLimit } from "@/lib/api/distributed-rate-limit";
 import { runSafeApiRoute } from "@/lib/api/safe-route";
 import { NextRequest, NextResponse } from "next/server";
@@ -52,7 +53,7 @@ export async function GET(request: NextRequest) {
   try {
     const url = new URL(`https://api.themoviedb.org/3/movie/${movieId}`);
     url.searchParams.set("append_to_response", "release_dates");
-    const response = await fetch(url, {
+    const response = await fetchWithTimeout(url, {
       headers: {
         Authorization: `Bearer ${token}`,
         accept: "application/json",

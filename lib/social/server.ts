@@ -15,7 +15,7 @@ import {
   type SocialProfilePayload,
 } from "@/lib/social/types";
 import { validateMediaSnapshot, validateModuleLayout, validateProgressionSnapshot, validateStatsSnapshot } from "@/lib/social/validation";
-import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { getApplicationServerClient as getSupabaseServerClient } from "@/lib/backend/application-server";
 import type { Json } from "@/lib/supabase/types";
 import { socialRecord, validateActivityVisibility, validateSocialMediaSnapshot, validateUuid } from "@/lib/social/interactions-validation";
 import { validateActivityType } from "@/lib/social/interactions-validation";

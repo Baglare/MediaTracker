@@ -1,5 +1,5 @@
 import { safeLog } from "@/lib/security/safe-logging";
-import type { User } from "@supabase/supabase-js";
+import type { ApplicationUser } from "@/lib/auth/identity";
 import type { StorageWriteResult } from "./local-data-storage";
 import type { LocalOwnerScope } from "./local-owner-scope";
 import {
@@ -136,7 +136,7 @@ export function saveProfilePreferences(preferences: ProfilePreferences): void {
 
 export function resolveProfileDisplayName(
   preferences: ProfilePreferences,
-  user: User | null
+  user: ApplicationUser | null
 ): string {
   const preferred = preferences.displayName.trim();
   if (preferred) return preferred;
