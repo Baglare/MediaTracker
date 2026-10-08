@@ -44,6 +44,7 @@ jobs:
         run: node scripts/ci-audit.mjs
       - name: Generate route types and typecheck
         env:
+          BACKEND_PROVIDER: supabase
           NODE_OPTIONS: --import=${{ github.workspace }}/scripts/ci-offline.mjs
         run: |
           node node_modules/next/dist/bin/next typegen

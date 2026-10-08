@@ -4,6 +4,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { test } from "node:test";
 import { tmpdir } from "node:os";
 import net from "node:net";
+import yaml from "js-yaml";
 import { exception, verifyAudit, verifyUpstreamVersion } from "./ci-audit.mjs";
 import { checkEnvironment, checkFile, checkMigrations, checkTestIntegrity, checkWorkflow, criticalMigrations } from "./ci-checks.mjs";
 
@@ -75,6 +76,15 @@ for (const [label, mutate] of [
 test("workflow parses YAML and satisfies authority/stage contract", () => {
   checkWorkflow(readFileSync(".github/workflows/ci.yml", "utf8"));
 });
+for (const provider of [undefined, "native", "invalid"]) {
+  test(`workflow rejects typegen backend provider ${provider ?? "missing"}`, () => {
+    const workflow = yaml.load(readFileSync(".github/workflows/ci.yml", "utf8"));
+    const step = workflow.jobs.validate.steps.find(step => step.run?.includes("next typegen"));
+    if (provider === undefined) delete step.env.BACKEND_PROVIDER;
+    else step.env.BACKEND_PROVIDER = provider;
+    assert.throws(() => checkWorkflow(yaml.dump(workflow)), /Missing explicit offline typegen provider/);
+  });
+}
 for (const [label, from, to] of [
   ['PR/main artifact trigger', "github.event_name == 'push' && github.ref == 'refs/heads/release/v1-hardening'", 'always()'],
   ['validation dependency removed', 'needs: validate', 'needs: []'],

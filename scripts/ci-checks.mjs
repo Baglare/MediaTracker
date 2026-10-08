@@ -171,6 +171,7 @@ export function checkWorkflow(text) {
   for (const step of job.steps.filter((step) => /typegen|test:run|run build/.test(step.run ?? ""))) {
     requireContract(step.env?.NODE_OPTIONS === "--import=${{ github.workspace }}/scripts/ci-offline.mjs", "Missing offline network guard");
   }
+  requireContract(job.steps.find(step => step.run?.includes("next typegen"))?.env?.BACKEND_PROVIDER === "supabase", "Missing explicit offline typegen provider");
   requireContract(job.steps.find(step => step.run === "npm run build")?.env?.BACKEND_PROVIDER === "supabase", "Missing explicit offline build provider");
   const artifact = workflow.jobs['native-linux-artifact'];
   requireContract(artifact.needs === 'validate'
