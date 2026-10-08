@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import { join, dirname, relative } from 'node:path';
 import { checkArtifactFile, parseElfEvidence } from './native-artifact-check.mjs';
-import { verifyNativePackage, packageFailureDiagnostic, dependencyCopyFilter } from './native-package.mjs';
+import { verifyNativePackage, packageFailureDiagnostic, dependencyCopyFilter, preflightDependencies } from './native-package.mjs';
 import { nativeMigrationManifest } from './native-migrations.mjs';
 
 const packageCli = fileURLToPath(new URL('./native-package.mjs', import.meta.url));
@@ -205,6 +205,186 @@ for(const [label,alter,category] of [
     } finally {await rm(fixture.root,{recursive:true,force:true});}
   });
 }
+
+async function nestedFixture() {
+  const fixture=await packageFixture();
+  const lock=JSON.parse(await readFile(join(fixture.root,'package-lock.json'),'utf8'));
+  lock.packages['']={dependencies:{sharp:'1',runtime:'1'}};
+  Object.assign(lock.packages,{
+    'node_modules/sharp':{version:'1',optional:true,dependencies:{semver:'7', '@scope/addon':'1'}},
+    'node_modules/semver':{version:'6',dev:true},
+    'node_modules/sharp/node_modules/semver':{version:'7',optional:true},
+    'node_modules/sharp/node_modules/@scope/addon':{version:'1',optional:true},
+    'node_modules/runtime':{version:'1',dependencies:{renamed:'npm:@scope/real@1',shared:'1'}},
+    'node_modules/runtime/node_modules/renamed':{name:'@scope/real',version:'1'},
+    'node_modules/shared':{version:'1',devOptional:true},
+  });
+  await fixture.put('package-lock.json',JSON.stringify(lock));
+  for(const name of ['sharp/node_modules/semver','sharp/node_modules/@scope/addon',
+    'runtime/node_modules/renamed','shared'])
+    await fixture.put(`.next/standalone/node_modules/${name}/package.json`,'{}');
+  return fixture;
+}
+
+test('nested npm containers, scoped children, aliases, hoisted shared and optional runtime packages copy safely',async()=>{
+  const fixture=await nestedFixture();
+  try {
+    const output=await copyDependencies(fixture);
+    for(const name of ['sharp/node_modules/semver','sharp/node_modules/@scope/addon',
+      'runtime/node_modules/renamed','shared'])
+      assert.equal(await readFile(join(output,'node_modules',name,'package.json'),'utf8'),'{}');
+    assert.equal((await preflightDependencies(fixture.root)).rejected,0);
+  } finally {await rm(fixture.root,{recursive:true,force:true});}
+});
+
+for(const container of ['node_modules','node_modules/@scope']) {
+  test(`Turbopack directory alias to a production nested ${container} retains child ownership checks`,async()=>{
+    const fixture=await nestedFixture();
+    try {
+      await fixture.put('node_modules/sharp/node_modules/semver/package.json','{}');
+      await fixture.put('node_modules/sharp/node_modules/@scope/addon/package.json','{}');
+      await mkdir(join(fixture.root,'.next/standalone/.next/node_modules'));
+      const link=join(fixture.root,'.next/standalone/.next/node_modules/dependency-hash');
+      await symlink(relative(dirname(link),join(fixture.root,'node_modules/sharp',container)),link,'dir');
+      const output=await copyDependencies(fixture);
+      const report=await preflightDependencies(fixture.root);
+      assert.equal(report.status,'PASS');assert.equal(report.entireTreeAudited,true);
+      await assertOrdinaryTree(output);
+      const lock=JSON.parse(await readFile(join(fixture.root,'package-lock.json'),'utf8'));
+      lock.packages['node_modules/sharp/node_modules/@scope/addon'].dev=true;
+      await fixture.put('package-lock.json',JSON.stringify(lock));
+      await assert.rejects(copyDependencies(fixture),/dependency_untrusted/);
+    } finally {await rm(fixture.root,{recursive:true,force:true});}
+  });
+}
+
+async function reviewedSemverFixture() {
+  const fixture=await nestedFixture();
+  const lock=JSON.parse(await readFile(join(fixture.root,'package-lock.json'),'utf8'));
+  lock.packages['node_modules/next'].version='16.3.8';
+  lock.packages['node_modules/sharp'].version='0.35.5';
+  lock.packages['node_modules/semver'].version='6.3.1';
+  lock.packages['node_modules/sharp/node_modules/semver'].version='7.8.5';
+  await fixture.put('package-lock.json',JSON.stringify(lock));
+  await fixture.put('.next/standalone/node_modules/semver/package.json','{"name":"semver","version":"6.3.1"}');
+  await fixture.put('.next/next-server.js.nft.json',JSON.stringify({version:1,files:[
+    '../node_modules/semver/package.json','../node_modules/sharp/node_modules/semver/package.json']}));
+  return fixture;
+}
+
+test('reviewed dev-only semver metadata is omitted while nested production semver is retained',async()=>{
+  const fixture=await reviewedSemverFixture();
+  try {
+    const report=await preflightDependencies(fixture.root);
+    assert.equal(report.status,'PASS');
+    assert.deepEqual(report.omissions,[{identity:'semver',reason:'reviewed_development_metadata',traced:true}]);
+    const output=await copyDependencies(fixture);
+    await assert.rejects(readFile(join(output,'node_modules/semver/package.json')),error=>error.code==='ENOENT');
+    assert.equal(await readFile(join(output,'node_modules/sharp/node_modules/semver/package.json'),'utf8'),'{}');
+  } finally {await rm(fixture.root,{recursive:true,force:true});}
+});
+
+for(const change of ['runtime_sibling','metadata_link','version_drift','production_edge','external_dev_target']) {
+  test(`reviewed metadata omission fails closed on ${change}`,async()=>{
+    const fixture=await reviewedSemverFixture();
+    try {
+      const lock=JSON.parse(await readFile(join(fixture.root,'package-lock.json'),'utf8'));
+      if(change==='runtime_sibling')await fixture.put('.next/standalone/node_modules/semver/index.js','runtime');
+      if(change==='metadata_link') {
+        await rm(join(fixture.root,'.next/standalone/node_modules/semver/package.json'));
+        await symlink(join(fixture.root,'public/icon.txt'),join(fixture.root,'.next/standalone/node_modules/semver/package.json'),'file');
+      }
+      if(change==='version_drift')lock.packages['node_modules/sharp/node_modules/semver'].version='7.8.6';
+      if(change==='production_edge')lock.packages[''].dependencies.semver='6.3.1';
+      if(change==='external_dev_target') {
+        await fixture.put('node_modules/semver/index.js','runtime');
+        await symlink(join(fixture.root,'node_modules/semver/index.js'),join(fixture.root,'.next/standalone/node_modules/runtime/linked'),'file');
+      }
+      await fixture.put('package-lock.json',JSON.stringify(lock));
+      await assert.rejects(copyDependencies(fixture),/dependency_untrusted/);
+      assert.equal((await preflightDependencies(fixture.root)).status,'REJECTED');
+    } finally {await rm(fixture.root,{recursive:true,force:true});}
+  });
+}
+
+test('preflight compares exact nested ownership with NFT traces and the production graph; collects all classes',async()=>{
+  const fixture=await nestedFixture();
+  try {
+    const lock=JSON.parse(await readFile(join(fixture.root,'package-lock.json'),'utf8'));
+    lock.packages['node_modules/runtime/node_modules/dev']={dev:true};
+    lock.packages['node_modules/runtime/node_modules/workspace']={link:true};
+    await fixture.put('package-lock.json',JSON.stringify(lock));
+    for(const name of ['semver','runtime/node_modules/dev','runtime/node_modules/workspace','not-approved'])
+      await fixture.put(`.next/standalone/node_modules/${name}/package.json`,'{}');
+    await fixture.put('.next/next-server.js.nft.json',JSON.stringify({version:1,files:[
+      '../node_modules/semver/package.json','../node_modules/sharp/node_modules/semver/package.json']}));
+    const report=await preflightDependencies(fixture.root);
+    assert.equal(report.status,'REJECTED');assert.equal(report.entireTreeAudited,true);
+    assert.equal(report.traceStatus,'AVAILABLE');assert.equal(report.truncated,false);
+    const semver=report.rejections.find(row=>row.identity==='semver');
+    assert.equal(semver.reason,'development_package');assert.equal(semver.tracedFiles,1);
+    assert.equal(semver.productionGraph,false);
+    assert.ok(report.rejections.some(row=>row.identity==='dev'&&row.reason==='development_package'));
+    assert.ok(report.rejections.some(row=>row.identity==='workspace'&&row.reason==='linked_package'));
+    assert.ok(report.rejections.some(row=>row.reason==='unlisted_package'));
+    assert.ok(!JSON.stringify(report).includes('not-approved'));
+    assert.ok(!JSON.stringify(report).includes(fixture.root));
+    await assert.rejects(copyDependencies(fixture),/dependency_untrusted/);
+    const cli=spawnSync(process.execPath,[packageCli,'preflight'],{cwd:fixture.root,encoding:'utf8'});
+    assert.equal(cli.status,1);assert.equal(cli.stderr,'');assert.deepEqual(JSON.parse(cli.stdout),report);
+    const create=spawnSync(process.execPath,[packageCli,'create','dist/rejected'],{
+      cwd:fixture.root,encoding:'utf8',env:{...process.env,BACKEND_PROVIDER:'native'}});
+    assert.equal(create.status,1);assert.deepEqual(JSON.parse(create.stderr).dependencyPreflight,report);
+  } finally {await rm(fixture.root,{recursive:true,force:true});}
+});
+
+test('nested scope and dependency containers cannot bypass development ancestors or unknown children',async()=>{
+  for(const devParent of [false,true]) {
+    const fixture=await nestedFixture();
+    try {
+      const lock=JSON.parse(await readFile(join(fixture.root,'package-lock.json'),'utf8'));
+      if(devParent)lock.packages['node_modules/sharp'].dev=true;
+      else await fixture.put('.next/standalone/node_modules/sharp/node_modules/@scope/unlisted/package.json','{}');
+      await fixture.put('package-lock.json',JSON.stringify(lock));
+      await assert.rejects(copyDependencies(fixture),/dependency_untrusted/);
+    } finally {await rm(fixture.root,{recursive:true,force:true});}
+  }
+});
+
+test('preflight output is capped without stopping the audit and suppresses malformed package identities',async()=>{
+  const fixture=await nestedFixture();
+  try {
+    const lock=JSON.parse(await readFile(join(fixture.root,'package-lock.json'),'utf8'));
+    for(let index=0;index<95;index++) {
+      const name=`dev-${index}`;lock.packages[`node_modules/${name}`]={dev:true};
+      await fixture.put(`.next/standalone/node_modules/${name}/package.json`,'{}');
+    }
+    lock.packages['node_modules/dev-0'].name='secret=value/untrusted';
+    await fixture.put('package-lock.json',JSON.stringify(lock));
+    const report=await preflightDependencies(fixture.root);
+    assert.equal(report.rejectedClasses,95);assert.equal(report.rejections.length,80);
+    assert.equal(report.truncated,true);assert.ok(report.rejected>=190);
+    assert.ok(!JSON.stringify(report).includes('secret=value'));
+  } finally {await rm(fixture.root,{recursive:true,force:true});}
+});
+
+test('preflight audits safely dereferenced directories, rejects cycles and never follows escaping links',async()=>{
+  const fixture=await nestedFixture();
+  try {
+    await fixture.put('node_modules/runtime/value.js','synthetic');
+    await fixture.put('node_modules/dev/value.js','synthetic');
+    await symlink(join(fixture.root,'node_modules/dev/value.js'),join(fixture.root,'node_modules/runtime/linked'),'file');
+    await mkdir(join(fixture.root,'.next/standalone/.next/node_modules'));
+    await symlink(join(fixture.root,'node_modules/runtime'),join(fixture.root,'.next/standalone/.next/node_modules/runtime-hash'),'dir');
+    await symlink(join(fixture.root,'public'),join(fixture.root,'.next/standalone/node_modules/runtime/escape'),'dir');
+    const report=await preflightDependencies(fixture.root);
+    assert.equal(report.status,'REJECTED');
+    assert.ok(report.rejections.some(row=>row.reason==='development_package'));
+    assert.ok(report.rejections.some(row=>row.reason==='deployment_trace_link_unsafe'));
+    assert.ok(!JSON.stringify(report).includes('escape'));
+  } finally {await rm(fixture.root,{recursive:true,force:true});}
+});
+
 function failedCli(root, ...args) {
   const result = spawnSync(process.execPath, [packageCli, ...args], {
     cwd: root, encoding: 'utf8', env: { ...process.env, BACKEND_PROVIDER: 'native' },
@@ -213,6 +393,10 @@ function failedCli(root, ...args) {
   assert.equal(result.stdout, '');
   // A single JSON record excludes raw errors, Git stderr, full paths and env.
   const diagnostic = JSON.parse(result.stderr);
+  if(diagnostic.dependencyPreflight) {
+    assert.equal(typeof diagnostic.dependencyPreflight.entireTreeAudited,'boolean');
+    delete diagnostic.dependencyPreflight;
+  }
   assert.deepEqual(Object.keys(diagnostic), ['event', 'stage', 'category']);
   assert.equal(diagnostic.event, 'deployment_package_failed');
   assert.ok(!result.stderr.includes(root));

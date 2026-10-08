@@ -15,8 +15,10 @@ export function forbiddenArtifactPath(path) {
     || /\.(?:sql|dump|bak|zip|tar|gz|7z|tsbuildinfo|pem|key)$/i.test(path);
 }
 const sha = data => createHash('sha256').update(data).digest('hex');
-// Diagnostic fields are fixed vocabulary, never paths, messages, stacks or env.
+// Diagnostics use fixed vocabulary and validated lock-owned npm identities;
+// never paths, arbitrary filenames, messages, stacks or env.
 const failureStages = new WeakMap();
+const dependencyFailures = new WeakMap();
 const approvedErrors = new Set([
   'deployment_native_build_required', 'deployment_destination_invalid',
   'deployment_build_provider_mismatch', 'deployment_trace_link_unsafe',
@@ -47,6 +49,49 @@ export async function dependencyCopyFilter(cwd,standalone) {
   const lock=JSON.parse(await readFile(join(cwd,'package-lock.json'),'utf8'));
   const packages=Object.entries(lock.packages??{}).filter(([name])=>name.startsWith('node_modules/'));
   const packageNames=new Set(packages.map(([name])=>name));
+  const ownerKey=path=>{
+    const root=roots.find(root=>inside(root,path));
+    if(!root)return null;
+    const key=`node_modules/${relative(root,path).replaceAll('\\','/')}`;
+    return packages.filter(([pkg])=>key===pkg||key.startsWith(pkg+'/'))
+      .sort(([a],[b])=>b.length-a.length)[0]?.[0]??null;
+  };
+  const identity=path=>{
+    const key=ownerKey(path);
+    if(!key)return null;
+    const name=lock.packages[key].name??key.split('node_modules/').at(-1);
+    return approvedPackageIdentity(name)?name:null;
+  };
+  function reject(path,reason) {
+    const error=new Error('deployment_trace_dependency_untrusted');
+    dependencyFailures.set(error,{identity:identity(path),key:ownerKey(path),path,reason});
+    throw error;
+  }
+  // Reviewed Next 16.3.8 trace residue: root semver 6 is dev-only and
+  // contributes only package metadata; Sharp 0.35.5 resolves its own runtime
+  // semver 7. Keep this omission exact and fail closed on version/layout drift.
+  // No dev package file is accepted, including a newly added runtime sibling.
+  const rootSemver=lock.packages?.['node_modules/semver'];
+  const sharpSemver=lock.packages?.['node_modules/sharp/node_modules/semver'];
+  const reached=productionLockGraph(lock);
+  const metadataRoot=join(standalone,'node_modules','semver');
+  const metadataFile=join(metadataRoot,'package.json');
+  const reviewedMetadata=lock.packages?.['node_modules/next']?.version==='16.3.8'
+    &&lock.packages?.['node_modules/sharp']?.version==='0.35.5'
+    &&rootSemver?.dev===true&&rootSemver.version==='6.3.1'&&rootSemver.link!==true
+    &&sharpSemver?.dev!==true&&sharpSemver?.link!==true&&sharpSemver?.version==='7.8.5'
+    &&!reached.has('node_modules/semver')&&reached.has('node_modules/sharp/node_modules/semver');
+  async function metadataOnly() {
+    if(!reviewedMetadata)return false;
+    const directory=await lstat(metadataRoot).catch(()=>null);
+    if(!directory?.isDirectory()||directory.isSymbolicLink())return false;
+    await safeDirectory(metadataRoot);
+    const children=await readdir(metadataRoot);
+    if(children.length!==1||children[0]!=='package.json')return false;
+    if(!(await lstat(metadataFile)).isFile())return false;
+    const metadata=JSON.parse(await readFile(metadataFile,'utf8'));
+    return metadata.name==='semver'&&metadata.version===rootSemver.version;
+  }
   function trusted(path,allowRoot=false) {
     const root=roots.find(root=>inside(root,path));
     if(!root&&allowRoot&&inside(traceModules,path)) {
@@ -62,9 +107,14 @@ export async function dependencyCopyFilter(cwd,standalone) {
     const owner=parts.slice(0,index+(parts[index+1]?.startsWith('@')?3:2)).join('/');
     const owners=packages.filter(([pkg])=>key===pkg||key.startsWith(pkg+'/'));
     const container=parts.length===index+1 || (parts.length===index+2&&parts[index+1].startsWith('@'));
-    if((!packageNames.has(owner)&&!(allowRoot&&container&&owners.length))
-      ||owners.some(([,entry])=>entry.dev===true||entry.link===true))
-      throw new Error('deployment_trace_dependency_untrusted');
+    // node_modules and @scope directories are traversal containers, not
+    // packages. Their ancestors still require production lock ownership; each
+    // child is checked independently at its exact installed (possibly nested) key.
+    if(owners.some(([,entry])=>entry.link===true))reject(path,'linked_package');
+    if(owners.some(([,entry])=>entry.dev===true))reject(path,'development_package');
+    if(container&&(allowRoot||owners.length)) {
+      if(!packages.some(([pkg])=>pkg.startsWith(key+'/')))reject(path,'unlisted_container');
+    } else if(!packageNames.has(owner))reject(path,'unlisted_package');
     return root;
   }
   async function inspect(path,seen=new Set()) {
@@ -107,7 +157,11 @@ export async function dependencyCopyFilter(cwd,standalone) {
     trusted(current,true);
     return current;
   }
-  return async path=>{
+  const filter=async path=>{
+    if((path===metadataRoot||path===metadataFile)&&await metadataOnly()) {
+      // Traverse the ordinary directory so any new file still gets checked.
+      return path===metadataRoot;
+    }
     const name=relative(standalone,path).replaceAll('\\','/');
     if(inside(standalone,path)) {
       if(name && !['.next','node_modules','server.js','package.json'].includes(name.split('/')[0]))return false;
@@ -129,6 +183,131 @@ export async function dependencyCopyFilter(cwd,standalone) {
     }
     return true;
   };
+  filter.inspect=inspect;
+  filter.identity=identity;
+  filter.ownerKey=ownerKey;
+  filter.omission=path=>path===metadataFile?{identity:'semver',reason:'reviewed_development_metadata'}:null;
+  return filter;
+}
+
+function approvedPackageIdentity(name) {
+  return typeof name==='string' && name.length<=214
+    && /^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/.test(name);
+}
+// npm resolution is location based: prefer a consumer's nested installation,
+// then walk ancestor node_modules. Aliases retain their installed lock key.
+function productionLockGraph(lock) {
+  const entries=lock.packages??{},reached=new Set(),pending=[''];
+  function dependency(consumer,name) {
+    let location=consumer;
+    while(true) {
+      const candidate=`${location?location+'/':''}node_modules/${name}`;
+      if(entries[candidate])return candidate;
+      if(!location)return null;
+      const index=location.lastIndexOf('node_modules/');
+      location=index>0?location.slice(0,index-1):'';
+    }
+  }
+  while(pending.length) {
+    const key=pending.pop(),entry=entries[key];
+    if(!entry||reached.has(key))continue;
+    reached.add(key);
+    // Optional peers can be installed by dev tooling. They are not proof of
+    // production need merely because an installed lock entry exists.
+    const peers=Object.fromEntries(Object.entries(entry.peerDependencies??{})
+      .filter(([name])=>entry.peerDependenciesMeta?.[name]?.optional!==true));
+    for(const name of Object.keys({...entry.dependencies,...entry.optionalDependencies,...peers})) {
+      if(!approvedPackageIdentity(name))continue;
+      const target=dependency(key,name);
+      if(target)pending.push(target);
+    }
+  }
+  return reached;
+}
+// Read-only audit: never logs file names, paths, environment, link text or
+// arbitrary errors. Output is capped; scanning continues after that cap.
+export async function preflightDependencies(cwd=process.cwd()) {
+  const standalone=join(cwd,'.next','standalone');
+  await safeDirectory(standalone);
+  const filter=await dependencyCopyFilter(cwd,standalone);
+  const lock=JSON.parse(await readFile(join(cwd,'package-lock.json'),'utf8'));
+  const reached=productionLockGraph(lock),traced=new Set();
+  let manifests=0,traceErrors=0,visited=0,rejected=0,excluded=0,unsafeLinksNotFollowed=0;
+  const groups=new Map(),omissions=new Map(),limit=80;
+  function record(path,error,reason) {
+    rejected++;
+    const detail=dependencyFailures.get(error),key=detail?detail.key:filter.ownerKey(path);
+    const identity=detail?detail.identity:filter.identity(path);
+    const category=reason??detail?.reason??packageFailureDiagnostic(error).category;
+    const productionGraph=key!==null&&reached.has(key);
+    const groupKey=JSON.stringify([identity,category,productionGraph]);
+    if(!groups.has(groupKey))groups.set(groupKey,{identity,reason:category,count:0,
+      tracedFiles:0,productionGraph});
+    const group=groups.get(groupKey);group.count++;
+    if(traced.has(path)||traced.has(detail?.path))group.tracedFiles++;
+  }
+  async function traceFile(path) {
+    try {
+      const data=JSON.parse(await readFile(path,'utf8'));
+      if(!Array.isArray(data.files)||!data.files.every(file=>typeof file==='string'))throw new SyntaxError();
+      manifests++;
+      for(const file of data.files) {
+        const source=resolve(dirname(path),file);
+        if(inside(cwd,source)) {
+          traced.add(source);
+          traced.add(join(standalone,relative(cwd,source)));
+        }
+      }
+    } catch {traceErrors++;}
+  }
+  async function traces(directory) {
+    for(const entry of await readdir(directory,{withFileTypes:true})) {
+      const path=join(directory,entry.name);
+      if(entry.isDirectory())await traces(path);
+      else if(entry.isFile()&&entry.name.endsWith('.nft.json'))await traceFile(path);
+      else if(entry.isSymbolicLink())traceErrors++;
+    }
+  }
+  // Only build manifests: do not enter standalone, caches or arbitrary repo dirs.
+  for(const entry of await readdir(join(cwd,'.next'),{withFileTypes:true})) {
+    const path=join(cwd,'.next',entry.name);
+    if(entry.name==='server'&&entry.isDirectory())await traces(path);
+    else if(entry.isFile()&&entry.name.endsWith('.nft.json'))await traceFile(path);
+    else if(entry.isSymbolicLink()&&(entry.name==='server'||entry.name.endsWith('.nft.json')))traceErrors++;
+  }
+  async function walk(path,ancestors=new Set()) {
+    visited++;
+    let accepted=true,resolved=path,info;
+    try {
+      accepted=await filter(path);
+      info=await lstat(path);
+      if(info.isSymbolicLink())resolved=await filter.inspect(path);
+    } catch(error) {
+      record(path,error);
+      // Rejected ordinary containers must not hide other rejected classes.
+      // Never follow a rejected symlink or a symlink in a parent directory.
+      info=await lstat(path).catch(()=>null);
+      if(info?.isSymbolicLink())unsafeLinksNotFollowed++;
+      if(!info?.isDirectory()||info.isSymbolicLink())return;
+    }
+    if(!accepted){
+      excluded++;const omission=filter.omission(path);
+      if(omission)omissions.set(omission.identity,{...omission,traced:traced.has(path)});
+      return;
+    }
+    if(ancestors.has(resolved)){record(path,null,'deployment_trace_link_chain_unsafe');return;}
+    if((await lstat(resolved)).isDirectory()) {
+      const next=new Set(ancestors);next.add(resolved);
+      for(const entry of await readdir(resolved,{withFileTypes:true}))await walk(join(resolved,entry.name),next);
+    }
+  }
+  await walk(standalone);
+  const rows=[...groups.values()].sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b)));
+  return {event:'deployment_dependency_preflight',status:rejected||traceErrors?'REJECTED':'PASS',
+    entireTreeAudited:unsafeLinksNotFollowed===0,unsafeLinksNotFollowed,visited,rejected,excluded,traceManifests:manifests,
+    traceStatus:traceErrors?'INVALID':manifests?'AVAILABLE':'MISSING',traceErrors,
+    rejectedClasses:rows.length,truncated:rows.length>limit,rejections:rows.slice(0,limit),
+    omissions:[...omissions.values()]};
 }
 export function packageFailureDiagnostic(error) {
   const category = approvedErrors.has(error?.message) ? error.message
@@ -245,8 +424,20 @@ export async function verifyNativePackage(root) {
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href) {
   try {
-    if(process.argv.length!==4||!['create','verify'].includes(process.argv[2]))throw new Error('deployment_package_arguments_invalid');
-    const result=process.argv[2]==='create'?await packageNative(process.argv[3]):await verifyNativePackage(process.argv[3]);
+    if(!((process.argv.length===3&&process.argv[2]==='preflight')
+      ||(process.argv.length===4&&['create','verify'].includes(process.argv[2]))))throw new Error('deployment_package_arguments_invalid');
+    const result=process.argv[2]==='preflight'?await preflightDependencies()
+      :process.argv[2]==='create'?await packageNative(process.argv[3]):await verifyNativePackage(process.argv[3]);
+    if(result.status==='REJECTED')process.exitCode=1;
     console.log(JSON.stringify({...result,directory:undefined},null,2));
-  } catch(error) {console.error(JSON.stringify(packageFailureDiagnostic(error)));process.exitCode=1;}
+  } catch(error) {
+    const diagnostic=packageFailureDiagnostic(error);
+    // A failed create on CI still reports every discoverable class without
+    // altering the workflow, accepting anything, or changing the failure code.
+    if(process.argv[2]==='create'&&diagnostic.category.startsWith('deployment_trace_')) {
+      try {diagnostic.dependencyPreflight=await preflightDependencies();}
+      catch {diagnostic.preflightStatus='UNAVAILABLE';}
+    }
+    console.error(JSON.stringify(diagnostic));process.exitCode=1;
+  }
 }
