@@ -1,15 +1,15 @@
 # Native backend P4 hosting proof
 
-2026-10-08. Updated with later user-reported disposable TürkHosting tests.
+2026-10-09. Updated with additional user-reported disposable TürkHosting tests.
 The earlier local-only Phase 0 attempt is retained below as historical evidence.
 
-## Current P4 summary — later tests on 2026-10-08
+## Current P4 summary — evidence updated 2026-10-09
 
 ```text
 P4_STATUS = ACCESS_QUALIFIED
 P5_READY = NO
 REAL_DB_PROOF = BLOCKED
-NEXT_STANDALONE_RUNTIME = NOT_RUN
+NEXT_STANDALONE_RUNTIME = PASS_WITHIN_PROBE_SCOPE
 DB_RLS_AUTH_ACCEPTANCE = NOT_RUN
 ```
 
@@ -17,7 +17,8 @@ Evidence provenance: the SSH/Plesk/Actions observations and outputs below were
 supplied by the user. Codex did not independently execute these remote tests or
 verify the Actions run in this documentation update. `PASS` is scoped to the
 reported probe, not complete application or production acceptance. Only
-disposable P4 work was performed; the real MediaTracker application has not started.
+disposable P4 work was reported; real Next.js standalone now has scoped runtime
+proof, while real DB-backed application acceptance remains blocked.
 
 ### Qualified environment
 
@@ -53,9 +54,9 @@ libvips: 8.18.7
 ```
 
 This proves the tested native image-processing scenario on this host. It does
-not prove all native paths or Next.js standalone startup. The artifact was built
-with synthetic `https://app.example.invalid`; real deployment requires a new
-build with the canonical origin.
+not prove all native paths or Next.js standalone startup by itself. This historical
+artifact used synthetic `https://app.example.invalid`; the later canonical-origin
+build and runtime probes are recorded below.
 
 ### Plesk / Passenger probes — PASS within probe scope
 
@@ -71,7 +72,47 @@ PORT: absent
 Plesk stored `BACKEND_PROVIDER=native` and passed it to the Node process. The
 temporary server worked through Passenger without an explicit `PORT` environment
 variable. These observations prove temporary startup, HTTPS forwarding and env
-delivery only; actual standalone `app.cjs` startup and health endpoints are NOT_RUN.
+delivery only. Later real standalone and health probes are recorded separately below.
+
+### Real Next.js standalone — PASS within probe scope
+
+The older Linux artifact returned localhost liveness HTTP 200, readiness HTTP 503
+and homepage HTTP 200: PASS for those probes. These do not change its historical
+synthetic-origin build limitation.
+
+The new canonical-origin artifact is pinned to commit
+`cfe7a98ba89e23aa7774d3b252fdce157ccdfb43`, GitHub Actions run `37843136347`.
+CI validation and native Linux artifact jobs: PASS. Canonical origin:
+`https://mediatracker.baglare.com.tr`. Transfer to the server and SHA-256
+verification: PASS; manifest source SHA, native backend and Node 24.x were verified.
+
+Real Next.js through Passenger 6.2.0 returned HTTPS homepage HTTP 200 and readiness
+HTTP 503: PASS within probe scope. Without a database, 503 is the expected
+fail-closed response, not successful DB readiness. Passenger liveness was not
+separately recorded and remains NOT_RUN as a recorded proof. After testing, the
+previous Passenger `app.js` was restored, the application restarted and the
+previous response verified. Real DB connection, migrations, Auth and RLS remain
+NOT_RUN / BLOCKED; these probes do not establish production readiness or full
+hosting acceptance.
+
+### Cron — scheduler PASS; real maintenance NOT_RUN
+
+Plesk manual Node.js execution and actual `* * * * *` automatic scheduling: PASS.
+A dedicated file verified execution at UTC `2026-10-08T20:25:02.065Z`.
+The temporary Cron task and test file were removed. Real MediaTracker maintenance
+through Cron remains NOT_RUN; scheduler proof does not prove job authority,
+deadlines or DB-backed maintenance behavior.
+
+### Reverse proxy / trusted IP — incomplete evidence
+
+Normal requests contained `X-Forwarded-For` and `X-Real-IP`. A forged
+`X-Forwarded-For: 198.51.100.77` reached the backend, so `X-Forwarded-For` cannot
+be trusted directly. A forged `X-Real-IP: 203.0.113.88` did not arrive unchanged;
+this is only a preliminary observation, not complete header-trust proof.
+Node socket `remoteAddress` was loopback. Proxy overwrite and direct-access
+denial acceptance remain incomplete. Preserve `TRUSTED_INGRESS_MODE=unconfigured`
+as the safe default; no trusted ingress tuple is qualified by these observations.
+The temporary test application was restored and restarted.
 
 ### PostgreSQL blockers — unresolved
 
@@ -101,8 +142,9 @@ can_create: true
 `mt_p4_runtime` has a direct public CREATE grant, which the native pool safety
 check rejects. A TürkHosting technical support request covering TLS, runtime
 privileges and role/provisioning options was sent; **the reply is pending**.
-No migration was run, no role privilege was changed, and no actual application
-DB readiness test or hosted DB/RLS/Auth acceptance was completed.
+No migration was run, no role privilege was changed, and no real application
+DB connection or hosted DB/RLS/Auth acceptance was completed. The readiness 503
+probes above prove fail-closed responses only.
 
 ### Private storage probes — PASS within probe scope
 
@@ -125,7 +167,15 @@ had not been collected; displayed `0 MB` is not measured consumption. SSH report
 `NOT_ACCESSIBLE`. Temporary Node Passenger RSS was `54336 KB`, not MediaTracker RSS.
 The user's recollection of approximately 1–2 GB RAM and two CPU cores is an
 unverified estimate, not an official limit or accepted capacity. The 1 GB budget,
-worker count, peak RSS, concurrent load and CPU limits still require proof.
+worker count, aggregate peak RSS, concurrent load and CPU limits still require proof.
+
+The new canonical-origin artifact was also tested on localhost in a separate
+temporary Node process. Liveness: PASS; readiness fail-closed: PASS. Eight homepage
+HTTP requests, in pairs: 8/8 PASS. Measured idle RSS: 118.0 MiB; sampled peak RSS:
+151.2 MiB. The temporary process was terminated after testing. These are light-load
+measurements of that Node process only, not Passenger aggregate consumption,
+official hosting RAM limits, Auth/DB load, long-duration or high-concurrency
+capacity acceptance. They do not establish the 1 GB budget.
 
 ## Historical Phase 0 attempt — earlier on 2026-10-08
 
@@ -175,25 +225,25 @@ are `BLOCKED`. Prior P3 local evidence remains distinct from hosted proof.
 | # | Proof | Current result |
 | --- | --- | --- |
 | 1 | Access / target fingerprint | ACCESS_QUALIFIED; disposable targets identified above; operator fingerprint/empty-state acceptance still pending |
-| 2 | Node / Passenger capability | PASS for Node 24.21.0 temporary HTTP/HTTPS/env probe; actual Next startup NOT_RUN |
+| 2 | Node / Passenger capability | PASS for historical temporary HTTP/HTTPS/env probe and scoped real Next.js HTTPS homepage/readiness through Passenger 6.2.0; full application acceptance open |
 | 3 | PostgreSQL version / capabilities | 18.6 reported; BLOCKED: tested endpoint TLS unsupported; provisioning/connection limits UNVERIFIED |
 | 4 | Actual DB role separation | BLOCKED: mt_p4_runtime differs from required mt_runtime and has direct public CREATE; contract acceptance NOT_RUN |
 | 5 | pgcrypto availability / privileges | UNVERIFIED / NOT RUN; current runbook says native 001–009 does not require it |
 | 6 | Native migrations / ledger / checksums / lock | UNVERIFIED / NOT RUN |
 | 7 | RLS A/B/anonymous isolation | UNVERIFIED / NOT RUN; all 14 requested proofs pending |
 | 8 | Better Auth sessions / cookies / denial | UNVERIFIED / NOT RUN; SMTP availability also unverified |
-| 9 | Linux native artifact / disposable deployment | PASS for reported Actions jobs, transfer checksum, ABI comparison and Sharp probe; canonical-origin rebuild pending; actual deployment NOT_RUN |
-| 10 | Hosted liveness / readiness | NOT_RUN for MediaTracker; temporary HTTP response is not health acceptance; DB readiness BLOCKED |
-| 11 | Trusted ingress / IP spoof rejection | UNVERIFIED / NOT RUN; no ingress tuple enabled |
+| 9 | Linux native artifact / disposable deployment | PASS for historical ABI/Sharp probes and new canonical-origin Actions run 37843136347, transfer SHA-256/manifest verification and temporary real Next.js runtime; full deployment acceptance open |
+| 10 | Hosted liveness / readiness | Localhost liveness 200 PASS; Passenger HTTPS homepage 200 and readiness 503 fail-closed PASS; Passenger liveness recorded proof NOT_RUN; DB readiness BLOCKED |
+| 11 | Trusted ingress / IP spoof rejection | INCOMPLETE: forged X-Forwarded-For reached backend; X-Real-IP preliminary only; socket loopback; TRUSTED_INGRESS_MODE=unconfigured preserved |
 | 12 | Cloud Media | UNVERIFIED / NOT RUN |
 | 13 | Goals | UNVERIFIED / NOT RUN |
 | 14 | Social | UNVERIFIED / NOT RUN |
 | 15 | XP / themes / preferences | UNVERIFIED / NOT RUN |
 | 16 | Persistent rate limiter | UNVERIFIED / NOT RUN |
 | 17 | Filesystem security / persistence | PASS for private directory mode/owner, exclusive write/link/fsync and probe persistence; real app authorization/file operations NOT_RUN |
-| 18 | Cold start / Passenger restart | PASS for probe-file persistence after temporary app restart; real application restart/cold-start/session behavior NOT_RUN |
-| 19 | Resource / RSS / connections / disk | Package disk/traffic and temporary RSS observed; app capacity, CPU/RAM limits, workers/peak load/connections UNVERIFIED; no 1 GB verdict |
-| 20 | Cron / maintenance independent of worker sleep | UNVERIFIED / NOT RUN |
+| 18 | Cold start / Passenger restart | Historical probe-file persistence PASS; previous app.js restoration/restart/response verified after real Next test; real application cold-start/session behavior NOT_RUN |
+| 19 | Resource / RSS / connections / disk | Separate new-artifact Node process: idle 118.0 MiB / sampled peak 151.2 MiB, homepage 8/8 PASS in pairs; Passenger aggregate, official RAM/CPU limits, Auth/DB and sustained/high-concurrency capacity UNVERIFIED; no 1 GB verdict |
+| 20 | Cron / maintenance independent of worker sleep | Manual Node and actual `* * * * *` scheduling PASS via dedicated file; temporary task/file removed; real MediaTracker maintenance NOT_RUN |
 | 21 | Actual PostgreSQL + asset backup | UNVERIFIED / NOT RUN |
 | 22 | Restore into new disposable target | UNVERIFIED / NOT RUN; second-target limit unknown |
 | 23 | Privacy export | UNVERIFIED / NOT RUN |
@@ -202,14 +252,16 @@ are `BLOCKED`. Prior P3 local evidence remains distinct from hosted proof.
 | 26 | Hosted security regression / disabled providers | UNVERIFIED / NOT RUN; no provider or paid AI enablement |
 | 27 | P4 source fixes | NOT_APPLICABLE; this update changes documentation only |
 | 28 | Final local regression | Historical diff check PASS; current update verification recorded separately below; suites, lint, typecheck and builds NOT_RUN |
-| 29 | External / manual issues | Support reply pending for TLS/runtime grants/role provisioning; canonical-origin rebuild and capacity evidence pending |
-| 30 | Exact P5 blockers | DB TLS/role/CREATE obstacles plus actual Next startup and mandatory DB/RLS/Auth/domain/ingress/maintenance/privacy/recovery/resource proofs remain open; P5_READY=NO |
+| 29 | External / manual issues | Support reply pending for TLS/runtime grants/role provisioning; full ingress and capacity acceptance pending; canonical-origin rebuild and scoped startup proved |
+| 30 | Exact P5 blockers | DB TLS/role/CREATE obstacles plus mandatory DB/RLS/Auth/domain/ingress/real maintenance/privacy/recovery/resource acceptance remain open; Passenger liveness recorded proof pending; P5_READY=NO |
 
 Historical Phase 0 cleanup note: no synthetic accounts, rows, files, backups or
 remote resources were created during that earlier local attempt. Later disposable
 state includes the reported test DB/roles, extracted artifact, temporary app and
-storage directories; only the storage probe file is reported cleaned. Do not infer
-that all later test resources were removed. No alternative provider was substituted.
+storage directories. The storage probe file and temporary Cron task/file were
+reported removed; the separate Node process was terminated and the prior Passenger
+app restored/restarted. Do not infer that all later test resources were removed.
+No alternative provider was substituted.
 
 ## Historical access prerequisites — earlier Phase 0 attempt
 
@@ -247,11 +299,13 @@ implemented architecture or durable behavior change requiring a Vault candidate.
 Await and review the TürkHosting support response against the unchanged TLS,
 role/provisioning and public CREATE safety contracts. Do not treat the request as
 resolution or bypass checks. Once those blockers are resolved and separately
-authorized disposable targets are fingerprinted, prepare a canonical-origin
-artifact and prove real standalone startup/readiness before DB/RLS/Auth and the
-remaining acceptance sequence. No Production/P5 authorization follows from this report.
+authorized disposable targets are fingerprinted, use the pinned canonical-origin
+artifact for DB-backed readiness, DB/RLS/Auth and the remaining acceptance sequence.
+Scoped standalone startup and fail-closed readiness are already reported above;
+they do not close trusted ingress, real maintenance or capacity acceptance.
+No Production/P5 authorization follows from this report.
 
-## Documentation update verification — 2026-10-08
+## Historical documentation update verification — 2026-10-08
 
 Codex locally verified branch `release/v1-hardening` and HEAD
 `f81d30586011ebbe476725684facff3b82332796`; the initial worktree was clean.
@@ -262,3 +316,16 @@ not marked PASS. Suites, lint, typecheck and builds: NOT_RUN (documentation only
 No SSH, PostgreSQL connection, deployment, deletion, commit or push was performed
 by Codex. No secrets were recorded; Supabase and rollback mechanisms were unchanged.
 No Vault write was performed under this task's two-file-only scope.
+
+## Documentation update verification — 2026-10-09
+
+Codex locally verified branch `release/v1-hardening` and HEAD
+`cfe7a98ba89e23aa7774d3b252fdce157ccdfb43`; the initial worktree was clean.
+Changed-file scope and historical/current evidence consistency: PASS, limited
+to this proof and `NATIVE_HOSTING_DEPLOYMENT_RUNBOOK.md`. `git diff --check`: PASS.
+Remote evidence is user-reported, not independently re-executed in this update.
+Passenger liveness, real maintenance and DB/Auth/RLS acceptance remain unproved;
+TLS/role/CREATE blockers, unconfigured ingress and P5_READY=NO remain intact.
+Suites, lint, typecheck and builds: NOT_RUN (documentation only). No SSH, hosting,
+DB or live-application operation, source/workflow/test/migration/env change,
+commit, push or Vault write was performed by Codex.

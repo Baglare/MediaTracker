@@ -1,6 +1,6 @@
 # Native hosting deployment runbook
 
-2026-10-07 source procedure; hosting status updated 2026-10-08 from user-reported
+2026-10-07 source procedure; hosting status updated 2026-10-09 from user-reported
 disposable probes. Target: TürkHosting/shared Node hosting; untested provider
 properties remain unverified. This document authorizes no connection,
 deployment, database mutation, real-user migration or Production cutover.
@@ -21,7 +21,7 @@ substituting the existing staging DB. That attempt preserved an uncommitted P3
 workspace authorized for disposable proof. Pin source/artifact manifests; the
 clean committed artifact requirement remains a Production/P5 gate.
 
-## Current P4 hosting prechecks — later on 2026-10-08
+## Current P4 hosting prechecks — evidence updated 2026-10-09
 
 `P4_STATUS=ACCESS_QUALIFIED`, `P5_READY=NO`, `REAL_DB_PROOF=BLOCKED`.
 All remote evidence here was supplied by the user; Codex did not independently
@@ -39,16 +39,38 @@ work was performed. Detailed outputs, targets and limits are in the
   SSH archive transfer checksum was OK; extraction only into
   `~/mt-p4-artifact/release-test`. Required entry files and Sharp were present.
   ABI comparison and Sharp image probe PASS (Sharp 0.35.5 / libvips 8.18.7).
-  This is scoped native-library proof; actual Next standalone startup is NOT_RUN.
+  This historical artifact used `https://app.example.invalid`; its ABI/Sharp
+  results remain scoped native-library proof. Later localhost liveness 200,
+  readiness 503 and homepage 200 were also reported PASS for this older artifact.
 - Temporary independent `app.js` HTTP server PASS through Passenger/HTTPS and
-  received `BACKEND_PROVIDER=native`; explicit `PORT` was absent. Real
-  MediaTracker `app.cjs`, liveness/readiness and domain behavior remain NOT_RUN.
+  received `BACKEND_PROVIDER=native`; explicit `PORT` was absent. This historical
+  temporary-server probe remains distinct from the real Next.js probes below.
+- New canonical-origin artifact commit `cfe7a98ba89e23aa7774d3b252fdce157ccdfb43`,
+  Actions run `37843136347`: CI validation and native Linux artifact jobs PASS.
+  Canonical origin `https://mediatracker.baglare.com.tr`; server transfer,
+  SHA-256 and manifest source SHA/native/Node 24.x verification PASS.
+  Real Next.js through Passenger 6.2.0 returned HTTPS homepage 200 and readiness
+  503: PASS within probe scope. With no DB, 503 is expected fail-closed behavior,
+  not DB readiness acceptance. Passenger liveness was not separately recorded:
+  NOT_RUN as a recorded proof. Previous Passenger `app.js` was restored, restart
+  and previous response verified. Real DB connection/migrations/Auth/RLS remain
+  NOT_RUN / BLOCKED; this is not production readiness or full hosting acceptance.
+- Plesk manual Node execution and actual `* * * * *` Cron scheduling PASS via a
+  dedicated file, UTC `2026-10-08T20:25:02.065Z`. Temporary task and test file
+  removed. Real MediaTracker maintenance through Cron remains NOT_RUN.
+- Normal requests included `X-Forwarded-For` and `X-Real-IP`; forged
+  `X-Forwarded-For: 198.51.100.77` reached the backend, so that header cannot
+  be trusted directly. Forged `X-Real-IP: 203.0.113.88` did not arrive unchanged:
+  preliminary evidence only, not complete trust proof. Socket `remoteAddress`
+  was loopback. Keep `TRUSTED_INGRESS_MODE=unconfigured`; full overwrite and
+  direct-access-denial proof remains incomplete. Test app restored/restarted.
 - DB BLOCKED at test endpoint `127.0.0.1:5433`: `PG_TLS=NOT_SUPPORTED` conflicts
   with production `verify-full`; test login `mt_p4_runtime` differs from required
   `mt_runtime`; its direct public CREATE grant is rejected by native pool checks.
   Database `mt_p4_test` is owned by `postgres`; public by `pg_database_owner`.
   TLS/runtime privilege/role provisioning support request sent; reply pending.
-  No migration, role privilege change or application DB readiness test occurred.
+  No migration, role privilege change or real DB connection acceptance occurred;
+  the readiness 503 probes above do not resolve these blockers.
 - `~/mt-p4-storage` layout, directory `0700`/owner `wfdqewrm`, Node exclusive
   write/link/fsync and probe persistence across Passenger restart PASS. Probe
   file cleaned, directories retained. Real app file authorization, server reboot,
@@ -57,19 +79,25 @@ work was performed. Detailed outputs, targets and limits are in the
   statistics are not usage proof. `ulimit -v=unlimited`, `ulimit -u=191898`,
   cgroup memory limits inaccessible. Temporary app RSS `54336 KB` is not
   MediaTracker usage. Recalled 1–2 GB RAM / two cores are unverified estimates;
-  official limits, 1 GB budget, workers, peak RSS/concurrency and CPU remain open.
+  official limits, 1 GB budget, workers, aggregate peak RSS/concurrency and CPU
+  remain open. The new artifact in a separate temporary localhost Node process
+  passed liveness and fail-closed readiness; eight homepage HTTP requests in
+  pairs passed 8/8. Idle RSS was 118.0 MiB, sampled peak RSS 151.2 MiB; the
+  process was terminated. These are that process's light-load measurements only:
+  Passenger aggregate, hosting RAM limit, Auth/DB load, long-duration and
+  high-concurrency capacity remain UNVERIFIED.
 
 Next safe step: review the pending support reply against existing DB contracts,
-without weakening TLS/role/CREATE checks. Real deployment still needs a
-canonical-origin rebuild (current artifact uses `https://app.example.invalid`),
-independent target fingerprinting and separately authorized disposable runtime
-proof. DB/RLS/Auth, ingress, resources, maintenance, privacy and recovery gates
+without weakening TLS/role/CREATE checks. The canonical-origin rebuild and scoped
+real standalone runtime probes are now reported; DB-backed readiness still needs
+independent target fingerprinting and separately authorized disposable proof.
+DB/RLS/Auth, trusted ingress, capacity, real maintenance, privacy and recovery gates
 remain open; Production/P5 conditions and Supabase rollback procedures below remain.
 
 ## Experimental Linux artifact pipeline — 2026-10-08
 
 Initially implemented locally with GitHub execution `NOT_RUN` at that time.
-The later user-reported successful run is pinned in the current prechecks above.
+The later user-reported successful runs are pinned in the current prechecks above.
 Historical Phase 0 evidence remains an account of the earlier attempt.
 This job is packaging only, not hosting acceptance or deployment.
 
@@ -79,7 +107,8 @@ This job is packaging only, not hosting acceptance or deployment.
 - Ubuntu 24.04 / Node 24.21.0 performs `npm ci`, validates synthetic production
   configuration and builds native standalone with the existing offline preload.
   The DB is unreachable loopback port 1; auth/limiter strings are synthetic,
-  app origin is `https://app.example.invalid`, AI/research/cache remain disabled.
+  historical app origin was `https://app.example.invalid`; the new artifact above
+  uses canonical `https://mediatracker.baglare.com.tr`. AI/research/cache remain disabled.
   No repository secrets, Supabase configuration, migrations or email/provider
   calls are used. These build values are never valid hosting credentials.
 - P3 `native-package.mjs create` and `verify` use a new run/attempt directory.
@@ -107,8 +136,10 @@ This job is packaging only, not hosting acceptance or deployment.
 - Later, only with separate target/upload authorization, transfer these verified
   contents to a new release folder and reverify checksums. Preserve `.next`, public
   assets and traced modules; configure real runtime secrets privately outside the
-  archive. Synthetic public app origin is compiled: a real-host release requires
-  a separately approved rebuild with its canonical origin before deployment.
+  archive. Public app origin is compiled: an artifact with a synthetic origin
+  requires a separately approved canonical-origin rebuild before real-host use.
+  The pinned new artifact above already has that canonical origin; this does not
+  close the remaining hosting/DB acceptance gates.
 - `HOST_ABI_COMPATIBILITY = PARTIAL`: the later host ABI comparison and Sharp
   smoke passed within their reported scope; full standalone/native-path acceptance
   remains UNVERIFIED. Ubuntu success alone is not hosting proof.
@@ -272,7 +303,9 @@ broader application/runtime contract.
     the optional header/proof-hash/direct-access-blocked tuple. Source validates
     its shape only; an arbitrary hash or `1` does not establish proxy safety.
     Missing/partial tuple and comma-separated IP chains fail closed. This is
-    `REQUIRES_P4_PROOF`; do not whitelist
+    `REQUIRES_P4_PROOF`. Current P4 probes show spoofed X-Forwarded-For reaches
+    the backend and only preliminary X-Real-IP behavior; keep
+    `TRUSTED_INGRESS_MODE=unconfigured`. Do not whitelist
     `x-forwarded-for`/`x-real-ip` by assumption. Better Auth trusts no forwarding header.
 22. **Filesystem:** prove upload/decode limits, exclusive publication, authorization,
     no direct private-file access, crash/orphan retry and release replacement.
@@ -297,8 +330,9 @@ broader application/runtime contract.
     `--job privacy` remains runner-owned disposable only: requires actual Docker
     container/run/local-endpoint proof plus user/email, dedicated erasure confirmation
     and participant-loss acknowledgement; it never logs exports. Production erasure
-    authority remains P5. Host cron, job deadlines and operator access are
-    `REQUIRES_P4_PROOF`; required work never relies on Passenger staying awake.
+    authority remains P5. Host Cron manual/automatic scheduling is now scoped
+    PASS; real maintenance execution, job deadlines and operator authority remain
+    `REQUIRES_P4_PROOF`. Required work never relies on Passenger staying awake.
 25. **Backup:** private operator login must have dump privileges for ALL schemas,
     including FORCE-RLS and native Auth, plus privacy-operator membership. An
     underprivileged dump must fail; never use `--no-owner`, `--no-acl`, filtered
