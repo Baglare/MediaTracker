@@ -61,3 +61,80 @@ jobs:
         run: npm run build
       - name: Lockfile and tracked-source stability
         run: git diff --exit-code
+
+  native-linux-artifact:
+    name: Experimental native Linux artifact
+    needs: validate
+    if: github.event_name == 'push' && github.ref == 'refs/heads/release/v1-hardening'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      CI: 'true'
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # official v6
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+      - name: Setup Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # official v6
+        with:
+          node-version: '24.21.0'
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Clean install
+        run: npm ci
+      - name: Refuse inherited application configuration
+        run: node scripts/ci-checks.mjs --environment-only
+      - name: Artifact safety regression tests
+        run: node --test scripts/native-artifact-check.test.mjs
+      - name: Native production build and P3 package (offline, synthetic only)
+        env:
+          NODE_OPTIONS: --import=${{ github.workspace }}/scripts/ci-offline.mjs
+          BACKEND_PROVIDER: native
+          DATABASE_URL: postgresql://mt_runtime:synthetic-build-only@127.0.0.1:1/mt_build
+          DATABASE_SSL_MODE: verify-full
+          BETTER_AUTH_URL: https://app.example.invalid
+          NEXT_PUBLIC_APP_URL: https://app.example.invalid
+          BETTER_AUTH_SECRET: synthetic-build-auth-aaaaaaaaaaaaaaaaaaaaaaaa
+          RATE_LIMIT_IDENTITY_HMAC_KEY: synthetic-build-identity-bbbbbbbbbbbbbbbbbbbb
+          RATE_LIMIT_RPC_SIGNING_KEY: synthetic-build-signing-cccccccccccccccccccc
+          RATE_LIMIT_RPC_KEY_VERSION: v1
+          RATE_LIMIT_RPC_AUDIENCE: mt-native-build
+          NATIVE_STORAGE_ROOT: /tmp/mediatracker-native-build-data
+          TRUSTED_INGRESS_MODE: unconfigured
+          AI_SERVER_ACCESS_MODE: disabled
+          D7_RESEARCH_ROLLOUT_MODE: disabled
+          D7_RESEARCH_SHADOW_ENABLED: '0'
+          D7_RESEARCH_PUBLIC_CITATIONS_ENABLED: '0'
+          D7_RESEARCH_EVIDENCE_CACHE_ENABLED: '0'
+          MEDIA_TRACKER_PERSISTENT_EMBEDDING_CACHE: off
+        run: |
+          node --input-type=module -e "import {validateReleaseEnvironment} from './scripts/ops/release-policy.mjs'; const env=Object.fromEntries(Object.entries(process.env).filter(([key])=>/^(BACKEND_PROVIDER|DATABASE_|BETTER_AUTH_|NEXT_PUBLIC_APP_URL|NATIVE_STORAGE_ROOT|TRUSTED_INGRESS_MODE|RATE_LIMIT_|AI_SERVER_ACCESS_MODE|D7_RESEARCH_|MEDIA_TRACKER_PERSISTENT_EMBEDDING_CACHE)$|^(DATABASE_|BETTER_AUTH_|RATE_LIMIT_|D7_RESEARCH_)/.test(key))); if(!validateReleaseEnvironment(env,'PRODUCTION').valid) throw new Error('synthetic_build_contract_invalid');"
+          npm run build
+          package="dist/native-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          node scripts/native-package.mjs create "$package"
+          node scripts/native-package.mjs verify "$package"
+          node scripts/native-artifact-check.mjs "$package" "dist/native-abi.json"
+      - name: Archive verified directory including hidden output
+        id: archive
+        run: |
+          name="mediatracker-native-linux-${GITHUB_SHA:0:12}"
+          package="dist/native-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          tar -czf "dist/$name.tar.gz" -C "$package" .
+          (cd dist && sha256sum "$name.tar.gz" > "$name.tar.gz.sha256")
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          git diff --exit-code
+      - name: Upload experimental artifact (no deployment)
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # official v4.6.2
+        with:
+          name: ${{ steps.archive.outputs.name }}
+          path: |
+            dist/${{ steps.archive.outputs.name }}.tar.gz
+            dist/${{ steps.archive.outputs.name }}.tar.gz.sha256
+            dist/native-abi.json
+          if-no-files-found: error
+          retention-days: 7

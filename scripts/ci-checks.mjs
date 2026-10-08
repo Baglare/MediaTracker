@@ -149,7 +149,7 @@ export function checkWorkflow(text) {
     && JSON.stringify(workflow.on.push.branches) === JSON.stringify(["main", "release/**"])
     && workflow.on.pull_request === null, "CI trigger contract changed");
   requireContract(workflow.concurrency?.group === "ci-${{ github.ref }}" && workflow.concurrency["cancel-in-progress"] === true, "Missing ref concurrency");
-  requireContract(Object.keys(workflow.jobs).join() === "validate", "Unexpected CI job");
+  requireContract(Object.keys(workflow.jobs).join() === "validate,native-linux-artifact", "Unexpected CI job");
   const job = workflow.jobs.validate;
   requireContract(job["runs-on"] === "ubuntu-24.04" && job["timeout-minutes"] === 20
     && !job.permissions && !job.environment && !job.container, "Unexpected CI job authority/runtime");
@@ -172,6 +172,31 @@ export function checkWorkflow(text) {
     requireContract(step.env?.NODE_OPTIONS === "--import=${{ github.workspace }}/scripts/ci-offline.mjs", "Missing offline network guard");
   }
   requireContract(job.steps.find(step => step.run === "npm run build")?.env?.BACKEND_PROVIDER === "supabase", "Missing explicit offline build provider");
+  const artifact = workflow.jobs['native-linux-artifact'];
+  requireContract(artifact.needs === 'validate'
+    && artifact.if === "github.event_name == 'push' && github.ref == 'refs/heads/release/v1-hardening'"
+    && artifact['runs-on'] === 'ubuntu-24.04' && artifact['timeout-minutes'] === 20
+    && JSON.stringify(artifact.permissions) === JSON.stringify({contents:'read'})
+    && !artifact.environment && !artifact.container, 'Unsafe native artifact job authority/trigger');
+  const artifactActions = artifact.steps.filter(step => step.uses);
+  requireContract(artifactActions.length === 3
+    && JSON.stringify(artifactActions[0]) === JSON.stringify(actions[0])
+    && artifactActions[1].uses === actions[1].uses && artifactActions[1].with['node-version'] === '24.21.0'
+    && artifactActions[1].with.cache === 'npm' && artifactActions[1].with['cache-dependency-path'] === 'package-lock.json'
+    && artifactActions[2].uses === 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02'
+    && artifactActions[2].with['retention-days'] === 7 && artifactActions[2].with['if-no-files-found'] === 'error',
+    'Native artifact action pin/retention contract');
+  const build = artifact.steps.find(step => step.run?.includes('npm run build'));
+  requireContract(build?.env?.BACKEND_PROVIDER === 'native'
+    && build.env.NODE_OPTIONS === '--import=${{ github.workspace }}/scripts/ci-offline.mjs'
+    && build.run.includes('validateReleaseEnvironment') && build.run.includes("'PRODUCTION'")
+    && build.run.includes('node scripts/native-package.mjs create "$package"')
+    && build.run.includes('node scripts/native-package.mjs verify "$package"')
+    && build.run.includes('node scripts/native-artifact-check.mjs "$package"'), 'Native artifact build/verification contract');
+  requireContract(artifact.steps.some(step => step.run === 'npm ci')
+    && artifact.steps.some(step => step.run === 'node scripts/ci-checks.mjs --environment-only')
+    && artifact.steps.some(step => step.run?.includes('tar -czf') && step.run.includes('-C "$package" .') && step.run.includes('sha256sum')),
+    'Native artifact install/archive contract');
 }
 
 function git(...args) {

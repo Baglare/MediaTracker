@@ -76,6 +76,19 @@ test("workflow parses YAML and satisfies authority/stage contract", () => {
   checkWorkflow(readFileSync(".github/workflows/ci.yml", "utf8"));
 });
 for (const [label, from, to] of [
+  ['PR/main artifact trigger', "github.event_name == 'push' && github.ref == 'refs/heads/release/v1-hardening'", 'always()'],
+  ['validation dependency removed', 'needs: validate', 'needs: []'],
+  ['floating upload action', 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02', 'actions/upload-artifact@v4'],
+  ['extended retention', 'retention-days: 7', 'retention-days: 90'],
+  ['omitted package verification', 'node scripts/native-package.mjs verify "$package"', 'echo omitted'],
+  ['omitted safety scan', 'node scripts/native-artifact-check.mjs "$package"', 'echo omitted'],
+  ['wrong native selector', 'BACKEND_PROVIDER: native', 'BACKEND_PROVIDER: supabase'],
+]) {
+  test(`workflow rejects ${label}`, () => {
+    assert.throws(() => checkWorkflow(readFileSync('.github/workflows/ci.yml', 'utf8').replace(from, to)));
+  });
+}
+for (const [label, from, to] of [
   ["write permissions", "contents: read", "contents: write"],
   ["floating action", "actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803", "actions/checkout@v6"],
   ["bypassed audit", "node scripts/ci-audit.mjs", "node scripts/ci-audit.mjs || true"],

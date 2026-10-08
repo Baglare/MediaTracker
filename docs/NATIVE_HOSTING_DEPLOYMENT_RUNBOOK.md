@@ -20,6 +20,58 @@ The current uncommitted P3 workspace is authorized for disposable P4 proof and
 must be preserved. Pin its source/artifact manifest for reproducibility; the
 clean committed artifact requirement remains a Production/P5 gate.
 
+## Experimental Linux artifact pipeline — 2026-10-08
+
+Implemented locally; the GitHub result is `NOT_RUN` until this workflow change is
+committed and pushed. Historical P4 access/proof evidence above remains unchanged.
+This job is packaging only, not hosting acceptance or deployment.
+
+- A push to `release/v1-hardening` starts CI; `native-linux-artifact` runs only
+  after `validate` succeeds. Main, pull requests and other release branches do
+  not run packaging. Existing Supabase validation remains unchanged.
+- Ubuntu 24.04 / Node 24.21.0 performs `npm ci`, validates synthetic production
+  configuration and builds native standalone with the existing offline preload.
+  The DB is unreachable loopback port 1; auth/limiter strings are synthetic,
+  app origin is `https://app.example.invalid`, AI/research/cache remain disabled.
+  No repository secrets, Supabase configuration, migrations or email/provider
+  calls are used. These build values are never valid hosting credentials.
+- P3 `native-package.mjs create` and `verify` use a new run/attempt directory.
+  An additional safety check rejects private paths, env, dumps/archives, token
+  signatures, embedded build credentials, dev-only packages and non-Linux native
+  binaries. Signature scanning is a guard, not proof against every possible secret.
+  `readelf` records all packaged ELF x64 libraries, dependencies, search paths
+  and GLIBC/GLIBCXX/CXXABI symbol versions. Packaged Sharp/libvips processes a
+  generated pixel on the builder; no application or database is started.
+- Repository **Actions → CI → successful run for the exact branch/SHA → Artifacts**:
+  download `mediatracker-native-linux-<12-character-sha>` within seven days.
+  Unzip the GitHub download wrapper to obtain `.tar.gz`, `.tar.gz.sha256` and
+  `native-abi.json`. No upload to TürkHosting occurs.
+- From that download directory on Linux, run
+  `sha256sum -c mediatracker-native-linux-<sha>.tar.gz.sha256` before extraction.
+  On Windows, compare `Get-FileHash <archive> -Algorithm SHA256` to the checksum.
+  Inspect `tar -tzf <archive>`; extract into a NEW empty directory with
+  `tar -xzf <archive> -C <new-directory>`. Tar contains directory contents including
+  `.next`. Inspect `deployment-manifest.json`: source SHA/branch, clean worktree,
+  native selector, Linux/x64/buildLibc, lockfile/migration/file checksums.
+  From a matching source checkout, run `node scripts/native-package.mjs verify
+  <extracted-directory>` to verify the inner file inventory. Outer hash proves
+  transfer integrity, not independently trusted provenance; match the Actions SHA.
+- Later, only with separate target/upload authorization, transfer these verified
+  contents to a new release folder and reverify checksums. Preserve `.next`, public
+  assets and traced modules; configure real runtime secrets privately outside the
+  archive. Synthetic public app origin is compiled: a real-host release requires
+  a separately approved rebuild with its canonical origin before deployment.
+- `HOST_ABI_COMPATIBILITY = UNVERIFIED`: Ubuntu success is not hosting proof.
+  Obtain the APPLICATION runtime's glibc, loader, libstdc++, CPU/OS/architecture
+  and Node 24.21.0 facts; compare ELF requirements and prove Sharp/libvips loading
+  on the separately authorized disposable host. A Red Hat PostgreSQL SERVER build
+  cannot establish the application glibc. Musl variants, other native modules and
+  shared-library resolution also need review. `native-abi.json` records builder
+  evidence only. Real PostgreSQL/RLS acceptance remains pending.
+- Deployment and ordered database migration are separate authorized operations
+  with their own fingerprints, backups and rollback gates below. Downloading an
+  artifact authorizes neither operation; Supabase fallback/history stay intact.
+
 ## Environment contract
 
 Web environment and operator environment are separate. The machine contract is
