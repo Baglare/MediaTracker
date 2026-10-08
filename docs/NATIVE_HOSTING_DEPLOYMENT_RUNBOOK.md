@@ -1,29 +1,76 @@
 # Native hosting deployment runbook
 
-2026-10-07. SOURCE_ONLY. Target: TürkHosting/shared Node hosting; every provider
-property is a claim until P4 establishes it. This document authorizes no connection,
+2026-10-07 source procedure; hosting status updated 2026-10-08 from user-reported
+disposable probes. Target: TürkHosting/shared Node hosting; untested provider
+properties remain unverified. This document authorizes no connection,
 deployment, database mutation, real-user migration or Production cutover.
 P3 source/validation evidence: [P3 deployment](NATIVE_BACKEND_P3_DEPLOYMENT.md).
 Supabase fallback and historical migrations remain intact until P4 acceptance.
 
-## P4 access qualification — 2026-10-08
+## Historical P4 access qualification — earlier on 2026-10-08
 
 `P4_STATUS=BLOCKED_ACCESS`, `P5_READY=NO`, `REAL_DB_PROOF=BLOCKED`.
 The scoped local configuration inventory exposed no usable TürkHosting/native
 operator access or confirmed disposable application/database target. No remote
 connection, deployment or SQL was attempted. Provisioning and all provider runtime
-facts remain `UNVERIFIED`; none became `PROVEN` or `FAILED` in this attempt.
+facts remained `UNVERIFIED`; none became `PROVEN` or `FAILED` in that attempt.
 The exact access prerequisites and pending proof register are recorded in
-[P4 hosting proof](NATIVE_BACKEND_P4_HOSTING_PROOF.md). Resume at access qualification
-and independent target fingerprinting; do not substitute the existing staging DB.
-The current uncommitted P3 workspace is authorized for disposable P4 proof and
-must be preserved. Pin its source/artifact manifest for reproducibility; the
+[P4 hosting proof](NATIVE_BACKEND_P4_HOSTING_PROOF.md). The earlier instruction was
+to resume at access qualification and independent target fingerprinting without
+substituting the existing staging DB. That attempt preserved an uncommitted P3
+workspace authorized for disposable proof. Pin source/artifact manifests; the
 clean committed artifact requirement remains a Production/P5 gate.
+
+## Current P4 hosting prechecks — later on 2026-10-08
+
+`P4_STATUS=ACCESS_QUALIFIED`, `P5_READY=NO`, `REAL_DB_PROOF=BLOCKED`.
+All remote evidence here was supplied by the user; Codex did not independently
+run SSH/Plesk/DB/Actions tests in this documentation update. Only disposable P4
+work was performed. Detailed outputs, targets and limits are in the
+[current P4 proof register](NATIVE_BACKEND_P4_HOSTING_PROOF.md).
+
+- TürkHosting/Plesk/Passenger at `mediatracker.baglare.com.tr`: application
+  `x86_64`, glibc 2.28, Node 24.21.0, artifact Next 16.3.8, PostgreSQL 18.6.
+  Plesk mode `production`, document root `/mediatracker.baglare.com.tr/public`,
+  application root `/mediatracker.baglare.com.tr`; panel mode is not acceptance.
+- Actions validation/artifact jobs PASS for commit
+  `f81d30586011ebbe476725684facff3b82332796` on `release/v1-hardening`,
+  run `37806188211`, artifact `mediatracker-native-linux-f81d30586011`.
+  SSH archive transfer checksum was OK; extraction only into
+  `~/mt-p4-artifact/release-test`. Required entry files and Sharp were present.
+  ABI comparison and Sharp image probe PASS (Sharp 0.35.5 / libvips 8.18.7).
+  This is scoped native-library proof; actual Next standalone startup is NOT_RUN.
+- Temporary independent `app.js` HTTP server PASS through Passenger/HTTPS and
+  received `BACKEND_PROVIDER=native`; explicit `PORT` was absent. Real
+  MediaTracker `app.cjs`, liveness/readiness and domain behavior remain NOT_RUN.
+- DB BLOCKED at test endpoint `127.0.0.1:5433`: `PG_TLS=NOT_SUPPORTED` conflicts
+  with production `verify-full`; test login `mt_p4_runtime` differs from required
+  `mt_runtime`; its direct public CREATE grant is rejected by native pool checks.
+  Database `mt_p4_test` is owned by `postgres`; public by `pg_database_owner`.
+  TLS/runtime privilege/role provisioning support request sent; reply pending.
+  No migration, role privilege change or application DB readiness test occurred.
+- `~/mt-p4-storage` layout, directory `0700`/owner `wfdqewrm`, Node exclusive
+  write/link/fsync and probe persistence across Passenger restart PASS. Probe
+  file cleaned, directories retained. Real app file authorization, server reboot,
+  disaster durability and backup/restore remain UNVERIFIED / NOT_RUN.
+- Plesk package shows 10 GB disk / 200 GB monthly traffic; uncollected `0 MB`
+  statistics are not usage proof. `ulimit -v=unlimited`, `ulimit -u=191898`,
+  cgroup memory limits inaccessible. Temporary app RSS `54336 KB` is not
+  MediaTracker usage. Recalled 1–2 GB RAM / two cores are unverified estimates;
+  official limits, 1 GB budget, workers, peak RSS/concurrency and CPU remain open.
+
+Next safe step: review the pending support reply against existing DB contracts,
+without weakening TLS/role/CREATE checks. Real deployment still needs a
+canonical-origin rebuild (current artifact uses `https://app.example.invalid`),
+independent target fingerprinting and separately authorized disposable runtime
+proof. DB/RLS/Auth, ingress, resources, maintenance, privacy and recovery gates
+remain open; Production/P5 conditions and Supabase rollback procedures below remain.
 
 ## Experimental Linux artifact pipeline — 2026-10-08
 
-Implemented locally; the GitHub result is `NOT_RUN` until this workflow change is
-committed and pushed. Historical P4 access/proof evidence above remains unchanged.
+Initially implemented locally with GitHub execution `NOT_RUN` at that time.
+The later user-reported successful run is pinned in the current prechecks above.
+Historical Phase 0 evidence remains an account of the earlier attempt.
 This job is packaging only, not hosting acceptance or deployment.
 
 - A push to `release/v1-hardening` starts CI; `native-linux-artifact` runs only
@@ -45,7 +92,8 @@ This job is packaging only, not hosting acceptance or deployment.
 - Repository **Actions → CI → successful run for the exact branch/SHA → Artifacts**:
   download `mediatracker-native-linux-<12-character-sha>` within seven days.
   Unzip the GitHub download wrapper to obtain `.tar.gz`, `.tar.gz.sha256` and
-  `native-abi.json`. No upload to TürkHosting occurs.
+  `native-abi.json`. The packaging job itself does not upload to TürkHosting;
+  the later disposable SSH transfer is recorded above.
 - From that download directory on Linux, run
   `sha256sum -c mediatracker-native-linux-<sha>.tar.gz.sha256` before extraction.
   On Windows, compare `Get-FileHash <archive> -Algorithm SHA256` to the checksum.
@@ -61,7 +109,9 @@ This job is packaging only, not hosting acceptance or deployment.
   assets and traced modules; configure real runtime secrets privately outside the
   archive. Synthetic public app origin is compiled: a real-host release requires
   a separately approved rebuild with its canonical origin before deployment.
-- `HOST_ABI_COMPATIBILITY = UNVERIFIED`: Ubuntu success is not hosting proof.
+- `HOST_ABI_COMPATIBILITY = PARTIAL`: the later host ABI comparison and Sharp
+  smoke passed within their reported scope; full standalone/native-path acceptance
+  remains UNVERIFIED. Ubuntu success alone is not hosting proof.
   Obtain the APPLICATION runtime's glibc, loader, libstdc++, CPU/OS/architecture
   and Node 24.21.0 facts; compare ELF requirements and prove Sharp/libvips loading
   on the separately authorized disposable host. A Red Hat PostgreSQL SERVER build
@@ -115,7 +165,11 @@ rejects Supabase, Vercel, `PG*`, privacy/DR and `NATIVE_OPS_*` credentials/confi
 Never upload `.env.local`, use runtime credentials for migrations, or place operator
 credentials into Passenger. No production AI key is needed.
 
-## Sequential operator procedure (future authorized P4)
+## Sequential operator procedure (remaining separately authorized P4 work)
+
+Current prechecks above qualify only their stated probes. The following acceptance
+and safety procedure remains in force; probe success does not complete a step's
+broader application/runtime contract.
 
 1. **Hosting prerequisites:** obtain an exact account/application/database target,
    TLS hostname, architecture/OS/libc, SSH/operator execution access, upload limits,
