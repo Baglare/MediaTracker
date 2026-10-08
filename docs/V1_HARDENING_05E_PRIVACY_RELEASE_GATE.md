@@ -2,6 +2,16 @@
 
 Date: 2026-10-05. Phase order: 05C source/synthetic acceptance → 05D retention design acceptance → 05E consolidation. This is the Phase 5 privacy matrix; it does not supersede or close existing D8 production/security hold gates.
 
+Native V1 scope update (2026-10-09): the dated matrices, Supabase/GoTrue/Storage
+proof requirements and test results below retain their historical/fallback scope.
+They do not identify active native recipients. Use the current
+[native provider/KVKK/retention closure](NATIVE_V1_PROVIDER_PRIVACY_RETENTION_GATE.md)
+for Better Auth/PostgreSQL, TürkHosting/Passenger, private files/backups and
+recipient/TTL distinctions; [06E](V1_HARDENING_06E_OPERATIONAL_RELEASE_GATE.md)
+remains the single current master hold table. Mailbox access/MFA/receipt/reply are
+now user-confirmed; legal retention, secure delivery and transfer evidence remain
+manual. Native privacy/live DB acceptance and legal approval remain open.
+
 **V1-HARDENING-05 STILL BLOCKED — PostgreSQL role/concurrency enforcement and the real Auth-service erasure sequence remain LIVE UNVERIFIED.** [05F operational closure](V1_HARDENING_05F_OPERATIONAL_ERASURE_CLOSURE.md) implements the DB write barrier, operational disposable adapter and deterministic participant policy with offline proof. No safe disposable stack was available to execute migrations/role/concurrency/Storage/Auth integration. This is not Production privacy approval.
 
 Canonical unresolved values:

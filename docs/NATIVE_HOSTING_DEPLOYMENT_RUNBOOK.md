@@ -184,7 +184,11 @@ Builds use synthetic secrets and an unreachable loopback DB, never production se
 | `RATE_LIMIT_RPC_AUDIENCE` | REQUIRED, PUBLIC server config | 1–96 alphanumeric/colon/underscore/hyphen | security |
 | `NEXT_PUBLIC_CLOUD_MEDIA_SCHEMA_STAGE` / `NEXT_PUBLIC_CLOUD_MEDIA_V2_ENABLED` | OPTIONAL capability pair, PUBLIC | `d2c1` / `true` only after matching ledger proof | release |
 | `NEXT_PUBLIC_CLOUD_GOALS_SCHEMA_STAGE` / `NEXT_PUBLIC_CLOUD_GOALS_V1_ENABLED` | OPTIONAL capability pair, PUBLIC | `v1` / `true`, requiring the Media pair | release |
-| `MEDIA_TRACKER_PROVIDER_USER_AGENT` | OPTIONAL, PUBLIC provider identity | real reviewed contact; otherwise Open Library disabled | provider |
+| `MEDIA_TRACKER_PROVIDER_USER_AGENT` | OPTIONAL, PUBLIC provider identity | valid reviewed identity technically enables Open Library; supply in Production only after use-case registration and manual suitability evidence; otherwise leave unset and keep Open Library disabled | provider |
+
+Provider enablement, native recipient/foreign-processing inventory and retention
+boundaries: [Native V1 source closure and manual gates](NATIVE_V1_PROVIDER_PRIVACY_RETENTION_GATE.md).
+This source closure does not approve legal compliance or hosted Production use.
 
 Required fixed v1 values: `AI_SERVER_ACCESS_MODE=disabled`,
 `D7_RESEARCH_ROLLOUT_MODE=disabled`, `D7_RESEARCH_SHADOW_ENABLED=0`,

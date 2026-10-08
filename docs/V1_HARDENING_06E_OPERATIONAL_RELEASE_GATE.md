@@ -4,6 +4,19 @@
 
 Baseline: `release/v1-hardening`, HEAD `b48f5ee1fa2c9a9277ce3b0852e49a1e9de9830e`, initially clean, local `origin/release/v1-hardening` equal; exact-SHA [Actions PASS](https://github.com/Baglare/MediaTracker/actions/runs/37373905546). Candidate source validation is separate from that remote baseline.
 
+Native V1 applicability update — 2026-10-09: this remains the single master hold
+table. The historical baseline/validation below is preserved; it is not fresh
+native acceptance. Current provider, recipient and retention source closure is
+[Native V1 provider/KVKK/retention](NATIVE_V1_PROVIDER_PRIVACY_RETENTION_GATE.md).
+Native normal runtime uses Better Auth/PostgreSQL and TürkHosting/Passenger/private
+files; Supabase/Vercel target, GoTrue/Storage and Advisor requirements apply only
+to retained fallback/older deployments. Native release instead needs its actual
+DB roles/RLS/Auth, ingress, filesystem and recovery evidence under
+[P4](NATIVE_BACKEND_P4_HOSTING_PROOF.md) and the
+[native runbook](NATIVE_HOSTING_DEPLOYMENT_RUNBOOK.md). P1–P3 source work and ingress
+source regressions do not close those live gates. User-confirmed mailbox operation
+is scoped evidence, not legal/vendor/retention approval. Production remains frozen.
+
 | Gate | Status | Evidence / exact closure requirement |
 | --- | --- | --- |
 | Dependency/runtime hardening | CLOSED | 08 authorized lock-only source-map-js 1.2.1 → 1.2.2; runtime audit zero vulnerabilities (High=0/Critical=0); full verifier PASS with only five existing dev-only braces-chain entries. Existing braces exception unchanged, review/expiry 2026-11-03 UTC. Renewed full local tests/typecheck/lint/offline build PASS; immutable RC/live gates remain open; user prohibits commit/push/deploy |
@@ -13,10 +26,10 @@ Baseline: `release/v1-hardening`, HEAD `b48f5ee1fa2c9a9277ce3b0852e49a1e9de9830e
 | Distributed limiter source | CLOSED | 02D and forward fixes retained; historical measured acceptance not Production SLA |
 | Distributed limiter live release config | LIVE_VALIDATION_REQUIRED | Fresh Vault/key-version/audience, ingress, concurrency/capacity/cron and failure proof |
 | CI | CLOSED | Exact baseline SHA Actions success; candidates need own clean SHA after user commit/publication |
-| Provider source gates | CLOSED | TVMaze attribution, conditional Open Library, AniList/TMDB/OMDb hard-disabled; no policy change |
-| Privacy notice technical representation | SOURCE_READY | 05A/05B facts; final operator/legal sufficiency unapproved |
+| Provider source gates | CLOSED | TVMaze attribution/limiter retained; Open Library valid-UA capability is technical only, registration/use-case suitability remain manual before Production enablement; AniList/TMDB/OMDb and paid AI disabled. Native V1 policy source closure documented; runtime unchanged |
+| Privacy notice technical representation | SOURCE_READY | Current page selects native/Supabase; native recipient/foreign-processing and TTL inventory closed in Native V1 document. 05A/05B dated fallback facts preserved; final operator/legal sufficiency unapproved |
 | Privacy export/erasure source work | SOURCE_READY | ACCOUNT_WRITE_BARRIER / ACCOUNT_ERASURE_WORKFLOW source complete; 08 retained activity CHECK repair, source/synthetic proof only; real proof open |
-| Phase 5 real disposable DB/Auth/Storage proof | BLOCKED_ENVIRONMENT | GAP-007 discovery 2026-10-06: Docker 29.6.2 client present, Linux daemon pipe absent; no proven LOCAL_DISPOSABLE target. 26 migrations present / 0 applied; 71 targeted offline tests + 40 CI policy tests PASS, not live evidence. [Focused evidence and exact environment requirements](V1_GAP_007_DISPOSABLE_EVIDENCE.md); grants/concurrency/deferred XP/participant/Auth-last execution remains required |
+| Phase 5 real disposable DB/Auth/Storage proof | BLOCKED_ENVIRONMENT | Supabase fallback: GAP-007 historical discovery/test/migration counts in [focused evidence](V1_GAP_007_DISPOSABLE_EVIDENCE.md) unchanged. Native target: DB/RLS/Better Auth/participant/XP/Auth-last/private-files erasure still LIVE_UNVERIFIED; P4 PostgreSQL TLS/roles and ingress acceptance pending. Supabase synthetic proof is not native acceptance |
 | Backup tooling | SOURCE_READY | 06A disposable encrypted DB packaging/plan/integrity; actual hosted transport and Storage/Auth recovery excluded |
 | Restore tooling | SOURCE_READY | 06A default plan, exact local proof, empty prerequisites, stop-on-error DB verifier; DB-only success never full DR |
 | Disposable restore rehearsal | BLOCKED_ENVIRONMENT | NOT_RUN_ENVIRONMENT_BLOCKED: Docker daemon unavailable, no safe fixture established |
@@ -31,15 +44,15 @@ Baseline: `release/v1-hardening`, HEAD `b48f5ee1fa2c9a9277ce3b0852e49a1e9de9830e
 | Article 9 | MANUAL_LEGAL_GATE | Recipient/transfer mechanism evidence and legal approval; no filing/contact by this task |
 | VERBIS | BLOCKED_MANUAL | Operator/legal exemption/registration determination; no assumed exemption |
 | Legal basis / Article 10 final notice | MANUAL_LEGAL_GATE | Provisional matrix requires real controller/bases/recipients and approval |
-| Legal retention / restored erasure reconciliation | MANUAL_LEGAL_GATE | Vendor/device/backup periods and recovery quarantine/erase reconciliation approved |
-| Request/mailbox operation | BLOCKED_MANUAL | Actual secured channel/MFA/operator/deadlines/delivery/retention evidence |
+| Legal retention / restored erasure reconciliation | MANUAL_LEGAL_GATE | Native source TTL/cleanup inventory closed; purpose-based mailbox/content/log/DB/private-file backup periods and recovery quarantine/erase reconciliation require approval and actual proof. No new duration or user purge |
+| Request/mailbox operation | BLOCKED_MANUAL | Access, MFA, message receipt and reply user-confirmed 2026-10-09; not independently accessed by Codex. Remaining: authorized/backup handler, formal channel/deadline tracking, secure export delivery, minimization/retention and vendor/Article 9 evidence |
 | Vendor/DPA/regions/subprocessors | MANUAL_EXTERNAL_GATE | Account-specific evidence; DPA alone does not close Article 9 |
 | Enabled-provider manual/legal gates | MANUAL_LEGAL_GATE | Actual operator/contact/disclosures + TVMaze interpretation; Open Library can remain disabled if registration not closed |
-| Open Library registration | MANUAL_EXTERNAL_GATE | Explicit registration evidence if enabled; historical contact/Preview result insufficient |
-| TVMaze ShareAlike interpretation | MANUAL_LEGAL_GATE | Persisted/transformed metadata and exports legal decision |
+| Open Library registration | MANUAL_EXTERNAL_GATE | Explicit use-case registration plus manual usage suitability evidence before Production enablement; valid UA/contact or historical Preview result insufficient. Without evidence, leave UA unset to keep existing capability disabled; no new runtime gate |
+| TVMaze ShareAlike interpretation | MANUAL_LEGAL_GATE | Source attribution retained; persisted/normalized/season-derived/combined metadata, public projections and portable/account exports need license-scope decision; source links/tests alone do not settle ShareAlike |
 | Hosted signup / anonymous Auth | LIVE_VALIDATION_REQUIRED | Fresh hosted setting + provider-level deny proof; existing sign-in retained |
 | Env review | BLOCKED_MANUAL | Current 06D classes, isolated targets/keys, forbidden absence and platform provenance |
-| Security Advisor | LIVE_VALIDATION_REQUIRED | Fresh current target/database Advisor, grants/RLS/function/search_path and blocker resolution |
+| Security Advisor | LIVE_VALIDATION_REQUIRED | Supabase fallback target: fresh Advisor/grants/RLS/function/search_path review. Native: actual PostgreSQL roles/grants/FORCE RLS/function/search_path and blocker resolution; Supabase Advisor is not a native-host requirement or substitute proof |
 | Platform log/access/retention | MANUAL_EXTERNAL_GATE | Actual vendor capability/permissions/retention not inferred from logger source |
 | Final browser smoke | LIVE_VALIDATION_REQUIRED | Approved exact-SHA Preview/target, safe synthetic accounts; not run here |
 | Final immutable RC | BLOCKED_MANUAL | Final gap/security audit, user publication, clean SHA CI + all required live/manual gates; no tag now |
