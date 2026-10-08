@@ -1,5 +1,5 @@
-import { cp, mkdir, readFile, writeFile, lstat, opendir, realpath, readdir } from 'node:fs/promises';
-import { resolve, join, relative, isAbsolute } from 'node:path';
+import { cp, mkdir, readFile, writeFile, lstat, opendir, readdir, readlink } from 'node:fs/promises';
+import { resolve, join, relative, isAbsolute, dirname, sep } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
@@ -10,7 +10,9 @@ export function forbiddenArtifactPath(path) {
     || ['.git','.codex','.vercel','backups','backup','tests','__tests__','.cache'].includes(part.toLowerCase()))
     || /^\.next\/(?:cache|dev|diagnostics)(?:\/|$)/.test(path.replaceAll('\\','/'))
     || /(?:^|\/)[^/]+\.(?:test|spec)\.[cm]?[jt]sx?$/.test(path)
-    || /(?:^|\/)(?:tsconfig\.tsbuildinfo|\.DS_Store|npm-debug\.log)$/.test(path);
+    || /(?:^|\/)(?:tsconfig\.tsbuildinfo|\.DS_Store|npm-debug\.log)$/.test(path)
+    || /(?:^|[\\/])(?:fixtures?|private|coverage|\.ai|\.claude|\.knowledge-compiler|\.npm|\.pnpm-store|\.vscode)(?:[\\/]|$)/i.test(path)
+    || /\.(?:sql|dump|bak|zip|tar|gz|7z|tsbuildinfo|pem|key)$/i.test(path);
 }
 const sha = data => createHash('sha256').update(data).digest('hex');
 // Diagnostic fields are fixed vocabulary, never paths, messages, stacks or env.
@@ -18,6 +20,8 @@ const failureStages = new WeakMap();
 const approvedErrors = new Set([
   'deployment_native_build_required', 'deployment_destination_invalid',
   'deployment_build_provider_mismatch', 'deployment_trace_link_unsafe',
+  'deployment_trace_link_dangling', 'deployment_trace_link_chain_unsafe',
+  'deployment_trace_dependency_untrusted',
   'deployment_artifact_unsafe', 'deployment_required_file_missing',
   'deployment_runtime_incomplete', 'deployment_native_library_missing',
   'deployment_migration_state_stale', 'deployment_artifact_checksum_mismatch',
@@ -26,6 +30,106 @@ const approvedErrors = new Set([
 const filesystemErrors = new Set(['ENOENT','EEXIST','EACCES','EPERM','ENOTDIR','EISDIR','ELOOP','ENOSPC','EINVAL','ENAMETOOLONG']);
 const copyErrors = new Set(['ERR_FS_CP_EINVAL','ERR_FS_CP_DIR_TO_NON_DIR','ERR_FS_CP_NON_DIR_TO_DIR',
   'ERR_FS_CP_SYMLINK_TO_SUBDIRECTORY','ERR_FS_CP_FIFO_PIPE','ERR_FS_CP_SOCKET','ERR_FS_CP_UNKNOWN']);
+function inside(root,path) {
+  const name=relative(root,path);
+  return name!== '..' && !name.startsWith(`..${sep}`) && !isAbsolute(name);
+}
+// Only the installed production lock graph and its traced standalone copy are
+// trusted. Validate every hop, including symlinks in parent directories, before
+// fs.cp dereferences it; realpath alone hides unsafe intermediate hops.
+export async function dependencyCopyFilter(cwd,standalone) {
+  const roots=[join(standalone,'node_modules'),join(cwd,'node_modules')];
+  // Turbopack also emits hashed dependency aliases under compiled .next.
+  // These are permitted link origins, never additional trusted target roots.
+  const traceModules=join(standalone,'.next','node_modules');
+  const sourceRoots=[...roots,traceModules];
+  await safeDirectory(roots[1]);
+  const lock=JSON.parse(await readFile(join(cwd,'package-lock.json'),'utf8'));
+  const packages=Object.entries(lock.packages??{}).filter(([name])=>name.startsWith('node_modules/'));
+  const packageNames=new Set(packages.map(([name])=>name));
+  function trusted(path,allowRoot=false) {
+    const root=roots.find(root=>inside(root,path));
+    if(!root&&allowRoot&&inside(traceModules,path)) {
+      if(forbiddenArtifactPath(relative(standalone,path).replaceAll('\\','/')))throw new Error('deployment_trace_link_unsafe');
+      return traceModules;
+    }
+    if(!root)throw new Error('deployment_trace_link_unsafe');
+    const name=relative(root,path).replaceAll('\\','/');
+    if(forbiddenArtifactPath(name))throw new Error('deployment_trace_link_unsafe');
+    if(!name && allowRoot)return root;
+    const key=`node_modules/${name}`;
+    const parts=key.split('/'),index=parts.lastIndexOf('node_modules');
+    const owner=parts.slice(0,index+(parts[index+1]?.startsWith('@')?3:2)).join('/');
+    const owners=packages.filter(([pkg])=>key===pkg||key.startsWith(pkg+'/'));
+    const container=parts.length===index+1 || (parts.length===index+2&&parts[index+1].startsWith('@'));
+    if((!packageNames.has(owner)&&!(allowRoot&&container&&owners.length))
+      ||owners.some(([,entry])=>entry.dev===true||entry.link===true))
+      throw new Error('deployment_trace_dependency_untrusted');
+    return root;
+  }
+  async function inspect(path,seen=new Set()) {
+    const root=trusted(path,true),parts=relative(root,path).split(sep).filter(Boolean);
+    let current=root;
+    for(let i=0;i<parts.length;i++) {
+      current=join(current,parts[i]);
+      let info;
+      try {info=await lstat(current);} catch(error) {
+        if(error.code==='ENOENT'||error.code==='ENOTDIR')throw new Error('deployment_trace_link_dangling');
+        throw error;
+      }
+      if(info.isSymbolicLink()) {
+        if(seen.has(current)||seen.size>=40)throw new Error('deployment_trace_link_chain_unsafe');
+        seen.add(current);
+        const link=await readlink(current);
+        // Check raw components too: normalization must not hide private paths.
+        if(forbiddenArtifactPath(link))throw new Error('deployment_trace_link_unsafe');
+        if(!isAbsolute(link)) {
+          let hop=dirname(current),descended=false;
+          for(const part of link.split(/[\\/]/)) {
+            // Resolving name/.. lexically can hide a symlink at name. Permit
+            // leading parent traversal only, within the verified workspace.
+            // Generated .next aliases can cross its build directories on the
+            // way to node_modules; the final target still requires trusted().
+            if(part==='..'&&descended)throw new Error('deployment_trace_link_unsafe');
+            if(part&&part!=='.'&&part!=='..')descended=true;
+            hop=resolve(hop,part||'.');
+            if(!inside(cwd,hop))throw new Error('deployment_trace_link_unsafe');
+          }
+        } else if(link.split(/[\\/]/).includes('..'))throw new Error('deployment_trace_link_unsafe');
+        const target=resolve(dirname(current),link);
+        trusted(target);
+        const resolved=await inspect(target,seen);
+        return inspect(join(resolved,...parts.slice(i+1)),seen);
+      }
+      if(!info.isDirectory() && !(i===parts.length-1&&info.isFile()))
+        throw new Error('deployment_trace_link_unsafe');
+    }
+    trusted(current,true);
+    return current;
+  }
+  return async path=>{
+    const name=relative(standalone,path).replaceAll('\\','/');
+    if(inside(standalone,path)) {
+      if(name && !['.next','node_modules','server.js','package.json'].includes(name.split('/')[0]))return false;
+      if(forbiddenArtifactPath(name))return false;
+    }
+    if(sourceRoots.some(root=>inside(root,path))) {
+      // A scoped namespace is a container, not a package. Its children still
+      // require lock-graph membership, and the namespace itself cannot be a link.
+      const root=sourceRoots.find(root=>inside(root,path));
+      const dep=relative(root,path);
+      if(!dep||/^@[a-z0-9._-]+$/i.test(dep)) {
+        if(!(await lstat(path)).isDirectory())throw new Error('deployment_trace_link_unsafe');
+        return true;
+      }
+      await inspect(path);
+    } else {
+      const info=await lstat(path);
+      if(info.isSymbolicLink()||(!info.isDirectory()&&!info.isFile()))throw new Error('deployment_trace_link_unsafe');
+    }
+    return true;
+  };
+}
 export function packageFailureDiagnostic(error) {
   const category = approvedErrors.has(error?.message) ? error.message
     : filesystemErrors.has(error?.code) ? `filesystem_${error.code.toLowerCase()}`
@@ -72,23 +176,13 @@ export async function packageNative(destination) {
   await mkdir(join(cwd,'dist'),{recursive:true});await safeDirectory(join(cwd,'dist'));
   await mkdir(root,{recursive:false}); // Existing output is never overwritten/deleted.
   stage='standalone_copy';
-  await cp(standalone,root,{recursive:true,dereference:true,filter:async path=>{
-    const name=relative(standalone,path).replaceAll('\\','/');
-    // Generated server consumes compiled .next + traced modules. Annotation
-    // filesystem traces also copy source/docs/ops; they are never deployment input.
-    if(name && !['.next','node_modules','server.js','package.json'].includes(name.split('/')[0]))return false;
-    if(forbiddenArtifactPath(name))return false;
-    if((await lstat(path)).isSymbolicLink()) {
-      const destination=await realpath(path),rel=relative(join(cwd,'node_modules'),destination);
-      if(rel.startsWith('..')||isAbsolute(rel)||!(await lstat(destination)).isDirectory())throw new Error('deployment_trace_link_unsafe');
-    }
-    return true;
-  }});
+  const dependencyFilter=await dependencyCopyFilter(cwd,standalone);
+  await cp(standalone,root,{recursive:true,dereference:true,filter:dependencyFilter});
   // NFT can trace sharp.node while missing its dynamically loaded libvips DLL/SO.
   // Copy only installed sharp native optional packages, never bulk node_modules.
   stage='sharp_dependencies';
   for(const name of (await readdir(join(cwd,'node_modules','@img'))).filter(name=>/^sharp-(?:libvips-)?[a-z0-9-]+$/.test(name))) {
-    await cp(join(cwd,'node_modules','@img',name),join(root,'node_modules','@img',name),{recursive:true,dereference:true});
+    await cp(join(cwd,'node_modules','@img',name),join(root,'node_modules','@img',name),{recursive:true,dereference:true,filter:dependencyFilter});
   }
   stage='static_copy';
   await cp(join(cwd,'.next','static'),join(root,'.next','static'),{recursive:true});

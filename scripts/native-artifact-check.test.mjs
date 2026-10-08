@@ -1,13 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { mkdtemp, mkdir, writeFile, rm, symlink } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, rm, symlink, cp, lstat, readFile, readdir } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
-import { join, dirname } from 'node:path';
+import { join, dirname, relative } from 'node:path';
 import { checkArtifactFile, parseElfEvidence } from './native-artifact-check.mjs';
-import { verifyNativePackage, packageFailureDiagnostic } from './native-package.mjs';
+import { verifyNativePackage, packageFailureDiagnostic, dependencyCopyFilter } from './native-package.mjs';
 import { nativeMigrationManifest } from './native-migrations.mjs';
 
 const packageCli = fileURLToPath(new URL('./native-package.mjs', import.meta.url));
@@ -25,6 +25,9 @@ async function packageFixture() {
     '.next/standalone/node_modules/next/package.json': '{}',
     '.next/standalone/node_modules/pg/package.json': '{}',
     '.next/standalone/node_modules/sharp/package.json': '{}',
+    'package-lock.json': JSON.stringify({lockfileVersion:3,packages:Object.fromEntries(
+      ['next','pg','sharp','@img/sharp-synthetic','runtime','alias','unsafe','dev'].map(name=>[
+        `node_modules/${name}`,{version:'1.0.0',...(name==='dev'?{dev:true}:{})}]))}),
     'node_modules/@img/sharp-synthetic/sharp.node': 'synthetic',
     'node_modules/@img/sharp-synthetic/libvips.dll': 'synthetic',
     '.next/static/chunk.js': 'synthetic',
@@ -33,6 +36,174 @@ async function packageFixture() {
     'lib/backend/native-migration-state.json': JSON.stringify(nativeMigrationManifest().map(({ name, checksum }) => ({ name, checksum }))),
   })) await put(path, contents);
   return { root, put };
+}
+
+async function copyDependencies(fixture) {
+  const standalone=join(fixture.root,'.next/standalone'),output=join(fixture.root,'copied');
+  const filter=await dependencyCopyFilter(fixture.root,standalone);
+  await cp(standalone,output,{recursive:true,dereference:true,filter});
+  return output;
+}
+async function assertOrdinaryTree(root) {
+  for(const entry of await readdir(root,{withFileTypes:true})) {
+    const path=join(root,entry.name),info=await lstat(path);
+    assert.equal(info.isSymbolicLink(),false);
+    if(info.isDirectory())await assertOrdinaryTree(path);
+    else assert.equal(info.isFile(),true);
+  }
+}
+test('creates and verifies a synthetic package with dereferenced dependency links',async()=>{
+  const checkout=await mkdtemp(join(tmpdir(),'mt-package-checkout-'));
+  const repository=fileURLToPath(new URL('..',import.meta.url));
+  const git=(...args)=>{
+    const result=spawnSync('git',args,{cwd:checkout,encoding:'utf8'});
+    assert.equal(result.status,0,result.stderr);
+  };
+  let fixture;
+  try {
+    // Borrow existing objects in a disposable local checkout; create no commit
+    // and never write to the source checkout or its refs.
+    git('clone','--shared','--no-checkout',repository,checkout);
+    git('read-tree','--empty');
+    fixture=await packageFixture();
+    await cp(fixture.root,checkout,{recursive:true});
+    await writeFile(join(checkout,'.gitignore'),'.next/\nnode_modules/\ndist/\n');
+    await mkdir(join(checkout,'node_modules/next'),{recursive:true});
+    await writeFile(join(checkout,'node_modules/next/package.json'),'{"version":"synthetic"}');
+    await writeFile(join(checkout,'.next/BUILD_ID'),'synthetic');
+    await mkdir(join(checkout,'node_modules/runtime/lib'),{recursive:true});
+    await writeFile(join(checkout,'node_modules/runtime/lib/value.js'),'runtime fixture');
+    await mkdir(join(checkout,'.next/standalone/node_modules/alias'));
+    const base=join(checkout,'.next/standalone/node_modules/alias');
+    await symlink(join(checkout,'node_modules/runtime/lib/value.js'),join(base,'file.js'),'file');
+    await symlink(join(checkout,'node_modules/runtime/lib'),join(base,'directory'),'dir');
+    await symlink('file.js',join(base,'chain.js'),'file');
+    await mkdir(join(checkout,'.next/standalone/.next/node_modules'));
+    const traceLink=join(checkout,'.next/standalone/.next/node_modules/runtime-hash');
+    await symlink(relative(dirname(traceLink),join(checkout,'node_modules/runtime/lib')),traceLink,'dir');
+    const created=spawnSync(process.execPath,[packageCli,'create','dist/package'],{
+      cwd:checkout,encoding:'utf8',env:{...process.env,BACKEND_PROVIDER:'native'},
+    });
+    assert.equal(created.status,0,created.stderr);
+    const output=join(checkout,'dist/package');
+    assert.equal(await readFile(join(output,'node_modules/alias/file.js'),'utf8'),'runtime fixture');
+    assert.equal(await readFile(join(output,'node_modules/alias/directory/value.js'),'utf8'),'runtime fixture');
+    assert.equal(await readFile(join(output,'node_modules/alias/chain.js'),'utf8'),'runtime fixture');
+    assert.equal(await readFile(join(output,'.next/node_modules/runtime-hash/value.js'),'utf8'),'runtime fixture');
+    await assertOrdinaryTree(output);
+    assert.equal((await verifyNativePackage(output)).status,'VERIFIED');
+    const verified=spawnSync(process.execPath,[packageCli,'verify',output],{cwd:checkout,encoding:'utf8'});
+    assert.equal(verified.status,0,verified.stderr);
+    assert.equal(JSON.parse(verified.stdout).status,'VERIFIED');
+  } finally {
+    if(fixture)await rm(fixture.root,{recursive:true,force:true});
+    await rm(checkout,{recursive:true,force:true});
+  }
+});
+for(const location of ['node_modules','.next/standalone/node_modules']) {
+  for(const kind of ['file','dir']) {
+    test(`dereferences legitimate ${kind} dependency links in ${location}`,async()=>{
+      const fixture=await packageFixture();
+      try {
+        await fixture.put(`${location}/runtime/lib/value.js`,'runtime fixture');
+        await fixture.put('.next/standalone/node_modules/alias/package.json','{}');
+        const target=join(fixture.root,location,'runtime',kind==='file'?'lib/value.js':'lib');
+        await symlink(target,join(fixture.root,'.next/standalone/node_modules/alias/linked'),kind);
+        const output=await copyDependencies(fixture);
+        const copied=join(output,'node_modules/alias/linked',...(kind==='dir'?['value.js']:[]));
+        assert.equal(await readFile(copied,'utf8'),'runtime fixture');
+        await assertOrdinaryTree(output);
+      } finally {await rm(fixture.root,{recursive:true,force:true});}
+    });
+  }
+}
+for(const [label,target,category] of [
+  ['external file','public/icon.txt','deployment_trace_link_unsafe'],
+  ['dangling file','node_modules/runtime/missing.js','deployment_trace_link_dangling'],
+  ['private target','node_modules/runtime/private/value.js','deployment_trace_link_unsafe'],
+  ['env target','node_modules/runtime/.env.local','deployment_trace_link_unsafe'],
+  ['test target','node_modules/runtime/value.test.js','deployment_trace_link_unsafe'],
+  ['dump target','node_modules/runtime/data.sql','deployment_trace_link_unsafe'],
+  ['development target','node_modules/dev/value.js','deployment_trace_dependency_untrusted'],
+  ['unlisted target','node_modules/unknown/value.js','deployment_trace_dependency_untrusted'],
+]) {
+  test(`package creation rejects aliased ${label} with safe diagnostics`,async()=>{
+    const fixture=await packageFixture();
+    try {
+      if(label!=='dangling file')await fixture.put(target,'synthetic private fixture');
+      await fixture.put('.next/standalone/node_modules/alias/package.json','{}');
+      await symlink(join(fixture.root,target),join(fixture.root,'.next/standalone/node_modules/alias/innocent.js'),'file');
+      assert.deepEqual(failedCli(fixture.root,'create','dist/package'),{
+        event:'deployment_package_failed',stage:'standalone_copy',category});
+    } finally {await rm(fixture.root,{recursive:true,force:true});}
+  });
+}
+for(const [label,alter,category] of [
+  ['directory with private descendant',async f=>{
+    await f.put('node_modules/runtime/private/value.js','private fixture');
+    await symlink(join(f.root,'node_modules/runtime/private/value.js'),join(f.root,'node_modules/runtime/innocent.js'),'file');
+    await symlink(join(f.root,'node_modules/runtime'),join(f.root,'.next/standalone/node_modules/alias/linked'),'dir');
+  },'deployment_trace_link_unsafe'],
+  ['directory with development descendant',async f=>{
+    await f.put('node_modules/runtime/node_modules/dev/value.js','dev fixture');
+    const lock=JSON.parse(await readFile(join(f.root,'package-lock.json'),'utf8'));
+    lock.packages['node_modules/runtime/node_modules/dev']={dev:true};
+    await f.put('package-lock.json',JSON.stringify(lock));
+    await symlink(join(f.root,'node_modules/runtime'),join(f.root,'.next/standalone/node_modules/alias/linked'),'dir');
+  },'deployment_trace_dependency_untrusted'],
+  ['escaping intermediate chain',async f=>{
+    await f.put('node_modules/runtime/value.js','runtime fixture');
+    await symlink(join(f.root,'node_modules/runtime/value.js'),join(f.root,'public/intermediate'),'file');
+    await symlink(join(f.root,'public/intermediate'),join(f.root,'.next/standalone/node_modules/alias/linked'),'file');
+  },'deployment_trace_link_unsafe'],
+  ['cyclic chain',async f=>{
+    const base=join(f.root,'.next/standalone/node_modules/alias');
+    await symlink('second',join(base,'linked'),'file');
+    await symlink('linked',join(base,'second'),'file');
+  },'deployment_trace_link_chain_unsafe'],
+  ['directory cycle',async f=>{
+    await f.put('node_modules/runtime/value.js','runtime fixture');
+    await symlink(join(f.root,'node_modules/runtime'),join(f.root,'node_modules/runtime/self'),'dir');
+    await symlink(join(f.root,'node_modules/runtime'),join(f.root,'.next/standalone/node_modules/alias/linked'),'dir');
+  },'deployment_trace_link_chain_unsafe'],
+  ['unsupported FIFO target',async f=>{
+    await f.put('node_modules/runtime/package.json','{}');
+    const target=join(f.root,'node_modules/runtime/pipe');
+    const result=spawnSync('mkfifo',[target],{encoding:'utf8'});
+    assert.equal(result.status,0,result.stderr);
+    await symlink(target,join(f.root,'.next/standalone/node_modules/alias/linked'),'file');
+  },'deployment_trace_link_unsafe'],
+  ['traversal outside dependency roots',async f=>{
+    await symlink('../../../../public/icon.txt',join(f.root,'.next/standalone/node_modules/alias/linked'),'file');
+  },'deployment_trace_link_unsafe'],
+  ['traversal out and back into a trusted root',async f=>{
+    await f.put('node_modules/runtime/value.js','runtime fixture');
+    await symlink(join(f.root,'node_modules/runtime/value.js'),join(f.root,'.next/standalone/node_modules/alias/linked'),'file');
+    await symlink('../../public/../node_modules/runtime/value.js',join(f.root,'node_modules/runtime/escape'),'file');
+    await rm(join(f.root,'.next/standalone/node_modules/alias/linked'));
+    await symlink(join(f.root,'node_modules/runtime/escape'),join(f.root,'.next/standalone/node_modules/alias/linked'),'file');
+  },'deployment_trace_link_unsafe'],
+  ['private traversal normalized away',async f=>{
+    await f.put('node_modules/runtime/value.js','runtime fixture');
+    await mkdir(join(f.root,'node_modules/runtime/private'));
+    await symlink('private/../value.js',join(f.root,'node_modules/runtime/escape'),'file');
+    await symlink(join(f.root,'node_modules/runtime/escape'),join(f.root,'.next/standalone/node_modules/alias/linked'),'file');
+  },'deployment_trace_link_unsafe'],
+  ['symlink parent traversal normalized away',async f=>{
+    await f.put('node_modules/runtime/value.js','runtime fixture');
+    await symlink(join(f.root,'public'),join(f.root,'node_modules/runtime/escape-directory'),'dir');
+    await symlink('escape-directory/../value.js',join(f.root,'node_modules/runtime/escape'),'file');
+    await symlink(join(f.root,'node_modules/runtime/escape'),join(f.root,'.next/standalone/node_modules/alias/linked'),'file');
+  },'deployment_trace_link_unsafe'],
+]) {
+  test(`package creation rejects ${label}`,async()=>{
+    const fixture=await packageFixture();
+    try {
+      await fixture.put('.next/standalone/node_modules/alias/package.json','{}');
+      await alter(fixture);
+      assert.equal(failedCli(fixture.root,'create','dist/package').category,category);
+    } finally {await rm(fixture.root,{recursive:true,force:true});}
+  });
 }
 function failedCli(root, ...args) {
   const result = spawnSync(process.execPath, [packageCli, ...args], {
@@ -68,7 +239,7 @@ for (const [label, alter, stage, category] of [
   ['Git failure with captured stderr', async () => {}, 'source_listing', 'deployment_git_failed'],
   ['existing output', f => mkdir(join(f.root, 'dist/package'), { recursive: true }), 'destination_create', 'filesystem_eexist'],
   ['unsafe traced directory link', f => symlink(join(f.root, 'public'), join(f.root, '.next/standalone/node_modules/unsafe'), 'junction'), 'standalone_copy', 'deployment_trace_link_unsafe'],
-  ['unsafe Sharp optional package content', f => f.put('node_modules/@img/sharp-synthetic/.env', 'private fixture'), 'package_inventory', 'deployment_artifact_unsafe'],
+  ['unsafe Sharp optional package content', f => f.put('node_modules/@img/sharp-synthetic/.env', 'private fixture'), 'sharp_dependencies', 'deployment_trace_link_unsafe'],
 ]) {
   test(`packaging fails closed and reports ${label}`, async () => {
     const fixture = await packageFixture();
