@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { readFileSync, readdirSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { posix } from "node:path";
+import { isDeepStrictEqual } from "node:util";
 import ts from "typescript";
 import yaml from "js-yaml";
 import { exception } from "./ci-audit.mjs";
@@ -149,7 +150,7 @@ export function checkWorkflow(text) {
     && JSON.stringify(workflow.on.push.branches) === JSON.stringify(["main", "release/**"])
     && workflow.on.pull_request === null, "CI trigger contract changed");
   requireContract(workflow.concurrency?.group === "ci-${{ github.ref }}" && workflow.concurrency["cancel-in-progress"] === true, "Missing ref concurrency");
-  requireContract(Object.keys(workflow.jobs).join() === "validate,native-linux-artifact", "Unexpected CI job");
+  requireContract(Object.keys(workflow.jobs).join() === "validate,native-linux-artifact,native-postgres-disposable-proof", "Unexpected CI job");
   const job = workflow.jobs.validate;
   requireContract(job["runs-on"] === "ubuntu-24.04" && job["timeout-minutes"] === 20
     && !job.permissions && !job.environment && !job.container, "Unexpected CI job authority/runtime");
@@ -198,6 +199,50 @@ export function checkWorkflow(text) {
     && artifact.steps.some(step => step.run === 'node scripts/ci-checks.mjs --environment-only')
     && artifact.steps.some(step => step.run?.includes('tar -czf') && step.run.includes('-C "$package" .') && step.run.includes('sha256sum')),
     'Native artifact install/archive contract');
+  checkDisposableProofJob(workflow);
+}
+
+function checkDisposableProofJob(workflow) {
+  // An exact allowlist also rejects step conditions, failure masking, services,
+  // target/env overrides and artifact uploads, including unexpected YAML keys.
+  const proof = workflow.jobs['native-postgres-disposable-proof'];
+  requireContract(!workflow.env && !workflow.defaults, 'Inherited disposable proof configuration denied');
+  const localDocker = `set -euo pipefail
+for key in $(compgen -e); do
+  case "$key" in
+    DOCKER_*|NODE_OPTIONS|NATIVE_P1_PROOF_*) echo 'Inherited Docker/proof configuration denied'; exit 1 ;;
+  esac
+done
+test -S /var/run/docker.sock
+test "$(docker context show)" = default
+test "$(docker context inspect default --format '{{.Endpoints.docker.Host}}')" = unix:///var/run/docker.sock
+test "$(docker --host unix:///var/run/docker.sock info --format '{{.OSType}}')" = linux`;
+  const prepareImage = `set -euo pipefail
+timeout 180s docker --host unix:///var/run/docker.sock pull postgres:17-alpine
+docker --host unix:///var/run/docker.sock image inspect postgres:17-alpine --format '{{.Id}}'`;
+  const expected = {
+    name: 'Disposable native PostgreSQL P1/P2 proof',
+    needs: 'validate',
+    if: "github.event_name == 'push' && github.ref == 'refs/heads/release/v1-hardening'",
+    'runs-on': 'ubuntu-24.04',
+    'timeout-minutes': 10,
+    permissions: {contents: 'read'},
+    env: {CI: 'true', NEXT_TELEMETRY_DISABLED: '1'},
+    steps: [
+      {name: 'Checkout', uses: 'actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803',
+        with: {'persist-credentials': false, 'fetch-depth': 2}},
+      {name: 'Setup Node', uses: 'actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38',
+        with: {'node-version': '24.21.0', cache: 'npm', 'cache-dependency-path': 'package-lock.json'}},
+      {name: 'Refuse inherited application configuration', run: 'node scripts/ci-checks.mjs --environment-only'},
+      {name: 'Verify local Linux Docker daemon', shell: 'bash', run: localDocker},
+      {name: 'Clean install', run: 'npm ci'},
+      {name: 'Prepare local PostgreSQL image before disposable tests', shell: 'bash', run: prepareImage},
+      {name: 'Disposable PostgreSQL P1 proof', run: 'node scripts/native-postgres-proof.mjs'},
+      {name: 'Disposable PostgreSQL P2 proof', run: 'node scripts/native-postgres-proof.mjs --p2'},
+    ],
+  };
+  const normalized = {...proof, steps: proof?.steps?.map(step => step.run ? {...step, run: step.run.trim()} : step)};
+  requireContract(isDeepStrictEqual(normalized, expected), 'Unsafe disposable PostgreSQL proof contract');
 }
 
 function git(...args) {

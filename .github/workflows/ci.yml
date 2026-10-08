@@ -139,3 +139,54 @@ jobs:
             dist/native-abi.json
           if-no-files-found: error
           retention-days: 7
+
+  native-postgres-disposable-proof:
+    name: Disposable native PostgreSQL P1/P2 proof
+    needs: validate
+    if: github.event_name == 'push' && github.ref == 'refs/heads/release/v1-hardening'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      CI: 'true'
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # official v6
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+      - name: Setup Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # official v6
+        with:
+          node-version: '24.21.0'
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Refuse inherited application configuration
+        run: node scripts/ci-checks.mjs --environment-only
+      - name: Verify local Linux Docker daemon
+        shell: bash
+        run: |
+          set -euo pipefail
+          for key in $(compgen -e); do
+            case "$key" in
+              DOCKER_*|NODE_OPTIONS|NATIVE_P1_PROOF_*) echo 'Inherited Docker/proof configuration denied'; exit 1 ;;
+            esac
+          done
+          test -S /var/run/docker.sock
+          test "$(docker context show)" = default
+          test "$(docker context inspect default --format '{{.Endpoints.docker.Host}}')" = unix:///var/run/docker.sock
+          test "$(docker --host unix:///var/run/docker.sock info --format '{{.OSType}}')" = linux
+      - name: Clean install
+        run: npm ci
+      - name: Prepare local PostgreSQL image before disposable tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout 180s docker --host unix:///var/run/docker.sock pull postgres:17-alpine
+          docker --host unix:///var/run/docker.sock image inspect postgres:17-alpine --format '{{.Id}}'
+      - name: Disposable PostgreSQL P1 proof
+        run: node scripts/native-postgres-proof.mjs
+      - name: Disposable PostgreSQL P2 proof
+        run: node scripts/native-postgres-proof.mjs --p2

@@ -76,6 +76,68 @@ for (const [label, mutate] of [
 test("workflow parses YAML and satisfies authority/stage contract", () => {
   checkWorkflow(readFileSync(".github/workflows/ci.yml", "utf8"));
 });
+for (const [label, mutate] of [
+  ['PR trigger', job => { job.if = "github.event_name == 'pull_request'"; }],
+  ['main trigger', job => { job.if = "github.event_name == 'push' && github.ref == 'refs/heads/main'"; }],
+  ['unconditional trigger', job => { job.if = 'always()'; }],
+  ['missing trigger', job => { delete job.if; }],
+  ['missing validate dependency', job => { delete job.needs; }],
+  ['other dependency', job => { job.needs = 'native-linux-artifact'; }],
+  ['self-hosted runner', job => { job['runs-on'] = 'self-hosted'; }],
+  ['other Ubuntu version', job => { job['runs-on'] = 'ubuntu-latest'; }],
+  ['unbounded runtime', job => { delete job['timeout-minutes']; }],
+  ['write permission', job => { job.permissions.contents = 'write'; }],
+  ['extra permission', job => { job.permissions['id-token'] = 'write'; }],
+  ['deployment environment', job => { job.environment = 'production'; }],
+  ['job failure masking', job => { job['continue-on-error'] = true; }],
+  ['job container', job => { job.container = 'postgres:17-alpine'; }],
+  ['service database', job => { job.services = {postgres: {image: 'postgres:17-alpine'}}; }],
+  ['Docker TCP override', job => { job.env.DOCKER_HOST = 'tcp://example.invalid:2375'; }],
+  ['Docker SSH override', job => { job.env.DOCKER_HOST = 'ssh://example.invalid'; }],
+  ['Docker context override', job => { job.env.DOCKER_CONTEXT = 'remote'; }],
+  ['external database target', job => { job.env.DATABASE_URL = 'postgresql://example.invalid/db'; }],
+  ['secret expression', job => { job.env.SUPABASE_SERVICE_ROLE_KEY = '${{ secrets.FORBIDDEN }}'; }],
+  ['Node preload', job => { job.env.NODE_OPTIONS = '--import=./unexpected.mjs'; }],
+  ['floating checkout action', job => { job.steps[0].uses = 'actions/checkout@v6'; }],
+  ['persisted checkout credentials', job => { job.steps[0].with['persist-credentials'] = true; }],
+  ['Node 22', job => { job.steps[1].with['node-version'] = '22.x'; }],
+  ['missing environment guard', job => { job.steps.splice(2, 1); }],
+  ['missing Docker guard', job => { job.steps.splice(3, 1); }],
+  ['removed Docker override rejection', job => { job.steps[3].run = job.steps[3].run.replace('DOCKER_*|', ''); }],
+  ['removed Linux check', job => { job.steps[3].run = job.steps[3].run.split('\n').slice(0, -2).join('\n'); }],
+  ['remote socket preparation', job => { job.steps[5].run = job.steps[5].run.replaceAll('unix:///var/run/docker.sock', 'tcp://example.invalid:2375'); }],
+  ['other image', job => { job.steps[5].run = job.steps[5].run.replaceAll('postgres:17-alpine', 'postgres:latest'); }],
+  ['unbounded image pull', job => { job.steps[5].run = job.steps[5].run.replace('timeout 180s ', ''); }],
+  ['missing local image inspect', job => { job.steps[5].run = job.steps[5].run.split('\n').slice(0, -2).join('\n'); }],
+  ['image preparation after proof', job => { [job.steps[5], job.steps[6]] = [job.steps[6], job.steps[5]]; }],
+  ['reversed P1/P2 order', job => { [job.steps[6], job.steps[7]] = [job.steps[7], job.steps[6]]; }],
+  ['omitted P2', job => { job.steps.pop(); }],
+  ['proof target argument', job => { job.steps[6].run += ' --target example.invalid'; }],
+  ['proof success replacement', job => { job.steps[6].run = 'echo success'; }],
+  ['proof failure masking', job => { job.steps[7]['continue-on-error'] = true; }],
+  ['conditional proof skip', job => { job.steps[6].if = 'false'; }],
+  ['step database target', job => { job.steps[7].env = {DATABASE_URL: 'postgresql://example.invalid/db'}; }],
+  ['step shell override', job => { job.steps[6].shell = 'bash {0}'; }],
+  ['privileged Docker', job => { job.steps.push({run: 'docker run --privileged postgres:17-alpine'}); }],
+  ['host network', job => { job.steps.push({run: 'docker run --network host postgres:17-alpine'}); }],
+  ['persistent volume', job => { job.steps.push({run: 'docker run -v pgdata:/var/lib/postgresql/data postgres:17-alpine'}); }],
+  ['credential artifact upload', job => { job.steps.push({uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02', with: {path: 'dump.sql'}}); }],
+]) {
+  test(`disposable PostgreSQL workflow rejects ${label}`, () => {
+    const workflow = yaml.load(readFileSync('.github/workflows/ci.yml', 'utf8'));
+    // YAML reserialization must pass before applying the attack mutation.
+    checkWorkflow(yaml.dump(workflow));
+    mutate(workflow.jobs['native-postgres-disposable-proof']);
+    assert.throws(() => checkWorkflow(yaml.dump(workflow)));
+  });
+}
+for (const key of ['env', 'defaults']) {
+  test(`disposable PostgreSQL workflow rejects inherited ${key}`, () => {
+    const workflow = yaml.load(readFileSync('.github/workflows/ci.yml', 'utf8'));
+    workflow[key] = key === 'env' ? {DOCKER_HOST: 'ssh://example.invalid'} : {run: {shell: 'bash {0}'}};
+    assert.throws(() => checkWorkflow(yaml.dump(workflow)), /Inherited disposable proof configuration denied/);
+  });
+}
 for (const provider of [undefined, "native", "invalid"]) {
   test(`workflow rejects typegen backend provider ${provider ?? "missing"}`, () => {
     const workflow = yaml.load(readFileSync(".github/workflows/ci.yml", "utf8"));
