@@ -98,8 +98,8 @@ jobs:
           BACKEND_PROVIDER: native
           DATABASE_URL: postgresql://mt_runtime:synthetic-build-only@127.0.0.1:1/mt_build
           DATABASE_SSL_MODE: verify-full
-          BETTER_AUTH_URL: https://app.example.invalid
-          NEXT_PUBLIC_APP_URL: https://app.example.invalid
+          BETTER_AUTH_URL: https://mediatracker.baglare.com.tr
+          NEXT_PUBLIC_APP_URL: https://mediatracker.baglare.com.tr
           BETTER_AUTH_SECRET: synthetic-build-auth-aaaaaaaaaaaaaaaaaaaaaaaa
           RATE_LIMIT_IDENTITY_HMAC_KEY: synthetic-build-identity-bbbbbbbbbbbbbbbbbbbb
           RATE_LIMIT_RPC_SIGNING_KEY: synthetic-build-signing-cccccccccccccccccccc
