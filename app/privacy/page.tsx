@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ShieldCheck } from "lucide-react";
+import { getBackendProvider } from "@/lib/backend/provider";
 
 export const metadata: Metadata = {
   title: "Kişisel Veriler ve Gizlilik | MediaTracker",
@@ -9,13 +10,19 @@ export const metadata: Metadata = {
 
 const CONTACT = "mediatracker.contact@gmail.com";
 
-const PROCESSING_GROUPS = [
+const processingGroups = (native: boolean) => [
   {
     title: "Hesap ve kimlik doğrulama",
-    data: "E-posta, hesap kimliği ve oturum bilgileri; girişte şifre işlenir, uygulama tablosunda tutulmaz.",
+    data: native
+      ? "E-posta, hesap kimliği ve oturum bilgileri; girişte şifre işlenir, şifre özeti ve oturum kayıtları Better Auth'un özel PostgreSQL şemasında tutulur."
+      : "E-posta, hesap kimliği ve oturum bilgileri; girişte şifre işlenir, uygulama tablosunda tutulmaz.",
     purpose: "Mevcut kullanıcıların girişini ve oturum güvenliğini sağlamak.",
-    method: "Giriş formu ve hesap/oturum SDK'sı; otomatik işlemler.",
-    destination: "Yapılandırılmış Supabase Auth ve isteklerin geçtiği Vercel; kimlik doğrulama hizmetleri.",
+    method: native
+      ? "Giriş formu, uygulamanın Better Auth uçları ve oturum çerezleri; otomatik işlemler."
+      : "Giriş formu ve hesap/oturum SDK'sı; otomatik işlemler.",
+    destination: native
+      ? "Better Auth, yapılandırılmış native PostgreSQL ve TürkHosting/Plesk/Passenger uygulama sunucusu; kimlik doğrulama işlemleri."
+      : "Yapılandırılmış Supabase Auth ve isteklerin geçtiği Vercel; kimlik doğrulama hizmetleri.",
   },
   {
     title: "Yerel kütüphane, ilerleme, notlar ve hedefler",
@@ -29,49 +36,63 @@ const PROCESSING_GROUPS = [
     data: "Kütüphane, ilerleme, not, hedef; eşitleme kuyruğu, revizyon ve silindi işaretleri.",
     purpose: "Talep ettiğiniz hesap kapsamlı eşitlemeyi yürütmek ve çakışmaları yönetmek.",
     method: "Etkinleştirilen Cloud yükleme/indirme ve otomatik eşitleme işlemleri.",
-    destination: "Tarayıcı ve yapılandırılmış Supabase Postgres; ilgili hizmet altyapısı.",
+    destination: native
+      ? "Tarayıcı, uygulama sunucusu ve yapılandırılmış native PostgreSQL; ilgili hizmet altyapısı."
+      : "Tarayıcı ve yapılandırılmış Supabase Postgres; ilgili hizmet altyapısı.",
   },
   {
     title: "Profil ve profil dosyaları",
     data: "Kullanıcı adı, görünen ad, bio, seçilen profil alanları, görünürlük, avatar/banner ve yayınlanan istatistikler.",
     purpose: "Profili düzenlemek ve açıkça yapılandırdığınız herkese açık alanları yayımlamak.",
     method: "Profil formu, kullanıcı dosya yüklemesi ve otomatik profil üretimi.",
-    destination: "Yerel tercihler, Vercel, Supabase Postgres/Storage; görünürlük kapsamında profil ziyaretçileri.",
+    destination: native
+      ? "Yerel tercihler, uygulama sunucusu ve native PostgreSQL; avatar/banner özel dosya sistemi depolamasında, erişim uygulama üzerinden denetlenir; görünürlük kapsamında profil ziyaretçileri."
+      : "Yerel tercihler, Vercel, Supabase Postgres/Storage; görünürlük kapsamında profil ziyaretçileri.",
   },
   {
     title: "Sosyal özellikler",
     data: "Takip/blok, aktivite, yorum, tepki, tavsiye mesajları, bildirim, rapor ve sosyal XP kayıtları.",
     purpose: "İstediğiniz sosyal etkileşimleri, bildirimleri ve ilerleme durumunu iletmek; raporları değerlendirmek.",
     method: "Sosyal etkileşimler ve otomatik olay/bildirim üretimi.",
-    destination: "Vercel, Supabase Postgres ve tarayıcı önbellek/kuyrukları; yetkili alıcılar ve görünürlük kapsamındaki kullanıcılar.",
+    destination: native
+      ? "Uygulama sunucusu, native PostgreSQL ve tarayıcı önbellek/kuyrukları; yetkili alıcılar ve görünürlük kapsamındaki kullanıcılar."
+      : "Vercel, Supabase Postgres ve tarayıcı önbellek/kuyrukları; yetkili alıcılar ve görünürlük kapsamındaki kullanıcılar.",
   },
   {
     title: "Tercihler ve temalar",
     data: "Görünüm, yerleşim, başlangıç, sosyal tercihler ve tema seçimleri.",
     purpose: "Seçtiğiniz görünümü uygulamak; kullanılan tema eşitlemesi ve profil tema yayınını yürütmek.",
     method: "Ayarlar girdisi, tarayıcı depolaması/çerezleri ve isteğe bağlı tema eşitlemesi; otomatik işlemler.",
-    destination: "Çoğunlukla tarayıcı; ilgili özellik kullanılırsa Supabase ve Vercel; yayınlanan tema için profil ziyaretçileri.",
+    destination: native
+      ? "Çoğunlukla tarayıcı; ilgili özellik kullanılırsa native PostgreSQL ve uygulama sunucusu; yayınlanan tema için profil ziyaretçileri."
+      : "Çoğunlukla tarayıcı; ilgili özellik kullanılırsa Supabase ve Vercel; yayınlanan tema için profil ziyaretçileri.",
   },
   {
     title: "Öneriler ve yerel AI durumu",
     data: "Öneri girdisi, seçilmiş kütüphane/bağlam, öneri oturumları, geri bildirim ve yerel AI tercihleri.",
     purpose: "Deterministik önerileri hesaplamak ve öneri oturumunu sürdürmek.",
     method: "Öneri girdisi ve otomatik hesaplama; tarayıcı depolaması ve sunucu isteği.",
-    destination: "Tarayıcı ve sunucu üzerinden hesaplamada Vercel; yerel-first kullanım her işlemin cihazda kaldığı anlamına gelmez.",
+    destination: native
+      ? "Tarayıcı ve sunucu üzerinden hesaplamada TürkHosting/Plesk/Passenger uygulama sunucusu; yerel-first kullanım her işlemin cihazda kaldığı anlamına gelmez."
+      : "Tarayıcı ve sunucu üzerinden hesaplamada Vercel; yerel-first kullanım her işlemin cihazda kaldığı anlamına gelmez.",
   },
   {
     title: "Sağlayıcı aramaları",
     data: "Arama sorgusu, sağlayıcı medya kimliği, alınan katalog bilgileri ve teknik istek bilgileri.",
     purpose: "İstediğiniz katalog aramasını yapmak, medya ayrıntısı/takvim bilgisi ve görsellerini göstermek.",
     method: "Arama girdisi ve otomatik ayrıntı/takvim/görsel istekleri.",
-    destination: "Vercel, TVMaze ve koşullu Open Library; kaydedilen sonuçlar tarayıcı/Cloud'da, görseller dış sunucularda.",
+    destination: native
+      ? "Uygulama sunucusu, TVMaze ve koşullu Open Library; kaydedilen sonuçlar tarayıcı/Cloud'da, görseller dış sunucularda."
+      : "Vercel, TVMaze ve koşullu Open Library; kaydedilen sonuçlar tarayıcı/Cloud'da, görseller dış sunucularda.",
   },
   {
     title: "Güvenlik ve kötüye kullanımın önlenmesi",
     data: "İstek kimliği, zaman, sabit rota, sonuç kodu; sınırlandırma için IP/kullanıcıdan türetilen takma adlı özetler ve raporlar.",
     purpose: "Rotaları kötüye kullanımdan korumak, yetki denetimi ve sınırlı güvenlik kaydı tutmak.",
     method: "Otomatik üretilen istek/güvenlik metadata'sı; kullanıcı rapor girdisi.",
-    destination: "Vercel, Supabase sınırlandırma/sosyal kayıtları; platformların kendi ağ/istek logları ayrıca bulunabilir.",
+    destination: native
+      ? "Uygulama sunucusu, native PostgreSQL sınırlandırma/sosyal kayıtları; barındırma ve ağ altyapısının kendi istek logları ayrıca bulunabilir."
+      : "Vercel, Supabase sınırlandırma/sosyal kayıtları; platformların kendi ağ/istek logları ayrıca bulunabilir.",
   },
   {
     title: "Destek ve gizlilik başvuruları",
@@ -94,6 +115,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 export default function PrivacyPage() {
+  const native = getBackendProvider() === "native";
   return (
     <div className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6 sm:py-10">
       <header className="mb-6 rounded-2xl border border-[var(--app-border)] bg-[var(--app-panel-bg)] p-5 sm:p-7">
@@ -137,9 +159,17 @@ export default function PrivacyPage() {
           </p>
           <p>
             MediaTracker’ın v1 arayüzünde yeni hesap oluşturma akışı sunulmaz. Mevcut yetkili hesaplar giriş yapabilir.
-            Barındırılan Auth hizmetinde yeni kayıtların kapatılması ayrıca bir yayın yapılandırması gereğidir;
-            bu sayfa canlı Auth ayarlarının doğrulandığı anlamına gelmez.
+            {native
+              ? "Native modda Better Auth yeni kayıt işlemleri kaynak kodunda kapalıdır; bu sayfa canlı Auth ayarlarının veya gerçek veritabanı kabulünün doğrulandığı anlamına gelmez."
+              : "Barındırılan Auth hizmetinde yeni kayıtların kapatılması ayrıca bir yayın yapılandırması gereğidir; bu sayfa canlı Auth ayarlarının doğrulandığı anlamına gelmez."}
           </p>
+          {native && (
+            <p>
+              Bu dağıtım için seçilen native mimari aşağıda açıklanır. Supabase alternatifi korunmaktadır;
+              native production geçişi henüz tamamlanmamıştır. Gerçek veritabanı, kimlik doğrulama ve erişim
+              denetimlerinin kabulü ile sağlayıcı veri bölgesi ve yedekleme koşulları henüz doğrulanmamıştır.
+            </p>
+          )}
         </Section>
 
         <Section title="İşlenen veriler, amaçlar ve toplama yöntemi">
@@ -149,7 +179,7 @@ export default function PrivacyPage() {
             insan incelemesini de içerir. Yerel depolama, isteğe bağlı Cloud ve dış servislere giden istekler ayrı akışlardır.
           </p>
           <div className="space-y-5">
-            {PROCESSING_GROUPS.map((group) => (
+            {processingGroups(native).map((group) => (
               <div key={group.title} className="border-t border-[var(--app-border)] pt-4">
                 <h3 className="font-semibold text-[var(--app-text-primary)]">{group.title}</h3>
                 <dl className="mt-2 space-y-2">
@@ -180,7 +210,10 @@ export default function PrivacyPage() {
 
         <Section title="Alıcılar, dış servisler ve yurt dışı işleme">
           <p>
-            Supabase hesap, veritabanı ve dosya hizmetlerinde; Vercel barındırma ve sunucu işlemlerinde kullanılır.
+            {native
+              ? "Better Auth kimlik doğrulamada, native PostgreSQL hesap ve uygulama verilerinde, özel dosya sistemi avatar/banner depolamasında kullanılır. TürkHosting/Plesk/Passenger barındırma ve sunucu işlemleri için seçilmiştir."
+              : "Supabase hesap, veritabanı ve dosya hizmetlerinde; Vercel barındırma ve sunucu işlemlerinde kullanılır."}
+            {" "}
             Talep e-postaları operatörün Gmail posta altyapısında işlenir. Profil ve sosyal içerik, seçilen
             görünürlük veya etkileşim kapsamında ilgili kullanıcılara gösterilebilir. Bu servislerin hukuki
             rol sınıflandırması ayrıca incelenmelidir.
@@ -193,12 +226,16 @@ export default function PrivacyPage() {
           </p>
           <p>
             AniList ve TMDB canlı API erişimi v1 kodunda kapalıdır; OMDb public API erişimi kapalıdır. Eski kayıtlardaki
-            metadata veya kapak URL’leri korunabilir. Sağlayıcı/CDN görselleri ve Supabase imzalı profil dosyaları
-            tarayıcıdan doğrudan çağrılabilir; API’nin kapalı olması görsel sunucusuna isteği engellemez.
+            metadata veya kapak URL’leri korunabilir. {native
+              ? "Sağlayıcı/CDN görselleri tarayıcıdan doğrudan çağrılabilir; native profil dosyaları ise uygulamanın erişim denetimli dosya uçları üzerinden sunulur, özel depolama doğrudan herkese açık değildir."
+              : "Sağlayıcı/CDN görselleri ve Supabase imzalı profil dosyaları tarayıcıdan doğrudan çağrılabilir;"}
+            {" "}API’nin kapalı olması görsel sunucusuna isteği engellemez.
           </p>
           <p>
-            Vercel, Supabase, posta ve diğer dış servisler gerçek altyapı/yapılandırmaya göre Türkiye dışında veri
-            işleyebilir. Tarayıcıdan doğrudan dış sunuculara yapılan istekler IP ve istek metadata’sını o sunucuya
+            {native
+              ? "TürkHosting adı verilerin yalnız Türkiye'de işlendiğini göstermez. Barındırma, veritabanı, dosya depolaması, posta ve diğer dış servisler gerçek altyapı/yapılandırmaya göre Türkiye dışında veri işleyebilir."
+              : "Vercel, Supabase, posta ve diğer dış servisler gerçek altyapı/yapılandırmaya göre Türkiye dışında veri işleyebilir."}
+            {" "}Tarayıcıdan doğrudan dış sunuculara yapılan istekler IP ve istek metadata’sını o sunucuya
             gösterebilir. Kesin bölge, platform logları ve saklama koşulları uygulama kaynak koduyla belirlenemez.
             Yurt dışı aktarım için madde 9 mekanizması ayrı operatör/hukuk kanıtı gerektirir; henüz kesinleştirilmemiştir.
           </p>
@@ -298,6 +335,13 @@ export default function PrivacyPage() {
             yedeği/loglarının silinmesiyle aynı değildir. Platform logları kendi koşullarına tabidir. Destek posta
             kutusu ve diğer kesinleşmemiş süreler için ayrı saklama politikası operatör tarafından tamamlanmalıdır.
           </p>
+          {native && (
+            <p>
+              Native PostgreSQL ve özel dosya depolaması için gerçek yedekleme/geri yükleme kabulü ve yedek
+              saklama süreleri henüz doğrulanmamıştır. Barındırma loglarının saklama süresi de kesinleşmemiştir;
+              özel dosya depolaması yedeklerin veya logların silindiğine ilişkin garanti değildir.
+            </p>
+          )}
         </Section>
 
         <Section title="Dışa aktarma, yerel kontrol ve hesap silme sınırları">

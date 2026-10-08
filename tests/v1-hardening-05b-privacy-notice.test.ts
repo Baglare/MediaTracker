@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import PrivacyPage, { metadata } from "@/app/privacy/page";
 
 vi.mock("next/link", () => ({
@@ -15,9 +15,47 @@ const markup = () => {
   vi.stubGlobal("React", React);
   return renderToStaticMarkup(React.createElement(PrivacyPage));
 };
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
+});
 
-describe("05B public factual notice and manual request procedure", () => {
+describe.each(["supabase", "native"] as const)("05B public factual notice and manual request procedure (%s)", (provider) => {
+  beforeEach(() => {
+    vi.stubEnv("BACKEND_PROVIDER", provider);
+    vi.stubEnv("NEXT_PUBLIC_BACKEND_PROVIDER", provider);
+  });
+
+  it("renders the selected architecture without substituting another backend or implying live acceptance", () => {
+    const html = markup();
+    const groups = html.split("İşlenen veriler, amaçlar ve toplama yöntemi</h2>")[1].split("</section>")[0];
+    const recipients = html.split("Alıcılar, dış servisler ve yurt dışı işleme</h2>")[1].split("</section>")[0];
+    if (provider === "native") {
+      for (const phrase of ["Better Auth", "şifre özeti ve oturum kayıtları", "özel PostgreSQL şemasında", "oturum çerezleri", "native PostgreSQL", "TürkHosting/Plesk/Passenger", "özel dosya sistemi", "erişim uygulama üzerinden denetlenir"]) expect(groups).toContain(phrase);
+      expect(groups).not.toMatch(/Supabase|Vercel/);
+      // All eight server-processing groups must identify their selected destination.
+      expect(groups.match(/<dd>[^<]*native PostgreSQL/g)).toHaveLength(6);
+      expect(groups.match(/<dd>[^<]*uygulama sunucusu/gi)).toHaveLength(8);
+      expect(recipients).toContain("erişim denetimli dosya uçları");
+      expect(recipients).toContain("özel depolama doğrudan herkese açık değildir");
+      expect(recipients).not.toMatch(/Supabase|Vercel/);
+      for (const phrase of ["Supabase alternatifi korunmaktadır", "production geçişi henüz tamamlanmamıştır", "gerçek veritabanı kabulünün", "kabulü ile sağlayıcı veri bölgesi", "yedekleme koşulları henüz doğrulanmamıştır", "yalnız Türkiye&#x27;de işlendiğini göstermez", "yedek saklama süreleri henüz doğrulanmamıştır", "loglarının saklama süresi de kesinleşmemiştir"]) expect(html).toContain(phrase);
+    } else {
+      for (const phrase of ["Supabase Auth", "şifre işlenir, uygulama tablosunda tutulmaz", "Supabase Postgres/Storage", "Supabase sınırlandırma/sosyal kayıtları", "Vercel"]) expect(groups).toContain(phrase);
+      expect(recipients).toContain("Supabase imzalı profil dosyaları");
+      expect(recipients).toContain("Vercel, Supabase, posta ve diğer dış servisler");
+      expect(html).not.toMatch(/Better Auth|native PostgreSQL|TürkHosting|Plesk|Passenger|özel dosya sistemi/);
+    }
+    for (const phrase of ["TVMaze", "Open Library", "Gmail", "Sağlayıcı/CDN görselleri", "tarayıcıdan doğrudan", "IP ve istek metadata"]) expect(html).toContain(phrase);
+    expect(html).not.toMatch(/tüm veriler Türkiye|loglar \d+ gün|yedekler \d+ gün|KVKK uyumlu/i);
+  });
+
+  it("uses the existing selector's fail-closed configuration checks", () => {
+    vi.stubEnv("NEXT_PUBLIC_BACKEND_PROVIDER", provider === "native" ? "supabase" : "native");
+    expect(markup).toThrow("backend_configuration_invalid");
+    vi.stubEnv("BACKEND_PROVIDER", "unknown");
+    expect(markup).toThrow("backend_configuration_invalid");
+  });
   it("renders without an account, request context or network and retains public navigation", () => {
     const html = markup();
     expect(metadata.title).toBe("Kişisel Veriler ve Gizlilik | MediaTracker");
