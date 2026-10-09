@@ -7,6 +7,7 @@ import { pathToFileURL } from 'node:url';
 import { nativeMigrationSteps } from './native-migrations.mjs';
 import { startDisposableRelay, validateDisposableTarget, verifyDisposableRelay } from './native-disposable-relay.mjs';
 import { Client } from 'pg';
+import { performance } from 'node:perf_hooks';
 const p2 = process.argv[2] === '--p2';
 if (process.argv.slice(2).some(arg => arg !== '--p2') || process.argv.length > 3) throw new Error('proof_target_arguments_denied');
 const image = 'postgres:17-alpine';
@@ -44,6 +45,41 @@ function p2Sql(sql) {
   return r.stdout;
 }
 const password=randomBytes(32).toString('hex');
+async function waitForDatabase() {
+  // Preserve the old maximum budget (20 * (3000ms + 250ms)), but enforce
+  // a wall-clock deadline. The entrypoint's socket-only init server cannot
+  // answer an authenticated query through this verified TCP relay.
+  const deadline=performance.now()+65000;
+  while(!interrupted && performance.now()<deadline) {
+    const timeout=Math.max(1,Math.min(3000,Math.ceil(deadline-performance.now())));
+    const client=new Client({host:'127.0.0.1',port:relay.descriptor.port,
+      user:'postgres',password,database:'mt_p1_proof',ssl:false,
+      connectionTimeoutMillis:timeout,query_timeout:timeout});
+    let ready=false,timedOut=false;
+    // Network errors between connect/query/end invalidate this attempt without
+    // escaping as raw errors or becoming an unhandled EventEmitter error.
+    client.on('error',()=>{ready=false;});
+    const timer=setTimeout(()=>{timedOut=true;client.connection.stream.destroy();},timeout);
+    try {
+      await client.connect();
+      const result=await client.query('SELECT 1 AS ready');
+      ready=result.rows.length===1 && result.rows[0].ready===1;
+    } catch {
+      // Startup refusal, shutdown and authentication/database-not-yet-ready
+      // failures are retried only within the fixed deadline.
+    } finally {
+      // Register end's completion before destroying the probe socket, including
+      // failed handshakes and stalled queries; never retain a failed client.
+      const ending=client.end();
+      client.connection.stream.destroy();
+      try {await ending;} finally {clearTimeout(timer);}
+    }
+    if(ready && !timedOut && !interrupted && performance.now()<deadline) return;
+    const remaining=deadline-performance.now();
+    if(!interrupted && remaining>0) await new Promise(resolve=>setTimeout(resolve,Math.min(250,remaining)));
+  }
+  throw new Error('database_not_ready');
+}
 try {
   // Context inspection reads local CLI metadata without contacting an engine.
   // Pin every subsequent command to a recognized local socket, never an
@@ -72,14 +108,10 @@ try {
   validateDisposableTarget(inspect,net,identity);
   stage='RELAY_START';
   relay=await startDisposableRelay(identity);
+  stage='RELAY_VALIDATION';
+  await verifyDisposableRelay(identity,relay.proof,'127.0.0.1',relay.descriptor.port);
   stage='DATABASE_READY';
-  let ready=false;
-  for(let i=0;i<20;i++) {
-    const r=spawnSync('docker',['--host',localEndpoint,'exec',id,'pg_isready','-U','postgres','-d','mt_p1_proof'],{env:dockerEnv,timeout:3000,stdio:'ignore'});
-    if(r.status===0){ready=true;break;}
-    await new Promise(resolve=>setTimeout(resolve,250));
-  }
-  if(!ready) throw new Error('BLOCKED_ENVIRONMENT');
+  await waitForDatabase();
   stage='SQL_PROOF';
   let output;
   if(p2) {
