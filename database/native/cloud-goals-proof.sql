@@ -14,15 +14,15 @@ DECLARE r jsonb; replay jsonb;
   goal jsonb := '{"id":"goal-a","title":"Synthetic goal","origin":"manual","lifecycle":"active","scope":{},"metric":{},"schedule":{},"createdAt":"2026-10-07T00:00:00Z","updatedAt":"2026-10-07T00:00:00Z"}';
 BEGIN
   r:=app.apply_media_item_sync_operation('p2-create-media','shared-local-id','upsert',0,payload);
-  IF r->>'reason'<>'created' OR (r->>'revision')::integer<>1 THEN RAISE EXCEPTION 'native_create_failed'; END IF;
+  IF r->>'reason' IS DISTINCT FROM 'created' OR (r->>'revision')::integer IS DISTINCT FROM 1 THEN RAISE EXCEPTION 'native_create_failed'; END IF;
   replay:=app.apply_media_item_sync_operation('p2-create-media','shared-local-id','upsert',0,payload);
-  IF replay<>r THEN RAISE EXCEPTION 'native_receipt_failed'; END IF;
+  IF replay IS DISTINCT FROM r THEN RAISE EXCEPTION 'native_receipt_failed'; END IF;
   r:=app.apply_media_item_sync_operation('p2-media-conflict','shared-local-id','delete',0,NULL);
-  IF r->>'reason'<>'revision_mismatch' THEN RAISE EXCEPTION 'native_cas_failed'; END IF;
+  IF r->>'reason' IS DISTINCT FROM 'revision_mismatch' THEN RAISE EXCEPTION 'native_cas_failed'; END IF;
   r:=app.apply_cloud_goal_v1('cccccccc-cccc-4ccc-8ccc-cccccccccccc','goal-a',0,goal,false);
-  IF r->>'status'<>'applied' OR (r->>'revision')::integer<>1 THEN RAISE EXCEPTION 'native_goal_failed'; END IF;
+  IF r->>'status' IS DISTINCT FROM 'applied' OR (r->>'revision')::integer IS DISTINCT FROM 1 THEN RAISE EXCEPTION 'native_goal_failed'; END IF;
   replay:=app.apply_cloud_goal_v1('cccccccc-cccc-4ccc-8ccc-cccccccccccc','goal-a',0,goal,false);
-  IF replay->>'status'<>'idempotent_replay' THEN RAISE EXCEPTION 'native_goal_receipt_failed'; END IF;
+  IF replay->>'status' IS DISTINCT FROM 'idempotent_replay' THEN RAISE EXCEPTION 'native_goal_receipt_failed'; END IF;
   IF has_table_privilege(current_user,'native_auth."user"','DELETE')
     OR has_table_privilege(current_user,'native_auth."user"','INSERT')
     OR has_function_privilege(current_user,'app.transition_account(uuid,text,text)','EXECUTE')

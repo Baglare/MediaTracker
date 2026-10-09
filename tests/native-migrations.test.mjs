@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { nativeMigrationManifest, nativeMigrationPlan } from '../scripts/native-migrations.mjs';
+import { nativeMigrationManifest, nativeMigrationPlan, nativeMigrationSteps } from '../scripts/native-migrations.mjs';
 test('native ledger is explicit, checksum checked, transactional and has no connection target', () => {
   const manifest = nativeMigrationManifest();
   assert.equal(manifest.length,9);
@@ -15,6 +15,29 @@ test('native ledger is explicit, checksum checked, transactional and has no conn
   assert.throws(()=>nativeMigrationPlan([{...manifest[0],sql:manifest[0].sql+'\n'}]),/native_migration_invalid/);
   assert.throws(()=>nativeMigrationPlan([{...manifest[0],name:"001_bad';DROP.sql"}]),/native_migration_invalid/);
   assert.doesNotMatch(readFileSync('scripts/native-migrations.mjs','utf8'),/\b(?:Pool|DATABASE_URL|SUPABASE_URL|fetch\()\b/);
+});
+
+test('granular migration steps retain checksums, order, ledger and transaction boundaries', () => {
+  const manifest=nativeMigrationManifest(),steps=nativeMigrationSteps(manifest);
+  assert.deepEqual(steps.map(step=>step.name),['LEDGER_SETUP',...manifest.map(entry=>entry.name)]);
+  assert.equal(steps.map(step=>step.sql).join(''),nativeMigrationPlan(manifest));
+  for(const [i,step] of steps.slice(1).entries()) {
+    assert.match(step.sql,/^BEGIN;/);
+    assert.equal((step.sql.match(/^BEGIN;$/gm)??[]).length,1);
+    assert.equal((step.sql.match(/^COMMIT;$/gm)??[]).length,1);
+    assert.ok(step.sql.includes(manifest[i].checksum));
+    assert.ok(step.sql.indexOf('\\gexec')<step.sql.indexOf('INSERT INTO native_migrations.ledger'));
+    assert.ok(step.sql.endsWith('COMMIT;\n'));
+  }
+});
+
+test('P2 functional assertions reject null or absent result fields', () => {
+  const proof=readFileSync('database/native/cloud-goals-proof.sql','utf8');
+  for(const expected of ['created','revision_mismatch','applied','idempotent_replay']) {
+    assert.ok(proof.includes(`IS DISTINCT FROM '${expected}'`));
+  }
+  assert.equal((proof.match(/::integer IS DISTINCT FROM 1/g)??[]).length,2);
+  assert.match(proof,/replay IS DISTINCT FROM r/);
 });
 test('native account admission denies runtime identity recreation and operator impersonation', () => {
   const sql=readFileSync('database/native/003_account_admission.sql','utf8');

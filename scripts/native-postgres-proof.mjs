@@ -4,7 +4,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { randomUUID, randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
-import { nativeMigrationPlan } from './native-migrations.mjs';
+import { nativeMigrationSteps } from './native-migrations.mjs';
 import { startDisposableRelay, validateDisposableTarget, verifyDisposableRelay } from './native-disposable-relay.mjs';
 import { Client } from 'pg';
 const p2 = process.argv[2] === '--p2';
@@ -29,6 +29,20 @@ function docker(args, input) {
 }
 let id, network, relay;
 let stage='DOCKER_CONTEXT';
+let sqlstate;
+// Only fixed PostgreSQL codes from SQLSTATE-only psql errors may leave the runner.
+const allowedSqlstates=new Set(['42601','42501','42883','42P01','42703','42704','42P07','42710','42804','42P13','42P17','23502','23503','23505','23514','22023','22P02','40001','40P01','55P03','57014','P0001']);
+function p2Sql(sql) {
+  if(!localEndpoint || interrupted) throw new Error('proof_interrupted');
+  const r=spawnSync('docker',['--host',localEndpoint,'exec','-i',id,'psql','-X','-v','ON_ERROR_STOP=1','-v','VERBOSITY=sqlstate','-U','postgres','-d','mt_p1_proof'],
+    {input:sql,env:dockerEnv,encoding:'utf8',timeout:15000});
+  if(r.status!==0 || r.error || r.signal) {
+    const codes=[...(r.stderr??'').matchAll(/^ERROR:\s+([0-9A-Z]{5})\s*$/gm)].map(match=>match[1]);
+    if(r.status===3 && !r.error && !r.signal && codes.length===1 && allowedSqlstates.has(codes[0])) sqlstate=codes[0];
+    throw new Error('proof_failed');
+  }
+  return r.stdout;
+}
 const password=randomBytes(32).toString('hex');
 try {
   // Context inspection reads local CLI metadata without contacting an engine.
@@ -67,12 +81,26 @@ try {
   }
   if(!ready) throw new Error('BLOCKED_ENVIRONMENT');
   stage='SQL_PROOF';
-  const sql=p2 ? nativeMigrationPlan() + '\n' + readFileSync(new URL('../database/native/cloud-goals-proof.sql',import.meta.url),'utf8')
-    : ['001_security_foundation.sql','002_better_auth.sql','rls-proof.sql']
+  let output;
+  if(p2) {
+    for(const step of nativeMigrationSteps()) {
+      stage=step.name==='LEDGER_SETUP' ? 'P2_LEDGER_SETUP' : `P2_MIGRATION_${step.name.slice(0,3)}`;
+      p2Sql(step.sql);
+      console.log(`PASS: disposable proof; stage=${stage}`);
+    }
+    stage='P2_FUNCTIONAL_PROOF';
+    output=p2Sql(readFileSync(new URL('../database/native/cloud-goals-proof.sql',import.meta.url),'utf8'));
+    if(!output.includes('P2_CLOUD_GOALS_PROOF_PASS')) throw new Error('proof_failed');
+    console.log(`PASS: disposable proof; stage=${stage}`);
+    stage='P2_RUNTIME_PASSWORD';
+    p2Sql(`ALTER ROLE mt_runtime PASSWORD '${password}';`);
+  } else {
+  const sql=['001_security_foundation.sql','002_better_auth.sql','rls-proof.sql']
     .map(file=>readFileSync(new URL(`../database/native/${file}`,import.meta.url),'utf8')).join('\n');
-  const output=docker(['exec','-i',id,'psql','-X','-v','ON_ERROR_STOP=1','-U','postgres','-d','mt_p1_proof'],
+  output=docker(['exec','-i',id,'psql','-X','-v','ON_ERROR_STOP=1','-U','postgres','-d','mt_p1_proof'],
     sql+`\nALTER ROLE mt_runtime PASSWORD '${password}';`);
   if(!output.includes(p2 ? 'P2_CLOUD_GOALS_PROOF_PASS' : 'P1_RLS_PROOF_PASS')) throw new Error('proof_failed');
+  }
   stage='RELAY_VALIDATION';
   const databaseUrl=`postgresql://mt_runtime:${password}@127.0.0.1:${relay.descriptor.port}/mt_p1_proof`;
   await verifyDisposableRelay(identity,relay.proof,'127.0.0.1',relay.descriptor.port);
@@ -97,7 +125,7 @@ try {
   console.log('PASS: real disposable PostgreSQL RLS, Better Auth and pg transaction proof');
   }
 } catch {
-  console.error(`${id?'FAIL: disposable proof':'BLOCKED_ENVIRONMENT: disposable proof'}; stage=${stage}; diagnostics redacted`);
+  console.error(`${id?'FAIL: disposable proof':'BLOCKED_ENVIRONMENT: disposable proof'}; stage=${stage}${sqlstate?`; sqlstate=${sqlstate}`:''}; diagnostics redacted`);
   process.exitCode=1;
 } finally {
   cleaning=true;

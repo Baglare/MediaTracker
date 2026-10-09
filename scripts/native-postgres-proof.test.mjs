@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
 import { EventEmitter } from 'node:events';
 import { validateDisposableTarget } from './native-disposable-relay.mjs';
+import { nativeMigrationSteps } from './native-migrations.mjs';
 
 // Exercise the actual runner with inert process boundaries; never contact Docker/DB.
 const source=readFileSync(new URL('./native-postgres-proof.mjs',import.meta.url),'utf8')
@@ -11,8 +12,9 @@ const source=readFileSync(new URL('./native-postgres-proof.mjs',import.meta.url)
   .replaceAll('import.meta.url',"'file:///synthetic/scripts/native-postgres-proof.mjs'");
 const id='a'.repeat(64),network='b'.repeat(64),name=`mt-p1-${'c'.repeat(36)}`;
 const privateDiagnostic='synthetic-private-diagnostic';
-async function run({fail,mutate=()=>{},p2=false,endpoint='unix:///var/run/docker.sock',interrupt=false}={}) {
+async function run({fail,sqlFailure,sqlStatus=3,sqlSignal=null,sqlSpawnError,sqlError=`ERROR:  42601\n${privateDiagnostic}`,missingProof=false,mutate=()=>{},p2=false,endpoint='unix:///var/run/docker.sock',interrupt=false}={}) {
   const calls=[],logs=[];
+  let sqlCall=0;
   const target={Id:id,State:{Running:true},Name:`/${name}`,Config:{Labels:{'mt.p1.proof':name}},
     HostConfig:{NetworkMode:name,Privileged:false,PublishAllPorts:false,PortBindings:{}},NetworkSettings:{Ports:{'5432/tcp':null},Networks:{[name]:{NetworkID:network,IPAddress:'172.20.0.2'}}},
     Mounts:[{Type:'tmpfs',Destination:'/var/lib/postgresql/data'}]};
@@ -31,7 +33,11 @@ async function run({fail,mutate=()=>{},p2=false,endpoint='unix:///var/run/docker
     if(key==='run --detach') response.stdout=id;
     if(key===`inspect ${id}`) response.stdout=JSON.stringify([target]);
     if(key==='network inspect') response.stdout=JSON.stringify([net]);
-    if(key==='exec -i') response.stdout=p2?'P2_CLOUD_GOALS_PROOF_PASS':'P1_RLS_PROOF_PASS';
+    if(key==='exec -i') {
+      sqlCall++;
+      if(sqlCall===sqlFailure) return {...response,status:sqlStatus,signal:sqlSignal,error:sqlSpawnError,stdout:privateDiagnostic,stderr:sqlError};
+      response.stdout=missingProof ? '' : p2?'P2_CLOUD_GOALS_PROOF_PASS':'P1_RLS_PROOF_PASS';
+    }
     return response;
   };
   await runInNewContext(`(async()=>{${source}\n})()`,{
@@ -40,7 +46,7 @@ async function run({fail,mutate=()=>{},p2=false,endpoint='unix:///var/run/docker
     verifyDisposableRelay:async()=>{calls.push({key:'relay verify'});if(fail==='relay verify')throw Error('redacted');},
     Client:class {async connect(){calls.push({key:'pg connect'});if(fail==='pg connect')throw Error('redacted');}async query(){}async end(){calls.push({key:'pg end'});}},
     spawn:(command,args,options)=>{calls.push({key:'auth',args:Array.from(args),options});const child=new EventEmitter();child.kill=signal=>{assert.equal(signal,'SIGKILL');queueMicrotask(()=>child.emit('close',null));};queueMicrotask(()=>interrupt?process.emit('SIGTERM'):child.emit('close',fail==='auth'?1:0));return child;},randomUUID:()=>name.slice(6),randomBytes:()=>({toString:()=>privateDiagnostic}),
-    readFileSync:()=>privateDiagnostic,nativeMigrationPlan:()=>privateDiagnostic,
+    readFileSync:()=>privateDiagnostic,nativeMigrationSteps,
     pathToFileURL:()=>({href:'file:///synthetic/offline.mjs'}),setTimeout:resolve=>resolve(),
     console:{log:line=>logs.push(line),error:line=>logs.push(line)},
   });
@@ -125,9 +131,62 @@ test('interruption kills Vitest and closes relay before Docker cleanup',async()=
   assert.equal(result.process.exitCode,1);
   assert.deepEqual(result.calls.slice(-3).map(c=>c.key),['relay close','rm --force','network rm']);
 });
+const p2PassStages=['P2_LEDGER_SETUP',...Array.from({length:9},(_,i)=>`P2_MIGRATION_${String(i+1).padStart(3,'0')}`),'P2_FUNCTIONAL_PROOF'];
 test('P2 rejects an unverified relay and cleans every owned resource',async()=>{
   const result=await run({p2:true,fail:'relay verify'});
   assert.equal(result.process.exitCode,1);
-  assert.deepEqual(result.logs,['FAIL: disposable proof; stage=RELAY_VALIDATION; diagnostics redacted']);
+  assert.deepEqual(result.logs,[...p2PassStages.map(stage=>`PASS: disposable proof; stage=${stage}`),'FAIL: disposable proof; stage=RELAY_VALIDATION; diagnostics redacted']);
   assert.deepEqual(result.calls.slice(-3).map(c=>c.key),['relay close','rm --force','network rm']);
 });
+
+for(const [index,stage] of p2PassStages.entries()) {
+  test(`P2 failure identifies ${stage}, stops execution and never marks it PASS`,async()=>{
+    const result=await run({p2:true,sqlFailure:index+1});
+    assert.equal(result.process.exitCode,1);
+    assert.deepEqual(result.logs,[...p2PassStages.slice(0,index).map(s=>`PASS: disposable proof; stage=${s}`),
+      `FAIL: disposable proof; stage=${stage}; sqlstate=42601; diagnostics redacted`]);
+    assert.equal(result.calls.filter(call=>call.key==='exec -i').length,index+1);
+    assert.deepEqual(result.calls.slice(-3).map(call=>call.key),['relay close','rm --force','network rm']);
+    assert.ok(!result.calls.some(call=>call.key==='relay verify' || call.key==='auth'));
+  });
+}
+for(const sqlError of [`ERROR:  ZZ999\n${privateDiagnostic}`,`ERROR:  42601 ${privateDiagnostic}`,privateDiagnostic,'ERROR:  42601\nERROR:  42501']) {
+  test(`P2 suppresses unknown, malformed or ambiguous SQLSTATE diagnostics (${sqlError.slice(0,12)})`,async()=>{
+    const result=await run({p2:true,sqlFailure:2,sqlError});
+    assert.equal(result.process.exitCode,1);
+    assert.equal(result.logs.at(-1),'FAIL: disposable proof; stage=P2_MIGRATION_001; diagnostics redacted');
+  });
+}
+test('P2 functional proof cannot pass on a zero exit without its success sentinel',async()=>{
+  const result=await run({p2:true,missingProof:true});
+  assert.equal(result.process.exitCode,1);
+  assert.equal(result.logs.at(-1),'FAIL: disposable proof; stage=P2_FUNCTIONAL_PROOF; diagnostics redacted');
+  assert.ok(!result.logs.includes('PASS: disposable proof; stage=P2_FUNCTIONAL_PROOF'));
+});
+test('P2 password failure is separate from migrations and functional proof',async()=>{
+  const result=await run({p2:true,sqlFailure:12,sqlError:'ERROR:  42501'});
+  assert.equal(result.process.exitCode,1);
+  assert.equal(result.logs.at(-1),'FAIL: disposable proof; stage=P2_RUNTIME_PASSWORD; sqlstate=42501; diagnostics redacted');
+});
+test('P2 sends the actual ordered transactional plans and preserves SQLSTATE-only diagnostics',async()=>{
+  const result=await run({p2:true}),calls=result.calls.filter(call=>call.key==='exec -i');
+  const steps=nativeMigrationSteps();
+  for(const [i,step] of steps.entries()) {
+    assert.equal(calls[i].options.input,step.sql);
+    assert.ok(calls[i].args.includes('ON_ERROR_STOP=1'));
+    assert.ok(calls[i].args.includes('VERBOSITY=sqlstate'));
+    assert.equal(calls[i].options.timeout,15000);
+  }
+  assert.equal(calls.length,12);
+  assert.deepEqual(result.logs.slice(0,11),p2PassStages.map(stage=>`PASS: disposable proof; stage=${stage}`));
+});
+for(const failure of [{sqlStatus:null,sqlSignal:'SIGTERM'},{sqlStatus:0,sqlSpawnError:Error(privateDiagnostic)},{sqlStatus:1}]) {
+  test('P2 transport and timeout failures cannot emit PASS or untrusted SQLSTATE',async()=>{
+    const result=await run({p2:true,sqlFailure:6,...failure});
+    assert.equal(result.process.exitCode,1);
+    assert.equal(result.logs.at(-1),'FAIL: disposable proof; stage=P2_MIGRATION_005; diagnostics redacted');
+    assert.ok(!result.logs.includes('PASS: disposable proof; stage=P2_MIGRATION_005'));
+    assert.equal(result.calls.filter(call=>call.key==='exec -i').length,6);
+    assert.deepEqual(result.calls.slice(-3).map(call=>call.key),['relay close','rm --force','network rm']);
+  });
+}
