@@ -17,7 +17,7 @@
   },
   {
     "name": "005_social_xp_themes.sql",
-    "checksum": "9134a3174ca19f88b1f7c4e129d809d938396a570d40d334f187f8bcb5396999"
+    "checksum": "28c9848b22ec6bcbd1e12bbeb6ca3d2de16c7da027d44d44de03581045bfdc2d"
   },
   {
     "name": "006_distributed_limiter.sql",

@@ -2,6 +2,49 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { nativeMigrationManifest, nativeMigrationPlan, nativeMigrationSteps } from '../scripts/native-migrations.mjs';
+
+// Static guard for the native files' schema-qualified, p_* named argument declarations.
+// Identity uses input types, not parameter names or return types; overloads are distinct.
+function assertNoDuplicateFunctionCreation(manifest) {
+  const functions = new Map();
+  for (const { name, sql } of manifest) {
+    for (const match of sql.matchAll(/create\s+(or\s+replace\s+)?function\s+([\w.]+)\s*\(([^)]*)\)/gi)) {
+      const types = match[3].split(',').filter(arg => arg.trim()).map(arg => {
+        assert.match(arg.trim(), /^p_\w+\s+/i, `${name}: unsupported argument declaration`);
+        return arg.trim().toLowerCase().replace(/\s+default\s+[\s\S]*/, '')
+          .replace(/^p_\w+\s+/, '').replace(/\s+/g, ' ');
+      });
+      const signature = `${match[2].toLowerCase()}(${types.join(',')})`;
+      assert.ok(match[1] || !functions.has(signature),
+        `${name}: duplicate CREATE FUNCTION ${signature}, previously created in ${functions.get(signature)}`);
+      functions.set(signature, name);
+    }
+  }
+}
+
+test('ordered native migrations never recreate an existing function signature without OR REPLACE', () => {
+  const manifest = nativeMigrationManifest();
+  assertNoDuplicateFunctionCreation(manifest);
+  const broken = manifest.map(entry => entry.name === '005_social_xp_themes.sql'
+    ? { ...entry, sql: entry.sql.replace('CREATE OR REPLACE FUNCTION app.set_updated_at()', 'CREATE FUNCTION app.set_updated_at()') }
+    : entry);
+  assert.throws(() => assertNoDuplicateFunctionCreation(broken), /duplicate CREATE FUNCTION app\.set_updated_at\(\)/);
+  assertNoDuplicateFunctionCreation([{ name: 'overloads.sql', sql:
+    'CREATE FUNCTION app.example(p_value text) RETURNS text; CREATE FUNCTION app.example(p_value uuid) RETURNS uuid; CREATE OR REPLACE FUNCTION app.example(p_renamed text) RETURNS text;' }]);
+});
+
+test('005 replaces the shared timestamp helper with its hardened path and unchanged trigger body', () => {
+  const manifest = nativeMigrationManifest();
+  const cloud = manifest.find(entry => entry.name === '004_cloud_goals.sql').sql;
+  const social = manifest.find(entry => entry.name === '005_social_xp_themes.sql').sql;
+  assert.match(cloud, /create function app\.set_updated_at\(\)\s+returns trigger/i);
+  assert.match(social, /SET LOCAL ROLE mt_owner;/);
+  assert.match(social, /CREATE OR REPLACE FUNCTION app\.set_updated_at\(\) RETURNS trigger LANGUAGE plpgsql SET search_path=pg_catalog AS \$\$ BEGIN NEW\.updated_at=now\(\); RETURN NEW; END; \$\$;/);
+  assert.match(cloud, /CREATE TRIGGER media_items_set_updated_at BEFORE UPDATE ON app\.media_items FOR EACH ROW EXECUTE FUNCTION app\.set_updated_at\(\);/);
+  assert.match(social, /CREATE TRIGGER profiles_set_updated_at BEFORE UPDATE ON app\.profiles FOR EACH ROW EXECUTE FUNCTION app\.set_updated_at\(\);/);
+  assert.doesNotMatch(social, /DROP FUNCTION app\.set_updated_at/i);
+  assert.match(social, /revoke all on function app\.set_updated_at\(\) from public,mt_runtime;/i);
+});
 test('native ledger is explicit, checksum checked, transactional and has no connection target', () => {
   const manifest = nativeMigrationManifest();
   assert.equal(manifest.length,9);

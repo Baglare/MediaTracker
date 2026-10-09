@@ -35,7 +35,7 @@ BEGIN;
 SET LOCAL ROLE mt_owner;
 ${translateDomainSql(profile)}
 ${translateDomainSql(feedback)}
-CREATE FUNCTION app.set_updated_at() RETURNS trigger LANGUAGE plpgsql SET search_path=pg_catalog AS $$ BEGIN NEW.updated_at=now(); RETURN NEW; END; $$;
+CREATE OR REPLACE FUNCTION app.set_updated_at() RETURNS trigger LANGUAGE plpgsql SET search_path=pg_catalog AS $$ BEGIN NEW.updated_at=now(); RETURN NEW; END; $$;
 CREATE TRIGGER profiles_set_updated_at BEFORE UPDATE ON app.profiles FOR EACH ROW EXECUTE FUNCTION app.set_updated_at();
 ALTER TABLE app.profiles ENABLE ROW LEVEL SECURITY;
 CREATE POLICY profiles_select_own ON app.profiles FOR SELECT TO mt_runtime USING(id=app.current_user_id());
