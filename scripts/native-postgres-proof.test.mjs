@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
+import { EventEmitter } from 'node:events';
+import { validateDisposableTarget } from './native-disposable-relay.mjs';
 
 // Exercise the actual runner with inert process boundaries; never contact Docker/DB.
 const source=readFileSync(new URL('./native-postgres-proof.mjs',import.meta.url),'utf8')
@@ -9,17 +11,18 @@ const source=readFileSync(new URL('./native-postgres-proof.mjs',import.meta.url)
   .replaceAll('import.meta.url',"'file:///synthetic/scripts/native-postgres-proof.mjs'");
 const id='a'.repeat(64),network='b'.repeat(64),name=`mt-p1-${'c'.repeat(36)}`;
 const privateDiagnostic='synthetic-private-diagnostic';
-async function run({fail,mutate=()=>{},p2=false,endpoint='unix:///var/run/docker.sock'}={}) {
+async function run({fail,mutate=()=>{},p2=false,endpoint='unix:///var/run/docker.sock',interrupt=false}={}) {
   const calls=[],logs=[];
-  const target={Name:`/${name}`,Config:{Labels:{'mt.p1.proof':name}},
-    HostConfig:{NetworkMode:name},NetworkSettings:{Ports:{'5432/tcp':[{HostIp:'127.0.0.1',HostPort:'54321'}]}},
-    Mounts:[{Type:'tmpfs'}]};
-  const net={Internal:true,Labels:{'mt.p1.proof':name}};
+  const target={Id:id,State:{Running:true},Name:`/${name}`,Config:{Labels:{'mt.p1.proof':name}},
+    HostConfig:{NetworkMode:name,Privileged:false,PublishAllPorts:false,PortBindings:{}},NetworkSettings:{Ports:{'5432/tcp':null},Networks:{[name]:{NetworkID:network,IPAddress:'172.20.0.2'}}},
+    Mounts:[{Type:'tmpfs',Destination:'/var/lib/postgresql/data'}]};
+  const net={Id:network,Name:name,Driver:'bridge',Internal:true,Labels:{'mt.p1.proof':name},Containers:{[id]:{Name:name,IPv4Address:'172.20.0.2/16'}}};
   mutate(target,net);
-  const process={argv:['node','proof.mjs',...(p2?['--p2']:[])],env:{},execPath:'node',cwd:()=>'/synthetic'};
+  const process=Object.assign(new EventEmitter(),{argv:['node','proof.mjs',...(p2?['--p2']:[])],env:{NODE_OPTIONS:'--existing-option'},execPath:'node',cwd:()=>'/synthetic'});
   const spawnSync=(command,args,options)=>{
     if(command==='docker' && args[0]==='--host') args=args.slice(2);
-    const key=command==='node'?'auth':args.slice(0,2).join(' ');
+    assert.equal(command,'docker','Vitest must be asynchronous so the relay can run');
+    const key=args.slice(0,2).join(' ');
     calls.push({key,args:Array.from(args),options});
     const response={status:0,stdout:'',stderr:privateDiagnostic};
     if(key===fail) return {...response,status:1,stdout:privateDiagnostic};
@@ -32,7 +35,11 @@ async function run({fail,mutate=()=>{},p2=false,endpoint='unix:///var/run/docker
     return response;
   };
   await runInNewContext(`(async()=>{${source}\n})()`,{
-    spawnSync,process,URL,randomUUID:()=>name.slice(6),randomBytes:()=>({toString:()=>privateDiagnostic}),
+    spawnSync,process,URL,validateDisposableTarget,
+    startDisposableRelay:async()=>{calls.push({key:'relay start'});if(fail==='relay start')throw Error('redacted');return {descriptor:{port:54321},proof:{controlPort:54322,token:'d'.repeat(64)},close:async()=>{calls.push({key:'relay close'});if(fail==='relay close')throw Error('redacted');}};},
+    verifyDisposableRelay:async()=>{calls.push({key:'relay verify'});if(fail==='relay verify')throw Error('redacted');},
+    Client:class {async connect(){calls.push({key:'pg connect'});if(fail==='pg connect')throw Error('redacted');}async query(){}async end(){calls.push({key:'pg end'});}},
+    spawn:(command,args,options)=>{calls.push({key:'auth',args:Array.from(args),options});const child=new EventEmitter();child.kill=signal=>{assert.equal(signal,'SIGKILL');queueMicrotask(()=>child.emit('close',null));};queueMicrotask(()=>interrupt?process.emit('SIGTERM'):child.emit('close',fail==='auth'?1:0));return child;},randomUUID:()=>name.slice(6),randomBytes:()=>({toString:()=>privateDiagnostic}),
     readFileSync:()=>privateDiagnostic,nativeMigrationPlan:()=>privateDiagnostic,
     pathToFileURL:()=>({href:'file:///synthetic/offline.mjs'}),setTimeout:resolve=>resolve(),
     console:{log:line=>logs.push(line),error:line=>logs.push(line)},
@@ -44,11 +51,14 @@ async function run({fail,mutate=()=>{},p2=false,endpoint='unix:///var/run/docker
 for(const [stage,options] of [
   ['CONTAINER_INSPECT',{fail:`inspect ${id}`}],
   ['NETWORK_INSPECT',{fail:'network inspect'}],
-  ['CONTAINER_VALIDATION',{mutate:target=>{target.Config.Labels['mt.p1.proof']='other';}}],
-  ['NETWORK_VALIDATION',{mutate:(_target,net)=>{net.Internal=false;}}],
-  ['PORT_VALIDATION',{mutate:target=>{target.NetworkSettings.Ports['5432/tcp']=null;}}],
-  ['PORT_VALIDATION',{mutate:target=>{target.NetworkSettings.Ports['5432/tcp'][0].HostIp='0.0.0.0';}}],
-  ['MOUNT_VALIDATION',{mutate:target=>{target.Mounts[0].Type='volume';}}],
+  ['TARGET_VALIDATION',{mutate:target=>{target.Config.Labels['mt.p1.proof']='other';}}],
+  ['TARGET_VALIDATION',{mutate:(_target,net)=>{net.Internal=false;}}],
+  ['TARGET_VALIDATION',{mutate:target=>{target.Id='f'.repeat(64);}}],
+  ['TARGET_VALIDATION',{mutate:target=>{target.NetworkSettings.Ports['5432/tcp']=[{HostIp:'0.0.0.0',HostPort:'54321'}];}}],
+  ['TARGET_VALIDATION',{mutate:target=>{target.Mounts[0].Type='volume';}}],
+  ['RELAY_START',{fail:'relay start'}],
+  ['RELAY_VALIDATION',{fail:'relay verify'}],
+  ['RELAY_VALIDATION',{fail:'pg connect'}],
   ['DATABASE_READY',{fail:`exec ${id}`}],
   ['SQL_PROOF',{fail:'exec -i'}],
   ['AUTH_INTEGRATION',{fail:'auth'}],
@@ -58,7 +68,7 @@ for(const [stage,options] of [
     assert.equal(result.process.exitCode,1);
     assert.deepEqual(result.logs,[`FAIL: disposable proof; stage=${stage}; diagnostics redacted`]);
     assert.deepEqual(result.calls.slice(-2).map(call=>call.args),[['rm','--force',id],['network','rm',network]]);
-    if(stage.endsWith('VALIDATION')) assert.ok(!result.calls.some(call=>call.key.startsWith('exec')));
+    if(stage==='TARGET_VALIDATION') assert.ok(!result.calls.some(call=>call.key.startsWith('exec')));
   });
 }
 test('container cleanup failure still attempts network cleanup and remains redacted',async()=>{
@@ -92,10 +102,32 @@ for(const p2 of [false,true]) {
     assert.ok(result.calls.find(call=>call.key==='exec -i').args.includes('ON_ERROR_STOP=1'));
     assert.ok(result.calls.find(call=>call.key==='network create').args.includes('--internal'));
     const create=result.calls.find(call=>call.key==='run --detach').args;
-    assert.equal(create[create.indexOf('--publish')+1],'127.0.0.1::5432');
+    assert.ok(!create.includes('--publish'));
+    assert.ok(result.calls.find(call=>call.key==='relay verify'));
+    assert.ok(result.calls.find(call=>call.key==='pg connect'));
+    assert.ok(result.calls.find(call=>call.key==='relay close'));
     assert.equal(create[create.indexOf('--mount')+1],'type=tmpfs,destination=/var/lib/postgresql/data');
     const auth=result.calls.find(call=>call.key==='auth');
     assert.equal(!!auth,!p2);
-    if(auth) assert.equal(auth.options.stdio,'pipe');
+    if(auth) {assert.equal(auth.options.stdio,'ignore');assert.ok(auth.options.env.NODE_OPTIONS.startsWith('--existing-option '));assert.match(auth.options.env.DATABASE_URL,/@127\.0\.0\.1:54321\/mt_p1_proof$/);}
   });
 }
+
+test('relay cleanup failure still cleans container and network and fails closed',async()=>{
+  const result=await run({fail:'relay close'});
+  assert.equal(result.process.exitCode,1);
+  assert.ok(result.logs.includes('FAIL: disposable proof; stage=RELAY_CLEANUP; diagnostics redacted'));
+  assert.deepEqual(result.calls.slice(-2).map(call=>call.args),[['rm','--force',id],['network','rm',network]]);
+});
+
+test('interruption kills Vitest and closes relay before Docker cleanup',async()=>{
+  const result=await run({interrupt:true});
+  assert.equal(result.process.exitCode,1);
+  assert.deepEqual(result.calls.slice(-3).map(c=>c.key),['relay close','rm --force','network rm']);
+});
+test('P2 rejects an unverified relay and cleans every owned resource',async()=>{
+  const result=await run({p2:true,fail:'relay verify'});
+  assert.equal(result.process.exitCode,1);
+  assert.deepEqual(result.logs,['FAIL: disposable proof; stage=RELAY_VALIDATION; diagnostics redacted']);
+  assert.deepEqual(result.calls.slice(-3).map(c=>c.key),['relay close','rm --force','network rm']);
+});

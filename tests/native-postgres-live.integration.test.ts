@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process';
+import { verifyDisposableRelay } from '../scripts/native-disposable-relay.mjs';
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { betterAuth } from 'better-auth';
@@ -11,28 +12,22 @@ import { getNativeAuth } from '@/lib/auth/native';
 import { getCurrentUser } from '@/lib/auth/current-user';
 import { withAuthenticatedTransaction } from '@/lib/backend/transaction';
 
-// A flag alone cannot authorize contact. Re-inspect the runner-owned Docker
-// instance and exact published loopback port BEFORE obtaining any DB client.
+// Re-inspect the pinned local container and authenticate the runner's live relay
+// before obtaining a DB client. Environment metadata alone is insufficient.
 const configured=!!process.env.NATIVE_P1_PROOF_CONTAINER;
 let approved=false;
-function assertDisposable() {
-  const id=process.env.NATIVE_P1_PROOF_CONTAINER!,name=process.env.NATIVE_P1_PROOF_NAME!;
-  if(!/^[a-f0-9]{64}$/.test(id) || !/^mt-p1-[a-f0-9-]{36}$/.test(name)) throw new Error('unsafe_test_target');
-  const inspect=(args:string[])=>{
-    const r=spawnSync('docker',args,{encoding:'utf8',timeout:5000});
-    if(r.status!==0) throw new Error('unsafe_test_target');return JSON.parse(r.stdout)[0];
-  };
-  const target=inspect(['inspect',id]),network=inspect(['network','inspect',name]);
-  const bindings=target.NetworkSettings.Ports['5432/tcp'],url=new URL(process.env.DATABASE_URL!);
-  if(target.Name!==`/${name}` || target.Config.Labels['mt.p1.proof']!==name || !target.State.Running
-    || network.Internal!==true || network.Labels['mt.p1.proof']!==name || target.HostConfig.NetworkMode!==name
-    || target.Mounts.some((m:{Type:string})=>m.Type!=='tmpfs') || bindings?.length!==1 || bindings[0].HostIp!=='127.0.0.1'
-    || url.hostname!=='127.0.0.1' || url.port!==bindings[0].HostPort || url.pathname!=='/mt_p1_proof'
-    || url.username!=='mt_runtime' || !/^[a-f0-9]{64}$/.test(url.password)) throw new Error('unsafe_test_target');
+async function assertDisposable() {
+  const url=new URL(process.env.DATABASE_URL!);
+  if(url.protocol!=='postgresql:' || url.pathname!=='/mt_p1_proof' || url.username!=='mt_runtime'
+    || !/^[a-f0-9]{64}$/.test(url.password)) throw new Error('unsafe_test_target');
+  await verifyDisposableRelay({containerId:process.env.NATIVE_P1_PROOF_CONTAINER,
+    runName:process.env.NATIVE_P1_PROOF_NAME,localEndpoint:process.env.DOCKER_HOST,networkId:process.env.NATIVE_P1_PROOF_NETWORK},
+    JSON.parse(process.env.NATIVE_P1_RELAY_PROOF??'null'),url.hostname,url.port);
 }
+
 describe.runIf(configured)('runner-owned disposable native DB proof',()=>{
   beforeAll(async()=>{
-    assertDisposable();
+    await assertDisposable();
     approved=true;
     await getNativePool().query('SELECT 1'); // onConnect verifies role separation.
   });
@@ -65,7 +60,7 @@ describe.runIf(configured)('runner-owned disposable native DB proof',()=>{
       ALTER TABLE app.p1_live ENABLE ROW LEVEL SECURITY; ALTER TABLE app.p1_live FORCE ROW LEVEL SECURITY;
       CREATE POLICY owner_policy ON app.p1_live TO mt_runtime USING(owner_id=app.current_user_id()) WITH CHECK(owner_id=app.current_user_id());
       GRANT SELECT,INSERT,UPDATE ON app.p1_live TO mt_runtime;`;
-    const r=spawnSync('docker',['exec','-i',process.env.NATIVE_P1_PROOF_CONTAINER!,'psql','-X','-v','ON_ERROR_STOP=1','-U','postgres','-d','mt_p1_proof'],{input:setup,encoding:'utf8',timeout:5000});
+    const r=spawnSync('docker',['--host',process.env.DOCKER_HOST!,'exec','-i',process.env.NATIVE_P1_PROOF_CONTAINER!,'psql','-X','-v','ON_ERROR_STOP=1','-U','postgres','-d','mt_p1_proof'],{input:setup,encoding:'utf8',timeout:5000});
     expect(r.status).toBe(0);
     expect((await login(users[0].email))?.id).toBe(users[0].id);
     await withAuthenticatedTransaction(async tx=>{await tx.query('INSERT INTO app.p1_live VALUES($1,$2)',[tx.userId,'A']);});

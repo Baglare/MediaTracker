@@ -1,27 +1,33 @@
 // No input target/credentials accepted. Creates an isolated, loopback-only,
-// mount-free ephemeral Docker DB from an ALREADY LOCAL image; never pulls.
-import { spawnSync } from 'node:child_process';
+// tmpfs-only ephemeral Docker DB from an ALREADY LOCAL image; never pulls.
+import { spawn, spawnSync } from 'node:child_process';
 import { randomUUID, randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { nativeMigrationPlan } from './native-migrations.mjs';
+import { startDisposableRelay, validateDisposableTarget, verifyDisposableRelay } from './native-disposable-relay.mjs';
+import { Client } from 'pg';
 const p2 = process.argv[2] === '--p2';
 if (process.argv.slice(2).some(arg => arg !== '--p2') || process.argv.length > 3) throw new Error('proof_target_arguments_denied');
 const image = 'postgres:17-alpine';
 const name = `mt-p1-${randomUUID()}`;
 let localEndpoint;
+let interrupted=false,cleaning=false,activeChild;
+const interrupt=()=>{interrupted=true;process.exitCode=1;activeChild?.kill('SIGKILL');};
+process.once('SIGINT',interrupt);
+process.once('SIGTERM',interrupt);
 const dockerEnv = { ...process.env };
 delete dockerEnv.DOCKER_HOST;
 delete dockerEnv.DOCKER_CONTEXT;
 delete dockerEnv.DOCKER_TLS_VERIFY;
 delete dockerEnv.DOCKER_CERT_PATH;
 function docker(args, input) {
-  if (!localEndpoint) throw new Error('BLOCKED_ENVIRONMENT');
+  if (!localEndpoint || (interrupted && !cleaning)) throw new Error('BLOCKED_ENVIRONMENT');
   const r = spawnSync('docker', ['--host',localEndpoint,...args], { input, env:dockerEnv, encoding:'utf8', timeout:15000 });
   if(r.status!==0) throw new Error('BLOCKED_ENVIRONMENT');
   return r.stdout.trim();
 }
-let id, network;
+let id, network, relay;
 let stage='DOCKER_CONTEXT';
 const password=randomBytes(32).toString('hex');
 try {
@@ -41,21 +47,17 @@ try {
   network=docker(['network','create','--internal','--label',`mt.p1.proof=${name}`,name]);
   stage='CONTAINER_CREATE';
   id=docker(['run','--detach','--name',name,'--label',`mt.p1.proof=${name}`,
-    '--network',name,'--publish','127.0.0.1::5432','--mount','type=tmpfs,destination=/var/lib/postgresql/data',
+    '--network',name,'--mount','type=tmpfs,destination=/var/lib/postgresql/data',
     '-e',`POSTGRES_PASSWORD=${password}`,'-e','POSTGRES_DB=mt_p1_proof',image]);
   stage='CONTAINER_INSPECT';
   const inspect=JSON.parse(docker(['inspect',id]))[0];
   stage='NETWORK_INSPECT';
   const net=JSON.parse(docker(['network','inspect',network]))[0];
-  stage='CONTAINER_VALIDATION';
-  if(inspect.Name!==`/${name}` || inspect.Config.Labels['mt.p1.proof']!==name) throw new Error('unsafe_disposable_target');
-  stage='NETWORK_VALIDATION';
-  if(inspect.HostConfig.NetworkMode!==name || net.Internal!==true || net.Labels['mt.p1.proof']!==name) throw new Error('unsafe_disposable_target');
-  stage='PORT_VALIDATION';
-  const bindings=inspect.NetworkSettings.Ports['5432/tcp'];
-  if(bindings?.length!==1 || bindings[0].HostIp!=='127.0.0.1') throw new Error('unsafe_disposable_target');
-  stage='MOUNT_VALIDATION';
-  if(inspect.Mounts.some(m=>m.Type!=='tmpfs')) throw new Error('unsafe_disposable_target');
+  stage='TARGET_VALIDATION';
+  const identity={containerId:id,runName:name,localEndpoint,networkId:network};
+  validateDisposableTarget(inspect,net,identity);
+  stage='RELAY_START';
+  relay=await startDisposableRelay(identity);
   stage='DATABASE_READY';
   let ready=false;
   for(let i=0;i<20;i++) {
@@ -71,22 +73,39 @@ try {
   const output=docker(['exec','-i',id,'psql','-X','-v','ON_ERROR_STOP=1','-U','postgres','-d','mt_p1_proof'],
     sql+`\nALTER ROLE mt_runtime PASSWORD '${password}';`);
   if(!output.includes(p2 ? 'P2_CLOUD_GOALS_PROOF_PASS' : 'P1_RLS_PROOF_PASS')) throw new Error('proof_failed');
+  stage='RELAY_VALIDATION';
+  const databaseUrl=`postgresql://mt_runtime:${password}@127.0.0.1:${relay.descriptor.port}/mt_p1_proof`;
+  await verifyDisposableRelay(identity,relay.proof,'127.0.0.1',relay.descriptor.port);
+  const client=new Client({connectionString:databaseUrl,connectionTimeoutMillis:5000,query_timeout:5000});
+  try {await client.connect();await client.query('SELECT 1');} finally {await client.end();}
+  if(interrupted) throw new Error('proof_interrupted');
   if (p2) {
     console.log('PASS: disposable native Cloud/Goals SQL, receipts, owner reads and lifecycle admission; other P2 domains NOT PROVED');
   } else {
   stage='AUTH_INTEGRATION';
-  const result=spawnSync(process.execPath,['node_modules/vitest/vitest.mjs','run','tests/native-postgres-live.integration.test.ts','--maxWorkers=1'],
-    {stdio:'pipe',env:{...dockerEnv,DOCKER_HOST:localEndpoint,BACKEND_PROVIDER:'native',DATABASE_URL:`postgresql://mt_runtime:${password}@127.0.0.1:${bindings[0].HostPort}/mt_p1_proof`,
+  const result=await new Promise((resolve,reject)=>{
+  const child=activeChild=spawn(process.execPath,['node_modules/vitest/vitest.mjs','run','tests/native-postgres-live.integration.test.ts','--maxWorkers=1'],
+    {stdio:'ignore',env:{...dockerEnv,DOCKER_HOST:localEndpoint,BACKEND_PROVIDER:'native',DATABASE_URL:databaseUrl,
       DATABASE_SSL_MODE:'disable',DATABASE_POOL_MAX:'1',BETTER_AUTH_URL:'http://localhost:3000',BETTER_AUTH_SECRET:randomBytes(32).toString('hex'),
-      NATIVE_P1_PROOF_CONTAINER:id,NATIVE_P1_PROOF_NAME:name,
-      NODE_OPTIONS:`--import=${pathToFileURL(`${process.cwd()}/scripts/ci-offline.mjs`).href}`},timeout:60000});
-  if(result.status!==0) throw new Error('auth_or_pool_proof_failed');
+      NATIVE_P1_PROOF_CONTAINER:id,NATIVE_P1_PROOF_NAME:name,NATIVE_P1_PROOF_NETWORK:network,NATIVE_P1_RELAY_PROOF:JSON.stringify(relay.proof),
+      NODE_OPTIONS:`${dockerEnv.NODE_OPTIONS??''} --import=${pathToFileURL(`${process.cwd()}/scripts/ci-offline.mjs`).href}`},timeout:60000,killSignal:'SIGKILL'});
+  child.once('error',reject);
+  child.once('close',(status)=>resolve({status}));
+  });
+  activeChild=undefined;
+  if(result.status!==0 || interrupted) throw new Error('auth_or_pool_proof_failed');
   console.log('PASS: real disposable PostgreSQL RLS, Better Auth and pg transaction proof');
   }
 } catch {
   console.error(`${id?'FAIL: disposable proof':'BLOCKED_ENVIRONMENT: disposable proof'}; stage=${stage}; diagnostics redacted`);
   process.exitCode=1;
 } finally {
+  cleaning=true;
+  if(relay) {
+    try {await relay.close();} catch {
+      console.error('FAIL: disposable proof; stage=RELAY_CLEANUP; diagnostics redacted');process.exitCode=1;
+    }
+  }
   // ID originates only from this run; never remove by ambiguous existing name.
   for(const [target,args,cleanupStage] of [
     [id,['rm','--force',id],'CONTAINER_CLEANUP'],
@@ -99,4 +118,6 @@ try {
       }
     }
   }
+  process.removeListener('SIGINT',interrupt);
+  process.removeListener('SIGTERM',interrupt);
 }
