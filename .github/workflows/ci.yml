@@ -163,6 +163,8 @@ jobs:
           node-version: '24.21.0'
           cache: npm
           cache-dependency-path: package-lock.json
+      - name: Clean install
+        run: npm ci
       - name: Refuse inherited application configuration
         run: node scripts/ci-checks.mjs --environment-only
       - name: Verify local Linux Docker daemon
@@ -178,8 +180,6 @@ jobs:
           test "$(docker context show)" = default
           test "$(docker context inspect default --format '{{.Endpoints.docker.Host}}')" = unix:///var/run/docker.sock
           test "$(docker --host unix:///var/run/docker.sock info --format '{{.OSType}}')" = linux
-      - name: Clean install
-        run: npm ci
       - name: Prepare local PostgreSQL image before disposable tests
         shell: bash
         run: |
