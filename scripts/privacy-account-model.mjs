@@ -103,7 +103,7 @@ export async function runErasure(adapter, userId, { execute = false, confirmatio
   const snapshot = await adapter.inspect();
   const plan = erasePlan(snapshot, userId);
   if (!execute) return { plan, stages: [], executed: false };
-  if (confirmation !== `ERASE ${adapter.environment === "disposable" ? "DISPOSABLE" : "SYNTHETIC"} ${userId}`) throw new Error("Destructive confirmation required");
+  if (confirmation !== `ERASE ${adapter.environment === "production" ? "PRODUCTION" : adapter.environment === "disposable" ? "DISPOSABLE" : "SYNTHETIC"} ${userId}`) throw new Error("Destructive confirmation required");
   if (plan.blocked.length) throw new Error("Erasure blocked by unclassified dependencies");
   if ((Object.keys(plan.participantLoss).length || plan.anonymizeReplies) && !acceptParticipantLoss) throw new Error("Dependent participant loss requires explicit acknowledgement");
   const stages = [];

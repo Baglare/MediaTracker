@@ -1,0 +1,78 @@
+{
+  "hosting-test": [
+    {
+      "name": "001_security_foundation.sql",
+      "checksum": "d8a96dfa16ac0fc9bd95909cd8bfea02b15a64b20669b0f3fd2b299be7a23956"
+    },
+    {
+      "name": "002_better_auth.sql",
+      "checksum": "13af7bd30c7503a80284ed08f6b6747e14d6b93352ed86e78bb00164d981ad90"
+    },
+    {
+      "name": "003_account_admission.sql",
+      "checksum": "40aefcc3ddf6f28609e5657ff348886bba9bf68818e6a135fd66e80d16a51688"
+    },
+    {
+      "name": "004_cloud_goals.sql",
+      "checksum": "6f26dbee7a87e7f5cb8a5314a71c0b759a0979d3bdda89ed9fe44318018237af"
+    },
+    {
+      "name": "005_social_xp_themes.sql",
+      "checksum": "eae2d2eb623df825b801bde80f661094d7f3e9dcbc0b655d3e19fabee7d86e79"
+    },
+    {
+      "name": "006_distributed_limiter.sql",
+      "checksum": "fe6205be68da6a082bd6445d72c4806376ea8864cdbe60d9131b50a86ed5a4ab"
+    },
+    {
+      "name": "007_filesystem_assets.sql",
+      "checksum": "ce33e57cf1c11a5cd7235af39c0f471e3b4f62334f3baa9656d813126f2b86fe"
+    },
+    {
+      "name": "008_privacy_lifecycle.sql",
+      "checksum": "9a2c5503edb46f7943bbf5da9f3dbb229bab9d22d22346ad2f122d0dbf073574"
+    },
+    {
+      "name": "009_deployment_operations.sql",
+      "checksum": "e3ec0f6199dea26f6d478356c7fe46c7921ad28b7b2161858768d4dca66e8a43"
+    }
+  ],
+  "hosting-production": [
+    {
+      "name": "001_security_foundation.sql",
+      "checksum": "14ac0954df3000f58ec0122ddafb699016a8ccbead77939a60540389339ebefb"
+    },
+    {
+      "name": "002_better_auth.sql",
+      "checksum": "a68d3e59545597635aff9d9e2f6d8b1e7a2d70140f09b372c090f68cec7083e8"
+    },
+    {
+      "name": "003_account_admission.sql",
+      "checksum": "6f10b8ebccbb091a0b5e54aa6fa8547fc67613d368552c24e04c945167ce4daf"
+    },
+    {
+      "name": "004_cloud_goals.sql",
+      "checksum": "137f4a65598616898dd3dd169d5011fe0ee5972b23cda82a3f3dea66207e0e4d"
+    },
+    {
+      "name": "005_social_xp_themes.sql",
+      "checksum": "348ed89b300d1d0474741b45fa3d0a338060fb4e5afb3efdbf064fa9c333c398"
+    },
+    {
+      "name": "006_distributed_limiter.sql",
+      "checksum": "29d1fba811e136cdf443170a85c141457eccd14960f0a54d633e3563c678caec"
+    },
+    {
+      "name": "007_filesystem_assets.sql",
+      "checksum": "d049ac73072dbb19f133815e212d8971dc073a64572e00f5b5b7a386573f6779"
+    },
+    {
+      "name": "008_privacy_lifecycle.sql",
+      "checksum": "e90956ccb7a80b4af78ad152f5b35a871442c82f22ca4570c6b828c45b6bb61a"
+    },
+    {
+      "name": "009_deployment_operations.sql",
+      "checksum": "4f5d5565c7c24efb9553515e8e1af1ba89b6d4b625fe12a7c180b7126664794e"
+    }
+  ]
+}

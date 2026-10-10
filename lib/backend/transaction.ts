@@ -3,11 +3,19 @@ import type { QueryResult, QueryResultRow } from 'pg';
 import { getNativePool } from './postgres';
 import { getCurrentUser } from '../auth/current-user';
 import { supabaseApplicationError } from '../supabase/safe-error';
+import localMigrations from './native-migration-state.json';
+import hostingMigrations from './native-hosting-migration-state.json';
+import { nativeRoles } from './native-roles.mjs';
 
 const contexts = new WeakSet<object>();
 /** Infrastructure-only read probe; no user context, mutation or raw errors. */
 export async function nativeDatabaseReady(expected: { name: string; checksum: string }[]): Promise<boolean> {
   try {
+    const roles = nativeRoles(process.env.NATIVE_ROLE_PROFILE);
+    if (roles.hosted) {
+      if (JSON.stringify(expected) !== JSON.stringify(localMigrations)) return false;
+      expected = hostingMigrations[roles.profile as keyof typeof hostingMigrations];
+    }
     const result = await getNativePool().query('SELECT app.native_migration_state() AS state, app.native_runtime_ready() AS ready');
     const state = result.rows[0]?.state;
     return result.rows[0]?.ready === true && Array.isArray(state) && state.length === expected.length && state.every((row, i) =>

@@ -18,7 +18,9 @@ const core = ["NEXT_PUBLIC_SUPABASE_URL","NEXT_PUBLIC_SUPABASE_ANON_KEY","NEXT_P
   "RATE_LIMIT_RPC_SIGNING_KEY","RATE_LIMIT_RPC_KEY_VERSION","RATE_LIMIT_RPC_AUDIENCE"];
 const optional=["MEDIA_TRACKER_PROVIDER_USER_AGENT","RATE_LIMIT_IDENTITY_HMAC_PREVIOUS_KEY","MEDIA_TRACKER_EMBEDDING_CACHE"];
 const nativeVariables=["DATABASE_URL","DATABASE_SSL_MODE","DATABASE_POOL_MAX","BETTER_AUTH_SECRET","BETTER_AUTH_URL",...nativeDeploymentVariables];
-const nativeAllowed={DATABASE_URL:"postgresql URL; mt_runtime login; no query/hash; server secret",
+const nativeAllowed={DATABASE_URL:"postgresql URL; closed profile runtime/database pair; no query/hash; server secret",
+  NATIVE_ROLE_PROFILE:"local (loopback only), hosting-test, hosting-production; fixed database/login pairs",
+  DATABASE_SSL_CA_FILE:"optional local absolute PEM CA file; required hosting profile; no symlink/private key; TLS verify-full only",
   NATIVE_STORAGE_ROOT:"absolute private persistent directory outside source/release/public/build; no symlinks",
   TRUSTED_INGRESS_MODE:"passenger or unconfigured; no trusted header by default; explicit reviewed P4 tuple required",
   TRUSTED_INGRESS_HEADER:"optional x-* lowercase single-IP header; verified overwrite + direct-access denial required",
@@ -35,6 +37,7 @@ const nativeAllowed={DATABASE_URL:"postgresql URL; mt_runtime login; no query/ha
 export const forbidden = /^(?:SUPABASE_SERVICE_ROLE_KEY|SUPABASE_TEST_.*|SUPABASE_PRODUCTION_URL|D8_.*|PRIVACY_.*|MEDIATRACKER_DR_.*|.*LIVE_SMOKE.*|.*FIXTURE.*|RATE_LIMIT_LOCAL_TEST_IP|(?:OPENAI|GROQ|GEMINI|OPENROUTER)_.*|TMDB_.*|ANILIST_.*|OMDB_.*|AI_PROVIDER|AI_.*SEMANTIC.*|MEDIA_TRACKER_ML_.*|MEDIA_TRACKER_EMBEDDING_MODEL|MEDIA_TRACKER_WIKIMEDIA_.*|MEDIA_TRACKER_RESEARCH_.*|D7_ANNOTATION_.*|D7_(?:OPENAI|GROQ|OPENROUTER)_.*|D7_RESEARCH_(?:DISCOVERY|EXTRACTION)_.*|DATABASE_URL|PG.*|VERCEL_TOKEN|NEXT_PUBLIC_.*(?:SECRET|PASSWORD|SERVICE_ROLE|HMAC|SIGNING).*)$/;
 export function environmentContract() {
   const nativeOptional=['DATABASE_POOL_MAX','DATABASE_CONNECTION_TIMEOUT_MS','DATABASE_IDLE_TIMEOUT_MS','DATABASE_STATEMENT_TIMEOUT_MS',
+    'NATIVE_ROLE_PROFILE','DATABASE_SSL_CA_FILE',
     'TRUSTED_INGRESS_HEADER','TRUSTED_INGRESS_PROOF_SHA256','TRUSTED_INGRESS_DIRECT_ACCESS_BLOCKED'];
   return [...core,...Object.keys(fixed),...optional,"BACKEND_PROVIDER",...nativeVariables].map(name => ({name,
     LOCAL:nativeVariables.includes(name)?"required only for native; pool max optional; isolated disposable target":"optional isolated offline/local; explicit values required for enabled Cloud/distributed mode",

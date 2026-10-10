@@ -2,6 +2,8 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
+import { nativeRoles } from '../lib/backend/native-roles.mjs';
+import { hostingSql, sqlWithoutTransaction } from './native-hosting-sql.mjs';
 export const nativeMigrationFiles = [
   '001_security_foundation.sql', '002_better_auth.sql',
   '003_account_admission.sql', '004_cloud_goals.sql',
@@ -9,9 +11,16 @@ export const nativeMigrationFiles = [
   '007_filesystem_assets.sql', '008_privacy_lifecycle.sql',
   '009_deployment_operations.sql',
 ];
-export function nativeMigrationManifest() {
+export function nativeMigrationManifest(profile = 'local') {
+  const roles = nativeRoles(profile);
   return nativeMigrationFiles.map(name => {
-    const sql = readFileSync(new URL(`../database/native/${name}`, import.meta.url), 'utf8').replace(/\r\n/g, '\n');
+    const source = readFileSync(new URL(`../database/native/${name}`, import.meta.url), 'utf8').replace(/\r\n/g, '\n');
+    if (roles.hosted) {
+      const baseline = JSON.parse(readFileSync(new URL('../lib/backend/native-migration-state.json', import.meta.url),'utf8'));
+      if (baseline.find(entry => entry.name===name)?.checksum !== createHash('sha256').update(source).digest('hex'))
+        throw new Error('native_hosting_source_drift');
+    }
+    const sql = hostingSql(name, source, roles);
     return { name, sql, checksum: createHash('sha256').update(sql).digest('hex') };
   });
 }
@@ -32,7 +41,7 @@ REVOKE ALL ON native_migrations.ledger FROM PUBLIC;
       || createHash('sha256').update(entry.sql).digest('hex') !== entry.checksum) throw new Error('native_migration_invalid');
     const name = quote(entry.name), checksum = quote(entry.checksum);
     // SQL files are explicit top-level transactions; the ledger owns that boundary.
-    const sql = entry.sql.replace(/^BEGIN;\s*$/gmi, '').replace(/^COMMIT;\s*$/gmi, '');
+    const sql = sqlWithoutTransaction(entry.sql);
     output = `BEGIN;
 SELECT pg_catalog.pg_advisory_xact_lock(207403,1);
 DO $ledger$ BEGIN

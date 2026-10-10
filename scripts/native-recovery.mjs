@@ -7,6 +7,9 @@ import { Transform } from 'node:stream';
 import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
+import { nativeRoles } from '../lib/backend/native-roles.mjs';
+import { inspectHostingContract } from './native-hosting-contract.mjs';
+import { postgresTls, postgresHostname } from '../lib/backend/postgres-tls.mjs';
 import { authorizeTarget, withOperator, digest } from './native-ops-target.mjs';
 import { nativeMigrationManifest } from './native-migrations.mjs';
 import { parseOperatorArgs, migrationHistory, validateHistory } from './native-migration-runner.mjs';
@@ -43,7 +46,7 @@ export function validateBackupManifest(manifest) {
   if(manifest?.format!=='MediaTrackerNativeBackupV1' || manifest.backend!=='native'
     || manifest.consistency!=='write-frozen-operator-quiesced' || !Array.isArray(manifest.files)
     || manifest.files.length>MAX_FILES || !Array.isArray(manifest.migrations)
-    || validateHistory(manifest.migrations).length || manifest.fingerprint!==digest({...manifest,fingerprint:undefined}))throw new Error('native_backup_manifest_invalid');
+    || validateHistory(manifest.migrations,nativeMigrationManifest(manifest.roleProfile)).length || manifest.fingerprint!==digest({...manifest,fingerprint:undefined}))throw new Error('native_backup_manifest_invalid');
   let bytes=0;const names=new Set();
   for(const file of manifest.files) {
     if(typeof file.path!=='string' || file.path.includes('\\') || file.path.split('/').some(p=>!p||p==='.'||p==='..')
@@ -71,11 +74,13 @@ async function newDirectory(path) {
 }
 export async function postgresTool(tool,config,path) {
   const url=config.url;
+  postgresTls(config.ssl,config.caFile,url.hostname);
   const env={PATH:process.env.PATH,SystemRoot:process.env.SystemRoot,TEMP:process.env.TEMP,TMP:process.env.TMP,
-    PGHOST:url.hostname,PGPORT:url.port||'5432',PGDATABASE:decodeURIComponent(url.pathname.slice(1)),
+    PGHOST:postgresHostname(url.hostname),PGPORT:url.port||'5432',PGDATABASE:decodeURIComponent(url.pathname.slice(1)),
     PGUSER:decodeURIComponent(url.username),PGPASSWORD:decodeURIComponent(url.password),
+    ...(config.caFile?{PGSSLROOTCERT:config.caFile}:{}),
     PGSSLMODE:config.ssl?'verify-full':'disable',PGCONNECT_TIMEOUT:'3',PGOPTIONS:'-c statement_timeout=120000 -c lock_timeout=2000'};
-  const args=tool==='pg_dump'?['--format=custom','--no-password']:['--exit-on-error','--single-transaction','--no-password','--dbname',env.PGDATABASE,path];
+  const args=tool==='pg_dump'?['--format=custom','--no-password',...(config.roles?.hosted?['--exclude-schema=public']:[])]:['--exit-on-error','--single-transaction','--no-password','--dbname',env.PGDATABASE,path];
   const child=spawn(tool,args,{env,stdio:['ignore',tool==='pg_dump'?'pipe':'ignore','ignore'],windowsHide:true});
   let deadline;
   const exit=new Promise((res,rej)=>{
@@ -102,23 +107,42 @@ async function assetsVerified(client,root) {
   }
   return rows.length;
 }
-export async function verifyNativeDatabase(client) {
+export async function verifyNativeDatabase(client, roles = nativeRoles(), restore = false) {
+  if(roles.hosted) await inspectHostingContract(client,roles,restore,true);
+  if(roles.hosted) {
+    const owners=JSON.stringify([
+      {schema:'app',owner:roles.owner},{schema:'native_auth',owner:roles.auth_owner},
+      {schema:'private_privacy_ops',owner:roles.owner},{schema:'private_rate_limit',owner:roles.limiter},
+      {schema:'native_migrations',owner:roles.ledger_owner}]);
+    const safe=(await client.query(`WITH expected AS (SELECT * FROM jsonb_to_recordset($1::jsonb) AS e(schema text,owner text))
+      SELECT NOT EXISTS(SELECT FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+        JOIN expected e ON e.schema=n.nspname WHERE c.relkind IN ('r','p','S','v','m') AND c.relowner<>e.owner::regrole)
+      AND NOT EXISTS(SELECT FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+        JOIN expected e ON e.schema=n.nspname CROSS JOIN LATERAL aclexplode(c.relacl) a WHERE a.grantee=0)
+      AND NOT EXISTS(SELECT FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace JOIN expected e ON e.schema=n.nspname
+        CROSS JOIN LATERAL aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a WHERE a.grantee=0)
+      AND NOT EXISTS(SELECT FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace JOIN expected e ON e.schema=n.nspname
+        WHERE p.proowner<>e.owner::regrole AND NOT (n.nspname='app' AND p.proowner=$2::regrole
+          AND p.proname IN ('consume_application_rate_limit_v1','report_provider_cooldown_v1')))
+      AS safe`,[owners,roles.limiter])).rows[0]?.safe;
+    if(safe!==true)throw new Error('native_recovery_ownership_acl_invalid');
+  }
   const catalog=(await client.query(`SELECT
-    EXISTS(SELECT FROM pg_roles WHERE rolname='mt_runtime' AND NOT (rolsuper OR rolbypassrls OR rolcreatedb OR rolcreaterole OR rolreplication))
-    AND NOT EXISTS(SELECT FROM pg_roles WHERE rolname IN ('mt_owner','mt_auth_owner','mt_privacy_operator','mt_limiter')
-      AND pg_has_role('mt_runtime',oid,'MEMBER'))
+    EXISTS(SELECT FROM pg_roles WHERE rolname=$1 AND NOT (rolsuper OR rolbypassrls OR rolcreatedb OR rolcreaterole OR rolreplication))
+    AND NOT EXISTS(SELECT FROM pg_roles WHERE rolname IN ($2,$3,$4,$5)
+      AND pg_has_role($1::text,oid,'MEMBER'))
     AND NOT EXISTS(SELECT FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='app'
-      AND c.relkind IN ('r','p') AND (NOT c.relrowsecurity OR NOT c.relforcerowsecurity OR c.relowner=(SELECT oid FROM pg_roles WHERE rolname='mt_runtime')))
+      AND c.relkind IN ('r','p') AND (NOT c.relrowsecurity OR NOT c.relforcerowsecurity OR c.relowner=(SELECT oid FROM pg_roles WHERE rolname=$1)))
     AND NOT EXISTS(SELECT FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname IN ('app','native_auth') AND p.prosecdef
-      AND NOT EXISTS(SELECT FROM unnest(p.proconfig) setting WHERE setting LIKE 'search_path=%')) AS safe`)).rows[0]?.safe;
+      AND NOT EXISTS(SELECT FROM unnest(p.proconfig) setting WHERE setting LIKE 'search_path=%')) AS safe`,[roles.runtime,roles.owner,roles.auth_owner,roles.privacy_operator,roles.limiter])).rows[0]?.safe;
   const lifecycle=(await client.query('SELECT app.native_ops_lifecycle_state() AS state')).rows[0]?.state;
   if(catalog!==true||!lifecycle||lifecycle.missing!==0||!Number.isSafeInteger(lifecycle.pending)||lifecycle.pending<0)throw new Error('native_recovery_catalog_invalid');
   return {catalog:'PASS',pendingPrivacyAccounts:lifecycle.pending};
 }
 export async function backupNative(client,config,target,options,tool=postgresTool) {
-  authorizeTarget(target,config,{operation:'BACKUP',...options,operator:true,provisioner:true});
-  if(validateHistory(await migrationHistory(client)).length)throw new Error('native_schema_incomplete');
-  await verifyNativeDatabase(client);
+  authorizeTarget(target,config,{operation:'BACKUP',...options,operator:true,provisioner:!config.roles?.hosted});
+  if(validateHistory(await migrationHistory(client,config.roles),nativeMigrationManifest(config.roles?.profile)).length)throw new Error('native_schema_incomplete');
+  await verifyNativeDatabase(client,config.roles);
   if(!options.apply)return {mode:'PLAN',consistency:'freeze; stop all workers and scheduled operators; dump; copy; verify; leave frozen'};
   if(options.quiesced!=='ALL_WORKERS_AND_OPERATORS_STOPPED')throw new Error('native_backup_quiescence_required');
   const root=storageRoot(options.storage),destination=outside(options.output,[root,process.cwd()]);
@@ -141,12 +165,13 @@ export async function backupNative(client,config,target,options,tool=postgresToo
     }
     if(JSON.stringify(source)!==JSON.stringify(await tree(storage)))throw new Error('native_backup_copy_mismatch');
     const files=await tree(destination);
-    const migrations=await migrationHistory(client);
-    if(validateHistory(migrations).length)throw new Error('native_schema_incomplete');
+    const migrations=await migrationHistory(client,config.roles);
+    if(validateHistory(migrations,nativeMigrationManifest(config.roles?.profile)).length)throw new Error('native_schema_incomplete');
     const references=await assetsVerified(client,storage);
-    const databaseState=await verifyNativeDatabase(client);
+    const databaseState=await verifyNativeDatabase(client,config.roles);
     if(JSON.stringify(source)!==JSON.stringify(await tree(root)))throw new Error('native_backup_source_changed');
     const manifest={format:'MediaTrackerNativeBackupV1',backend:'native',createdAt:new Date().toISOString(),
+      ...(config.roles?.hosted?{roleProfile:config.roles.profile}:{}),
       consistency:'write-frozen-operator-quiesced',targetFingerprint:target.fingerprint,migrations,files,references,databaseState};
     manifest.fingerprint=digest(manifest);validateBackupManifest(manifest);
     await writeFile(join(destination,'manifest.json'),JSON.stringify(manifest,null,2)+'\n',{flag:'wx',mode:0o600});
@@ -163,8 +188,9 @@ export async function verifyBackup(path) {
   return manifest;
 }
 export async function restoreNative(client,config,target,options,tool=postgresTool) {
-  authorizeTarget(target,config,{operation:'RESTORE',...options,operator:true,provisioner:true});
+  authorizeTarget(target,config,{operation:'RESTORE',...options,operator:true,provisioner:!config.roles?.hosted});
   const manifest=await verifyBackup(resolve(options.input));
+  if((manifest.roleProfile??'local')!==(config.roles?.profile??'local'))throw new Error('native_restore_profile_mismatch');
   if(manifest.fingerprint!==options['backup-fingerprint'])throw new Error('native_restore_backup_unconfirmed');
   const exists=(await client.query(`SELECT EXISTS(SELECT FROM pg_namespace WHERE nspname NOT IN ('public','information_schema') AND nspname NOT LIKE 'pg_%')
     OR EXISTS(SELECT FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind IN ('r','p','S','v','m')) AS occupied`)).rows[0]?.occupied;
@@ -176,8 +202,8 @@ export async function restoreNative(client,config,target,options,tool=postgresTo
   // pg_restore preserves role ownership/ACLs. Provision exact NOLOGIN/login roles
   // beforehand out-of-band; never restore using --no-owner or --no-acl.
   await tool('pg_restore',config,join(resolve(options.input),'database.dump'));
-  if(validateHistory(await migrationHistory(client)).length)throw new Error('native_restore_schema_mismatch');
-  const databaseState=await verifyNativeDatabase(client);
+  if(validateHistory(await migrationHistory(client,config.roles),nativeMigrationManifest(config.roles?.profile)).length)throw new Error('native_restore_schema_mismatch');
+  const databaseState=await verifyNativeDatabase(client,config.roles,true);
   for(const file of manifest.files.filter(f=>f.path.startsWith('storage/'))) {
     const path=join(root,file.path.slice('storage/'.length));await safeDirectory(resolve(path,'..'),true);
     await copyFile(join(options.input,file.path),path);await chmod(path,0o600);

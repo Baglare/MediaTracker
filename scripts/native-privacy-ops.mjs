@@ -1,4 +1,6 @@
 // Operator-scoped job adapter; no default URL, discovery, CLI credentials or web import.
+import { authorizeTarget, assertHostedOperatorClient } from './native-ops-target.mjs';
+import { nativeRoles } from '../lib/backend/native-roles.mjs';
 import { readdir, rmdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { assertUser, runErasure, accountExport } from './privacy-account-model.mjs';
@@ -20,16 +22,16 @@ export async function verifyNativeFilesystemAbsent(root,user) {
   if((await readdir(path)).length)throw new Error('privacy_storage_residual');
   await rmdir(path);
 }
-export function nativePrivacyAdapter(client,root,user) {
+export function nativePrivacyAdapter(client,root,user,roles = nativeRoles()) {
   assertUser(user);
   // Runtime credentials fail before any target mutation.
   const admitted=async()=>{
-    const row=(await client.query("SELECT session_user AS login,pg_has_role(session_user,'mt_privacy_operator','MEMBER') AS operator")).rows[0];
-    if(!row?.operator || row.login==='mt_runtime')throw new Error('privacy_ops_denied');
+    const row=(await client.query("SELECT session_user AS login,pg_has_role(session_user,$1::text,'USAGE') AS operator",[roles.privacy_operator])).rows[0];
+    if(!row?.operator || row.login===roles.runtime)throw new Error('privacy_ops_denied');
   };
   const query=async(sql,values=[])=>{await admitted();return client.query(sql,values);};
   return {
-    environment:'disposable',
+    environment:roles.profile==='hosting-production'?'production':'disposable',
     async inspect(){return (await query('SELECT app.native_privacy_inspect($1::uuid) AS result',[user])).rows[0].result;},
     async transition(id,state){if(id!==user)throw new Error('privacy_target_changed');await query('SELECT app.transition_account($1::uuid,$2,$3)',[user,state,`PRIVACY ${user}`]);},
     async assertLocked(id){if(id!==user)throw new Error('privacy_target_changed');const snapshot=await this.inspect();if(snapshot.auth.length && !['ERASURE_PENDING','ERASING'].includes(snapshot.lifecycle?.[user]))throw new Error('privacy_lock_missing');},
@@ -47,11 +49,15 @@ export function nativePrivacyAdapter(client,root,user) {
     async recordStage(id,stage,status){if(id!==user)throw new Error('privacy_target_changed');await query('SELECT app.native_privacy_record_stage($1::uuid,$2,$3)',[user,stage,status==='PASS']);},
   };
 }
-/** Invocation requires a connection already proven disposable by the runner.
- * No discovered environment credential is accepted as evidence of disposability. */
-export async function runNativePrivacyJob({client,disposableProof,storage,user,email,execute=false,confirmation,acceptParticipantLoss=false}) {
-  assertNativeDisposableClient(client,disposableProof);
-  const root=storageRoot(storage),adapter=nativePrivacyAdapter(client,root,user);
+/** Local jobs require the runner-owned disposable capability. Hosted jobs
+ * require the exact client/config/target bound by withOperator, plus confirmations. */
+export async function runNativePrivacyJob({hostingConfig,hostingTarget,operatorConfirmation,roles = nativeRoles(),client,disposableProof,storage,user,email,execute=false,confirmation,acceptParticipantLoss=false}) {
+  if(roles.hosted) {
+    if(hostingConfig?.roles?.profile!==roles.profile || hostingConfig.kind!=='privacy_login')throw new Error('privacy_ops_denied');
+    assertHostedOperatorClient(client,hostingConfig,hostingTarget);
+    authorizeTarget(hostingTarget,hostingConfig,{operation:'MAINTAIN',apply:execute,confirmation:operatorConfirmation,operator:true});
+  } else assertNativeDisposableClient(client,disposableProof);
+  const root=storageRoot(storage),adapter=nativePrivacyAdapter(client,root,user,roles);
   if(!execute)return {export:accountExport(await adapter.inspect(),user,email,new Date().toISOString()),erasure:await runErasure(adapter,user)};
   return runErasure(adapter,user,{execute,confirmation,acceptParticipantLoss});
 }

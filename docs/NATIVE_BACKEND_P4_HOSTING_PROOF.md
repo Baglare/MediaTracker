@@ -1,5 +1,30 @@
 # Native backend P4 hosting proof
 
+## Current hosting contract — 2026-10-10
+
+The user's latest official TürkHosting response reports PostgreSQL 18.6 TLS
+`verify-full`, CA `/var/www/vhosts/baglare.com.tr/.postgresql/root.crt`, SAN
+`127.0.0.1`, `::1`, `localhost`, expiry year 2031, and support for precreated
+roles/schemas, PostgreSQL 18 membership options and separate test/Production
+roles. This is user-supplied provider information, not independently executed
+TLS/DB acceptance. Earlier TLS-unsupported / support-pending observations below
+are retained as historical evidence and do not describe the latest reply.
+
+The authoritative provisioning and installation contract is now
+[NATIVE_P4_FINAL_HOSTING_PROVISIONING.md](NATIVE_P4_FINAL_HOSTING_PROVISIONING.md).
+Use fixed `hosting-test` / `hosting-production` role profiles and the operator
+migration runner for hosted targets. Historical `mt_*` psql provisioning is
+local-only. Database and migration-ledger ownership are separate NOLOGIN roles;
+backup/restore use distinct controlled logins. Read the complete contract before
+provisioning; the initial eight-role proposal is insufficient.
+
+Source tests do not close actual PostgreSQL 18 migrations, hosted TLS/Auth/RLS,
+maintenance, backup/restore, ingress or capacity acceptance. No hosting/DB
+connection or Production operation was performed in this source adaptation.
+`P4_STATUS=ACCESS_QUALIFIED`, `REAL_DB_PROOF=LIVE_UNVERIFIED`, `P5_READY=NO`.
+Supabase fallback/rollback and disabled-provider policy remain intact.
+
+
 2026-10-09. Updated with additional user-reported disposable TÃ¼rkHosting tests.
 The earlier local-only Phase 0 attempt is retained below as historical evidence.
 

@@ -269,7 +269,7 @@
     "CI": "absent: credential-free offline suite",
     "PREVIEW": "native only; required; forbidden in supabase",
     "PRODUCTION": "native only; required; forbidden in supabase",
-    "allowed": "postgresql URL; mt_runtime login; no query/hash; server secret",
+    "allowed": "postgresql URL; closed profile runtime/database pair; no query/hash; server secret",
     "visibility": "server secret",
     "owner": "release operator",
     "failure": "unset/invalid keeps capability disabled or blocks acceptance; no substitute target"
@@ -314,6 +314,28 @@
     "PREVIEW": "native only; required; forbidden in supabase",
     "PRODUCTION": "native only; required; forbidden in supabase",
     "allowed": "canonical HTTP(S) origin equal to app URL; hosted requires HTTPS",
+    "visibility": "server non-secret",
+    "owner": "release operator",
+    "failure": "unset/invalid keeps capability disabled or blocks acceptance; no substitute target"
+  },
+  {
+    "name": "NATIVE_ROLE_PROFILE",
+    "LOCAL": "required only for native; pool max optional; isolated disposable target",
+    "CI": "absent: credential-free offline suite",
+    "PREVIEW": "native only; optional; forbidden in supabase",
+    "PRODUCTION": "native only; optional; forbidden in supabase",
+    "allowed": "local (loopback only), hosting-test, hosting-production; fixed database/login pairs",
+    "visibility": "server non-secret",
+    "owner": "release operator",
+    "failure": "unset/invalid keeps capability disabled or blocks acceptance; no substitute target"
+  },
+  {
+    "name": "DATABASE_SSL_CA_FILE",
+    "LOCAL": "required only for native; pool max optional; isolated disposable target",
+    "CI": "absent: credential-free offline suite",
+    "PREVIEW": "native only; optional; forbidden in supabase",
+    "PRODUCTION": "native only; optional; forbidden in supabase",
+    "allowed": "optional local absolute PEM CA file; required hosting profile; no symlink/private key; TLS verify-full only",
     "visibility": "server non-secret",
     "owner": "release operator",
     "failure": "unset/invalid keeps capability disabled or blocks acceptance; no substitute target"

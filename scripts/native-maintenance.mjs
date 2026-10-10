@@ -2,6 +2,7 @@ import { pathToFileURL } from 'node:url';
 import { opendir, lstat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { authorizeTarget, withOperator } from './native-ops-target.mjs';
+import { nativeMigrationManifest } from './native-migrations.mjs';
 import { parseOperatorArgs, migrationHistory, validateHistory } from './native-migration-runner.mjs';
 import { cleanupNativeAssets } from './native-assets-maintenance.mjs';
 import { storageRoot, safeDirectory, removeTemporary } from '../lib/backend/filesystem-core.mjs';
@@ -9,13 +10,13 @@ import { attestNativeDisposableClient } from './native-disposable-capability.mjs
 import { runNativePrivacyJob } from './native-privacy-ops.mjs';
 export async function runMaintenance(client,config,target,options) {
   authorizeTarget(target,config,{operation:'MAINTAIN',...options,operator:true});
-  if(validateHistory(await migrationHistory(client)).length)throw new Error('native_schema_incomplete');
+  if(validateHistory(await migrationHistory(client,config.roles),nativeMigrationManifest(config.roles?.profile)).length)throw new Error('native_schema_incomplete');
   const job=options.job??'cleanup';
   if(!['cleanup','freeze','unfreeze','inspect','privacy'].includes(job))throw new Error('native_maintenance_job_invalid');
   if(job==='privacy') {
-    if(target.environment!=='disposable')throw new Error('native_privacy_target_unproven');
-    const disposableProof=await attestNativeDisposableClient(client,{containerId:options['container-id'],runName:options['run-name'],localEndpoint:options['local-endpoint']});
-    const result=await runNativePrivacyJob({client,disposableProof,storage:options.storage,user:options.user,email:options.email,
+    if(!config.roles?.hosted && target.environment!=='disposable')throw new Error('native_privacy_target_unproven');
+    const disposableProof=config.roles?.hosted?undefined:await attestNativeDisposableClient(client,{containerId:options['container-id'],runName:options['run-name'],localEndpoint:options['local-endpoint']});
+    const result=await runNativePrivacyJob({hostingConfig:config.roles?.hosted?config:undefined,hostingTarget:target,operatorConfirmation:options.confirmation,roles:config.roles,client,disposableProof,storage:options.storage,user:options.user,email:options.email,
       execute:options.apply,confirmation:options['privacy-confirmation'],acceptParticipantLoss:options['participant-loss']==='acknowledged'});
     if(options.apply&&result.completed!==true)throw new Error('native_privacy_cleanup_pending');
     // Export/snapshot/UUID/email content is deliberately never sent to logs.
