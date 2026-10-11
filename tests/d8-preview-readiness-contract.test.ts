@@ -1,5 +1,8 @@
 import { readFileSync } from "node:fs";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("server-only", () => ({}));
+import { validateSameOrigin } from "@/lib/api/request-security";
 
 function source(path: string) {
   return readFileSync(path, "utf8");
@@ -29,12 +32,17 @@ describe("D8-4A.5 Preview readiness contract", () => {
 
   it("supports Vercel request origins without a localhost-only dependency", () => {
     const candidateSearch = source("lib/ai/candidate-search.ts");
-    const requestSecurity = source("lib/api/request-security.ts");
 
     expect(candidateSearch).toContain("process.env.VERCEL_URL");
     expect(candidateSearch.indexOf("process.env.VERCEL_URL"))
       .toBeLessThan(candidateSearch.indexOf('return "http://localhost:3000"'));
-    expect(requestSecurity).toContain("new URL(origin).origin === new URL(request.url).origin");
+    vi.stubEnv("BACKEND_PROVIDER", "supabase");
+    try {
+      const target = "https://preview-123.vercel.app";
+      expect(validateSameOrigin(new Request(`${target}/api/test`, { headers: { Origin: target } }))).toBeNull();
+      expect(validateSameOrigin(new Request(`${target}/api/test`, { headers: { Origin: "https://attacker.example" } })))
+        .toHaveProperty("status", 403);
+    } finally { vi.unstubAllEnvs(); }
   });
 
   it("keeps incompatible cloud rollout combinations fail-closed", () => {

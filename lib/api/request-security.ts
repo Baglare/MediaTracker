@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getApplicationServerClient as getSupabaseServerClient } from "@/lib/backend/application-server";
+import { nativeConfig } from "@/lib/backend/native-config";
 import { BodyLimitError, readBoundedBytes, readBoundedText } from "./bounded-body";
 
 export const API_NO_STORE_HEADERS = { "Cache-Control": "no-store" } as const;
@@ -32,11 +33,25 @@ export function apiError(code: string, status: number, headers?: HeadersInit) {
   );
 }
 
+function mutationTargetOrigin(request: Request): string {
+  if (process.env.NODE_ENV === "production" && process.env.BACKEND_PROVIDER === "native"
+    && process.env.NATIVE_ROLE_PROFILE !== undefined && process.env.NATIVE_ROLE_PROFILE !== "local") {
+    const config = nativeConfig(process.env);
+    if (config.roles.hosted) {
+      // Passenger may expose an internal HTTP request URL. Only validated server
+      // configuration defines the public boundary; never trust forwarded headers.
+      if (process.env.NEXT_PUBLIC_APP_URL !== config.authUrl) throw new Error("native_configuration_invalid");
+      return config.authUrl;
+    }
+  }
+  return new URL(request.url).origin;
+}
+
 export function validateSameOrigin(request: Request): NextResponse | null {
   const origin = request.headers.get("origin");
   if (!origin) return null;
   try {
-    if (new URL(origin).origin === new URL(request.url).origin) return null;
+    if (new URL(origin).origin === mutationTargetOrigin(request)) return null;
   } catch {
     // Invalid origins fail closed.
   }
@@ -50,8 +65,7 @@ export function validateAuthenticatedMutationRequest(request: Request): NextResp
     // Origin is a serialized HTTP(S) origin, never a URL with credentials/path/query.
     if (!origin || !/^https?:\/\/[^/?#\\\s]+$/i.test(origin)) return apiError("invalid_origin", 403);
     const source = new URL(origin);
-    const target = new URL(request.url);
-    if (source.username || source.password || source.origin !== target.origin) {
+    if (source.username || source.password || source.origin !== mutationTargetOrigin(request)) {
       return apiError("invalid_origin", 403);
     }
   } catch {
