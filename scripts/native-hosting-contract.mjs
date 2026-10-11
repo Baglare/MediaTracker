@@ -15,9 +15,11 @@ export function hostingSchemas(r) {
     {schema:'native_migrations',owner:r.ledger_owner}];
 }
 export async function inspectHostingContract(client, r, restore = false, installed = false) {
+  const shared = r.capability==='shared-managed';
+  if (shared && restore) throw new Error('native_shared_recovery_unavailable');
   const names = ['runtime','migrator','privacy_login','owner','auth_owner','auth_access','privacy_operator','limiter','backup','restore','database_owner','ledger_owner']
     .map(key => ({name:r[key],login:['runtime','migrator','privacy_login','backup','restore'].includes(key),
-      inherit:key==='runtime',bypass:key==='backup'||key==='restore',limit:key==='runtime'?5:['migrator','privacy_login','backup','restore'].includes(key)?2:-1}));
+      inherit:key==='runtime',bypass:!shared&&(key==='backup'||key==='restore'),limit:key==='runtime'?5:['migrator','privacy_login','backup','restore'].includes(key)?2:-1}));
   const safe = (await client.query(`WITH expected AS (SELECT * FROM jsonb_to_recordset($1::jsonb)
       AS e(name text,login boolean,inherit boolean,bypass boolean,"limit" integer)),
     edges AS (SELECT * FROM jsonb_to_recordset($2::jsonb) AS e(member text,role text,inherit boolean,set boolean)),
@@ -35,7 +37,8 @@ export async function inspectHostingContract(client, r, restore = false, install
       AND NOT EXISTS(SELECT FROM schemas e LEFT JOIN pg_namespace n ON n.nspname=e.schema
         LEFT JOIN pg_roles owner ON owner.oid=n.nspowner
         WHERE (NOT $4 AND n.oid IS NULL) OR (n.oid IS NOT NULL AND owner.rolname<>e.owner))
-      AND (SELECT datdba=$5::regrole FROM pg_database WHERE datname=current_database())
+      AND ($9::boolean OR (
+      (SELECT datdba=$5::regrole FROM pg_database WHERE datname=current_database())
       AND NOT EXISTS(SELECT FROM pg_database d, LATERAL aclexplode(coalesce(d.datacl,acldefault('d',d.datdba))) a
         WHERE d.datname=current_database() AND a.grantee=0 AND a.privilege_type IN ('CONNECT','CREATE','TEMPORARY'))
       AND NOT EXISTS(SELECT FROM pg_database d CROSS JOIN LATERAL aclexplode(coalesce(d.datacl,acldefault('d',d.datdba))) a
@@ -50,6 +53,11 @@ export async function inspectHostingContract(client, r, restore = false, install
       AND NOT EXISTS(SELECT FROM expected e JOIN pg_roles r ON r.rolname=e.name CROSS JOIN pg_database d
         WHERE (d.datname=($6::text[])[1] AND has_database_privilege(r.oid,d.oid,'CONNECT')<>(e.name=ANY($7::text[])))
            OR (d.datname=($6::text[])[2] AND has_database_privilege(r.oid,d.oid,'CONNECT')<>(e.name=ANY($8::text[]))))
+      ))
+      AND (NOT $9::boolean OR NOT EXISTS(SELECT FROM pg_database d JOIN pg_roles owner ON owner.oid=d.datdba
+        WHERE d.datname=current_database() AND owner.rolname IN (SELECT name FROM expected)))
+      AND NOT EXISTS(SELECT FROM schemas e JOIN pg_namespace n ON n.nspname=e.schema,
+        LATERAL aclexplode(coalesce(n.nspacl,acldefault('n',n.nspowner))) a WHERE a.grantee=0)
       AND (SELECT nspowner='pg_database_owner'::regrole FROM pg_namespace WHERE nspname='public')
       AND NOT EXISTS(SELECT FROM pg_namespace n, LATERAL aclexplode(coalesce(n.nspacl,acldefault('n',n.nspowner))) a
         WHERE n.nspname='public' AND a.privilege_type='CREATE' AND (a.grantee=0 OR a.grantee<>n.nspowner))
@@ -59,7 +67,7 @@ export async function inspectHostingContract(client, r, restore = false, install
         WHERE n.nspname='public')
       AS safe`, [JSON.stringify(names),JSON.stringify(hostingMemberships(r)),JSON.stringify(hostingSchemas(r)),
         restore && !installed,r.database_owner,[r.database,r.restoreDatabase],
-        [r.runtime,r.migrator,r.privacy_login,r.backup,r.database_owner],[r.restore,r.database_owner]])).rows[0]?.safe;
+        [r.runtime,r.migrator,r.privacy_login,r.backup,r.database_owner],[r.restore,r.database_owner],shared])).rows[0]?.safe;
   if (safe !== true) throw new Error('native_hosting_contract_invalid');
   // Runtime connection checks also apply when inspecting as an operator.
   const check = runtimeRoleCheck(r,false);

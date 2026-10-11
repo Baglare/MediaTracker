@@ -272,6 +272,49 @@ async function reviewedSemverFixture() {
   return fixture;
 }
 
+for(const platform of ['linux','windows']) {
+  test(`npm nested ${platform} command shims are omitted from directory aliases`,async()=>{
+    const fixture=await nestedFixture();
+    try {
+      await fixture.put('node_modules/sharp/node_modules/semver/package.json','{}');
+      await fixture.put('node_modules/sharp/node_modules/semver/bin/semver.js','runtime');
+      const bin=join(fixture.root,'node_modules/sharp/node_modules/.bin');
+      await mkdir(bin);
+      if(platform==='linux')await symlink('../semver/bin/semver.js',join(bin,'semver'),'file');
+      else for(const name of ['semver','semver.cmd','semver.ps1'])await fixture.put(`node_modules/sharp/node_modules/.bin/${name}`,'npm shim');
+      const link=join(fixture.root,'.next/standalone/.next/node_modules/dependency-hash');
+      await mkdir(dirname(link),{recursive:true});
+      await symlink(relative(dirname(link),dirname(bin)),link,'dir');
+      assert.equal((await preflightDependencies(fixture.root)).status,'PASS');
+      const output=await copyDependencies(fixture);
+      await assert.rejects(lstat(join(output,'.next/node_modules/dependency-hash/.bin')),error=>error.code==='ENOENT');
+      assert.equal(await readFile(join(output,'.next/node_modules/dependency-hash/semver/bin/semver.js'),'utf8'),'runtime');
+      const filter=await dependencyCopyFilter(fixture.root,join(fixture.root,'.next/standalone'));
+      await assert.rejects(filter.inspect(join(bin,'semver')),/link_unsafe/);
+      await fixture.put('node_modules/sharp/node_modules/unlisted/package.json','{}');
+      await assert.rejects(copyDependencies(fixture),/dependency_untrusted/);
+    } finally {await rm(fixture.root,{recursive:true,force:true});}
+  });
+}
+
+test('npm command directory omission rejects linked containers and development ancestors',async()=>{
+  for(const change of ['linked','development']) {
+    const fixture=await nestedFixture();
+    try {
+      const bin=join(fixture.root,'.next/standalone/node_modules/sharp/node_modules/.bin');
+      if(change==='linked')await symlink(join(fixture.root,'public'),bin,'dir');
+      else {
+        await mkdir(bin);
+        const lock=JSON.parse(await readFile(join(fixture.root,'package-lock.json'),'utf8'));
+        lock.packages['node_modules/sharp'].dev=true;
+        await fixture.put('package-lock.json',JSON.stringify(lock));
+      }
+      await assert.rejects(copyDependencies(fixture),/link_unsafe|storage_path_unsafe|dependency_untrusted/);
+      assert.equal((await preflightDependencies(fixture.root)).status,'REJECTED');
+    } finally {await rm(fixture.root,{recursive:true,force:true});}
+  }
+});
+
 test('reviewed dev-only semver metadata is omitted while nested production semver is retained',async()=>{
   const fixture=await reviewedSemverFixture();
   try {

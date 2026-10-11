@@ -1,5 +1,5 @@
 import { cp, mkdir, readFile, writeFile, lstat, opendir, readdir, readlink } from 'node:fs/promises';
-import { resolve, join, relative, isAbsolute, dirname, sep } from 'node:path';
+import { resolve, join, relative, isAbsolute, dirname, basename, sep } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
@@ -100,6 +100,9 @@ export async function dependencyCopyFilter(cwd,standalone) {
     }
     if(!root)throw new Error('deployment_trace_link_unsafe');
     const name=relative(root,path).replaceAll('\\','/');
+    // npm command shims are installation tooling, never trusted link targets.
+    if(/(?:^|\/)node_modules\/\.bin(?:\/|$)/.test(`node_modules/${name}`))
+      throw new Error('deployment_trace_link_unsafe');
     if(forbiddenArtifactPath(name))throw new Error('deployment_trace_link_unsafe');
     if(!name && allowRoot)return root;
     const key=`node_modules/${name}`;
@@ -158,6 +161,17 @@ export async function dependencyCopyFilter(cwd,standalone) {
     return current;
   }
   const filter=async path=>{
+    if(basename(path)==='.bin' && sourceRoots.some(root=>inside(root,path))) {
+      // Turbopack directory aliases can include npm's nested command shims.
+      // Omit the ordinary directory on both platforms, after checking its
+      // production-owned parent. Linked containers and shim targets stay denied.
+      const directory=join(await inspect(dirname(path)),'.bin');
+      const dependencyRoot=roots.find(root=>inside(root,directory));
+      if(dependencyRoot && /(?:^|\/)node_modules\/\.bin$/.test(`node_modules/${relative(dependencyRoot,directory).replaceAll('\\','/')}`)) {
+        await safeDirectory(directory);
+        return false;
+      }
+    }
     if((path===metadataRoot||path===metadataFile)&&await metadataOnly()) {
       // Traverse the ordinary directory so any new file still gets checked.
       return path===metadataRoot;

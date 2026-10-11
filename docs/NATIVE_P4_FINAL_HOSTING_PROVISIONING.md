@@ -1,5 +1,10 @@
 # Native PostgreSQL P4 — Nihai hosting kurulum şartnamesi
 
+2026-10-11: Tamamlanan sağlayıcı raporunda BYPASSRLS, ayrı restore DB ve database
+ownership/ACL değişiklikleri sunulmadı. Mevcut yapı için
+[shared-managed kurulumu](NATIVE_SHARED_HOSTING_START.md) uygulanır. Aşağıdaki
+şartname `dedicated` profilinin tarihsel sözleşmesidir; yeniden rol/DB talebi değildir.
+
 Tarih: 2026-10-10. Kapsam: PostgreSQL 18.6, TürkHosting tarafından önceden
 oluşturulan roller/şemalar ve özel CA ile TLS `verify-full`.
 

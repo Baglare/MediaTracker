@@ -34,7 +34,7 @@
     },
     {
       "name": "009_deployment_operations.sql",
-      "checksum": "e3ec0f6199dea26f6d478356c7fe46c7921ad28b7b2161858768d4dca66e8a43"
+      "checksum": "5ed5a095be0c42a4ca6ef1db0a01d092b8f28c41fa76eef8e8bd6b6c808c240a"
     }
   ],
   "hosting-production": [
@@ -72,7 +72,7 @@
     },
     {
       "name": "009_deployment_operations.sql",
-      "checksum": "4f5d5565c7c24efb9553515e8e1af1ba89b6d4b625fe12a7c180b7126664794e"
+      "checksum": "141fdbfbfb7a777fe969534805b16e667aca80f58e66501d837b438fe6ffe345"
     }
   ]
 }

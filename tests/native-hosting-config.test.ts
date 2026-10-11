@@ -4,6 +4,7 @@ import { nativeRoles } from '@/lib/backend/native-roles.mjs';
 import { resolve } from 'node:path';
 import localMigrations from '@/lib/backend/native-migration-state.json';
 import hostingMigrations from '@/lib/backend/native-hosting-migration-state.json';
+import { nativeMigrationManifest } from '../scripts/native-migrations.mjs';
 const mocks=vi.hoisted(()=>({query:vi.fn()}));
 vi.mock('@/lib/backend/postgres',()=>({getNativePool:()=>({query:mocks.query})}));
 vi.mock('@/lib/auth/current-user',()=>({getCurrentUser:vi.fn()}));
@@ -17,6 +18,8 @@ it('binds hosted runtime to fixed profile, login and database with strict TLS CA
       DATABASE_SSL_MODE:'verify-full',DATABASE_SSL_CA_FILE:resolve('.codex/check/nonexistent-root.crt'),NODE_ENV:'production',
       BETTER_AUTH_URL:'https://app.example.invalid',BETTER_AUTH_SECRET:'a'.repeat(40)};
     expect(nativeConfig(env).roles.profile).toBe(profile);
+    expect(nativeConfig({...env,NATIVE_HOSTING_CAPABILITY:'shared-managed'}).roles.capability).toBe('shared-managed');
+    expect(()=>nativeConfig({...env,NATIVE_HOSTING_CAPABILITY:'invalid'})).toThrow('native_configuration_invalid');
     for(const patch of [{DATABASE_SSL_CA_FILE:''},{DATABASE_SSL_CA_FILE:'relative.crt'},{DATABASE_SSL_MODE:'disable'},
       {NATIVE_ROLE_PROFILE:'local'},{DATABASE_URL:env.DATABASE_URL.replace(r.runtime,r.owner)},
       {DATABASE_URL:env.DATABASE_URL.replace(`/${r.database}`,'/other')},{DATABASE_URL:env.DATABASE_URL+'?sslmode=disable'}])
@@ -26,10 +29,14 @@ it('binds hosted runtime to fixed profile, login and database with strict TLS CA
 it('readiness selects the exact hosted execution checksums and rejects the other environment or incomplete history',async()=>{
   for(const profile of ['hosting-test','hosting-production'] as const) {
     vi.stubEnv('NATIVE_ROLE_PROFILE',profile);
-    mocks.query.mockResolvedValue({rows:[{ready:true,state:hostingMigrations[profile]}]});
+    const manifest=nativeMigrationManifest(profile).map(({name,checksum}: {name:string;checksum:string})=>({name,checksum}));
+    expect(hostingMigrations[profile]).toEqual(manifest);
+    if(profile==='hosting-test')expect(manifest[8].checksum).toBe('5ed5a095be0c42a4ca6ef1db0a01d092b8f28c41fa76eef8e8bd6b6c808c240a');
+    mocks.query.mockResolvedValue({rows:[{ready:true,state:manifest}]});
     expect(await nativeDatabaseReady(localMigrations)).toBe(true);
     const other=profile==='hosting-test'?'hosting-production':'hosting-test';
-    for(const state of [hostingMigrations[other],hostingMigrations[profile].slice(1),localMigrations]) {
+    const stale=manifest.map(row=>({...row}));stale[8].checksum='e3ec0f6199dea26f6d478356c7fe46c7921ad28b7b2161858768d4dca66e8a43';
+    for(const state of [hostingMigrations[other],manifest.slice(1),localMigrations,stale,[...manifest].reverse()]) {
       mocks.query.mockResolvedValue({rows:[{ready:true,state}]});
       expect(await nativeDatabaseReady(localMigrations)).toBe(false);
     }

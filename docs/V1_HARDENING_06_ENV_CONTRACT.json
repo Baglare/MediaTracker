@@ -319,6 +319,17 @@
     "failure": "unset/invalid keeps capability disabled or blocks acceptance; no substitute target"
   },
   {
+    "name": "NATIVE_HOSTING_CAPABILITY",
+    "LOCAL": "required only for native; pool max optional; isolated disposable target",
+    "CI": "absent: credential-free offline suite",
+    "PREVIEW": "native only; optional; forbidden in supabase",
+    "PRODUCTION": "native only; optional; forbidden in supabase",
+    "allowed": "dedicated (default) or shared-managed (hosted only); provider recovery unverified; no native backup/restore",
+    "visibility": "server non-secret",
+    "owner": "release operator",
+    "failure": "unset/invalid keeps capability disabled or blocks acceptance; no substitute target"
+  },
+  {
     "name": "NATIVE_ROLE_PROFILE",
     "LOCAL": "required only for native; pool max optional; isolated disposable target",
     "CI": "absent: credential-free offline suite",

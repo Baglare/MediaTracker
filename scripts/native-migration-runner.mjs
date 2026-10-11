@@ -8,6 +8,26 @@ export function validateHistory(rows, manifest=nativeMigrationManifest()) {
   return manifest.slice(rows.length);
 }
 export async function migrationHistory(client, roles = undefined) {
+  if(roles?.hosted) {
+    const login=(await client.query('SELECT session_user AS login')).rows[0]?.login;
+    // Dedicated backup logins read with their existing grants; they cannot SET owner.
+    if(login===roles.migrator || login===roles.restore) {
+      try {
+        await client.query(`SET ROLE ${roles.ledger_owner}`);
+        return await readMigrationHistory(client, roles);
+      } finally {
+        try {await client.query('RESET ROLE');}
+        catch {
+          // An aborted outer transaction can reject RESET. Never reuse that session.
+          await client.end().catch(()=>{});
+          throw new Error('native_migration_role_reset_failed');
+        }
+      }
+    }
+  }
+  return readMigrationHistory(client, roles);
+}
+async function readMigrationHistory(client, roles) {
   const exists=(await client.query("SELECT to_regclass('native_migrations.ledger') IS NOT NULL AS present")).rows[0]?.present;
   if(!exists) {
     if(roles?.hosted) {await assertHostingEmpty(client,roles);return [];}

@@ -140,6 +140,7 @@ export async function verifyNativeDatabase(client, roles = nativeRoles(), restor
   return {catalog:'PASS',pendingPrivacyAccounts:lifecycle.pending};
 }
 export async function backupNative(client,config,target,options,tool=postgresTool) {
+  if(config.roles?.capability==='shared-managed')throw new Error('native_shared_recovery_unavailable');
   authorizeTarget(target,config,{operation:'BACKUP',...options,operator:true,provisioner:!config.roles?.hosted});
   if(validateHistory(await migrationHistory(client,config.roles),nativeMigrationManifest(config.roles?.profile)).length)throw new Error('native_schema_incomplete');
   await verifyNativeDatabase(client,config.roles);
@@ -188,6 +189,7 @@ export async function verifyBackup(path) {
   return manifest;
 }
 export async function restoreNative(client,config,target,options,tool=postgresTool) {
+  if(config.roles?.capability==='shared-managed')throw new Error('native_shared_recovery_unavailable');
   authorizeTarget(target,config,{operation:'RESTORE',...options,operator:true,provisioner:!config.roles?.hosted});
   const manifest=await verifyBackup(resolve(options.input));
   if((manifest.roleProfile??'local')!==(config.roles?.profile??'local'))throw new Error('native_restore_profile_mismatch');

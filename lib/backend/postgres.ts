@@ -15,7 +15,8 @@ export function getNativePool(): Pool {
       ssl: postgresTls(config.ssl, config.caFile, new URL(config.databaseUrl).hostname),
       connectionTimeoutMillis: config.connectionTimeoutMillis, idleTimeoutMillis: config.idleTimeoutMillis,
       statement_timeout: config.statementTimeout, query_timeout: config.statementTimeout + 1000, idle_in_transaction_session_timeout: 10000,
-      options: '-c search_path=native_auth,pg_catalog', application_name: 'mediatracker-native',
+      // Explicit pg_temp LAST prevents implicit temporary-table shadowing of auth tables.
+      options: '-c search_path=native_auth,pg_catalog,pg_temp', application_name: 'mediatracker-native',
       onConnect: async client => {
         try {
           const check = runtimeRoleCheck(config.roles);

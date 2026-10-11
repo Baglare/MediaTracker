@@ -128,5 +128,5 @@ GRANT USAGE ON SCHEMA native_migrations TO ${roles.migrator};
 GRANT SELECT ON native_migrations.ledger TO ${roles.migrator};
 RESET ROLE;
 ` : '';
-  return mapNativeSql(sql, roles) + grants;
+  return mapNativeSql(sql + grants, roles);
 }

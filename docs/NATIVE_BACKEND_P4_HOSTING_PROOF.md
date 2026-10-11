@@ -1,5 +1,16 @@
 # Native backend P4 hosting proof
 
+## Shared hosting update - 2026-10-11
+
+The provider report was read: no BYPASSRLS, separate restore databases, database
+ownership/ACL changes or custom pg_hba. Use [shared-managed test setup](NATIVE_SHARED_HOSTING_START.md)
+for the existing infrastructure; dedicated provisioning below is historical.
+2026-10-11 operator report: real mt_p4_test migrations 001-009 and the corrected
+009 ledger checksum were verified; see [test acceptance](NATIVE_TEST_ACCEPTANCE.md).
+This source review did not connect to PostgreSQL. Auth/RLS/runtime/recovery/deployment
+remain LIVE_UNVERIFIED; no Production connection or mutation was performed.
+
+
 ## Current hosting contract — 2026-10-10
 
 The user's latest official TürkHosting response reports PostgreSQL 18.6 TLS

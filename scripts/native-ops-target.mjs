@@ -16,10 +16,11 @@ export function operatorConfig(env) {
   try {
     const url = new URL(env.NATIVE_OPS_DATABASE_URL);
     const environment = env.NATIVE_OPS_ENVIRONMENT;
-    const roles = nativeRoles(env.NATIVE_ROLE_PROFILE);
+    const roles = nativeRoles(env.NATIVE_ROLE_PROFILE, env.NATIVE_HOSTING_CAPABILITY);
     const kind = env.NATIVE_OPS_ROLE_KIND ?? 'migrator';
     if(env.NATIVE_OPS_SSL_CA_FILE && (!isAbsolute(env.NATIVE_OPS_SSL_CA_FILE) || env.NATIVE_OPS_SSL_MODE!=='verify-full'))throw new Error();
     if (!['migrator','privacy_login','backup','restore'].includes(kind)) throw new Error();
+    if (roles.capability==='shared-managed' && ['backup','restore'].includes(kind)) throw new Error();
     assertNativeRoleTarget(roles,url,kind,kind==='restore');
     if (roles.hosted && (env.NATIVE_OPS_SSL_MODE!=='verify-full' || !env.NATIVE_OPS_SSL_CA_FILE
       || (kind==='restore' ? environment!=='disposable' : environment!==(roles.profile==='hosting-test'?'disposable':'production')))) throw new Error();
@@ -32,7 +33,7 @@ export function operatorConfig(env) {
 }
 export async function inspectTarget(client, config) {
   const row=(await client.query(`SELECT current_database() AS database, session_user AS role,
-    current_setting('server_version_num')::integer AS version, inet_server_addr()::text AS address,
+    current_setting('server_version_num')::integer AS version, host(inet_server_addr()) AS address,
     inet_server_port() AS port, (SELECT oid::text FROM pg_database WHERE datname=current_database()) AS oid,
     CASE WHEN EXISTS(SELECT FROM pg_roles WHERE rolname=$1)
       THEN pg_has_role(session_user,(SELECT oid FROM pg_roles WHERE rolname=$1),'MEMBER') ELSE false END AS operator,

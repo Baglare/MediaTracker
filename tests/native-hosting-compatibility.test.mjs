@@ -12,6 +12,7 @@ import { operatorConfig, authorizeTarget } from '../scripts/native-ops-target.mj
 import { migrationHistory, runMigrations, validateHistory } from '../scripts/native-migration-runner.mjs';
 import { validateBackupManifest, backupNative, restoreNative, verifyBackup } from '../scripts/native-recovery.mjs';
 import { nativePrivacyAdapter, runNativePrivacyJob } from '../scripts/native-privacy-ops.mjs';
+import { hostingPreflight } from '../scripts/native-hosting-preflight.mjs';
 
 const fingerprint='a'.repeat(64);
 function config(profile='hosting-test',kind='migrator') {
@@ -21,6 +22,56 @@ function config(profile='hosting-test',kind='migrator') {
     NATIVE_OPS_SSL_MODE:'verify-full',NATIVE_OPS_SSL_CA_FILE:'/private/root.crt',NATIVE_OPS_EXPECTED_FINGERPRINT:fingerprint});
 }
 const target={environment:'disposable',fingerprint,operator:true,provisioner:true};
+
+test('shared capability is explicit, retains isolation and refuses incomplete recovery before SQL/tools',async()=>{
+  assert.throws(()=>nativeRoles('local','shared-managed'));
+  assert.throws(()=>nativeRoles('hosting-test','unknown'));
+  const roles=nativeRoles('hosting-test','shared-managed');
+  const c={...config(),roles};
+  const calls=[];
+  const client={query:async(text,values)=>{calls.push([text,values]);return {rows:[{safe:true}]};}};
+  await inspectHostingContract(client,roles);
+  const expected=JSON.parse(calls[0][1][0]);
+  assert.equal(expected.some(r=>r.bypass),false);
+  assert.equal(calls[0][1][8],true);
+  const check=runtimeRoleCheck(roles);
+  assert.match(check.text,/d.datname=current_database\(\) AND has_database_privilege/);
+  assert.match(check.text,/has_schema_privilege/);
+  assert.match(check.text,/relforcerowsecurity/);
+  assert.match(check.text,/rolbypassrls/);
+  assert.match(runtimeRoleCheck(nativeRoles('hosting-test')).text,/'TEMP'/);
+  await assert.rejects(inspectHostingContract({query:async text=>({rows:[{safe:!text.includes('relforcerowsecurity')}]})},roles),/runtime_invalid/);
+  const before=calls.length;
+  await assert.rejects(backupNative(client,c,target,{}),/shared_recovery_unavailable/);
+  await assert.rejects(restoreNative(client,c,target,{}),/shared_recovery_unavailable/);
+  assert.equal(calls.length,before);
+  for(const kind of ['backup','restore']) {
+    const original=config('hosting-test',kind);
+    assert.throws(()=>operatorConfig({NATIVE_ROLE_PROFILE:'hosting-test',NATIVE_HOSTING_CAPABILITY:'shared-managed',
+      NATIVE_OPS_ROLE_KIND:kind,NATIVE_OPS_ENVIRONMENT:'disposable',NATIVE_OPS_SSL_MODE:'verify-full',
+      NATIVE_OPS_SSL_CA_FILE:'/private/root.crt',NATIVE_OPS_DATABASE_URL:original.url.href}));
+  }
+});
+
+test('test preflight is read-only, fingerprints target and reports pending plan without mutation',async()=>{
+  const c={...config(),roles:nativeRoles('hosting-test','shared-managed')},calls=[];
+  const client={query:async text=>{
+    calls.push(text);
+    if(text==='SELECT session_user AS login')return {rows:[{login:c.roles.migrator}]};
+    if(text.includes('pg_stat_ssl'))return {rows:[{database:'mt_p4_test',role:'mt_test_migrator',version:180006,server:'127.0.0.1',port:5433,oid:'123',ssl:true}]};
+    if(text.includes(' AS safe'))return {rows:[{safe:true}]};
+    if(text.includes(' AS dirty'))return {rows:[{dirty:false}]};
+    if(text.includes('to_regclass'))return {rows:[{present:false}]};
+    return {rows:[]};
+  }};
+  const report=await hostingPreflight(client,c);
+  assert.equal(report.contract,'PASS');assert.equal(report.history,'EMPTY');assert.equal(report.pending.length,9);
+  assert.match(report.target.fingerprint,/^[a-f0-9]{64}$/);
+  assert.equal(calls[0],'BEGIN READ ONLY');assert.equal(calls.at(-1),'ROLLBACK');
+  assert.ok(calls.every(sql=>sql==='BEGIN READ ONLY'||sql==='ROLLBACK'||sql==='SET ROLE mt_test_ledger_owner'||sql==='RESET ROLE'||sql.startsWith('SELECT')||sql.startsWith('WITH')));
+  await assert.rejects(hostingPreflight(client,config('hosting-production')),/test_target_required/);
+  await assert.rejects(hostingPreflight({query:async()=>({rows:[{ssl:false}]})},c),/identity_invalid/);
+});
 
 test('closed profiles bind every login to its exact environment/database and operation',()=>{
   for(const p of ['hosting-test','hosting-production']) {

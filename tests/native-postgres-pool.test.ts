@@ -23,6 +23,7 @@ it('reuses one bounded process pool and verifies actual role before handing out 
   expect(getNativePool()).toBe(getNativePool());expect(mocks.create).toHaveBeenCalledTimes(1);
   const options=mocks.create.mock.calls[0][0];
   expect(options).toMatchObject({max:2,connectionTimeoutMillis:3000,statement_timeout:5000,query_timeout:6000});
+  expect(options.options).toBe('-c search_path=native_auth,pg_catalog,pg_temp');
   expect(mocks.on).toHaveBeenCalledWith('error',expect.any(Function));
   await expect(options.onConnect({query:async()=>({rows:[{safe:true}]})})).resolves.toBeUndefined();
   for(const query of [async()=>({rows:[{safe:false}]}),async()=>{throw new Error('password personal SQL');}]) {

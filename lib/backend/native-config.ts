@@ -5,7 +5,7 @@ export function nativeConfig(env: Record<string, string | undefined>) {
   try {
     const database = new URL(env.DATABASE_URL ?? "");
     const auth = new URL(env.BETTER_AUTH_URL ?? "");
-    const roles = nativeRoles(env.NATIVE_ROLE_PROFILE);
+    const roles = nativeRoles(env.NATIVE_ROLE_PROFILE, env.NATIVE_HOSTING_CAPABILITY);
     assertNativeRoleTarget(roles, database);
     if (!['postgres:', 'postgresql:'].includes(database.protocol) || !database.hostname
       || !database.pathname.slice(1) || !database.username || database.search || database.hash

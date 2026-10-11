@@ -14,6 +14,15 @@ test('native production env requires reviewed selector, native secrets and safe 
     const missing={...env};delete missing[key];assert.equal(validateReleaseEnvironment(missing,'PRODUCTION').valid,false);
   }
 });
+
+test('shared managed capability requires a hosted role profile and stays forbidden for Supabase',()=>{
+  const shared={...env,NATIVE_ROLE_PROFILE:'hosting-test',NATIVE_HOSTING_CAPABILITY:'shared-managed',
+    DATABASE_URL:'postgresql://mt_test_runtime:synthetic@127.0.0.1:5433/mt_p4_test',
+    DATABASE_SSL_CA_FILE:process.platform==='win32'?'C:/private/root.crt':'/private/root.crt'};
+  assert.equal(validateReleaseEnvironment(shared,'PRODUCTION').valid,true);
+  for(const patch of [{NATIVE_ROLE_PROFILE:'local'},{NATIVE_HOSTING_CAPABILITY:'unknown'},{BACKEND_PROVIDER:'supabase'}])
+    assert.equal(validateReleaseEnvironment({...shared,...patch},'PRODUCTION').valid,false);
+});
 test('source boundary confines pg, pool and Better Auth imports to their server/adapter owners',()=>{
   for(const source of ['import {getNativePool} from "@/lib/backend/postgres";',
     'const pool = import("../backend/postgres");','const pg = require("pg");','export {betterAuth} from "better-auth";'])
