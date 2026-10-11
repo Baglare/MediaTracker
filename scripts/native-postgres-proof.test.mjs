@@ -142,7 +142,7 @@ test('interruption kills Vitest and closes relay before Docker cleanup',async()=
   assert.equal(result.process.exitCode,1);
   assert.deepEqual(result.calls.slice(-3).map(c=>c.key),['relay close','rm --force','network rm']);
 });
-const p2PassStages=['P2_LEDGER_SETUP',...Array.from({length:9},(_,i)=>`P2_MIGRATION_${String(i+1).padStart(3,'0')}`),'P2_FUNCTIONAL_PROOF'];
+const p2PassStages=[...nativeMigrationSteps().map(step=>step.name==='LEDGER_SETUP'?'P2_LEDGER_SETUP':`P2_MIGRATION_${step.name.slice(0,3)}`),'P2_FUNCTIONAL_PROOF'];
 test('P2 rejects an unverified relay and cleans every owned resource',async()=>{
   const result=await run({p2:true,fail:'relay verify'});
   assert.equal(result.process.exitCode,1);
@@ -177,7 +177,7 @@ test('P2 functional proof cannot pass on a zero exit without its success sentine
   assert.ok(!result.logs.includes('PASS: disposable proof; stage=P2_FUNCTIONAL_PROOF'));
 });
 test('P2 password failure is separate from migrations and functional proof',async()=>{
-  const result=await run({p2:true,sqlFailure:12,sqlError:'ERROR:  42501'});
+  const result=await run({p2:true,sqlFailure:p2PassStages.length+1,sqlError:'ERROR:  42501'});
   assert.equal(result.process.exitCode,1);
   assert.equal(result.logs.at(-1),'FAIL: disposable proof; stage=P2_RUNTIME_PASSWORD; sqlstate=42501; diagnostics redacted');
 });
@@ -190,8 +190,8 @@ test('P2 sends the actual ordered transactional plans and preserves SQLSTATE-onl
     assert.ok(calls[i].args.includes('VERBOSITY=sqlstate'));
     assert.equal(calls[i].options.timeout,15000);
   }
-  assert.equal(calls.length,12);
-  assert.deepEqual(result.logs.slice(0,11),p2PassStages.map(stage=>`PASS: disposable proof; stage=${stage}`));
+  assert.equal(calls.length,steps.length+2);
+  assert.deepEqual(result.logs.slice(0,p2PassStages.length),p2PassStages.map(stage=>`PASS: disposable proof; stage=${stage}`));
 });
 for(const failure of [{sqlStatus:null,sqlSignal:'SIGTERM'},{sqlStatus:0,sqlSpawnError:Error(privateDiagnostic)},{sqlStatus:1}]) {
   test('P2 transport and timeout failures cannot emit PASS or untrusted SQLSTATE',async()=>{

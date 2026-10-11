@@ -36,7 +36,7 @@ it('readiness selects the exact hosted execution checksums and rejects the other
     expect(await nativeDatabaseReady(localMigrations)).toBe(true);
     const other=profile==='hosting-test'?'hosting-production':'hosting-test';
     const stale=manifest.map(row=>({...row}));stale[8].checksum='e3ec0f6199dea26f6d478356c7fe46c7921ad28b7b2161858768d4dca66e8a43';
-    for(const state of [hostingMigrations[other],manifest.slice(1),localMigrations,stale,[...manifest].reverse()]) {
+    for(const state of [hostingMigrations[other],manifest.slice(0,9),manifest.slice(0,10),manifest.slice(1),localMigrations,stale,[...manifest].reverse()]) {
       mocks.query.mockResolvedValue({rows:[{ready:true,state}]});
       expect(await nativeDatabaseReady(localMigrations)).toBe(false);
     }
