@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 vi.mock('server-only', () => ({}));
-vi.mock('@/lib/api/distributed-rate-limit',()=>({enforceDistributedRateLimit:vi.fn(async()=>null)}));
+vi.mock('@/lib/api/distributed-rate-limit',()=>({enforceNativeCloudRateLimit:vi.fn(async()=>null)}));
 const mocks = vi.hoisted(() => ({ user: vi.fn(), connect: vi.fn(), query: vi.fn(), release: vi.fn() }));
 vi.mock('@/lib/auth/current-user', () => ({ getCurrentUser: mocks.user }));
 vi.mock('@/lib/backend/postgres', () => ({ getNativePool: () => ({ connect: mocks.connect }) }));

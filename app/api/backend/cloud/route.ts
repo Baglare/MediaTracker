@@ -4,7 +4,7 @@ import { executeNativeCloudOperation, isNativeCloudTable, readNativeCloudSnapsho
 import { validateAuthenticatedMutationRequest, readStrictJsonObject } from '@/lib/api/request-security';
 import { getCurrentUser } from '@/lib/auth/current-user';
 import { runSafeApiRoute } from '@/lib/api/safe-route';
-import { enforceDistributedRateLimit } from '@/lib/api/distributed-rate-limit';
+import { enforceNativeCloudRateLimit } from '@/lib/api/distributed-rate-limit';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -17,7 +17,7 @@ export async function POST(request: Request): Promise<Response> {
     const boundary = validateAuthenticatedMutationRequest(request);
     if (boundary) return boundary;
     if (!await getCurrentUser()) return fail('authentication_required',401);
-    const admission=await enforceDistributedRateLimit(request,'social_write');
+    const admission=await enforceNativeCloudRateLimit(request);
     if(admission)return admission;
     const parsed = await readStrictJsonObject(request,
       new Set(['action','expectedUserId','name','args','table','includeDeleted','recordId']), 1_048_576);

@@ -100,11 +100,12 @@ async function signedRpc(operation: "consume" | "cooldown", policy: RateLimitPol
   finally { clearTimeout(timer); }
 }
 
-async function consumeWithinDeadline(request: Request, policy: RateLimitPolicy, deadline: number): Promise<RateLimitDecision> {
+async function consumeWithinDeadline(request: Request, policy: RateLimitPolicy, deadline: number, nativeCloud = false): Promise<RateLimitDecision> {
   if (!Object.hasOwn(RATE_LIMIT_POLICIES, policy)) return unavailable();
   const ip = trustedRateLimitIp(request);
   const native=getBackendProvider()==='native';
-  if(native && !ip)return unavailable();
+  if (nativeCloud && (!native || policy !== 'social_write')) return unavailable();
+  if(native && !ip && !nativeCloud)return unavailable();
   let identity: LimiterIdentity | null = null;
   try {
     if(native) {
@@ -118,6 +119,7 @@ async function consumeWithinDeadline(request: Request, policy: RateLimitPolicy, 
       if (!error && data.user?.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(data.user.id)) identity = { kind: "user", value: data.user.id.toLowerCase() };
     }
   } catch { /* Never use an unverified user ID. */ }
+  if (nativeCloud && identity?.kind !== 'user') return unavailable();
   if (!identity && ip) identity = { kind: "ip", value: ip };
   if (!identity) return unavailable();
   if (performance.now() >= deadline) return unavailable();
@@ -132,15 +134,26 @@ async function consumeWithinDeadline(request: Request, policy: RateLimitPolicy, 
 }
 
 export async function consumeRateLimit(request: Request, policy: RateLimitPolicy): Promise<RateLimitDecision> {
+  return consumeWithDeadline(request, policy);
+}
+
+async function consumeWithDeadline(request: Request, policy: RateLimitPolicy, nativeCloud = false): Promise<RateLimitDecision> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    return await Promise.race([consumeWithinDeadline(request, policy, performance.now() + 750),
+    return await Promise.race([consumeWithinDeadline(request, policy, performance.now() + 750, nativeCloud),
       new Promise<RateLimitDecision>((resolve) => { timer = setTimeout(() => resolve(unavailable()), 750); })]);
   } finally { clearTimeout(timer); }
 }
 
 export async function enforceDistributedRateLimit(request: Request, policy: RateLimitPolicy) {
   return rateLimitResponse(await consumeRateLimit(request, policy));
+}
+
+/** Cloud-only admission: verified native session required, even when ingress is absent.
+ * Keep the user quota and SQL global budgets; include ingress protection whenever trusted.
+ * No caller-supplied user identity or public/provider policy can opt into this path. */
+export async function enforceNativeCloudRateLimit(request: Request) {
+  return rateLimitResponse(await consumeWithDeadline(request, 'social_write', true));
 }
 
 export function providerRetryAfter(value: string | null, now = Date.now()): number {
