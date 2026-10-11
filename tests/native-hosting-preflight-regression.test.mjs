@@ -53,7 +53,7 @@ for(const profile of ['hosting-test','hosting-production']) {
     const history=present?manifest.slice(0,2).map(({name,checksum})=>({name,checksum})):[];
     const f=fixture({profile,present,history});
     assert.deepEqual(await migrationHistory(f.client,roles),history);
-    assert.equal(validateHistory(history,manifest).length,present?7:9);
+    assert.equal(validateHistory(history,manifest).length,present?9:11);
     assert.equal(f.role,roles.migrator);assert.equal(f.closed,false);
     assert.ok(f.calls.indexOf(`SET ROLE ${roles.ledger_owner}`)<f.calls.indexOf(ledgerProbe));
     assert.equal(f.calls.at(-1),'RESET ROLE');
@@ -121,7 +121,7 @@ for(const server of ['127.0.0.1/32','::1/128'])test(`preflight and operator fing
   assert.equal(preflight.target.server,server.split('/')[0]);
   assert.equal(preflight.target.fingerprint,target.fingerprint);
   assert.equal(preflight.contract,'PASS');assert.equal(preflight.empty,true);
-  assert.equal(preflight.history,'EMPTY');assert.equal(preflight.pending.length,9);
+  assert.equal(preflight.history,'EMPTY');assert.equal(preflight.pending.length,11);
   assert.equal(preflight.mutation,'NOT_PERFORMED');
   assert.equal(f.role,f.roles.migrator);
   assert.ok(f.calls.indexOf('RESET ROLE')<f.calls.indexOf('ROLLBACK'));

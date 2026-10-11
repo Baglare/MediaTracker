@@ -10,6 +10,8 @@ export const nativeMigrationFiles = [
   '005_social_xp_themes.sql', '006_distributed_limiter.sql',
   '007_filesystem_assets.sql', '008_privacy_lifecycle.sql',
   '009_deployment_operations.sql',
+  '010_backup_select_policies.sql',
+  '011_backup_policy_role_scope.sql',
 ];
 export function nativeMigrationManifest(profile = 'local') {
   const roles = nativeRoles(profile);

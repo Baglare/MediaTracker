@@ -35,6 +35,14 @@
     {
       "name": "009_deployment_operations.sql",
       "checksum": "5ed5a095be0c42a4ca6ef1db0a01d092b8f28c41fa76eef8e8bd6b6c808c240a"
+    },
+    {
+      "name": "010_backup_select_policies.sql",
+      "checksum": "a482120eb943888e2c04155e719141446c2b1469638775e1b203de445f15b3e0"
+    },
+    {
+      "name": "011_backup_policy_role_scope.sql",
+      "checksum": "37fc373ef0fbc9e442acc6c5d17cc9a2b5f996f5a4830cb5346c14be537d402b"
     }
   ],
   "hosting-production": [
@@ -73,6 +81,14 @@
     {
       "name": "009_deployment_operations.sql",
       "checksum": "141fdbfbfb7a777fe969534805b16e667aca80f58e66501d837b438fe6ffe345"
+    },
+    {
+      "name": "010_backup_select_policies.sql",
+      "checksum": "c9d71436a82a3974b1b7964b2093c14bd238d9dbe326e6f9d0179e20c5a074a8"
+    },
+    {
+      "name": "011_backup_policy_role_scope.sql",
+      "checksum": "f26ebdeb605abe51d05f88582cf0d0ccf720212af015ea1eabf5b9b60b6f26fd"
     }
   ]
 }

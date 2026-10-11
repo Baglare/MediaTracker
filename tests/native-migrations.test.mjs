@@ -47,14 +47,14 @@ test('005 replaces the shared timestamp helper with its hardened path and unchan
 });
 test('native ledger is explicit, checksum checked, transactional and has no connection target', () => {
   const manifest = nativeMigrationManifest();
-  assert.equal(manifest.length,9);
-  assert.equal(new Set(manifest.map(e=>e.name)).size,9);
+  assert.equal(manifest.length,11);
+  assert.equal(new Set(manifest.map(e=>e.name)).size,11);
   const plan = nativeMigrationPlan(manifest);
   assert.match(plan,/native_migration_checksum_mismatch/);
   assert.match(plan,/pg_advisory_xact_lock/);
   assert.match(plan,/\\gexec/);
-  assert.equal((plan.match(/^BEGIN;$/gm)??[]).length,9);
-  assert.equal((plan.match(/^COMMIT;$/gm)??[]).length,9);
+  assert.equal((plan.match(/^BEGIN;$/gm)??[]).length,11);
+  assert.equal((plan.match(/^COMMIT;$/gm)??[]).length,11);
   assert.throws(()=>nativeMigrationPlan([{...manifest[0],sql:manifest[0].sql+'\n'}]),/native_migration_invalid/);
   assert.throws(()=>nativeMigrationPlan([{...manifest[0],name:"001_bad';DROP.sql"}]),/native_migration_invalid/);
   assert.doesNotMatch(readFileSync('scripts/native-migrations.mjs','utf8'),/\b(?:Pool|DATABASE_URL|SUPABASE_URL|fetch\()\b/);

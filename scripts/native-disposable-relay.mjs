@@ -1,7 +1,7 @@
 import net from 'node:net';
 import http from 'node:http';
 import { randomBytes } from 'node:crypto';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 
 export const localEndpoints=['npipe:////./pipe/docker_engine','npipe:////./pipe/dockerDesktopLinuxEngine','unix:///var/run/docker.sock'];
 const unsafe=()=>{throw new Error('unsafe_disposable_target');};
@@ -45,12 +45,27 @@ const listen=server=>new Promise((resolve,reject)=>{
   server.once('error',reject);
   server.listen(0,'127.0.0.1',()=>{server.removeListener('error',reject);resolve(server.address().port);});
 });
-export async function startDisposableRelay(identity) {
+export async function startDisposableRelay(identity,{transport='tcp'}={}) {
+  if(!['tcp','docker-exec'].includes(transport))unsafe();
   // Authority comes from pinned local Docker inspect, never an arbitrary proxy destination.
-  const target=inspectDisposableTarget(identity),sockets=new Set();
+  const target=inspectDisposableTarget(identity),sockets=new Set(),children=new Set();
   const track=socket=>{sockets.add(socket);socket.once('close',()=>sockets.delete(socket));return socket;};
   const relay=net.createServer(socket=>{
     track(socket);
+    if(transport==='docker-exec') {
+      // Docker Desktop's private bridge IP is not routable from Windows. Tunnel
+      // through exec stdio into this attested container; never publish a port.
+      try{inspectDisposableTarget(identity);}catch{socket.destroy();return;}
+      const env={...process.env};
+      for(const key of ['DOCKER_HOST','DOCKER_CONTEXT','DOCKER_TLS_VERIFY','DOCKER_CERT_PATH'])delete env[key];
+      const child=spawn('docker',['--host',identity.localEndpoint,'exec','-i',identity.containerId,'busybox','nc','127.0.0.1','5432'],
+        {env,stdio:['pipe','pipe','ignore'],windowsHide:true});children.add(child);
+      const stop=()=>{socket.destroy();child.kill();};
+      child.on('error',stop);child.stdin.on('error',stop);child.stdout.on('error',stop);
+      child.once('close',()=>{children.delete(child);socket.destroy();});
+      socket.on('error',stop);socket.once('close',()=>child.kill());socket.setTimeout(60000,stop);
+      socket.pipe(child.stdin);child.stdout.pipe(socket);return;
+    }
     const upstream=track(net.connect({host:target.targetHost,port:5432}));
     upstream.setTimeout(60000,()=>upstream.destroy());
     for(const [a,b] of [[socket,upstream],[upstream,socket]]) {
@@ -67,6 +82,7 @@ export async function startDisposableRelay(identity) {
   control.on('connection',track);
   const close=async()=>{
     for(const socket of sockets)socket.destroy();
+    await Promise.all([...children].map(child=>new Promise(resolve=>{child.once('close',resolve);child.kill();})));
     await Promise.all([relay,control].map(server=>new Promise((resolve,reject)=>{
       if(!server.listening)return resolve();
       server.close(error=>error?reject(error):resolve());

@@ -34,5 +34,13 @@
   {
     "name": "009_deployment_operations.sql",
     "checksum": "1ef1bc2b3072ccb2bb163d9d2ed2cc8880ae64b6a0922870b587568b6d1ee53a"
+  },
+  {
+    "name": "010_backup_select_policies.sql",
+    "checksum": "bbfb9ea049025b63fc1fcff30a5d1ad455c7f846b4d38aac1624bacd850bce37"
+  },
+  {
+    "name": "011_backup_policy_role_scope.sql",
+    "checksum": "8cf05e101e61c0ab2ca2226c267f9af4611a47cd5ace5a39d190d3d31b90b274"
   }
 ]

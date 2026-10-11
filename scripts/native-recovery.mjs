@@ -5,7 +5,7 @@ import { resolve, join, relative, isAbsolute } from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { Transform } from 'node:stream';
 import { createHash } from 'node:crypto';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { nativeRoles } from '../lib/backend/native-roles.mjs';
 import { inspectHostingContract } from './native-hosting-contract.mjs';
@@ -14,6 +14,8 @@ import { authorizeTarget, withOperator, digest } from './native-ops-target.mjs';
 import { nativeMigrationManifest } from './native-migrations.mjs';
 import { parseOperatorArgs, migrationHistory, validateHistory } from './native-migration-runner.mjs';
 import { safeDirectory, storageRoot, assetPath, assetKeyPattern } from '../lib/backend/filesystem-core.mjs';
+import { inspectBackupCoverage, recoveryInventory, recoveryRoles, recoveryDatabaseContract, assertRecoveryInventory } from './native-recovery-evidence.mjs';
+import { assertRecoveryProof } from './native-recovery-proof-contract.mjs';
 
 const MAX_BYTES=2*1024*1024*1024, MAX_FILES=10000;
 export async function fileDigest(path) {
@@ -47,6 +49,25 @@ export function validateBackupManifest(manifest) {
     || manifest.consistency!=='write-frozen-operator-quiesced' || !Array.isArray(manifest.files)
     || manifest.files.length>MAX_FILES || !Array.isArray(manifest.migrations)
     || validateHistory(manifest.migrations,nativeMigrationManifest(manifest.roleProfile)).length || manifest.fingerprint!==digest({...manifest,fingerprint:undefined}))throw new Error('native_backup_manifest_invalid');
+  if(manifest.capability==='shared-managed' && (manifest.pgMajor!==18 || !manifest.inventory
+    || manifest.coverage?.coverage!=='ALL_MANAGED_TABLES' || !/^[a-f0-9]{64}$/.test(manifest.inventory.catalogChecksum)
+    || !Array.isArray(manifest.inventory.tables) || !manifest.inventory.tables.length
+    || manifest.inventory.tables.some(t=>!Number.isSafeInteger(t.count)||t.count<0||!/^[a-f0-9]{64}$/.test(t.checksum))))throw new Error('native_backup_manifest_invalid');
+  if(manifest.capability==='shared-managed') {
+    const roles=nativeRoles(manifest.roleProfile,'shared-managed'),state=manifest.roleState;
+    const db=manifest.databaseContract;
+    if(!db||db.name!==roles.database||typeof db.owner!=='string'||!db.owner||!Array.isArray(db.acl)||db.acl.length>1000
+      ||db.acl.some(a=>typeof a.grantee!=='string'||!a.grantee||typeof a.grantor!=='string'||!a.grantor
+        ||!['CREATE','CONNECT','TEMPORARY'].includes(a.privilege)||typeof a.grantable!=='boolean'))throw new Error('native_backup_manifest_invalid');
+    const keys=['runtime','migrator','privacy_login','owner','auth_owner','auth_access','privacy_operator','limiter','backup','restore','database_owner','ledger_owner'];
+    if(!state||!Array.isArray(state.attributes)||state.attributes.length!==keys.length||!Array.isArray(state.settings)
+      || keys.some(key=>{
+        const attrs=state.attributes.filter(a=>a.name===roles[key]);
+        return attrs.length!==1||attrs[0].login!==['runtime','migrator','privacy_login','backup','restore'].includes(key)
+          ||attrs[0].inherit!==(key==='runtime')||attrs[0].limit!==(key==='runtime'?5:['migrator','privacy_login','backup','restore'].includes(key)?2:-1);
+      })||state.settings.some(s=>!keys.some(k=>roles[k]===s.name)||(s.database!==null&&s.database!==roles.database)
+        ||!Array.isArray(s.config)||s.config.some(v=>typeof v!=='string'||v.length>1024||!/^(search_path|statement_timeout|lock_timeout|idle_in_transaction_session_timeout)=/.test(v))))throw new Error('native_backup_manifest_invalid');
+  }
   let bytes=0;const names=new Set();
   for(const file of manifest.files) {
     if(typeof file.path!=='string' || file.path.includes('\\') || file.path.split('/').some(p=>!p||p==='.'||p==='..')
@@ -73,6 +94,7 @@ async function newDirectory(path) {
   await safeDirectory(path);
 }
 export async function postgresTool(tool,config,path) {
+  assertPostgres18Tool(tool);
   const url=config.url;
   postgresTls(config.ssl,config.caFile,url.hostname);
   const env={PATH:process.env.PATH,SystemRoot:process.env.SystemRoot,TEMP:process.env.TEMP,TMP:process.env.TMP,
@@ -80,7 +102,9 @@ export async function postgresTool(tool,config,path) {
     PGUSER:decodeURIComponent(url.username),PGPASSWORD:decodeURIComponent(url.password),
     ...(config.caFile?{PGSSLROOTCERT:config.caFile}:{}),
     PGSSLMODE:config.ssl?'verify-full':'disable',PGCONNECT_TIMEOUT:'3',PGOPTIONS:'-c statement_timeout=120000 -c lock_timeout=2000'};
-  const args=tool==='pg_dump'?['--format=custom','--no-password',...(config.roles?.hosted?['--exclude-schema=public']:[])]:['--exit-on-error','--single-transaction','--no-password','--dbname',env.PGDATABASE,path];
+  if(config.snapshot && !/^[0-9A-Fa-f-]+$/.test(config.snapshot))throw new Error('native_backup_snapshot_invalid');
+  const args=tool==='pg_dump'?['--format=custom','--no-password',...(config.roles?.hosted?['--exclude-schema=public']:[]),
+    ...(config.roles?.capability==='shared-managed'?['--enable-row-security']:[]),...(config.snapshot?[`--snapshot=${config.snapshot}`]:[])]:['--exit-on-error','--single-transaction','--no-password','--dbname',env.PGDATABASE,path];
   const child=spawn(tool,args,{env,stdio:['ignore',tool==='pg_dump'?'pipe':'ignore','ignore'],windowsHide:true});
   let deadline;
   const exit=new Promise((res,rej)=>{
@@ -97,7 +121,12 @@ export async function postgresTool(tool,config,path) {
   } catch {child.kill();throw new Error('native_postgres_tool_failed');}
   finally {clearTimeout(deadline);}
 }
-async function assetsVerified(client,root) {
+export function assertPostgres18Tool(tool) {
+  if(!['pg_dump','pg_restore'].includes(tool))throw new Error('native_postgres_tool_invalid');
+  const result=spawnSync(tool,['--version'],{encoding:'utf8',timeout:5000,windowsHide:true});
+  if(result.status!==0 || !new RegExp(`^${tool} \\(PostgreSQL\\) 18\\.`).test(result.stdout??''))throw new Error('native_postgres_18_required');
+}
+export async function assetsVerified(client,root) {
   const rows=(await client.query('SELECT * FROM app.native_ops_assets()')).rows;
   if(rows.length>MAX_FILES)throw new Error('native_recovery_capacity');
   for(const row of rows) {
@@ -140,21 +169,39 @@ export async function verifyNativeDatabase(client, roles = nativeRoles(), restor
   return {catalog:'PASS',pendingPrivacyAccounts:lifecycle.pending};
 }
 export async function backupNative(client,config,target,options,tool=postgresTool) {
-  if(config.roles?.capability==='shared-managed')throw new Error('native_shared_recovery_unavailable');
+  const shared=config.roles?.capability==='shared-managed';
   authorizeTarget(target,config,{operation:'BACKUP',...options,operator:true,provisioner:!config.roles?.hosted});
+  const recoveryProof=shared&&options.apply?await assertRecoveryProof(options,client):undefined;
+  const coverage=shared?await inspectBackupCoverage(client,config.roles):undefined;
   if(validateHistory(await migrationHistory(client,config.roles),nativeMigrationManifest(config.roles?.profile)).length)throw new Error('native_schema_incomplete');
   await verifyNativeDatabase(client,config.roles);
-  if(!options.apply)return {mode:'PLAN',consistency:'freeze; stop all workers and scheduled operators; dump; copy; verify; leave frozen'};
+  if(!options.apply)return {mode:'PLAN',consistency:shared?'require existing freeze and stopped workers/operators; snapshot dump; copy; inventory verification; leave frozen':'freeze; stop all workers and scheduled operators; dump; copy; verify; leave frozen'};
   if(options.quiesced!=='ALL_WORKERS_AND_OPERATORS_STOPPED')throw new Error('native_backup_quiescence_required');
   const root=storageRoot(options.storage),destination=outside(options.output,[root,process.cwd()]);
   await safeDirectory(root);
   if(!(await client.query('SELECT pg_try_advisory_lock(207403,2) AS locked')).rows[0]?.locked)throw new Error('native_maintenance_busy');
+  let transaction=false,migrationLock=false;
   try {
+    if(shared) {
+      migrationLock=(await client.query('SELECT pg_try_advisory_lock(207403,1) AS locked')).rows[0]?.locked===true;
+      if(!migrationLock)throw new Error('native_maintenance_busy');
+    }
     const state=(await client.query('SELECT app.native_ops_state() AS state')).rows[0]?.state;
     if(!state || typeof state.frozen!=='boolean')throw new Error('native_freeze_state_invalid');
+    if(shared && !state.frozen)throw new Error('native_backup_existing_freeze_required');
     if(!state.frozen)await client.query('SELECT app.set_release_freeze(true,$1::bigint)',[state.revision]);
+    let snapshot,inventory,roleState,databaseContract;
+    if(shared) {
+      await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');transaction=true;
+      await inspectBackupCoverage(client,config.roles);
+      inventory=await recoveryInventory(client,config.roles);
+      roleState=await recoveryRoles(client,config.roles);
+      databaseContract=await recoveryDatabaseContract(client);
+      snapshot=(await client.query('SELECT pg_export_snapshot() AS snapshot')).rows[0]?.snapshot;
+      if(!snapshot)throw new Error('native_backup_snapshot_invalid');
+    }
     await newDirectory(destination);
-    await tool('pg_dump',config,join(destination,'database.dump'));
+    await tool('pg_dump',{...config,snapshot},join(destination,'database.dump'));
     // No archive extraction/traversal; each regular private file is copied explicitly.
     const source=await tree(root);
     for(const file of source) if(!(file.path.startsWith('users/')&&assetKeyPattern.test(file.path.slice(6))
@@ -170,14 +217,30 @@ export async function backupNative(client,config,target,options,tool=postgresToo
     if(validateHistory(migrations,nativeMigrationManifest(config.roles?.profile)).length)throw new Error('native_schema_incomplete');
     const references=await assetsVerified(client,storage);
     const databaseState=await verifyNativeDatabase(client,config.roles);
+    if(shared) {
+      await client.query('ROLLBACK');transaction=false;
+      await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');transaction=true;
+      await inspectBackupCoverage(client,config.roles);
+      assertRecoveryInventory(await recoveryInventory(client,config.roles),inventory);
+      if(JSON.stringify(await recoveryRoles(client,config.roles))!==JSON.stringify(roleState))throw new Error('native_backup_source_changed');
+      if(JSON.stringify(await recoveryDatabaseContract(client))!==JSON.stringify(databaseContract))throw new Error('native_backup_source_changed');
+      const after=(await client.query('SELECT app.native_ops_state() AS state')).rows[0]?.state;
+      if(JSON.stringify(after)!==JSON.stringify(state))throw new Error('native_backup_source_changed');
+      await client.query('ROLLBACK');transaction=false;
+    }
     if(JSON.stringify(source)!==JSON.stringify(await tree(root)))throw new Error('native_backup_source_changed');
     const manifest={format:'MediaTrackerNativeBackupV1',backend:'native',createdAt:new Date().toISOString(),
       ...(config.roles?.hosted?{roleProfile:config.roles.profile}:{}),
+      ...(shared?{capability:'shared-managed',pgMajor:18,coverage,inventory,roleState,databaseContract,recoveryProof}:{}),
       consistency:'write-frozen-operator-quiesced',targetFingerprint:target.fingerprint,migrations,files,references,databaseState};
     manifest.fingerprint=digest(manifest);validateBackupManifest(manifest);
     await writeFile(join(destination,'manifest.json'),JSON.stringify(manifest,null,2)+'\n',{flag:'wx',mode:0o600});
     return {status:'BACKUP_CREATED',fingerprint:manifest.fingerprint,files:files.length,writeState:'FROZEN'};
-  } finally {await client.query('SELECT pg_advisory_unlock(207403,2)');}
+  } finally {
+    if(transaction)await client.query('ROLLBACK');
+    if(migrationLock)await client.query('SELECT pg_advisory_unlock(207403,1)');
+    await client.query('SELECT pg_advisory_unlock(207403,2)');
+  }
 }
 export async function verifyBackup(path) {
   await safeDirectory(path);
@@ -220,7 +283,7 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href) {
   try {
     const command=process.argv[2];
     if(!['backup','restore','verify'].includes(command))throw new Error('native_recovery_command_invalid');
-    const options=parseOperatorArgs(process.argv.slice(3),['--storage','--output','--input','--backup-fingerprint','--quiesced']);
+    const options=parseOperatorArgs(process.argv.slice(3),['--storage','--output','--input','--backup-fingerprint','--quiesced','--recovery-proof','--recovery-proof-fingerprint']);
     const result=command==='verify'?{status:'VERIFIED',fingerprint:(await verifyBackup(resolve(options.input))).fingerprint}:
       options.connect?await withOperator(process.env,(c,e,t)=>command==='backup'?backupNative(c,e,t,options):restoreNative(c,e,t,options)):
       {mode:'OFFLINE',command,migrations:nativeMigrationManifest().map(({name,checksum})=>({name,checksum}))};

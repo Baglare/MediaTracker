@@ -5,7 +5,8 @@ import http from 'node:http';
 import { randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
-import { once } from 'node:events';
+import { once, EventEmitter } from 'node:events';
+import { PassThrough } from 'node:stream';
 import { spawn } from 'node:child_process';
 import { validateDisposableTarget } from './native-disposable-relay.mjs';
 
@@ -122,4 +123,31 @@ test('relay binds loopback, forwards a fixed target, rejects forged metadata and
   } finally {
     socket?.destroy();await relay?.close();await new Promise(resolve=>backend.close(resolve));
   }
+});
+test('Docker Desktop relay pins exec to the attested container, forwards bytes and kills children on close',async()=>{
+  const state=fixture(),calls=[],children=[];
+  const source=readFileSync(new URL('./native-disposable-relay.mjs',import.meta.url),'utf8')
+    .replace(/^import .*;\r?\n/gm,'').replace(/^export /gm,'');
+  const api=runInNewContext(`${source}\n({startDisposableRelay})`,{
+    net:{...net,connect:()=>{throw new Error('bridge IP must not be used');}},http,randomBytes,
+    process:{env:{DOCKER_HOST:'tcp://forbidden.invalid:2375',DOCKER_CONTEXT:'remote'}},
+    spawnSync:(_cmd,args)=>({status:0,stdout:JSON.stringify([args[2]==='inspect'?state.container:state.network])}),
+    spawn:(cmd,args,options)=>{
+      calls.push({cmd,args,options});const child=new EventEmitter();child.stdin=new PassThrough();child.stdout=new PassThrough();
+      child.stdin.pipe(child.stdout);child.killed=false;child.kill=()=>{
+        if(child.killed)return;child.killed=true;child.stdin.destroy();child.stdout.destroy();queueMicrotask(()=>child.emit('close',0));
+      };children.push(child);return child;
+    },
+  });
+  let relay,socket;
+  try {
+    await assert.rejects(api.startDisposableRelay(identity,{transport:'ssh'}));
+    relay=await api.startDisposableRelay(identity,{transport:'docker-exec'});
+    socket=net.connect({host:relay.descriptor.host,port:relay.descriptor.port});await once(socket,'connect');
+    const reply=once(socket,'data');socket.write('PostgreSQL wire bytes');assert.equal((await reply)[0].toString(),'PostgreSQL wire bytes');
+    assert.equal(calls.length,1);assert.equal(calls[0].cmd,'docker');
+    assert.deepEqual([...calls[0].args],['--host',identity.localEndpoint,'exec','-i',id,'busybox','nc','127.0.0.1','5432']);
+    assert.equal(calls[0].options.env.DOCKER_HOST,undefined);assert.equal(calls[0].options.env.DOCKER_CONTEXT,undefined);
+    const closed=once(socket,'close');await relay.close();await closed;assert.ok(children.every(c=>c.killed));
+  }finally{socket?.destroy();await relay?.close();}
 });

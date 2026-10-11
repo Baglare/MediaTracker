@@ -20,7 +20,7 @@ export function operatorConfig(env) {
     const kind = env.NATIVE_OPS_ROLE_KIND ?? 'migrator';
     if(env.NATIVE_OPS_SSL_CA_FILE && (!isAbsolute(env.NATIVE_OPS_SSL_CA_FILE) || env.NATIVE_OPS_SSL_MODE!=='verify-full'))throw new Error();
     if (!['migrator','privacy_login','backup','restore'].includes(kind)) throw new Error();
-    if (roles.capability==='shared-managed' && ['backup','restore'].includes(kind)) throw new Error();
+    if (roles.capability==='shared-managed' && kind==='restore') throw new Error();
     assertNativeRoleTarget(roles,url,kind,kind==='restore');
     if (roles.hosted && (env.NATIVE_OPS_SSL_MODE!=='verify-full' || !env.NATIVE_OPS_SSL_CA_FILE
       || (kind==='restore' ? environment!=='disposable' : environment!==(roles.profile==='hosting-test'?'disposable':'production')))) throw new Error();
