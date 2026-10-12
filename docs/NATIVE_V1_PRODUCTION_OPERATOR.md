@@ -142,6 +142,19 @@ Test hesapları, test dump'ı veya test storage production'a kopyalanmaz.
 
 ## 3. Mevcut uygulamayı koruma ve Plesk durdurma
 
+Downtime ve migration'dan **önce** yeni source-bound proof'u offline doğrulayın.
+Eski PASS kaydını düzenlemeyin; uyuşmazlıkta siteyi durdurmadan burada durun.
+
+```bash
+read -r -p 'Yeni source-bound sentetik PASS JSON yolu: ' PROOF
+read -r -p 'Bagimsiz dogrulanmis proof fingerprint: ' PROOF_FP
+PROOF_FILE="$PROOF" PROOF_PIN="$PROOF_FP" "$NODE" --input-type=module - <<'JS'
+import {assertRecoveryProof} from './scripts/native-recovery-proof-contract.mjs';
+await assertRecoveryProof({'recovery-proof':process.env.PROOF_FILE,'recovery-proof-fingerprint':process.env.PROOF_PIN},{});
+console.log('CURRENT_SOURCE_RECOVERY_GATE_PASS');
+JS
+```
+
 Plesk'te mevcut application root, startup `app.cjs`, Node yolu, tüm runtime env
 ve scheduled task durumunu özel operator kaydına alın. Env görüntülerini chat'e
 göndermeyin. Mevcut env dosyasını özel CONFIG içine `cp -p` ile yedekleyin; Plesk
@@ -178,20 +191,24 @@ gerçek restore testini tekrar ettirmek gerekmez. Bu yeni gate henüz PASS deği
 production backup/cutover burada durur; backup kontrolü atlanmaz.
 
 ```bash
-read -r -p 'Yeni source-bound sentetik PASS JSON yolu: ' PROOF
-read -r -p 'Bagimsiz dogrulanmis proof fingerprint: ' PROOF_FP
 read -r -p 'Ozel 32-byte AES key dosyasi (anahtar yazmayin): ' KEY_FILE
 read -r -p 'Dogrulanmis SSH offsite kullanici@host:ozel-dizin: ' OFFSITE
 test -f "$PROOF" && test -f "$KEY_FILE" && test -n "$OFFSITE"
 STAMP=$(date -u +%Y%m%dT%H%M%SZ)
 PLAIN="$BASE/production-$STAMP-plain"
 SEALED="$BASE/production-$STAMP-sealed"
-STORAGE="$HOME/mt-production-storage"
+STORAGE=$("$NODE" --env-file="$RUNTIME_ENV" -p 'process.env.NATIVE_STORAGE_ROOT')
 mkdir -p "$STORAGE"; chmod 700 "$STORAGE"
 NATIVE_OPS_EXPECTED_FINGERPRINT="$BACKUP_FP" "$NODE" --env-file="$BACKUP_ENV" scripts/native-recovery.mjs backup --connect --apply --storage "$STORAGE" --output "$PLAIN" --quiesced ALL_WORKERS_AND_OPERATORS_STOPPED --confirmation "BACKUP production $BACKUP_FP" --recovery-proof "$PROOF" --recovery-proof-fingerprint "$PROOF_FP" > "$CONFIG/backup-result.json"
 NATIVE_RECOVERY_KEY_FILE="$KEY_FILE" "$NODE" scripts/native-recovery-seal.mjs seal "$PLAIN" "$SEALED" > "$CONFIG/seal-result.json"
 SEALED_FP=$("$NODE" -p 'JSON.parse(require("fs").readFileSync(process.argv[1])).fingerprint' "$CONFIG/seal-result.json")
 scp -pr "$SEALED" "$OFFSITE"
+read -r -p 'Offsite tam sealed dizini (kullanici@host:mutlak-yol): ' OFFSITE_COPY
+ROUNDTRIP="$BASE/production-$STAMP-roundtrip"
+test ! -e "$ROUNDTRIP"; mkdir -m 700 "$ROUNDTRIP"
+scp -pr "$OFFSITE_COPY" "$ROUNDTRIP/"
+NATIVE_RECOVERY_KEY_FILE="$KEY_FILE" "$NODE" scripts/native-recovery-seal.mjs unseal "$ROUNDTRIP/$(basename "$SEALED")" "$BASE/production-$STAMP-roundtrip-plain" "$SEALED_FP"
+"$NODE" scripts/native-recovery.mjs verify --input "$BASE/production-$STAMP-roundtrip-plain"
 ```
 
 Offsite host anahtarını, destination ACL/retention ve bağımsız anahtar kopyasını
