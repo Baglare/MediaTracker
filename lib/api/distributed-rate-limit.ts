@@ -32,6 +32,13 @@ export type RateLimitDecision = { allowed: boolean; retryAfterSeconds?: number; 
 const unavailable = (): RateLimitDecision => ({ allowed: false, retryAfterSeconds: 5, source: "unavailable" });
 const localSmoothingKey = randomBytes(32).toString("hex"); // RAM only, never DB authority/provisioning.
 
+// Explicit server policy: only these native APIs may use a verified session
+// without ingress proof. Anonymous traffic and all other policies stay closed.
+function nativeSessionPolicy(policy: RateLimitPolicy) {
+  return policy === 'tvmaze_search' || policy === 'tvmaze_details' || policy === 'tvmaze_calendar'
+    || policy === 'social_read' || policy === 'social_write';
+}
+
 export function rateLimitResponse(decision: RateLimitDecision): Response | null {
   if (decision.allowed) return null;
   return Response.json({ code: decision.source === "unavailable" ? "rate_limit_unavailable" : "rate_limited" }, {
@@ -105,7 +112,7 @@ async function consumeWithinDeadline(request: Request, policy: RateLimitPolicy, 
   const ip = trustedRateLimitIp(request);
   const native=getBackendProvider()==='native';
   if (nativeCloud && (!native || policy !== 'social_write')) return unavailable();
-  if(native && !ip && !nativeCloud)return unavailable();
+  if(native && !ip && !nativeCloud && !nativeSessionPolicy(policy))return unavailable();
   let identity: LimiterIdentity | null = null;
   try {
     if(native) {
@@ -118,7 +125,10 @@ async function consumeWithinDeadline(request: Request, policy: RateLimitPolicy, 
       const { data, error } = await client.auth.getUser();
       if (!error && data.user?.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(data.user.id)) identity = { kind: "user", value: data.user.id.toLowerCase() };
     }
-  } catch { /* Never use an unverified user ID. */ }
+  } catch {
+    if (native) return unavailable();
+    // Never use an unverified user ID.
+  }
   if (nativeCloud && identity?.kind !== 'user') return unavailable();
   if (!identity && ip) identity = { kind: "ip", value: ip };
   if (!identity) return unavailable();
@@ -151,7 +161,7 @@ export async function enforceDistributedRateLimit(request: Request, policy: Rate
 
 /** Cloud-only admission: verified native session required, even when ingress is absent.
  * Keep the user quota and SQL global budgets; include ingress protection whenever trusted.
- * No caller-supplied user identity or public/provider policy can opt into this path. */
+ * No caller-supplied user identity or policy can opt into this Cloud path. */
 export async function enforceNativeCloudRateLimit(request: Request) {
   return rateLimitResponse(await consumeWithDeadline(request, 'social_write', true));
 }
@@ -165,12 +175,30 @@ export function providerRetryAfter(value: string | null, now = Date.now()): numb
 
 export async function reportProviderCooldown(request: Request, policy: RateLimitPolicy, response: Response) {
   if (response.status !== 429) return null;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const decision = await Promise.race([reportCooldownWithinDeadline(request, policy, response, performance.now() + 750),
+      new Promise<RateLimitDecision>((resolve) => { timer = setTimeout(() => resolve(unavailable()), 750); })]);
+    return rateLimitResponse(decision);
+  } finally { clearTimeout(timer); }
+}
+
+async function reportCooldownWithinDeadline(request: Request, policy: RateLimitPolicy, response: Response, deadline: number): Promise<RateLimitDecision> {
+  if (!Object.hasOwn(RATE_LIMIT_POLICIES, policy)) return unavailable();
   const wait = providerRetryAfter(response.headers.get("retry-after"));
   const ip = trustedRateLimitIp(request);
-  if (!ip) return rateLimitResponse(unavailable());
-  const result = await signedRpc("cooldown", policy, { kind: "ip", value: ip }, ip, wait);
-  if (result.source === "unavailable") return rateLimitResponse(result);
-  return rateLimitResponse({ allowed: false, source: "distributed", retryAfterSeconds: result.retryAfterSeconds || wait });
+  let identity: LimiterIdentity | null = ip ? { kind: 'ip', value: ip } : null;
+  if (!ip && getBackendProvider() === 'native' && nativeSessionPolicy(policy)) {
+    try {
+      const { getCurrentUser } = await import('../auth/current-user');
+      const user = await getCurrentUser();
+      if (user) identity = { kind: 'user', value: user.id.toLowerCase() };
+    } catch { return unavailable(); }
+  }
+  if (!identity || performance.now() >= deadline) return unavailable();
+  const result = await signedRpc("cooldown", policy, identity, ip, wait, deadline - performance.now());
+  if (result.source === "unavailable") return result;
+  return { allowed: false, source: "distributed", retryAfterSeconds: result.retryAfterSeconds || wait };
 }
 
 // Explicit test IP adapters use environment configuration, never an HTTP override.
