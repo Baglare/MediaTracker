@@ -24,10 +24,12 @@ BEGIN
   replay:=app.apply_cloud_goal_v1('cccccccc-cccc-4ccc-8ccc-cccccccccccc','goal-a',0,goal,false);
   IF replay->>'status' IS DISTINCT FROM 'idempotent_replay' THEN RAISE EXCEPTION 'native_goal_receipt_failed'; END IF;
   IF has_table_privilege(current_user,'native_auth."user"','DELETE')
-    OR has_table_privilege(current_user,'native_auth."user"','INSERT')
     OR has_function_privilege(current_user,'app.transition_account(uuid,text,text)','EXECUTE')
     OR has_function_privilege(current_user,'app.set_release_freeze(boolean,bigint)','EXECUTE') THEN
     RAISE EXCEPTION 'native_operator_authority_leaked';
+  END IF;
+  IF NOT has_table_privilege(current_user,'native_auth."user"','INSERT') THEN
+    RAISE EXCEPTION 'native_signup_insert_missing';
   END IF;
 END; $$;
 COMMIT;
@@ -44,6 +46,39 @@ DO $$ BEGIN
 END; $$;
 COMMIT;
 RESET ROLE;
+-- 012 permits account creation, not lifecycle/admin authority. Roll back fixtures.
+SET ROLE mt_runtime;
+BEGIN;
+SELECT set_config('app.user_id','dddddddd-dddd-4ddd-8ddd-dddddddddddd',true);
+INSERT INTO native_auth."user"(id,name,email) VALUES
+('dddddddd-dddd-4ddd-8ddd-dddddddddddd','Synthetic signup','p2-signup@example.invalid');
+DO $$ BEGIN
+  IF NOT EXISTS(SELECT FROM app.account_lifecycle WHERE user_id='dddddddd-dddd-4ddd-8ddd-dddddddddddd' AND state='ACTIVE') THEN
+    RAISE EXCEPTION 'native_signup_lifecycle_missing';
+  END IF;
+  BEGIN
+    UPDATE native_auth."user" SET "emailVerified"=true WHERE id='dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+    RAISE EXCEPTION 'native_signup_verification_escalation';
+  EXCEPTION WHEN insufficient_privilege THEN NULL;
+  END;
+END; $$;
+ROLLBACK;
+RESET ROLE;
+SELECT app.set_release_freeze(true,0);
+SET ROLE mt_runtime;
+BEGIN;
+DO $$ BEGIN
+  BEGIN
+    INSERT INTO native_auth."user"(id,name,email) VALUES
+    ('dddddddd-dddd-4ddd-8ddd-dddddddddddd','Synthetic frozen signup','p2-frozen-signup@example.invalid');
+    RAISE EXCEPTION 'native_signup_freeze_bypassed';
+  EXCEPTION WHEN SQLSTATE 'P0001' THEN
+    IF SQLERRM<>'account_write_locked' THEN RAISE; END IF;
+  END;
+END; $$;
+ROLLBACK;
+RESET ROLE;
+SELECT app.set_release_freeze(false,1);
 SELECT app.transition_account('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','ERASURE_PENDING','PRIVACY aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
 SET ROLE mt_runtime;
 BEGIN;
