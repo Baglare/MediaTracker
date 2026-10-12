@@ -39,6 +39,14 @@ downloaded exports, vendor logs and backups need separate handling.
 
 ## Before SSH execution
 
+**Dependency correction:** the real server release trees omit Better Auth.
+The legacy `OLD/node_modules` symlink reuse below is therefore BLOCKED on that
+server. Use the separate locked Linux dependency archive and safe link replacement
+in [native-manual-qa-dependencies.md](native-manual-qa-dependencies.md) and its
+concrete delivery instructions. Preserve the existing `qa-plan.json`; do not run
+the old setup block again or overwrite the plan. Creation/cleanup contracts stay
+unchanged.
+
 Use a new **private operator directory pinned to the QA commit SHA**, with the
 existing Node 24 dependencies and CA, not Passenger's standalone runtime directory.
 Do not copy a new script into the old source tree. The delivered Git source archive
