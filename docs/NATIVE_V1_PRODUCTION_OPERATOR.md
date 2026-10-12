@@ -48,11 +48,40 @@ test ! -e "$OPS" && test ! -e "$RELEASE"
 mkdir -m 700 "$OPS" "$RELEASE"
 tar -xf "mediatracker-operator-$SHA.tar" -C "$OPS"
 tar -xzf "mediatracker-native-linux-${SHA:0:12}.tar.gz" -C "$RELEASE"
-# Mevcut operator checkout'ının gerçek yolunu girin; production parolası değil.
-read -r -p 'Mevcut calisan operator kaynak dizini: ' PREVIOUS_OPS
-test -f "$PREVIOUS_OPS/package-lock.json" && test -d "$PREVIOUS_OPS/node_modules"
-cmp "$PREVIOUS_OPS/package-lock.json" "$OPS/package-lock.json"
-cp -a "$PREVIOUS_OPS/node_modules" "$OPS/node_modules"
+# Teslimdeki güncel talimatlar documentation overlay'dir; executable kaynak/artifact değişmez.
+cp -p "$BASE/OPERATOR.md" "$OPS/docs/NATIVE_V1_PRODUCTION_OPERATOR.md"
+# Recovery dizini yalnız overlay olabilir: lock ve dependency ağacı ayrı yerlerde olabilir.
+read -r -p 'Plesk mevcut uygulama root mutlak yolu: ' ACTIVE_RELEASE
+# Yalnız mevcut uygulama/recovery ve mt-* operator dizinlerinde sınırlı envanter.
+for root in "$BASE" "$ACTIVE_RELEASE" "$HOME"/mt-*; do
+  [[ -d "$root" ]] || continue
+  find "$root" -maxdepth 2 \( -name node_modules -type d -print -prune \) -o \( -name package-lock.json -type f -print \)
+done
+read -r -p 'Envanterdeki gercek package-lock.json mutlak yolu: ' LOCK_FILE
+read -r -p 'Envanterdeki gercek node_modules mutlak yolu: ' MODULES_DIR
+[[ "$LOCK_FILE" = /* && "$MODULES_DIR" = /* && -f "$LOCK_FILE" && -d "$MODULES_DIR" ]]
+MODULES_DIR=$(realpath "$MODULES_DIR")
+cmp "$LOCK_FILE" "$OPS/package-lock.json"
+# Seçilen mevcut ağacın doğrudan operator bağımlılıkları lock ile eşleşmeli.
+"$NODE" --input-type=module - "$LOCK_FILE" "$MODULES_DIR" <<'JS'
+import fs from 'node:fs';import path from 'node:path';import assert from 'node:assert/strict';
+import {createRequire} from 'node:module';
+const lock=JSON.parse(fs.readFileSync(process.argv[2]));
+const modules=fs.realpathSync(process.argv[3]);
+const require=createRequire(path.join(modules,'__operator_check__.cjs'));
+for(const name of ['pg','sharp','better-auth','next']) {
+  let entry=require.resolve(name),directory=path.dirname(entry),actual;
+  while(directory!==path.dirname(directory)) {
+    const file=path.join(directory,'package.json');
+    if(fs.existsSync(file)){const p=JSON.parse(fs.readFileSync(file));if(p.name===name){actual=p;break;}}
+    directory=path.dirname(directory);
+  }
+  assert.equal(actual?.version,lock.packages['node_modules/'+name]?.version,'dependency version mismatch: '+name);
+  assert(actual?.version,'dependency missing: '+name);
+}
+console.log('EXISTING_OPERATOR_DEPENDENCIES_MATCH_LOCK');
+JS
+cp -a "$MODULES_DIR" "$OPS/node_modules"
 cd "$OPS"
 "$NODE" scripts/native-package.mjs verify "$RELEASE"
 "$NODE" scripts/native-artifact-check.mjs "$RELEASE" "$BASE/production-abi-$SHA.json"
@@ -69,7 +98,9 @@ JS
 ```
 
 Operator arşivi Git kaynaklarıdır; secret, `.git`, `.codex`, node_modules veya
-yedek içermez. Mevcut locked dependency seti uyuşmazsa DURUN; sunucuda build veya
+yedek içermez. BASE içinde lock/node_modules yokluğu tek başına engel değildir;
+gerçek mevcut yollar yukarıdaki sınırlı envanterle bulunur ve ayrı doğrulanır.
+Bu oturumda sunucu envanteri çalıştırılmadı. Mevcut locked dependency seti uyuşmazsa DURUN; sunucuda build veya
 rastgele package kurulumu yapmayın. Yeni Linux artifact offline CI'da üretilir.
 
 ## 2. Özel production env ve her bağlantının bağımsız hedefi
@@ -146,8 +177,8 @@ Downtime ve migration'dan **önce** yeni source-bound proof'u offline doğrulay�
 Eski PASS kaydını düzenlemeyin; uyuşmazlıkta siteyi durdurmadan burada durun.
 
 ```bash
-read -r -p 'Yeni source-bound sentetik PASS JSON yolu: ' PROOF
-read -r -p 'Bagimsiz dogrulanmis proof fingerprint: ' PROOF_FP
+PROOF="$BASE/PG18_RECOVERY_PROOF_627f0b6fb6db_20261012_PASS.json"
+PROOF_FP=84834be6936e442ac40c809b61897e080eb99c254c0044274ecc674140b6ed11
 PROOF_FILE="$PROOF" PROOF_PIN="$PROOF_FP" "$NODE" --input-type=module - <<'JS'
 import {assertRecoveryProof} from './scripts/native-recovery-proof-contract.mjs';
 await assertRecoveryProof({'recovery-proof':process.env.PROOF_FILE,'recovery-proof-fingerprint':process.env.PROOF_PIN},{});
@@ -192,8 +223,7 @@ production backup/cutover burada durur; backup kontrolü atlanmaz.
 
 ```bash
 read -r -p 'Ozel 32-byte AES key dosyasi (anahtar yazmayin): ' KEY_FILE
-read -r -p 'Dogrulanmis SSH offsite kullanici@host:ozel-dizin: ' OFFSITE
-test -f "$PROOF" && test -f "$KEY_FILE" && test -n "$OFFSITE"
+test -f "$PROOF" && test -f "$KEY_FILE"
 STAMP=$(date -u +%Y%m%dT%H%M%SZ)
 PLAIN="$BASE/production-$STAMP-plain"
 SEALED="$BASE/production-$STAMP-sealed"
@@ -202,22 +232,36 @@ mkdir -p "$STORAGE"; chmod 700 "$STORAGE"
 NATIVE_OPS_EXPECTED_FINGERPRINT="$BACKUP_FP" "$NODE" --env-file="$BACKUP_ENV" scripts/native-recovery.mjs backup --connect --apply --storage "$STORAGE" --output "$PLAIN" --quiesced ALL_WORKERS_AND_OPERATORS_STOPPED --confirmation "BACKUP production $BACKUP_FP" --recovery-proof "$PROOF" --recovery-proof-fingerprint "$PROOF_FP" > "$CONFIG/backup-result.json"
 NATIVE_RECOVERY_KEY_FILE="$KEY_FILE" "$NODE" scripts/native-recovery-seal.mjs seal "$PLAIN" "$SEALED" > "$CONFIG/seal-result.json"
 SEALED_FP=$("$NODE" -p 'JSON.parse(require("fs").readFileSync(process.argv[1])).fingerprint' "$CONFIG/seal-result.json")
-scp -pr "$SEALED" "$OFFSITE"
-read -r -p 'Offsite tam sealed dizini (kullanici@host:mutlak-yol): ' OFFSITE_COPY
-ROUNDTRIP="$BASE/production-$STAMP-roundtrip"
-test ! -e "$ROUNDTRIP"; mkdir -m 700 "$ROUNDTRIP"
-scp -pr "$OFFSITE_COPY" "$ROUNDTRIP/"
-NATIVE_RECOVERY_KEY_FILE="$KEY_FILE" "$NODE" scripts/native-recovery-seal.mjs unseal "$ROUNDTRIP/$(basename "$SEALED")" "$BASE/production-$STAMP-roundtrip-plain" "$SEALED_FP"
-"$NODE" scripts/native-recovery.mjs verify --input "$BASE/production-$STAMP-roundtrip-plain"
 ```
 
-Offsite host anahtarını, destination ACL/retention ve bağımsız anahtar kopyasını
-doğrulayın. Offsite kopyayı geri alıp **taze özel dizine** mevcut unseal aracıyla
-`SEALED_FP` pin'i altında decrypt/doğrulayın; ciphertext transferinin başarı kodu
-tek başına offsite doğrulaması değildir. Önceki gerçek yedek restore PASS farklı
-yedeğe aktarılmaz. Yeni boş production yedeğinin verify/unseal kabul kaydını özel
-CONFIG'e koyun. Offsite erişimi/anahtar eksikse site geçişini yapmayın. Plaintext,
-başarısız kopya veya mevcut veriyi otomatik silmeyin.
+**Mevcut manuel offsite yöntemi:** sealed dizinin tamamını güvenli mevcut indirme
+yöntemiyle operatör bilgisayarına indirin. Anahtarı yedekten ayrı saklayın.
+Sunucudaki SEALED fingerprint'ini bağımsız güvenilir kanaldan sabitleyin; indirilen
+dosyanın yanındaki manifest'i tek başına pin otoritesi saymayın. SSH/SCP hedefi
+zorunlu değildir. Bilgisayardaki özel ACL/retention ve anahtar erişimini doğrulayın.
+
+Aşağıdaki kontroller **yerel bilgisayarda**, bu SHA'nın operator kaynaklarıyla
+PowerShell'de çalışır; dosya yollarını okuyarak alın, içerik/anahtar yazdırmayın:
+
+```powershell
+$sealedCopy = Read-Host 'İndirilen sealed dizinin mutlak yolu'
+$localPlain = Read-Host 'Henüz var olmayan özel unseal hedefi'
+$env:NATIVE_RECOVERY_KEY_FILE = Read-Host 'Ayrı saklanan key dosyasının mutlak yolu'
+$sealedPin = Read-Host 'Bağımsız sabitlenmiş SEALED fingerprint'
+node scripts/native-recovery-seal.mjs unseal $sealedCopy $localPlain $sealedPin
+if ($LASTEXITCODE -ne 0) { throw 'STOP: offsite unseal doğrulanmadı' }
+node scripts/native-recovery.mjs verify --input $localPlain
+if ($LASTEXITCODE -ne 0) { throw 'STOP: offsite backup doğrulanmadı' }
+```
+
+Başarılı `UNSEALED_VERIFIED`/verify sonucunu ve doğru yedek fingerprint'ini özel
+operator kaydında saklayın; yeni production yedeğinin manuel offsite kabulünü SSH
+akışına dönmeden önce doğrulayın. Bu işlem **manuel indirme ve yerel doğrulamadır**;
+otomatik offsite aktarımı veya otomatik backup kurulmuş değildir. Önceki gerçek
+yedek restore PASS farklı yedeğe aktarılmaz. İsterseniz doğrulanmış SSH/SCP ile
+aktarabilirsiniz; aynı bağımsız pin ve unseal/verify kapıları yine geçerlidir.
+Doğrulama/anahtar eksikse site geçişini yapmayın. Plaintext, başarısız kopya veya
+mevcut veriyi otomatik silmeyin.
 
 ## 5. Runtime geçişi ve açılış
 
@@ -281,8 +325,9 @@ devam eder, sona gelince sıfır; freeze sırasında job başarısız olur, unfr
 Privacy erasure cron'a konmaz. Backup için ayrı maintenance window: job'ları ve
 Passenger'ı gerçekten durdur → freeze → backup → seal → offsite roundtrip verify
 → kontrollü unfreeze/start. Mevcut panel tam stop/start otomasyonu doğrulanmadan
-quiesced otomatik backup cron'u kurmayın. Offsite erişimi yoksa backup schedule
-BLOCKED_EXTERNAL, maintenance apply yapılmadıysa schedule NOT_RUN kalır.
+quiesced otomatik backup cron'u kurmayın. Mevcut manuel offsite indirme/unseal
+yöntemi geçerlidir; otomatik backup/offsite schedule bu yöntemle kurulmuş sayılmaz.
+Maintenance apply yapılmadıysa schedule NOT_RUN kalır.
 
 ## Kalan gerçek belge/kararlar (tek liste)
 
@@ -294,6 +339,7 @@ BLOCKED_EXTERNAL, maintenance apply yapılmadıysa schedule NOT_RUN kalır.
   Open Library bu hazırlıkta kapalıdır; kapalı AniList/TMDB/OMDb/AI açılışı v1 engeli
   değildir. UA verilirse Open Library use-case kayıt/uygunluk kanıtı gerekir.
 - Production erişim sonuçları: dört login + fingerprint, doluluk/koruma/taşıma
-  kararı (yalnız veri varsa), yeni source-bound recovery kanıtı ve offsite erişimi.
+  kararı (yalnız veri varsa) ve yeni production yedeğinin manuel offsite doğrulaması.
+  Bu teslimdeki 627f0b6 source-bound PG18 sentetik recovery kanıtı PASS ve pinlidir.
 - Production giriş/Cloud Sync/iki kullanıcı izolasyonu ve geçici hesap cleanup
   kabulü; bunlar eski test PASS veya readiness 200 ile kapanmaz.
