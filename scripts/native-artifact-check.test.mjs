@@ -32,7 +32,7 @@ async function packageFixture() {
     'node_modules/@img/sharp-synthetic/libvips.dll': 'synthetic',
     '.next/static/chunk.js': 'synthetic',
     'public/icon.txt': 'synthetic',
-    'scripts/passenger-start.cjs': 'synthetic',
+    'scripts/passenger-start.cjs': await readFile(new URL('./passenger-start.cjs', import.meta.url), 'utf8'),
     'lib/backend/native-migration-state.json': JSON.stringify(nativeMigrationManifest().map(({ name, checksum }) => ({ name, checksum }))),
   })) await put(path, contents);
   return { root, put };
@@ -52,6 +52,34 @@ async function assertOrdinaryTree(root) {
     else assert.equal(info.isFile(),true);
   }
 }
+test('packages the current Passenger startup source verbatim',async()=>{
+  const checkout=await mkdtemp(join(tmpdir(),'mt-passenger-package-'));
+  let fixture;
+  try {
+    const repository=fileURLToPath(new URL('..',import.meta.url));
+    for(const args of [['clone','--shared','--no-checkout',repository,checkout],['read-tree','--empty']]) {
+      const result=spawnSync('git',args,{cwd:checkout,encoding:'utf8'});
+      assert.equal(result.status,0,result.stderr);
+    }
+    fixture=await packageFixture();
+    await cp(fixture.root,checkout,{recursive:true});
+    await writeFile(join(checkout,'.gitignore'),'.next/\nnode_modules/\ndist/\n');
+    await mkdir(join(checkout,'node_modules/next'),{recursive:true});
+    await writeFile(join(checkout,'node_modules/next/package.json'),'{"version":"synthetic"}');
+    await writeFile(join(checkout,'.next/BUILD_ID'),'synthetic');
+    const created=spawnSync(process.execPath,[packageCli,'create','dist/package'],{
+      cwd:checkout,encoding:'utf8',env:{...process.env,BACKEND_PROVIDER:'native'},
+    });
+    assert.equal(created.status,0,created.stderr);
+    const output=join(checkout,'dist/package');
+    assert.equal(await readFile(join(output,'app.cjs'),'utf8'),await readFile(new URL('./passenger-start.cjs',import.meta.url),'utf8'));
+    assert.equal((await verifyNativePackage(output)).status,'VERIFIED');
+  } finally {
+    if(fixture)await rm(fixture.root,{recursive:true,force:true});
+    await rm(checkout,{recursive:true,force:true});
+  }
+});
+
 test('creates and verifies a synthetic package with dereferenced dependency links',async()=>{
   const checkout=await mkdtemp(join(tmpdir(),'mt-package-checkout-'));
   const repository=fileURLToPath(new URL('..',import.meta.url));
@@ -86,6 +114,7 @@ test('creates and verifies a synthetic package with dereferenced dependency link
     });
     assert.equal(created.status,0,created.stderr);
     const output=join(checkout,'dist/package');
+    assert.equal(await readFile(join(output,'app.cjs'),'utf8'),await readFile(new URL('./passenger-start.cjs',import.meta.url),'utf8'));
     assert.equal(await readFile(join(output,'node_modules/alias/file.js'),'utf8'),'runtime fixture');
     assert.equal(await readFile(join(output,'node_modules/alias/directory/value.js'),'utf8'),'runtime fixture');
     assert.equal(await readFile(join(output,'node_modules/alias/chain.js'),'utf8'),'runtime fixture');

@@ -8,4 +8,8 @@ if (process.env.BACKEND_PROVIDER !== manifest.backendProvider) throw new Error('
 if (process.env.PORT && !/^\d{1,5}$/.test(process.env.PORT)) throw new Error('deployment_port_invalid');
 if (process.env.PORT && (Number(process.env.PORT) < 1 || Number(process.env.PORT) > 65535)) throw new Error('deployment_port_invalid');
 process.env.HOSTNAME = '0.0.0.0';
+// Plesk may omit zero-valued flags. Preserve explicit values for validation.
+for (const name of ['D7_RESEARCH_SHADOW_ENABLED', 'D7_RESEARCH_PUBLIC_CITATIONS_ENABLED', 'D7_RESEARCH_EVIDENCE_CACHE_ENABLED']) {
+  if (process.env[name] === undefined) process.env[name] = '0';
+}
 require('./server.js');

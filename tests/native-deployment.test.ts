@@ -1,5 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { resolve } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { runInNewContext } from 'node:vm';
 import { nativeDeploymentConfig } from '@/lib/backend/deployment-config.mjs';
 import { nativeConfig } from '@/lib/backend/native-config';
 import { GET as live } from '@/app/api/health/live/route';
@@ -17,6 +19,53 @@ const env={NODE_ENV:'production' as const,BACKEND_PROVIDER:'native',DATABASE_URL
   RATE_LIMIT_IDENTITY_HMAC_KEY:'h'.repeat(40),RATE_LIMIT_RPC_SIGNING_KEY:'k'.repeat(40),RATE_LIMIT_RPC_KEY_VERSION:'v1',RATE_LIMIT_RPC_AUDIENCE:'mt',
   AI_SERVER_ACCESS_MODE:'disabled',D7_RESEARCH_ROLLOUT_MODE:'disabled',D7_RESEARCH_SHADOW_ENABLED:'0',D7_RESEARCH_PUBLIC_CITATIONS_ENABLED:'0',
   D7_RESEARCH_EVIDENCE_CACHE_ENABLED:'0',MEDIA_TRACKER_PERSISTENT_EMBEDDING_CACHE:'off'};
+const researchFlags = ['D7_RESEARCH_SHADOW_ENABLED', 'D7_RESEARCH_PUBLIC_CITATIONS_ENABLED', 'D7_RESEARCH_EVIDENCE_CACHE_ENABLED'] as const;
+const passengerSource = readFileSync(new URL('../scripts/passenger-start.cjs', import.meta.url), 'utf8');
+function startPassenger(runtimeEnv: Record<string, string | undefined>) {
+  const server = vi.fn(() => nativeDeploymentConfig(runtimeEnv));
+  runInNewContext(passengerSource, { process: { env: runtimeEnv }, require: (path: string) => {
+    if (path === './deployment-manifest.json') return { backendProvider: 'native' };
+    if (path === './server.js') return server();
+    throw new Error('unexpected_passenger_dependency');
+  } });
+  expect(server).toHaveBeenCalledTimes(1);
+}
+
+describe('Passenger research flag defaults', () => {
+  it('defaults all omitted flags before delegating to the standalone server', () => {
+    const runtimeEnv: Record<string, string | undefined> = { ...env };
+    for (const name of researchFlags) delete runtimeEnv[name];
+    expect(() => nativeDeploymentConfig(runtimeEnv)).toThrow(/^native_deployment_configuration_invalid$/);
+    startPassenger(runtimeEnv);
+    expect(runtimeEnv).toEqual({ ...env, HOSTNAME: '0.0.0.0' });
+  });
+  it.each(researchFlags)('defaults only the undefined flag %s', name => {
+    const runtimeEnv = { ...env, [name]: undefined };
+    startPassenger(runtimeEnv);
+    expect(runtimeEnv).toEqual({ ...env, HOSTNAME: '0.0.0.0' });
+  });
+  it('preserves explicit valid zero values', () => {
+    const runtimeEnv = { ...env };
+    startPassenger(runtimeEnv);
+    expect(runtimeEnv).toEqual({ ...env, HOSTNAME: '0.0.0.0' });
+  });
+  it.each(researchFlags.flatMap(name => ['', '1', 'false', 'invalid', ' 0 '].map(value => ({ name, value }))))(
+    'preserves and rejects explicit $name="$value" even when neighboring flags are absent', ({ name, value }) => {
+      const runtimeEnv: Record<string, string | undefined> = { ...env };
+      for (const flag of researchFlags) delete runtimeEnv[flag];
+      runtimeEnv[name] = value;
+      expect(() => startPassenger(runtimeEnv)).toThrow(/^native_deployment_configuration_invalid$/);
+      expect(runtimeEnv[name]).toBe(value);
+      for (const flag of researchFlags) if (flag !== name) expect(runtimeEnv[flag]).toBe('0');
+    });
+  it.each(['AI_SERVER_ACCESS_MODE', 'D7_RESEARCH_ROLLOUT_MODE', 'MEDIA_TRACKER_PERSISTENT_EMBEDDING_CACHE'])(
+    'does not default other required policy %s', name => {
+      const runtimeEnv: Record<string, string | undefined> = { ...env, [name]: undefined };
+      expect(() => startPassenger(runtimeEnv)).toThrow(/^native_deployment_configuration_invalid$/);
+      expect(runtimeEnv[name]).toBeUndefined();
+    });
+});
+
 describe('native production deployment boundary',()=>{
   it('accepts an explicit complete contract without Supabase or operator credentials',()=>{
     expect(nativeDeploymentConfig(env).max).toBe(2);
