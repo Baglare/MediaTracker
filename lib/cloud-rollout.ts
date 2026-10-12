@@ -104,14 +104,17 @@ export function getCloudRolloutContract(): CloudRolloutContract {
 }
 
 export function buildPublicCloudRolloutState(): PublicCloudRolloutState {
+  // Keep this server read dynamic: direct NEXT_PUBLIC references are frozen
+  // by Next.js in both browser and server bundles during compilation.
+  const runtimeValue = (key: string): string | undefined => process.env[key];
   return {
     format: "mediatracker-cloud-rollout",
     version: 1,
-    schemaStage: schemaStage(process.env.NEXT_PUBLIC_CLOUD_MEDIA_SCHEMA_STAGE),
-    maintenance: process.env.NEXT_PUBLIC_CLOUD_MEDIA_MAINTENANCE === "true",
-    deploymentEpoch: process.env.NEXT_PUBLIC_CLOUD_MEDIA_DEPLOYMENT_EPOCH ?? "",
+    schemaStage: schemaStage(runtimeValue("NEXT_PUBLIC_CLOUD_MEDIA_SCHEMA_STAGE")),
+    maintenance: runtimeValue("NEXT_PUBLIC_CLOUD_MEDIA_MAINTENANCE") === "true",
+    deploymentEpoch: runtimeValue("NEXT_PUBLIC_CLOUD_MEDIA_DEPLOYMENT_EPOCH") ?? "",
     minimumClientVersion:
-      process.env.NEXT_PUBLIC_CLOUD_MEDIA_MINIMUM_CLIENT_VERSION
+      runtimeValue("NEXT_PUBLIC_CLOUD_MEDIA_MINIMUM_CLIENT_VERSION")
       ?? CLOUD_MEDIA_CLIENT_VERSION,
   };
 }

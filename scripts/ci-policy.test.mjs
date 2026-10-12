@@ -76,6 +76,27 @@ for (const [label, mutate] of [
 test("workflow parses YAML and satisfies authority/stage contract", () => {
   checkWorkflow(readFileSync(".github/workflows/ci.yml", "utf8"));
 });
+for (const key of ['NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED', 'NEXT_PUBLIC_CLOUD_MEDIA_SCHEMA_STAGE',
+  'NEXT_PUBLIC_CLOUD_MEDIA_V2_ENABLED', 'NEXT_PUBLIC_CLOUD_GOALS_SCHEMA_STAGE',
+  'NEXT_PUBLIC_CLOUD_GOALS_V1_ENABLED', 'NEXT_PUBLIC_CLOUD_MEDIA_MAINTENANCE',
+  'NEXT_PUBLIC_CLOUD_MEDIA_MINIMUM_CLIENT_VERSION']) {
+  test(`native artifact rejects absent or incorrect ${key}`, () => {
+    for (const value of [undefined, 'invalid']) {
+      const workflow = yaml.load(readFileSync('.github/workflows/ci.yml', 'utf8'));
+      const env = workflow.jobs['native-linux-artifact'].steps.find(step => step.run?.includes('npm run build')).env;
+      if (value === undefined) delete env[key];
+      else env[key] = value;
+      assert.throws(() => checkWorkflow(yaml.dump(workflow)), /Native Cloud build contract/);
+    }
+  });
+}
+test('native artifact requires fresh SHA epoch and compiled verification', () => {
+  const source = readFileSync('.github/workflows/ci.yml', 'utf8');
+  for (const removed of ['export NEXT_PUBLIC_CLOUD_MEDIA_DEPLOYMENT_EPOCH="v1-${GITHUB_SHA:0:12}"',
+    'node scripts/cloud-build-contract.mjs .next "$GITHUB_SHA"', 'NEXT_PUBLIC_CLOUD_']) {
+    assert.throws(() => checkWorkflow(source.replace(removed, 'omitted')));
+  }
+});
 for (const [label, mutate] of [
   ['PR trigger', job => { job.if = "github.event_name == 'pull_request'"; }],
   ['main trigger', job => { job.if = "github.event_name == 'push' && github.ref == 'refs/heads/main'"; }],

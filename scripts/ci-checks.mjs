@@ -189,6 +189,20 @@ export function checkWorkflow(text) {
     && artifactActions[2].with['retention-days'] === 7 && artifactActions[2].with['if-no-files-found'] === 'error',
     'Native artifact action pin/retention contract');
   const build = artifact.steps.find(step => step.run?.includes('npm run build'));
+  for (const [name, value] of Object.entries({
+    NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED: 'false',
+    NEXT_PUBLIC_CLOUD_MEDIA_SCHEMA_STAGE: 'd2c1', NEXT_PUBLIC_CLOUD_MEDIA_V2_ENABLED: 'true',
+    NEXT_PUBLIC_CLOUD_GOALS_SCHEMA_STAGE: 'v1', NEXT_PUBLIC_CLOUD_GOALS_V1_ENABLED: 'true',
+    NEXT_PUBLIC_CLOUD_MEDIA_MAINTENANCE: 'false', NEXT_PUBLIC_CLOUD_MEDIA_MINIMUM_CLIENT_VERSION: 'd2c2',
+  })) requireContract(build?.env?.[name] === value, `Native Cloud build contract: ${name}`);
+  requireContract(build?.run?.includes('export NEXT_PUBLIC_CLOUD_MEDIA_DEPLOYMENT_EPOCH="v1-${GITHUB_SHA:0:12}"')
+    && build.run.indexOf('export NEXT_PUBLIC_CLOUD_MEDIA_DEPLOYMENT_EPOCH') < build.run.indexOf('npm run build')
+    && build.run.includes('NEXT_PUBLIC_CLOUD_')
+    && build.run.includes('node --test scripts/cloud-build-contract.test.mjs')
+    && build.run.includes('node scripts/cloud-build-contract.mjs .next "$GITHUB_SHA"')
+    && build.run.indexOf('node scripts/cloud-build-contract.mjs') > build.run.indexOf('npm run build')
+    && build.run.indexOf('node scripts/cloud-build-contract.mjs') < build.run.indexOf('node scripts/native-package.mjs create'),
+    'Missing compiled Cloud build/runtime verification');
   requireContract(build?.env?.BACKEND_PROVIDER === 'native'
     && build.env.NODE_OPTIONS === '--import=${{ github.workspace }}/scripts/ci-offline.mjs'
     && build.run.includes('validateReleaseEnvironment') && build.run.includes("'PRODUCTION'")

@@ -366,6 +366,7 @@ describe("Cloud Media V2 sync manager integration", () => {
   });
 
   it("does not dispatch queue transport that disagrees with the active adapter", async () => {
+    vi.stubEnv("NEXT_PUBLIC_CLOUD_MEDIA_SCHEMA_STAGE", "d2c1");
     const manager = await import("@/lib/sync-manager");
     const queue = await import("@/lib/sync-queue");
     const repository = await import("@/lib/supabase/cloud-repository");
@@ -386,9 +387,19 @@ describe("Cloud Media V2 sync manager integration", () => {
       ownerScope: scope.key,
       userId: scope.userId,
     }]);
+    // Mixed queues must stop as a whole; compatible new work cannot jump past
+    // legacy work. Preserve operation IDs, revisions, payloads and retry state.
+    const legacy = queue.loadSyncQueue(scope)[0];
+    const v2 = queue.createSyncQueueItem(scope, {
+      entity: "media_item", operation: "upsert", payload: media("new-v2"), id: "new-v2-op",
+    });
+    queue.saveSyncQueue(scope, [legacy, v2]);
+    const before = queue.loadSyncQueue(scope);
+    await manager.flush();
     await manager.flush();
 
     expect(manager.getSnapshot().incompatible).toBe(1);
+    expect(queue.loadSyncQueue(scope)).toEqual(before);
     expect(v2Mocks.dispatch).not.toHaveBeenCalled();
     expect(repository.uploadMediaItems).not.toHaveBeenCalled();
   });

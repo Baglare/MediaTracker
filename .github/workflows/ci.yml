@@ -107,6 +107,13 @@ jobs:
           RATE_LIMIT_RPC_AUDIENCE: mt-native-build
           NATIVE_STORAGE_ROOT: /tmp/mediatracker-native-build-data
           TRUSTED_INGRESS_MODE: unconfigured
+          NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED: 'false'
+          NEXT_PUBLIC_CLOUD_MEDIA_SCHEMA_STAGE: d2c1
+          NEXT_PUBLIC_CLOUD_MEDIA_V2_ENABLED: 'true'
+          NEXT_PUBLIC_CLOUD_GOALS_SCHEMA_STAGE: v1
+          NEXT_PUBLIC_CLOUD_GOALS_V1_ENABLED: 'true'
+          NEXT_PUBLIC_CLOUD_MEDIA_MAINTENANCE: 'false'
+          NEXT_PUBLIC_CLOUD_MEDIA_MINIMUM_CLIENT_VERSION: d2c2
           AI_SERVER_ACCESS_MODE: disabled
           D7_RESEARCH_ROLLOUT_MODE: disabled
           D7_RESEARCH_SHADOW_ENABLED: '0'
@@ -114,8 +121,11 @@ jobs:
           D7_RESEARCH_EVIDENCE_CACHE_ENABLED: '0'
           MEDIA_TRACKER_PERSISTENT_EMBEDDING_CACHE: off
         run: |
-          node --input-type=module -e "import {validateReleaseEnvironment} from './scripts/ops/release-policy.mjs'; const env=Object.fromEntries(Object.entries(process.env).filter(([key])=>/^(BACKEND_PROVIDER|DATABASE_|BETTER_AUTH_|NEXT_PUBLIC_APP_URL|NATIVE_STORAGE_ROOT|TRUSTED_INGRESS_MODE|RATE_LIMIT_|AI_SERVER_ACCESS_MODE|D7_RESEARCH_|MEDIA_TRACKER_PERSISTENT_EMBEDDING_CACHE)$|^(DATABASE_|BETTER_AUTH_|RATE_LIMIT_|D7_RESEARCH_)/.test(key))); if(!validateReleaseEnvironment(env,'PRODUCTION').valid) throw new Error('synthetic_build_contract_invalid');"
+          export NEXT_PUBLIC_CLOUD_MEDIA_DEPLOYMENT_EPOCH="v1-${GITHUB_SHA:0:12}"
+          node --input-type=module -e "import {validateReleaseEnvironment} from './scripts/ops/release-policy.mjs'; const env=Object.fromEntries(Object.entries(process.env).filter(([key])=>/^(BACKEND_PROVIDER|NEXT_PUBLIC_APP_URL|NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED|NATIVE_STORAGE_ROOT|TRUSTED_INGRESS_MODE|AI_SERVER_ACCESS_MODE|MEDIA_TRACKER_PERSISTENT_EMBEDDING_CACHE)$|^(DATABASE_|BETTER_AUTH_|RATE_LIMIT_|D7_RESEARCH_|NEXT_PUBLIC_CLOUD_)/.test(key))); if(!validateReleaseEnvironment(env,'PRODUCTION').valid) throw new Error('synthetic_build_contract_invalid');"
           npm run build
+          node --test scripts/cloud-build-contract.test.mjs
+          node scripts/cloud-build-contract.mjs .next "$GITHUB_SHA"
           package="dist/native-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           node scripts/native-package.mjs create "$package"
           node scripts/native-package.mjs verify "$package"

@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { GET } from "@/app/api/cloud/rollout/route";
 import {
   CLOUD_MEDIA_CLIENT_VERSION,
   decodePublicCloudRolloutState,
@@ -6,7 +7,29 @@ import {
   resolveCloudRolloutContract,
 } from "@/lib/cloud-rollout";
 
+afterEach(() => vi.unstubAllEnvs());
+
 describe("D2C.2 cloud rollout contract", () => {
+  it("reads current runtime values on every no-store request", async () => {
+    vi.stubEnv("NEXT_PUBLIC_CLOUD_MEDIA_SCHEMA_STAGE", "d2c1");
+    vi.stubEnv("NEXT_PUBLIC_CLOUD_MEDIA_MAINTENANCE", "false");
+    vi.stubEnv("NEXT_PUBLIC_CLOUD_MEDIA_DEPLOYMENT_EPOCH", "v1-012345abcdef");
+    vi.stubEnv("NEXT_PUBLIC_CLOUD_MEDIA_MINIMUM_CLIENT_VERSION", "d2c2");
+    const response = await GET();
+    expect(response.headers.get("Cache-Control")).toBe("no-store, max-age=0");
+    expect(await response.json()).toEqual({
+      format: "mediatracker-cloud-rollout", version: 1, schemaStage: "d2c1",
+      maintenance: false, deploymentEpoch: "v1-012345abcdef", minimumClientVersion: "d2c2",
+    });
+    vi.stubEnv("NEXT_PUBLIC_CLOUD_MEDIA_MAINTENANCE", "true");
+    vi.stubEnv("NEXT_PUBLIC_CLOUD_MEDIA_DEPLOYMENT_EPOCH", "v1-abcdef012345");
+    vi.stubEnv("NEXT_PUBLIC_CLOUD_MEDIA_MINIMUM_CLIENT_VERSION", "future-client");
+    expect(await (await GET()).json()).toMatchObject({
+      maintenance: true, deploymentEpoch: "v1-abcdef012345", minimumClientVersion: "future-client",
+    });
+    vi.stubEnv("NEXT_PUBLIC_CLOUD_MEDIA_SCHEMA_STAGE", undefined);
+    expect(await (await GET()).json()).toMatchObject({ schemaStage: "unknown" });
+  });
   it.each([
     ["legacy", false, "ready"],
     ["d2b1", false, "ready"],
