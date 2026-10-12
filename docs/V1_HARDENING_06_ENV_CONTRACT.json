@@ -253,6 +253,17 @@
     "failure": "unset/invalid keeps capability disabled or blocks acceptance; no substitute target"
   },
   {
+    "name": "NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED",
+    "LOCAL": "optional isolated offline/local; explicit values required for enabled Cloud/distributed mode",
+    "CI": "absent: credential-free offline suite",
+    "PREVIEW": "optional",
+    "PRODUCTION": "optional",
+    "allowed": "false or absent: closed; true: only after legal/vendor release approval and 012; rebuild with matching runtime value",
+    "visibility": "public build-time",
+    "owner": "release operator",
+    "failure": "unset/invalid keeps capability disabled or blocks acceptance; no substitute target"
+  },
+  {
     "name": "BACKEND_PROVIDER",
     "LOCAL": "optional isolated offline/local; explicit values required for enabled Cloud/distributed mode",
     "CI": "absent: credential-free offline suite",

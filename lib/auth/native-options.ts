@@ -1,10 +1,11 @@
 import { nativeConfig } from '../backend/native-config';
+import { nativeSignupEnabled } from './signup-policy';
 export function nativeAuthOptions(env: Record<string, string | undefined>) {
   const config = nativeConfig(env);
   return {
     secret: config.secret, baseURL: config.authUrl, basePath: '/api/auth',
     trustedOrigins: [config.authUrl],
-    emailAndPassword: { enabled: true, disableSignUp: true },
+    emailAndPassword: { enabled: true, disableSignUp: !nativeSignupEnabled(env) },
     session: { cookieCache: { enabled: false }, deferSessionRefresh: true },
     advanced: { useSecureCookies: config.production, database: { generateId: 'uuid' as const },
       // No unverified forwarded IP headers. P1 uses a conservative shared bucket

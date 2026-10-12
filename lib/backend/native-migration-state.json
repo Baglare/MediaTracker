@@ -42,5 +42,9 @@
   {
     "name": "011_backup_policy_role_scope.sql",
     "checksum": "8cf05e101e61c0ab2ca2226c267f9af4611a47cd5ace5a39d190d3d31b90b274"
+  },
+  {
+    "name": "012_public_signup.sql",
+    "checksum": "ed373fd611b57a25f537ebeaf9503136d2244383e2746f0744c108e0833c0193"
   }
 ]

@@ -22,6 +22,16 @@ it('requires explicit canonical same-origin and rejects privilege/identity/body 
   for(const body of [{ email:'x',password:'x',id },{ email:'x',password:'x',role:'admin' },{ user_metadata:{ is_admin:true } }]) expect((await POST(request('sign-in/email',body))).status).toBe(400);
   expect(mock.handler).not.toHaveBeenCalled();
 });
+it('admits only bounded signup fields after explicit release enablement', async () => {
+  vi.stubEnv('NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED','true');
+  const body={name:'Synthetic',email:'synthetic@example.invalid',password:'synthetic-password'};
+  for (const origin of [null,'null','https://attacker.invalid']) expect((await POST(request('sign-up/email',body,origin))).status).toBe(403);
+  for (const patch of [{id},{role:'admin'},{emailVerified:true},{image:'https://attacker.invalid'},{name:''},{name:'a'.repeat(101)},{password:'short'},{password:'x'.repeat(129)}])
+    expect((await POST(request('sign-up/email',{...body,...patch}))).status).toBe(400);
+  expect(mock.handler).not.toHaveBeenCalled();
+  expect((await POST(request('sign-up/email',body))).status).toBe(200);
+  expect(mock.handler).toHaveBeenCalledOnce();
+});
 it('bounds payload and allows only admitted auth operations', async () => {
   expect((await POST(request('sign-in/email',{email:'x',password:'x'.repeat(9000)}))).status).toBe(413);
   expect(mock.handler).not.toHaveBeenCalled();

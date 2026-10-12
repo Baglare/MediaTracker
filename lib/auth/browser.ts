@@ -14,6 +14,10 @@ export const nativeBrowserAuth = {
     const { error } = await client.signIn.email({ email, password });
     return { ok: !error, ...(error ? { error: 'Oturum açılamadı.' } : {}) };
   },
+  async signUp(email: string, password: string, name: string) {
+    const { error } = await client.signUp.email({ email, password, name });
+    return { ok: !error, ...(error ? { error: 'Hesap oluşturulamadı.' } : {}) };
+  },
   async signOut() {
     const { error } = await client.signOut({ fetchOptions: { body: {} } });
     return { ok: !error, ...(error ? { error: 'Oturum kapatılamadı.' } : {}) };

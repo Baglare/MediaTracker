@@ -16,9 +16,10 @@ const core = ["NEXT_PUBLIC_SUPABASE_URL","NEXT_PUBLIC_SUPABASE_ANON_KEY","NEXT_P
   "NEXT_PUBLIC_CLOUD_MEDIA_MAINTENANCE","NEXT_PUBLIC_CLOUD_MEDIA_DEPLOYMENT_EPOCH",
   "NEXT_PUBLIC_CLOUD_MEDIA_MINIMUM_CLIENT_VERSION","RATE_LIMIT_IDENTITY_HMAC_KEY",
   "RATE_LIMIT_RPC_SIGNING_KEY","RATE_LIMIT_RPC_KEY_VERSION","RATE_LIMIT_RPC_AUDIENCE"];
-const optional=["MEDIA_TRACKER_PROVIDER_USER_AGENT","RATE_LIMIT_IDENTITY_HMAC_PREVIOUS_KEY","MEDIA_TRACKER_EMBEDDING_CACHE"];
+const optional=["MEDIA_TRACKER_PROVIDER_USER_AGENT","RATE_LIMIT_IDENTITY_HMAC_PREVIOUS_KEY","MEDIA_TRACKER_EMBEDDING_CACHE","NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED"];
 const nativeVariables=["DATABASE_URL","DATABASE_SSL_MODE","DATABASE_POOL_MAX","BETTER_AUTH_SECRET","BETTER_AUTH_URL","NATIVE_HOSTING_CAPABILITY",...nativeDeploymentVariables];
 const nativeAllowed={DATABASE_URL:"postgresql URL; closed profile runtime/database pair; no query/hash; server secret",
+  NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED:"false or absent: closed; true: only after legal/vendor release approval and 012; rebuild with matching runtime value",
   NATIVE_ROLE_PROFILE:"local (loopback only), hosting-test, hosting-production; fixed database/login pairs",
   NATIVE_HOSTING_CAPABILITY:"dedicated (default) or shared-managed (hosted only); provider recovery unverified; no native backup/restore",
   DATABASE_SSL_CA_FILE:"optional local absolute PEM CA file; required hosting profile; no symlink/private key; TLS verify-full only",
@@ -54,6 +55,10 @@ export function environmentContract() {
 export function validateReleaseEnvironment(env,scope) {
   requireSafe(["LOCAL","CI","PREVIEW","PRODUCTION"].includes(scope) && env && typeof env === "object" && !Array.isArray(env));
   const errors=[];
+  if (env.NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED !== undefined && !['true','false'].includes(env.NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED))
+    errors.push({name:'NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED',reason:'invalid boolean'});
+  if (env.NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED === 'true' && env.BACKEND_PROVIDER !== 'native')
+    errors.push({name:'NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED',reason:'native signup only'});
   const hosted=["PREVIEW","PRODUCTION"].includes(scope);
   let provider;
   try { provider=resolveBackendProvider(env.BACKEND_PROVIDER,hosted); }

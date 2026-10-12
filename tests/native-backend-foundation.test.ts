@@ -109,6 +109,8 @@ describe('auth foundation', () => {
     expect(options.advanced.defaultCookieAttributes).toEqual({ httpOnly: true, sameSite: 'lax', secure: true });
     expect(options.advanced.database.generateId).toBe('uuid');
     expect(options.emailAndPassword).toEqual({ enabled: true, disableSignUp: true });
+    expect(nativeAuthOptions({...env,NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED:'true'}).emailAndPassword.disableSignUp).toBe(false);
+    expect(() => nativeAuthOptions({...env,NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED:'yes'})).toThrow('native_configuration_invalid');
     expect(options.session.cookieCache.enabled).toBe(false);
     expect(options.rateLimit.storage).toBe('database');
   });

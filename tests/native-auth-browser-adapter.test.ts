@@ -17,3 +17,11 @@ it('uses Better Auth email credentials and signout endpoints with JSON; returns 
   expect(await nativeBrowserAuth.signOut()).toEqual({ok:false,error:'Oturum kapatılamadı.'});
   expect(fetch.mock.calls[1][1]).toMatchObject({method:'POST',body:'{}'});
 });
+it('uses the bounded email signup endpoint without privilege fields',async()=>{
+  const fetch=vi.fn().mockResolvedValue(Response.json({error:'private SQL'},{status:400}));
+  vi.stubGlobal('fetch',fetch);vi.resetModules();
+  const {nativeBrowserAuth}=await import('@/lib/auth/browser');
+  expect(await nativeBrowserAuth.signUp('synthetic@example.invalid','synthetic-password','Synthetic')).toEqual({ok:false,error:'Hesap oluşturulamadı.'});
+  expect(fetch.mock.calls[0][0].toString()).toContain('/sign-up/email');
+  expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({email:'synthetic@example.invalid',password:'synthetic-password',name:'Synthetic'});
+});

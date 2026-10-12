@@ -18,7 +18,7 @@ const processingGroups = (native: boolean) => [
       : "E-posta, hesap kimliği ve oturum bilgileri; girişte şifre işlenir, uygulama tablosunda tutulmaz.",
     purpose: "Mevcut kullanıcıların girişini ve oturum güvenliğini sağlamak.",
     method: native
-      ? "Giriş formu, uygulamanın Better Auth uçları ve oturum çerezleri; otomatik işlemler."
+      ? "Giriş ve kayıt formu, uygulamanın Better Auth uçları ve oturum çerezleri; otomatik işlemler."
       : "Giriş formu ve hesap/oturum SDK'sı; otomatik işlemler.",
     destination: native
       ? "Better Auth, yapılandırılmış native PostgreSQL ve TürkHosting/Plesk/Passenger uygulama sunucusu; kimlik doğrulama işlemleri."
@@ -158,9 +158,9 @@ export default function PrivacyPage() {
             Bu aydınlatma metni açık rıza metni değildir; hizmet kullanımı bu metni kabul etme koşuluna bağlı değildir.
           </p>
           <p>
-            MediaTracker’ın v1 arayüzünde yeni hesap oluşturma akışı sunulmaz. Mevcut yetkili hesaplar giriş yapabilir.
+            Mevcut yetkili hesaplar giriş yapabilir. Yeni hesap kaydı ayrı yayın koşullarına bağlıdır.
             {native
-              ? "Native modda Better Auth yeni kayıt işlemleri kaynak kodunda kapalıdır; bu sayfa canlı Auth ayarlarının veya gerçek veritabanı kabulünün doğrulandığı anlamına gelmez."
+              ? "Native modda yeni kayıt varsayılan olarak kapalıdır; yalnız teknik ve hukuki yayın koşulları tamamlanıp kayıt ayarı açıldığında kullanılabilir. Bu sayfa canlı Auth ayarlarının veya gerçek veritabanı kabulünün doğrulandığı anlamına gelmez."
               : "Barındırılan Auth hizmetinde yeni kayıtların kapatılması ayrıca bir yayın yapılandırması gereğidir; bu sayfa canlı Auth ayarlarının doğrulandığı anlamına gelmez."}
           </p>
           {native && (

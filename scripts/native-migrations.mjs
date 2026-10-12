@@ -12,6 +12,7 @@ export const nativeMigrationFiles = [
   '009_deployment_operations.sql',
   '010_backup_select_policies.sql',
   '011_backup_policy_role_scope.sql',
+  '012_public_signup.sql',
 ];
 export function nativeMigrationManifest(profile = 'local') {
   const roles = nativeRoles(profile);

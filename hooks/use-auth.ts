@@ -27,6 +27,8 @@ export interface AuthActionResult {
 }
 
 export interface UseAuthApi extends UseAuthState {
+  signupEnabled: boolean;
+  signUp: (email: string, password: string, name: string) => Promise<AuthActionResult>;
   signIn: (email: string, password: string) => Promise<AuthActionResult>;
   signOut: () => Promise<AuthActionResult>;
 }
@@ -149,5 +151,12 @@ export function useAuth(): UseAuthApi {
     return { ok: true };
   };
 
-  return { ...state, signIn, signOut };
+  const signupEnabled = native && process.env.NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED === 'true';
+  const signUp = async (email: string, password: string, name: string): Promise<AuthActionResult> => {
+    if (!signupEnabled) return { ok: false, error: 'Yeni hesap kaydı kapalıdır.' };
+    const result = await nativeBrowserAuth.signUp(email, password, name);
+    await refreshNative();
+    return result;
+  };
+  return { ...state, signupEnabled, signUp, signIn, signOut };
 }

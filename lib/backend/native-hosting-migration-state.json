@@ -43,6 +43,10 @@
     {
       "name": "011_backup_policy_role_scope.sql",
       "checksum": "37fc373ef0fbc9e442acc6c5d17cc9a2b5f996f5a4830cb5346c14be537d402b"
+    },
+    {
+      "name": "012_public_signup.sql",
+      "checksum": "ab8d1553c140a92f3becdc045c38d7dff99a52377faeeb8e89e422a9812e25cd"
     }
   ],
   "hosting-production": [
@@ -89,6 +93,10 @@
     {
       "name": "011_backup_policy_role_scope.sql",
       "checksum": "f26ebdeb605abe51d05f88582cf0d0ccf720212af015ea1eabf5b9b60b6f26fd"
+    },
+    {
+      "name": "012_public_signup.sql",
+      "checksum": "ba40f2d2d99377744f6e1f40a065c59977526cc3db3f2f5f6f0e879bbd31a359"
     }
   ]
 }

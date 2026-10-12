@@ -13,12 +13,15 @@ import { LogIn, LogOut, Mail, ShieldCheck, Lock } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 
 export default function AuthPanel() {
-  const { configured, loading, user, signIn, signOut } = useAuth();
+  const { configured, loading, user, signupEnabled, signUp, signIn, signOut } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [register, setRegister] = useState(false);
+  const [name, setName] = useState('');
+  const registering = register && signupEnabled;
 
   const cardCls =
     "app-panel rounded-2xl border p-6";
@@ -99,7 +102,8 @@ export default function AuthPanel() {
     if (!email.trim()) return "E-posta boş olamaz.";
     if (!/^\S+@\S+\.\S+$/.test(email.trim())) return "Geçerli bir e-posta adresi gir.";
     if (!password) return "Şifre boş olamaz.";
-    if (password.length < 6) return "Şifre en az 6 karakter olmalı.";
+    if (password.length < (registering ? 8 : 6)) return registering ? "Şifre en az 8 karakter olmalı." : "Şifre en az 6 karakter olmalı.";
+    if (registering && (!name.trim() || name.length > 100 || password.length > 128)) return "Ad ve şifre uzunluğunu kontrol et.";
     return null;
   };
 
@@ -112,7 +116,7 @@ export default function AuthPanel() {
       return;
     }
     setSubmitting(true);
-    const res = await signIn(email.trim(), password);
+    const res = registering ? await signUp(email.trim(), password, name.trim()) : await signIn(email.trim(), password);
     setSubmitting(false);
 
     if (!res.ok) {
@@ -130,11 +134,15 @@ export default function AuthPanel() {
       <div className="flex items-center gap-2 mb-4">
         <div className="flex items-center gap-2">
           <LogIn className="w-5 h-5 text-violet-400" />
-          <h3 className="text-lg font-semibold text-zinc-100">Giriş Yap</h3>
+          <h3 className="text-lg font-semibold text-zinc-100">{registering ? 'Hesap Oluştur' : 'Giriş Yap'}</h3>
         </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-3">
+        {registering && <div>
+          <label className={labelCls} htmlFor="signup-name">Ad</label>
+          <input id="signup-name" autoComplete="name" maxLength={100} value={name} onChange={e => setName(e.target.value)} className={inputCls} required />
+        </div>}
         <div>
           <label className={labelCls}>E-posta</label>
           <div className="relative">
@@ -156,7 +164,7 @@ export default function AuthPanel() {
             <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
             <input
               type="password"
-              autoComplete="current-password"
+              autoComplete={registering ? 'new-password' : 'current-password'}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="En az 6 karakter"
@@ -175,12 +183,14 @@ export default function AuthPanel() {
           disabled={submitting}
           className="app-primary-action w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors disabled:opacity-50 cursor-pointer"
         >
-          {submitting ? "Lütfen bekle…" : "Giriş Yap"}
+          {submitting ? "Lütfen bekle…" : registering ? 'Hesap Oluştur' : "Giriş Yap"}
         </button>
 
-        <p className="text-[11px] text-zinc-500 leading-relaxed pt-1">
+        {signupEnabled ? <button type="button" disabled={submitting} onClick={() => { setRegister(!register); setError(null); }} className="block w-full text-center text-xs text-[var(--app-accent-strong)] underline underline-offset-4">
+          {registering ? 'Mevcut hesabımla giriş yap' : 'Yeni hesap oluştur'}
+        </button> : <p className="text-[11px] text-zinc-500 leading-relaxed pt-1">
           İlk sürümde yeni hesap kaydı kapalıdır. Mevcut hesabınla giriş yapabilir; giriş yapmadan yerel-first kullanıma devam edebilirsin.
-        </p>
+        </p>}
         <Link href="/privacy" className="block text-center text-xs text-[var(--app-accent-strong)] underline underline-offset-4">
           Gizlilik ve veri kullanımı
         </Link>
