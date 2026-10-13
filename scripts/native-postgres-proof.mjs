@@ -181,8 +181,11 @@ try {
   if(result.status!==0 || interrupted) throw new Error('auth_or_pool_proof_failed');
   console.log('PASS: real disposable PostgreSQL RLS, Better Auth and pg transaction proof');
   }
-} catch {
-  console.error(`${id?'FAIL: disposable proof':'BLOCKED_ENVIRONMENT: disposable proof'}; stage=${stage}${sqlstate?`; sqlstate=${sqlstate}`:''}${assertion?`; assertion=${assertion}`:''}; diagnostics redacted`);
+} catch(error) {
+  const checks=new Set(['connections','guest_lock_contention','guest_race','replay_and_ten_seconds','utc_daily_limit','provider_reserve','disabled_global_capacity','cooldown','envelope_negatives','authenticated_quota','authenticated_race','cloud_cas','tombstone','rls']);
+  const check=checks.has(error.releaseCheck)?error.releaseCheck:undefined;
+  if(check&&/^[0-9A-Z]{5}$/.test(error.code??'')&&allowedSqlstateClasses.has(error.code.slice(0,2)))sqlstate=error.code;
+  console.error(`${id?'FAIL: disposable proof':'BLOCKED_ENVIRONMENT: disposable proof'}; stage=${stage}${check?`; check=${check}`:''}${sqlstate?`; sqlstate=${sqlstate}`:''}${assertion?`; assertion=${assertion}`:''}; diagnostics redacted`);
   process.exitCode=1;
 } finally {
   cleaning=true;
