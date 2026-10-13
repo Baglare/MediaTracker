@@ -216,6 +216,28 @@ try {
     stage='SOURCE_BACKUP_COVERAGE';
     await inspectBackupCoverage(backup,roles);
     if((await backup.query('SELECT count(*)::integer AS n FROM app.media_items')).rows[0]?.n!==2)throw new Error('native_recovery_fixture_failed');
+    stage='SOURCE_NEGATIVE_OWNERSHIP_PROBES';
+    await verifyNativeDatabase(backup,roles);
+    // Register exactly the new (text,text) limiter transport, never arbitrary
+    // limiter-owned functions or an overload sharing its name.
+    for(const signature of ['app.recovery_unexpected_limiter()','app.tvmaze_guest_rate_limit_v1(integer,text)']) {
+      await setup.query(`CREATE FUNCTION ${signature} RETURNS integer LANGUAGE sql SECURITY DEFINER SET search_path=pg_catalog AS $$ SELECT 1 $$;
+        ALTER FUNCTION ${signature} OWNER TO ${qi(roles.limiter)};REVOKE ALL ON FUNCTION ${signature} FROM PUBLIC`);
+      let denied=false;
+      try {await verifyNativeDatabase(backup,roles);}
+      catch(error){if(error.message!=='native_recovery_ownership_acl_invalid')throw error;denied=true;}
+      finally {await setup.query(`DROP FUNCTION ${signature}`);}
+      if(!denied)throw new Error('native_recovery_ownership_fail_open');
+    }
+    const guest='app.tvmaze_guest_rate_limit_v1(text,text)';
+    for(const change of [`GRANT EXECUTE ON FUNCTION ${guest} TO PUBLIC`,`ALTER FUNCTION ${guest} OWNER TO ${qi(roles.owner)}`]) {
+      await setup.query(change);let denied=false;
+      try {await verifyNativeDatabase(backup,roles);}
+      catch(error){if(error.message!=='native_recovery_ownership_acl_invalid')throw error;denied=true;}
+      finally {await setup.query(`REVOKE ALL ON FUNCTION ${guest} FROM PUBLIC;ALTER FUNCTION ${guest} OWNER TO ${qi(roles.limiter)}`);}
+      if(!denied)throw new Error('native_recovery_ownership_fail_open');
+    }
+    await verifyNativeDatabase(backup,roles);
     // Negative checks ensure permissive SELECT never silently overrides restrictive policy.
     stage='SOURCE_NEGATIVE_POLICY_PROBES';
     await setup.query(`CREATE POLICY recovery_deny ON app.media_items AS RESTRICTIVE FOR SELECT TO ${qi(roles.backup)} USING(false)`);

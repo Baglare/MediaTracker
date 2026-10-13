@@ -152,7 +152,10 @@ export async function verifyNativeDatabase(client, roles = nativeRoles(), restor
         CROSS JOIN LATERAL aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a WHERE a.grantee=0)
       AND NOT EXISTS(SELECT FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace JOIN expected e ON e.schema=n.nspname
         WHERE p.proowner<>e.owner::regrole AND NOT (n.nspname='app' AND p.proowner=$2::regrole
-          AND p.proname IN ('consume_application_rate_limit_v1','report_provider_cooldown_v1')))
+          AND (p.proname IN ('consume_application_rate_limit_v1','report_provider_cooldown_v1')
+            OR (p.oid=to_regprocedure('app.tvmaze_guest_rate_limit_v1(text,text)') AND p.prosecdef))))
+      AND EXISTS(SELECT FROM pg_proc p WHERE p.oid=to_regprocedure('app.tvmaze_guest_rate_limit_v1(text,text)')
+        AND p.proowner=$2::regrole AND p.prosecdef)
       AS safe`,[owners,roles.limiter])).rows[0]?.safe;
     if(safe!==true)throw new Error('native_recovery_ownership_acl_invalid');
   }
