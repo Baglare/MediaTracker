@@ -40,6 +40,7 @@ export async function prepareReleaseUpgrade(config) {
       await admin.query('INSERT INTO native_auth."user"(id,name,email) VALUES($1,$2,$3)',[user,'Release '+i,'release-'+i+'@example.invalid']);
       await owner(runtime,user,async()=>{
         assert.equal((await media(runtime,'seed-'+user,'same-id','upsert',0,payload)).reason,'created');
+        if(i===0)assert.equal((await media(runtime,'seed-a-only-record','a-only-id','upsert',0,payload)).reason,'created');
         assert.equal((await media(runtime,'tomb-seed-'+user,'deleted-id','upsert',0,payload)).ok,true);
         assert.equal((await media(runtime,'tomb-delete-'+user,'deleted-id','delete',1,null)).ok,true);
         const goal={id:'same-goal',title:'Release goal',origin:'manual',lifecycle:'active',scope:{},metric:{},schedule:{},createdAt:'2026-10-14T00:00:00Z',updatedAt:'2026-10-14T00:00:00Z'};
@@ -158,7 +159,7 @@ export async function proveReleaseConcurrency({config}) {
     assert.equal((await admin.query("SELECT count FROM private_rate_limit.buckets WHERE policy_id='search' AND subject_digest=decode($1,'hex')",['d'.repeat(64)])).rows[0].count,60);
     // Two truly independent connections compete for the same expected revision.
     check='cloud_cas';
-    const writes=await Promise.all(workers.slice(0,2).map((c,i)=>owner(c,users[0],()=>media(c,'cas-'+i,'same-id','upsert',1,{...payload,title:'CAS '+i}))));
+    const writes=await Promise.all(workers.slice(0,2).map((c,i)=>owner(c,users[0],()=>media(c,'release-cas-'+i,'same-id','upsert',1,{...payload,title:'CAS '+i}))));
     assert.equal(writes.filter(r=>r.ok===true).length,1);assert.equal(writes.filter(r=>r.reason==='revision_mismatch').length,1);
     check='tombstone';
     await owner(workers[0],users[0],async()=>{
@@ -170,9 +171,14 @@ export async function proveReleaseConcurrency({config}) {
     for(const [i,c] of workers.slice(0,2).entries())await owner(c,users[i],async()=>{
       assert.ok((await c.query('SELECT user_id::text FROM app.media_items')).rows.every(r=>r.user_id===users[i]));
       assert.equal((await c.query('SELECT count(*)::int AS n FROM app.media_items WHERE user_id=$1',[users[1-i]])).rows[0].n,0);
-      assert.equal((await c.query("UPDATE app.media_items SET title='forged' WHERE user_id=$1",[users[1-i]])).rowCount,0);
+      await c.query('SAVEPOINT denied_direct_write');
+      await assert.rejects(c.query("UPDATE app.media_items SET title='forged' WHERE user_id=$1",[users[1-i]]),error=>error.code==='42501');
+      await c.query('ROLLBACK TO denied_direct_write');
       assert.ok((await c.query('SELECT user_id::text FROM app.goals')).rows.every(r=>r.user_id===users[i]));
+      if(i===1)assert.equal((await media(c,'cross-owner-delete','a-only-id','delete',1,null)).reason,'not_found');
     });
+    const sentinel=(await admin.query("SELECT revision::int,deleted_at FROM app.media_items WHERE user_id=$1 AND id='a-only-id'",[users[0]])).rows[0];
+    assert.deepEqual(sentinel,{revision:1,deleted_at:null});
   } catch(error) {error.releaseCheck=check;throw error;}
   finally {await Promise.all(clients.map(c=>c.end()));}
 }
