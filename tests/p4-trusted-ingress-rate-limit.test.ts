@@ -70,7 +70,7 @@ describe('P4 ingress source contract (no hosting proof)', () => {
 describe('native admission with offline local-test identity', () => {
   it.each([null, { id: owner }])('unconfigured ingress denies before auth or either backend, user=%s', async user => {
     vi.stubEnv('TRUSTED_INGRESS_MODE', 'unconfigured'); mocks.user.mockResolvedValue(user);
-    expect(await consumeRateLimit(request({ 'x-real-ip': '192.0.2.1', 'x-forwarded-for': '192.0.2.2' }), 'settings_write')).toMatchObject({ allowed: false, source: 'unavailable' });
+    expect(await consumeRateLimit(request({ 'x-real-ip': '192.0.2.1', 'x-forwarded-for': '192.0.2.2' }), 'funded_ai')).toMatchObject({ allowed: false, source: 'unavailable' });
     expect(mocks.user).not.toHaveBeenCalled(); expect(mocks.limiter).not.toHaveBeenCalled();
     expect(mocks.supabase).not.toHaveBeenCalled(); expect(mocks.rpc).not.toHaveBeenCalled();
   });

@@ -36,7 +36,8 @@ const localSmoothingKey = randomBytes(32).toString("hex"); // RAM only, never DB
 // without ingress proof. Anonymous traffic and all other policies stay closed.
 function nativeSessionPolicy(policy: RateLimitPolicy) {
   return policy === 'tvmaze_search' || policy === 'tvmaze_details' || policy === 'tvmaze_calendar'
-    || policy === 'social_read' || policy === 'social_write';
+    || policy === 'social_read' || policy === 'social_write'
+    || policy === 'asset_write' || policy === 'xp_sync' || policy === 'settings_write';
 }
 
 export function rateLimitResponse(decision: RateLimitDecision): Response | null {

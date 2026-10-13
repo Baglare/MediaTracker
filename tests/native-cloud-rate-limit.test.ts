@@ -114,7 +114,7 @@ describe('native Cloud admission through session verification and SQL transport 
     expect((await POST(request(owner, 'https://attacker.example.invalid'))).status).toBe(403);
     expect(mocks.session).not.toHaveBeenCalled(); expect(mocks.connect).not.toHaveBeenCalled();
   });
-  it.each(['openlibrary_search', 'interpret', 'recommend', 'funded_ai', 'asset_write', 'xp_sync', 'settings_write'] as const)(
+  it.each(['openlibrary_search', 'interpret', 'recommend', 'funded_ai', 'anilist_search', 'tmdb_search', 'anilist_details', 'tmdb_details', 'anilist_calendar', 'tmdb_calendar'] as const)(
     'keeps the general %s limiter closed with no ingress even for a verified owner', async policy => {
       expect(await consumeRateLimit(request(), policy)).toMatchObject({ allowed: false, source: 'unavailable' });
       expect(mocks.session).not.toHaveBeenCalled(); expect(mocks.connect).not.toHaveBeenCalled();
