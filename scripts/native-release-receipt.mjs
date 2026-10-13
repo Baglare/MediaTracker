@@ -29,6 +29,10 @@ async function create() {
     if(r.status!==0||r.error||!r.stdout.includes('PASS:')) {
       const stage=r.stderr?.match(/stage=([A-Z0-9_]{1,64})(?:;|$)/)?.[1];
       if(stage)console.error(`PG18_STAGE=${stage}`);
+      const sqlstate=r.stderr?.match(/sqlstate=([0-9A-Z]{5})(?:;|$)/)?.[1];
+      const assertion=r.stderr?.match(/assertion=(guest_[a-z_]{1,64})(?:;|$)/)?.[1];
+      if(sqlstate)console.error(`PG18_SQLSTATE=${sqlstate}`);
+      if(assertion)console.error(`PG18_ASSERTION=${assertion}`);
       throw new Error('release_pg18_failed');
     }
     console.log(`PG18_${argument[0]??'P1'}=PASS`);

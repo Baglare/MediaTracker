@@ -27,7 +27,7 @@ async function snapshot(c) {
     result[schemaname+'.'+tablename]=(await c.query(`SELECT to_jsonb(t) AS r FROM "${schemaname}"."${tablename}" t ORDER BY ${schemaname==='native_migrations'&&tablename==='ledger'?'name':'to_jsonb(t)::text'}`)).rows;
   }
   result.policies=(await c.query("SELECT schemaname,tablename,policyname,permissive,roles,cmd,qual,with_check FROM pg_policies WHERE schemaname IN ('app','native_auth','private_rate_limit','private_privacy_ops') AND tablename<>'tvmaze_guest_pool' ORDER BY 1,2,3")).rows;
-  result.acl=(await c.query("SELECT n.nspname,c.relname,c.relowner::regrole::text,c.relacl::text,c.relrowsecurity,c.relforcerowsecurity FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname IN ('app','native_auth','private_rate_limit','private_privacy_ops') AND c.relname<>'tvmaze_guest_pool' ORDER BY 1,2")).rows;
+  result.acl=(await c.query("SELECT n.nspname,c.relname,c.relowner::regrole::text,c.relacl::text,c.relrowsecurity,c.relforcerowsecurity FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname IN ('app','native_auth','private_rate_limit','private_privacy_ops') AND c.relname NOT IN ('tvmaze_guest_pool','tvmaze_guest_pool_pkey') ORDER BY 1,2")).rows;
   result.roles=(await c.query("SELECT rolname,rolsuper,rolbypassrls,rolcanlogin,rolinherit,rolconfig FROM pg_roles WHERE rolname LIKE 'mt_%' ORDER BY 1")).rows;
   return result;
 }
@@ -61,6 +61,7 @@ export async function verifyReleaseUpgrade({config,before}) {
     assert.deepEqual(after,before);
     const ledger=(await c.query('SELECT name,checksum FROM native_migrations.ledger ORDER BY name')).rows;
     assert.deepEqual(ledger,nativeMigrationManifest().map(({name,checksum})=>({name,checksum})));
+    assert.equal((await c.query("SELECT to_regclass('private_rate_limit.tvmaze_guest_pool_pkey') IS NOT NULL AS present")).rows[0].present,true);
   } finally {await c.end();}
 }
 function envelope(overrides={}) {

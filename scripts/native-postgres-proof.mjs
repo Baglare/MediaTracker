@@ -33,15 +33,19 @@ function docker(args, input) {
 let id, network, relay;
 let stage='DOCKER_CONTEXT';
 let sqlstate;
+let assertion;
+const fixtureAssertions=new Set([...readFileSync(new URL('../database/native/tvmaze-guest-proof.sql',import.meta.url),'utf8').matchAll(/RAISE EXCEPTION '(guest_[a-z_]+)'/g)].map(match=>match[1]));
 // Only fixed PostgreSQL codes from SQLSTATE-only psql errors may leave the runner.
 const allowedSqlstates=new Set(['42601','42501','42883','42P01','42703','42704','42P07','42710','42804','42P13','42P17','23502','23503','23505','23514','22023','22P02','40001','40P01','55P03','57014','P0001']);
-function p2Sql(sql) {
+function p2Sql(sql,fixture=false) {
   if(!localEndpoint || interrupted) throw new Error('proof_interrupted');
-  const r=spawnSync('docker',['--host',localEndpoint,'exec','-i',id,'psql','-X','-v','ON_ERROR_STOP=1','-v','VERBOSITY=sqlstate','-U','postgres','-d','mt_p1_proof'],
+  const r=spawnSync('docker',['--host',localEndpoint,'exec','-i',id,'psql','-X','-v','ON_ERROR_STOP=1','-v',fixture?'VERBOSITY=verbose':'VERBOSITY=sqlstate','-U','postgres','-d','mt_p1_proof'],
     {input:sql,env:dockerEnv,encoding:'utf8',timeout:15000});
   if(r.status!==0 || r.error || r.signal) {
-    const codes=[...(r.stderr??'').matchAll(/^ERROR:\s+([0-9A-Z]{5})\s*$/gm)].map(match=>match[1]);
+    const codes=[...(r.stderr??'').matchAll(/^ERROR:\s+([0-9A-Z]{5})(?::[^\n]*)?\s*$/gm)].map(match=>match[1]);
     if(r.status===3 && !r.error && !r.signal && codes.length===1 && allowedSqlstates.has(codes[0])) sqlstate=codes[0];
+    const message=fixture?(r.stderr??'').match(/^ERROR:\s+P0001:\s+(guest_[a-z_]+)\s*$/m)?.[1]:undefined;
+    if(r.status===3&&!r.error&&!r.signal&&fixtureAssertions.has(message))assertion=message;
     throw new Error('proof_failed');
   }
   return r.stdout;
@@ -141,7 +145,7 @@ try {
     if(!output.includes('P2_CLOUD_GOALS_PROOF_PASS')) throw new Error('proof_failed');
     console.log(`PASS: disposable proof; stage=${stage}`);
     stage='P2_TVMAZE_GUEST_PROOF';
-    output=p2Sql(readFileSync(new URL('../database/native/tvmaze-guest-proof.sql',import.meta.url),'utf8'));
+    output=p2Sql(readFileSync(new URL('../database/native/tvmaze-guest-proof.sql',import.meta.url),'utf8'),true);
     if(!output.includes('TVMAZE_GUEST_POOL_PROOF_PASS'))throw new Error('proof_failed');
     console.log(`PASS: disposable proof; stage=${stage}`);
     stage='P2_RUNTIME_PASSWORD';
@@ -177,7 +181,7 @@ try {
   console.log('PASS: real disposable PostgreSQL RLS, Better Auth and pg transaction proof');
   }
 } catch {
-  console.error(`${id?'FAIL: disposable proof':'BLOCKED_ENVIRONMENT: disposable proof'}; stage=${stage}${sqlstate?`; sqlstate=${sqlstate}`:''}; diagnostics redacted`);
+  console.error(`${id?'FAIL: disposable proof':'BLOCKED_ENVIRONMENT: disposable proof'}; stage=${stage}${sqlstate?`; sqlstate=${sqlstate}`:''}${assertion?`; assertion=${assertion}`:''}; diagnostics redacted`);
   process.exitCode=1;
 } finally {
   cleaning=true;
