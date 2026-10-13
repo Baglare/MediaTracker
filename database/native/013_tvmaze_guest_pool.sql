@@ -66,7 +66,7 @@ BEGIN
       OR (s->>'epoch')::bigint NOT IN (v_day,v_day-1)
       OR ((s->>'epoch')::bigint=v_day-1 AND v_seconds%86400>65) THEN RAISE EXCEPTION 'rate_limit_proof_invalid'; END IF;
   END LOOP;
-  IF NOT EXISTS(SELECT FROM jsonb_array_elements(e->'subjects') s WHERE (s->>'epoch')::bigint=v_day)
+  IF NOT EXISTS(SELECT FROM jsonb_array_elements(e->'subjects') AS subject_row(value) WHERE (subject_row.value->>'epoch')::bigint=v_day)
     OR (SELECT count(DISTINCT value) FROM jsonb_array_elements(e->'subjects'))<>jsonb_array_length(e->'subjects')
     THEN RAISE EXCEPTION 'rate_limit_proof_invalid'; END IF;
   -- Same lock as reserve_v1: all guest and authenticated budgets are serialized.

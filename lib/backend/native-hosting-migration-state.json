@@ -50,7 +50,7 @@
     },
     {
       "name": "013_tvmaze_guest_pool.sql",
-      "checksum": "55060f437092636fed2b6cf283425da23d96a8c8f4830f062ff82d08433aa9b4"
+      "checksum": "75efad2bb0176ce414da5afedf8b927f56df0e9503798d904d8f8a5e8d73f3f8"
     }
   ],
   "hosting-production": [
@@ -104,7 +104,7 @@
     },
     {
       "name": "013_tvmaze_guest_pool.sql",
-      "checksum": "53a21caea54afd58b51e50d974183d8f8f4381ce6f83097dc495b52b0fdc18c9"
+      "checksum": "f2126710f2ff180f5f230784f910f8243ae16b8ecc09af9c5a4cc054bdde5c3c"
     }
   ]
 }
