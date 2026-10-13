@@ -171,8 +171,8 @@ test('interruption kills Vitest and closes relay before Docker cleanup',async()=
 });
 const p2PassStages=[...nativeMigrationSteps().map(step=>step.name==='LEDGER_SETUP'?'P2_LEDGER_SETUP':`P2_MIGRATION_${step.name.slice(0,3)}`),'P2_FUNCTIONAL_PROOF','P2_TVMAZE_GUEST_PROOF'];
 test('synthetic guest diagnostics expose only source-owned assertion codes',async()=>{
-  for(const message of ['guest_admission_failed','guest_unknown_diagnostic']) {
-    const r=await run({p2:true,sqlFailure:nativeMigrationSteps().length+2,sqlError:`ERROR:  P0001: ${message}\n${privateDiagnostic}`});
+  for(const message of ['guest_admission_failed','guest_unknown_diagnostic']) for(const prefix of ['', 'psql:<stdin>:31: ']) {
+    const r=await run({p2:true,sqlFailure:nativeMigrationSteps().length+2,sqlError:`${prefix}ERROR:  P0001: ${message}\n${privateDiagnostic}`});
     assert.equal(r.process.exitCode,1);
     assert.ok(r.logs.some(line=>line.includes('sqlstate=P0001')));
     assert.equal(r.logs.some(line=>line.includes('assertion=')),message==='guest_admission_failed');

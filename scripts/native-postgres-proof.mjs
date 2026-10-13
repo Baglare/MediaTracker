@@ -36,15 +36,15 @@ let sqlstate;
 let assertion;
 const fixtureAssertions=new Set([...readFileSync(new URL('../database/native/tvmaze-guest-proof.sql',import.meta.url),'utf8').matchAll(/RAISE EXCEPTION '(guest_[a-z_]+)'/g)].map(match=>match[1]));
 // Only fixed PostgreSQL codes from SQLSTATE-only psql errors may leave the runner.
-const allowedSqlstates=new Set(['42601','42501','42883','42P01','42703','42704','42P07','42710','42804','42P13','42P17','23502','23503','23505','23514','22023','22P02','40001','40P01','55P03','57014','P0001']);
+const allowedSqlstates=new Set(['42601','42501','42883','42P01','42703','42704','42P07','42710','42804','42P13','42P17','3F000','42725','23502','23503','23505','23514','22023','22P02','40001','40P01','55P03','57014','P0001']);
 function p2Sql(sql,fixture=false) {
   if(!localEndpoint || interrupted) throw new Error('proof_interrupted');
   const r=spawnSync('docker',['--host',localEndpoint,'exec','-i',id,'psql','-X','-v','ON_ERROR_STOP=1','-v',fixture?'VERBOSITY=verbose':'VERBOSITY=sqlstate','-U','postgres','-d','mt_p1_proof'],
     {input:sql,env:dockerEnv,encoding:'utf8',timeout:15000});
   if(r.status!==0 || r.error || r.signal) {
-    const codes=[...(r.stderr??'').matchAll(/^ERROR:\s+([0-9A-Z]{5})(?::[^\n]*)?\s*$/gm)].map(match=>match[1]);
+    const codes=[...(r.stderr??'').matchAll(/^(?:psql:<stdin>:\d+: )?ERROR:\s+([0-9A-Z]{5})(?::[^\n]*)?\s*$/gm)].map(match=>match[1]);
     if(r.status===3 && !r.error && !r.signal && codes.length===1 && allowedSqlstates.has(codes[0])) sqlstate=codes[0];
-    const message=fixture?(r.stderr??'').match(/^ERROR:\s+P0001:\s+(guest_[a-z_]+)\s*$/m)?.[1]:undefined;
+    const message=fixture?(r.stderr??'').match(/^(?:psql:<stdin>:\d+: )?ERROR:\s+P0001:\s+(guest_[a-z_]+)\s*$/m)?.[1]:undefined;
     if(r.status===3&&!r.error&&!r.signal&&fixtureAssertions.has(message))assertion=message;
     throw new Error('proof_failed');
   }
