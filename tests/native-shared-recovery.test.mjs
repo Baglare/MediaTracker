@@ -35,6 +35,10 @@ test('shared recovery stays closed without operator-pinned PG18 evidence and rej
     const proof=JSON.parse(await readFile(options['recovery-proof'],'utf8'));proof.status='NOT_RUN';proof.fingerprint=digest({...proof,fingerprint:undefined});
     await writeFile(options['recovery-proof'],JSON.stringify(proof));
     await assert.rejects(assertRecoveryProof({...options,'recovery-proof-fingerprint':proof.fingerprint}),/proof_invalid/);
+    // Repinning a historical source fingerprint must not authorize 013 recovery.
+    proof.status='PASS';proof.sourceFingerprint='0'.repeat(64);proof.fingerprint=digest({...proof,fingerprint:undefined});
+    await writeFile(options['recovery-proof'],JSON.stringify(proof));
+    await assert.rejects(assertRecoveryProof({...options,'recovery-proof-fingerprint':proof.fingerprint}),/proof_invalid/);
   }finally{await rm(root,{recursive:true,force:true});}
 });
 test('shared backup configuration is isolated; shared hosting restore remains rejected',()=>{
@@ -54,7 +58,7 @@ test('010 maps only backup SELECT policies and preserves every historical SQL ch
   assert.ok(local.some(e=>e.name==='010_backup_select_policies.sql'));
 });
 test('011 changes only legacy PUBLIC role scope, retaining predicates and denying unexpected readers',()=>{
-  const sql=nativeMigrationManifest('hosting-test').at(-1).sql;
+  const sql=nativeMigrationManifest('hosting-test').find(e=>e.name==='011_backup_policy_role_scope.sql').sql;
   assert.match(sql,/pol\.polroles=ARRAY\[0::oid\]/);assert.match(sql,/pol\.polpermissive/);
   assert.match(sql,/pol\.polcmd IN \('r','\*'\)/);assert.match(sql,/native_backup_policy_reader_unexpected/);
   assert.match(sql,/ALTER POLICY %I ON app\.%I TO %I,%I/);
@@ -136,14 +140,14 @@ test('shared backup binds dump to exported snapshot and refuses a changed source
     }finally{await rm(root,{recursive:true,force:true});}
   }
 });
-test('read-only preflight reports only 010/011 pending and always rolls back',async()=>{
+test('read-only preflight reports the exact 010-013 suffix and always rolls back',async()=>{
   const calls=[];const client={query:async text=>{
     calls.push(text);if(text.includes('to_regclass'))return {rows:[{present:true}]};
     if(text==='SELECT name,checksum FROM native_migrations.ledger ORDER BY name')return {rows:nativeMigrationManifest(roles.profile).slice(0,9)};
     return {rows:[]};
   }};
   const result=await recoveryPreflight(client,config,target);
-  assert.deepEqual(result.pending,['010_backup_select_policies.sql','011_backup_policy_role_scope.sql']);assert.equal(result.coverage,'NOT_RUN');
+  assert.deepEqual(result.pending,['010_backup_select_policies.sql','011_backup_policy_role_scope.sql','012_public_signup.sql','013_tvmaze_guest_pool.sql']);assert.equal(result.coverage,'NOT_RUN');
   assert.equal(calls[0],'BEGIN READ ONLY');assert.equal(calls.at(-1),'ROLLBACK');
   assert.ok(!calls.some(s=>/INSERT|UPDATE|set_release_freeze/.test(s)));
 });

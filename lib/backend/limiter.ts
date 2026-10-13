@@ -1,6 +1,6 @@
 import 'server-only';
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { identityEpochs, subjectDigest, type LimiterIdentity } from '../api/rate-limit-identity';
+import { identityEpochs, subjectDigest, TVMAZE_GUEST_POOL, type LimiterIdentity } from '../api/rate-limit-identity';
 import { withReadTransaction, type AuthenticatedTransaction } from './transaction';
 
 export function nativeSocialSubjects(userId:string,env:Record<string,string|undefined>=process.env,now=Date.now()) {
@@ -20,8 +20,15 @@ export async function nativeSignedLimiter(operation:'consume'|'cooldown',payload
   if(!verifyNativeLimiterEnvelope(payload.p_envelope,payload.p_signature_hex,config.signingKey))throw new Error('rate_limit_proof_invalid');
   return withReadTransaction(async tx=>{
     if(identity.kind==='user' && tx.userId!==identity.value)throw new Error('owner_context_changed');
+    if(identity.kind==='guest_pool') {
+      const envelope=JSON.parse(payload.p_envelope);
+      if(tx.userId || identity.value!==TVMAZE_GUEST_POOL || envelope.identity_class!=='guest_pool'
+        || envelope.policy_id!=='tvmaze_search' || envelope.operation!==operation
+        || !Array.isArray(envelope.ingress) || envelope.ingress.length!==0)throw new Error('rate_limit_proof_invalid');
+    }
     await tx.query("SELECT set_config('app.limiter_audience',$1,true),set_config('app.limiter_key_version',$2,true)",[config.audience,config.keyVersion]);
-    const name=operation==='consume'?'consume_application_rate_limit_v1':'report_provider_cooldown_v1';
+    const name=identity.kind==='guest_pool'?'tvmaze_guest_rate_limit_v1'
+      :operation==='consume'?'consume_application_rate_limit_v1':'report_provider_cooldown_v1';
     return (await tx.query(`SELECT app.${name}($1::text,$2::text) AS result`,[payload.p_envelope,payload.p_signature_hex])).rows[0]?.result;
   });
 }

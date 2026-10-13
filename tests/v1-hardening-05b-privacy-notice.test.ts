@@ -39,7 +39,8 @@ describe.each(["supabase", "native"] as const)("05B public factual notice and ma
       expect(recipients).toContain("erişim denetimli dosya uçları");
       expect(recipients).toContain("özel depolama doğrudan herkese açık değildir");
       expect(recipients).not.toMatch(/Supabase|Vercel/);
-      for (const phrase of ["Supabase alternatifi korunmaktadır", "production geçişi henüz tamamlanmamıştır", "gerçek veritabanı kabulünün", "kabulü ile sağlayıcı veri bölgesi", "yedekleme koşulları henüz doğrulanmamıştır", "yalnız Türkiye&#x27;de işlendiğini göstermez", "yedek saklama süreleri henüz doğrulanmamıştır", "loglarının saklama süresi de kesinleşmemiştir"]) expect(html).toContain(phrase);
+      for (const phrase of ["Supabase alternatifi korunmaktadır", "gerçek veritabanı kabulünün", "Altyapının işletilmesi yeni sürümün bütün kullanıcı", "akışlarının kabul edildiği anlamına gelmez", "Sağlayıcı veri bölgesi, erişim ve yedek saklama", "ayrı operatör ve hukuk doğrulaması gerekir", "yalnız Türkiye&#x27;de işlendiğini göstermez", "yedek saklama süreleri henüz doğrulanmamıştır", "loglarının saklama süresi de kesinleşmemiştir"]) expect(html).toContain(phrase);
+      expect(html).not.toContain("native production geçişi henüz tamamlanmamıştır");
     } else {
       for (const phrase of ["Supabase Auth", "şifre işlenir, uygulama tablosunda tutulmaz", "Supabase Postgres/Storage", "Supabase sınırlandırma/sosyal kayıtları", "Vercel"]) expect(groups).toContain(phrase);
       expect(recipients).toContain("Supabase imzalı profil dosyaları");

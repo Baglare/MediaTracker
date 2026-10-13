@@ -55,7 +55,9 @@ export function trustedRateLimitIp(request: Request): string | null {
   return resolveTrustedIngress(request).ip;
 }
 
-export type LimiterIdentity = { kind: "user" | "ip"; value: string };
+// A server-owned shared pool, never a browser-selected identity or an IP.
+export const TVMAZE_GUEST_POOL = "tvmaze:shared-guest-search:v1";
+export type LimiterIdentity = { kind: "user" | "ip" | "guest_pool"; value: string };
 export function subjectDigest(key: string, audience: string, scope: string, epoch: number, identity: LimiterIdentity): string {
   return createHmac("sha256", key).update(JSON.stringify([1, audience, identity.kind, scope, epoch, identity.value])).digest("hex");
 }

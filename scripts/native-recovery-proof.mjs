@@ -2,7 +2,7 @@
 // --proof uses synthetic two-user fixtures. --input verifies an actual private backup.
 import { spawnSync } from 'node:child_process';
 import { randomBytes, randomUUID } from 'node:crypto';
-import { readFile, mkdir, mkdtemp, rm, writeFile, copyFile } from 'node:fs/promises';
+import { readFile, mkdir, mkdtemp, rm, writeFile, copyFile, chmod, lstat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { Client } from 'pg';
@@ -292,6 +292,8 @@ try {
   for(const file of manifest.files.filter(f=>f.path.startsWith('storage/'))) {
     const path=join(storage,file.path.slice(8));await mkdir(join(path,'..'),{recursive:true,mode:0o700});
     await copyFile(join(input,file.path),path);
+    await chmod(path,0o600);
+    if(process.platform!=='win32' && ((await lstat(path)).mode & 0o077)!==0)throw new Error('native_restore_file_permissions');
     if(JSON.stringify(await fileDigest(path))!==JSON.stringify({size:file.size,checksum:file.checksum}))throw new Error('native_restore_file_mismatch');
   }
   await assetsVerified(restored,storage);

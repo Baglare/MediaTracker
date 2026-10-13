@@ -10,7 +10,7 @@ import type {
   ProfilePreferences,
   SelectedTitleMode,
 } from "@/lib/profile-preferences";
-import { migrateLocalAvatar, shouldOfferLocalAvatarMigration } from "@/lib/social/avatar";
+import { localAvatarDataUrlToFile, migrateLocalAvatar, shouldOfferLocalAvatarMigration } from "@/lib/social/avatar";
 import { validateImageUpload } from "@/lib/social/validation";
 import { ProfileAvatar } from "./sidebar-profile-card";
 
@@ -92,13 +92,6 @@ async function resizeAvatarImage(file: File): Promise<string> {
   } finally {
     bitmap.close();
   }
-}
-
-async function dataUrlToFile(dataUrl: string): Promise<File> {
-  const response = await fetch(dataUrl);
-  const blob = await response.blob();
-  const extension = blob.type === "image/png" ? "png" : blob.type === "image/webp" ? "webp" : "jpg";
-  return new File([blob], `profile-avatar.${extension}`, { type: blob.type || "image/jpeg" });
 }
 
 async function uploadSocialAvatar(file: File): Promise<string | undefined> {
@@ -186,7 +179,7 @@ export default function ProfileSettingsCard({
       const result = await migrateLocalAvatar({
         confirmed: true,
         localAvatarDataUrl: preferences.avatarImageDataUrl,
-        upload: async (dataUrl) => uploadSocialAvatar(await dataUrlToFile(dataUrl)),
+        upload: async (dataUrl) => uploadSocialAvatar(localAvatarDataUrlToFile(dataUrl)),
       });
       if (result.status === "uploaded") {
         onChange({ ...preferences, socialAvatarMigrationDismissedFor: userId ?? undefined });

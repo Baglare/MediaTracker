@@ -63,9 +63,17 @@ for (const [name, route, policy, downstream] of routes) describe(`${name}: nativ
     expect(mocks.query).toHaveBeenCalledWith("SELECT set_config('app.user_id', $1, true)", [owner]);
     expect(downstream()).toHaveBeenCalledTimes(1);
   });
-  it.each([null, { user: { id: 'forged' } }])('denies missing/invalid session %j before limiter connection', async session => {
+  it.each([null, { user: { id: 'forged' } }])('missing/invalid session %j only admits the bounded search pool', async session => {
     mocks.session.mockResolvedValue(session);
-    const response = await route(); expect(response.status).toBe(503);
+    const response = await route();
+    if (policy === 'tvmaze_search' && session === null) {
+      expect(response.status).toBe(200);
+      const call = mocks.query.mock.calls.find(([sql]) => sql.includes('app.tvmaze_guest_rate_limit_v1'))!;
+      expect(JSON.parse(call[1][0])).toMatchObject({ identity_class: 'guest_pool', ingress: [], policy_id: 'tvmaze_search' });
+      expect(downstream()).toHaveBeenCalledTimes(1);
+      return;
+    }
+    expect(response.status).toBe(503);
     expect(await response.json()).toEqual({ code: 'rate_limit_unavailable' });
     expect(mocks.connect).not.toHaveBeenCalled(); expect(downstream()).not.toHaveBeenCalled();
   });
@@ -113,6 +121,26 @@ for (const [name, route, policy, downstream] of routes) describe(`${name}: nativ
 });
 
 describe('TVMaze native shared cooldown without ingress', () => {
+  it('provider budget denial returns 429 without an upstream call', async () => {
+    mocks.query.mockResolvedValue({ rows: [{ result: { allowed: false, reason: 'limited', retry_after_seconds: 1 } }] });
+    const response = await search(request());
+    expect(response.status).toBe(429);
+    expect(await response.json()).toEqual({ code: 'rate_limited' });
+    expect(response.headers.get('retry-after')).toBe('1');
+    expect(mocks.fetch).not.toHaveBeenCalled();
+  });
+  it.each([502, 503])('upstream HTTP %s is a stable 502, not an empty search', async status => {
+    mocks.fetch.mockResolvedValue(new Response(null, { status }));
+    const response = await search(request());
+    expect(response.status).toBe(502);
+    expect(await response.json()).toEqual({ code: 'upstream_error' });
+  });
+  it('successful empty upstream search remains HTTP 200', async () => {
+    mocks.fetch.mockResolvedValue(Response.json([]));
+    const response = await search(request());
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ results: [] });
+  });
   it('records signed user cooldown on upstream 429; subsequent denial starts no fetch', async () => {
     mocks.fetch.mockResolvedValue(new Response(null, { status: 429, headers: { 'Retry-After': '12' } }));
     mocks.query.mockImplementation(async (sql: string) => ({ rows: [{ result: sql.includes('app.report_provider_cooldown_v1')
@@ -136,10 +164,11 @@ describe('TVMaze native shared cooldown without ingress', () => {
     await vi.advanceTimersByTimeAsync(751); expect((await pending)?.status).toBe(503);
     await vi.advanceTimersByTimeAsync(500); expect(mocks.connect).not.toHaveBeenCalled();
   });
-  it('anonymous forged headers cannot report a cooldown', async () => {
+  it('anonymous cooldown uses the shared pool and ignores forged ingress', async () => {
     mocks.session.mockResolvedValue(null);
-    expect((await reportProviderCooldown(request(), 'tvmaze_search', new Response(null, { status: 429 })))?.status).toBe(503);
-    expect(mocks.connect).not.toHaveBeenCalled();
+    expect((await reportProviderCooldown(request(), 'tvmaze_search', new Response(null, { status: 429 })))?.status).toBe(429);
+    const call=mocks.query.mock.calls.find(([sql])=>sql.includes('app.tvmaze_guest_rate_limit_v1'))!;
+    expect(JSON.parse(call[1][0])).toMatchObject({ operation: 'cooldown', identity_class: 'guest_pool', ingress: [], policy_id: 'tvmaze_search' });
   });
   it.each([null, { user: { id: other } }])('cooldown session loss/change fails closed %j', async session => {
     mocks.session.mockResolvedValueOnce({ user: { id: owner } }).mockResolvedValueOnce(session);

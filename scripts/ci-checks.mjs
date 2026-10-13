@@ -175,7 +175,7 @@ export function checkWorkflow(text) {
   requireContract(job.steps.find(step => step.run?.includes("next typegen"))?.env?.BACKEND_PROVIDER === "supabase", "Missing explicit offline typegen provider");
   requireContract(job.steps.find(step => step.run === "npm run build")?.env?.BACKEND_PROVIDER === "supabase", "Missing explicit offline build provider");
   const artifact = workflow.jobs['native-linux-artifact'];
-  requireContract(artifact.needs === 'validate'
+  requireContract(isDeepStrictEqual(artifact.needs,['validate','native-postgres-disposable-proof'])
     && artifact.if === "github.event_name == 'push' && github.ref == 'refs/heads/release/v1-hardening'"
     && artifact['runs-on'] === 'ubuntu-24.04' && artifact['timeout-minutes'] === 20
     && JSON.stringify(artifact.permissions) === JSON.stringify({contents:'read'})
@@ -208,7 +208,8 @@ export function checkWorkflow(text) {
     && build.run.includes('validateReleaseEnvironment') && build.run.includes("'PRODUCTION'")
     && build.run.includes('node scripts/native-package.mjs create "$package"')
     && build.run.includes('node scripts/native-package.mjs verify "$package"')
-    && build.run.includes('node scripts/native-artifact-check.mjs "$package"'), 'Native artifact build/verification contract');
+    && build.run.includes('node scripts/native-artifact-check.mjs "$package"')
+    && build.run.includes('node scripts/native-release-artifact.mjs "$package" "$GITHUB_SHA"'), 'Native artifact build/verification contract');
   requireContract(artifact.steps.some(step => step.run === 'npm ci')
     && artifact.steps.some(step => step.run === 'node scripts/ci-checks.mjs --environment-only')
     && artifact.steps.some(step => step.run?.includes('tar -czf') && step.run.includes('-C "$package" .') && step.run.includes('sha256sum')),
@@ -232,14 +233,14 @@ test "$(docker context show)" = default
 test "$(docker context inspect default --format '{{.Endpoints.docker.Host}}')" = unix:///var/run/docker.sock
 test "$(docker --host unix:///var/run/docker.sock info --format '{{.OSType}}')" = linux`;
   const prepareImage = `set -euo pipefail
-timeout 180s docker --host unix:///var/run/docker.sock pull postgres:17-alpine
-docker --host unix:///var/run/docker.sock image inspect postgres:17-alpine --format '{{.Id}}'`;
+timeout 180s docker --host unix:///var/run/docker.sock pull postgres:18-alpine
+docker --host unix:///var/run/docker.sock image inspect postgres:18-alpine --format '{{.Id}}'`;
   const expected = {
     name: 'Disposable native PostgreSQL P1/P2 proof',
     needs: 'validate',
     if: "github.event_name == 'push' && github.ref == 'refs/heads/release/v1-hardening'",
     'runs-on': 'ubuntu-24.04',
-    'timeout-minutes': 10,
+    'timeout-minutes': 20,
     permissions: {contents: 'read'},
     env: {CI: 'true', NEXT_TELEMETRY_DISABLED: '1'},
     steps: [
@@ -251,8 +252,13 @@ docker --host unix:///var/run/docker.sock image inspect postgres:17-alpine --for
       {name: 'Refuse inherited application configuration', run: 'node scripts/ci-checks.mjs --environment-only'},
       {name: 'Verify local Linux Docker daemon', shell: 'bash', run: localDocker},
       {name: 'Prepare local PostgreSQL image before disposable tests', shell: 'bash', run: prepareImage},
-      {name: 'Disposable PostgreSQL P1 proof', run: 'node scripts/native-postgres-proof.mjs'},
-      {name: 'Disposable PostgreSQL P2 proof', run: 'node scripts/native-postgres-proof.mjs --p2'},
+      {name: 'PG18 fresh upgrade concurrency and source-bound recovery', run: 'node scripts/native-release-receipt.mjs'},
+      {name: 'Independent receipt fingerprint verification', run: 'node scripts/native-release-receipt.mjs --verify'},
+      {name: 'Guest HMAC and session spoofing negative tests (offline adapter)',
+        env: {NODE_OPTIONS:'--import=${{ github.workspace }}/scripts/ci-offline.mjs'},
+        run: 'node node_modules/vitest/vitest.mjs run tests/native-tvmaze-guest-pool.test.ts tests/native-api-session-rate-limit.test.ts --maxWorkers=1'},
+      {name: 'Upload validated synthetic receipts only',uses:'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02',
+        with:{name:'pg18-release-proof-${{ github.sha }}',path:'dist/release-proof/release.json\ndist/release-proof/recovery.json\n','if-no-files-found':'error','retention-days':7}},
     ],
   };
   const normalized = {...proof, steps: proof?.steps?.map(step => step.run ? {...step, run: step.run.trim()} : step)};

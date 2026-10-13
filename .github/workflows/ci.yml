@@ -65,7 +65,7 @@ jobs:
 
   native-linux-artifact:
     name: Experimental native Linux artifact
-    needs: validate
+    needs: [validate, native-postgres-disposable-proof]
     if: github.event_name == 'push' && github.ref == 'refs/heads/release/v1-hardening'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -130,6 +130,7 @@ jobs:
           node scripts/native-package.mjs create "$package"
           node scripts/native-package.mjs verify "$package"
           node scripts/native-artifact-check.mjs "$package" "dist/native-abi.json"
+          node scripts/native-release-artifact.mjs "$package" "$GITHUB_SHA"
       - name: Archive verified directory including hidden output
         id: archive
         run: |
@@ -137,6 +138,7 @@ jobs:
           package="dist/native-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           tar -czf "dist/$name.tar.gz" -C "$package" .
           (cd dist && sha256sum "$name.tar.gz" > "$name.tar.gz.sha256")
+          (cd dist && sha256sum -c "$name.tar.gz.sha256")
           echo "name=$name" >> "$GITHUB_OUTPUT"
           git diff --exit-code
       - name: Upload experimental artifact (no deployment)
@@ -155,7 +157,7 @@ jobs:
     needs: validate
     if: github.event_name == 'push' && github.ref == 'refs/heads/release/v1-hardening'
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 20
     permissions:
       contents: read
     env:
@@ -194,9 +196,22 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          timeout 180s docker --host unix:///var/run/docker.sock pull postgres:17-alpine
-          docker --host unix:///var/run/docker.sock image inspect postgres:17-alpine --format '{{.Id}}'
-      - name: Disposable PostgreSQL P1 proof
-        run: node scripts/native-postgres-proof.mjs
-      - name: Disposable PostgreSQL P2 proof
-        run: node scripts/native-postgres-proof.mjs --p2
+          timeout 180s docker --host unix:///var/run/docker.sock pull postgres:18-alpine
+          docker --host unix:///var/run/docker.sock image inspect postgres:18-alpine --format '{{.Id}}'
+      - name: PG18 fresh upgrade concurrency and source-bound recovery
+        run: node scripts/native-release-receipt.mjs
+      - name: Independent receipt fingerprint verification
+        run: node scripts/native-release-receipt.mjs --verify
+      - name: Guest HMAC and session spoofing negative tests (offline adapter)
+        env:
+          NODE_OPTIONS: --import=${{ github.workspace }}/scripts/ci-offline.mjs
+        run: node node_modules/vitest/vitest.mjs run tests/native-tvmaze-guest-pool.test.ts tests/native-api-session-rate-limit.test.ts --maxWorkers=1
+      - name: Upload validated synthetic receipts only
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # official v4.6.2
+        with:
+          name: pg18-release-proof-${{ github.sha }}
+          path: |
+            dist/release-proof/release.json
+            dist/release-proof/recovery.json
+          if-no-files-found: error
+          retention-days: 7

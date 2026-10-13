@@ -1,6 +1,7 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useCallback, useSyncExternalStore } from "react";
+import { useAuth } from "@/hooks/use-auth";
 
 import { applyNotificationCount, subscribeNotificationChanges } from "@/lib/social/notification-sync";
 
@@ -10,16 +11,21 @@ const listeners = new Set<Listener>();
 let count = 0;
 let inFlight: Promise<void> | null = null;
 let stopSharedListeners: (() => void) | null = null;
+let activeOwner: string | null = null;
+let generation = 0;
 
 function emit() {
   listeners.forEach((listener) => listener());
 }
 
 function refreshShared(): Promise<void> {
+  if (!activeOwner) return Promise.resolve();
   if (inFlight) return inFlight;
-  inFlight = fetch("/api/social/notifications?limit=1", { cache: "no-store" })
+  const version = generation;
+  const pending = fetch("/api/social/notifications?limit=1", { cache: "no-store" })
     .then((response) => response.ok ? response.json() : null)
     .then((data: unknown) => {
+      if (version !== generation || !activeOwner) return;
       if (!data || typeof data !== "object" || !("unreadCount" in data) || typeof data.unreadCount !== "number") return;
       if (count !== data.unreadCount) {
         count = data.unreadCount;
@@ -27,7 +33,8 @@ function refreshShared(): Promise<void> {
       }
     })
     .catch(() => undefined)
-    .finally(() => { inFlight = null; });
+    .finally(() => { if (inFlight === pending) inFlight = null; });
+  inFlight = pending;
   return inFlight;
 }
 
@@ -54,17 +61,27 @@ function startSharedListeners() {
   };
 }
 
-function subscribe(listener: Listener): () => void {
+function subscribe(ownerId: string | null, listener: Listener): () => void {
+  if (!ownerId) return () => undefined;
+  if (activeOwner !== ownerId) {
+    stopSharedListeners?.();
+    generation++;
+    activeOwner = ownerId;
+    count = 0;
+    inFlight = null;
+  }
   listeners.add(listener);
   startSharedListeners();
   return () => {
     listeners.delete(listener);
-    if (listeners.size === 0) stopSharedListeners?.();
+    if (listeners.size === 0) {
+      stopSharedListeners?.();
+      generation++;
+      activeOwner = null;
+      count = 0;
+      inFlight = null;
+    }
   };
-}
-
-function getSnapshot() {
-  return count;
 }
 
 function getServerSnapshot() {
@@ -72,7 +89,11 @@ function getServerSnapshot() {
 }
 
 export function NotificationBadge() {
-  const unreadCount = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
-  if (unreadCount < 1) return null;
+  const { user, loading } = useAuth();
+  const ownerId = !loading ? user?.id ?? null : null;
+  const subscribeOwner = useCallback((listener: Listener) => subscribe(ownerId, listener), [ownerId]);
+  const getSnapshot = useCallback(() => ownerId && ownerId === activeOwner ? count : 0, [ownerId]);
+  const unreadCount = useSyncExternalStore(subscribeOwner, getSnapshot, getServerSnapshot);
+  if (!ownerId || unreadCount < 1) return null;
   return <span className="min-w-5 rounded-full bg-violet-500 px-1.5 py-0.5 text-center text-[10px] font-bold text-white" aria-label={`${unreadCount} okunmamış bildirim`}>{unreadCount > 99 ? "99+" : unreadCount}</span>;
 }

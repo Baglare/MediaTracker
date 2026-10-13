@@ -2,7 +2,9 @@
 
 MediaTracker; film, dizi, anime, manga, manhwa, manhua, novel ve kitap takibi için geliştirilmiş local-first bir medya takip uygulamasıdır. Proje Next.js 16 App Router, React 19, TypeScript ve Tailwind CSS 4 üzerine kuruludur.
 
-Uygulamanın ana veri kaynağı tarayıcıdaki owner-scoped yerel depolamadır. Supabase yapılandırılırsa hesap, kontrollü Cloud aktarımı ve kuyruk tabanlı senkronizasyon devreye girer; yapılandırılmazsa uygulama yerel modda çalışmaya devam eder. Repository kayıtlarında D8-4A.5E code/Staging/Preview hazırlığı tamamlanmış, D8-4B Production cutover başlamamıştır; canlı Production durumu bu dokümanla doğrulanmış sayılmaz.
+Uygulamanın ana veri kaynağı tarayıcıdaki owner-scoped yerel depolamadır. Native V1; Better Auth, PostgreSQL ve özel dosya depolamasıyla isteğe bağlı hesap, kontrollü Cloud aktarımı ve sosyal özellikler sağlar. Supabase adapter'ı ayrı fallback olarak korunur; backend seçimi eski hesapları veya verileri otomatik taşımaz. Guest/local-first kullanım hesap gerektirmez.
+
+Native production altyapısı ile yeni Public V1 sürümünün kabulü ayrı değerlendirilir. Kaynakta hazırlanan anonim TVMaze ortak havuzu additive 013 migration gerektirir; yeni sürüm için gerçek PG18 migration/recovery kanıtı ve temiz SHA'ya bağlı Linux artifact kabulü gerekir. Bu README yeni sürümün deploy edildiği veya hukuk/sağlayıcı kapılarının kapandığı iddiası değildir. Tarihli D8/Supabase kayıtları kendi kapsamlarıyla korunur.
 
 TMDB v1 env contract: `MEDIA_TRACKER_TMDB_MODE` retired/ignored; `TMDB_READ_ACCESS_TOKEN` normal LOCAL runtime için gereksiz, CI/PREVIEW/PRODUCTION için forbidden/unset. Legacy poster CDN compatibility live metadata API enablement değildir.
 
@@ -10,7 +12,7 @@ TMDB v1 env contract: `MEDIA_TRACKER_TMDB_MODE` retired/ignored; `TMDB_READ_ACCE
 
 - App Router sayfaları ile sekmeli ana uygulamayı birleştiren Next.js uygulaması.
 - Varsayılan kullanım yerel moddur; medya ve ilerleme verisi owner-scoped biçimde tarayıcıda saklanır.
-- Supabase opsiyoneldir: auth, manuel Cloud upload/download/merge, owner-scoped sync queue, revision/idempotency ve conflict akışları vardır.
+- Native hesap/Cloud yolu Better Auth ve PostgreSQL kullanır; manuel upload/download/merge, owner-scoped sync queue, revision/idempotency ve conflict akışları vardır. Supabase ayrı fallback'tir.
 - AI Danışman kütüphane tabanlı deterministik modda kullanılabilir. İlk Production release politikası AI server provider, Grounded Research ve persistent embedding cache yollarını kapalı tutar; API anahtarı eklemek tek başına erişim açmaz.
 - Python tabanlı embedding/ML servisi yalnız opsiyonel legacy geliştirme yoludur; Recommendation V2'nin aktif production karar hattı değildir.
 
@@ -35,7 +37,7 @@ Ayrıntılı sıra ve sonraki aşamalar: [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 - Offline-first veri mimarisi ve `localStorage` tabanlı persistence.
 - Versioned JSON import/export, kontrollü additive import, checksum, rollback/undo ve portable backup akışı.
-- Supabase auth, manuel Cloud aktarım, owner-scoped sync queue, V2 revision/idempotency/tombstone ve conflict akışı.
+- Native Better Auth/PostgreSQL ve ayrı Supabase fallback ile manuel Cloud aktarım, owner-scoped sync queue, V2 revision/idempotency/tombstone ve conflict akışı.
 - Local-first kütüphaneden ayrılmış cloud sosyal profil, kullanıcı arama ve takip/engel temeli.
 - TVMaze ve contact/User-Agent kapısı sağlanırsa Open Library ile aktif; TMDB v1 live erişimi tüm ortamlarda hard-disabled, AniList v1 live erişimi tüm ortamlarda hard-disabled, OMDb için yalnız legacy kayıt uyumlu normalize medya modeli.
 - AI Recommendation V2 için structured provider evidence, deterministik eligibility/ranking ve unresolved hard constraint'lerde optional source-grounded research; LLM final sıralama yapmaz.
@@ -87,7 +89,8 @@ Ayrıntılı sıra ve sonraki aşamalar: [`docs/ROADMAP.md`](docs/ROADMAP.md).
   - Basit JSON içe/dışa aktarma ve yerel örnek verileri yönetme
   - Format ayrıntıları: [`docs/PORTABLE_BACKUP_FORMAT.md`](docs/PORTABLE_BACKUP_FORMAT.md)
 - Cloud:
-  - Supabase email/password auth
+  - Native Better Auth email/password oturumu; ayrı Supabase fallback
+  - Public V1 politikasında yeni kayıt kapalı; mevcut yetkili hesaplarla giriş ayrı kabul kapsamındadır
   - Yerel -> Cloud aktarım
   - Cloud -> Yerel indirme
   - Cloud verisini yerel veriyle birleştirme
@@ -125,11 +128,12 @@ Ayrıntılı sıra ve sonraki aşamalar: [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Teknoloji
 
-- Next.js `16.2.4`
+- Next.js `16.3.8`
 - React `19.2.4`
 - TypeScript
 - Tailwind CSS 4
-- Supabase SSR / Supabase JS
+- Better Auth, native PostgreSQL 18 ve özel profil dosyası depolaması
+- Supabase SSR / Supabase JS (ayrı fallback)
 - lucide-react
 - FastAPI tabanlı opsiyonel ML servisi
 - sentence-transformers tabanlı opsiyonel embedding modeli

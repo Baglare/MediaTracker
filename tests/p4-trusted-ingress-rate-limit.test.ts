@@ -83,9 +83,9 @@ describe('native admission with offline local-test identity', () => {
     mocks.user.mockResolvedValue({ id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' });
     await consumeRateLimit(request(), 'tvmaze_search');
     mocks.user.mockResolvedValue(null); await consumeRateLimit(request(), 'tvmaze_search');
-    expect(envelope(1).ingress).toEqual(envelope(2).ingress); expect(envelope(2).ingress).toEqual(envelope(3).ingress);
+    expect(envelope(1).ingress).toEqual(envelope(2).ingress); expect(envelope(3).ingress).toEqual([]);
     expect(envelope(1).subjects).not.toEqual(envelope(2).subjects); expect(envelope(2).subjects).not.toEqual(envelope(3).subjects);
-    expect(envelope(3).identity_class).toBe('ip');
+    expect(envelope(3).identity_class).toBe('guest_pool');
   });
   it.each([['192.0.2.10', '::ffff:c000:20a'], ['2001:db8:1:2::1', '2001:0DB8:0001:0002:ffff::2']])('canonical equivalents %s and %s preserve both quotas', async (a, b) => {
     mocks.user.mockResolvedValue(null); vi.stubEnv('RATE_LIMIT_LOCAL_TEST_IP', a);

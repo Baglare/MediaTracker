@@ -1,4 +1,20 @@
 import type { ProfilePreferences } from "@/lib/profile-preferences";
+import { validateImageUpload } from "./validation";
+
+/** Decode locally: fetching a data URL is blocked by the production connect-src policy. */
+export function localAvatarDataUrlToFile(dataUrl: string): File {
+  const invalid = () => new Error("Yerel profil fotoğrafı okunamadı. Resmi yeniden seçebilirsin.");
+  if (dataUrl.length > Math.ceil(5 * 1024 * 1024 / 3) * 4 + 64) throw invalid();
+  const match = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/]+={0,2})$/.exec(dataUrl);
+  if (!match) throw invalid();
+  let decoded: string;
+  try { decoded = atob(match[2]); } catch { throw invalid(); }
+  const validation = validateImageUpload("avatar", match[1], decoded.length);
+  if (!validation.ok) throw new Error(validation.error);
+  const bytes = Uint8Array.from(decoded, (character) => character.charCodeAt(0));
+  const extension = match[1] === "image/png" ? "png" : match[1] === "image/webp" ? "webp" : "jpg";
+  return new File([bytes], `profile-avatar.${extension}`, { type: match[1] });
+}
 
 export type AvatarSource = "social" | "local" | "preset" | "initials";
 

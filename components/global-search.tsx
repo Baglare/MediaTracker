@@ -18,6 +18,7 @@ import { TvmazeNormalizedResult } from "@/lib/tvmaze-types";
 import { OpenLibraryNormalizedResult } from "@/lib/openlibrary-types";
 import { TmdbNormalizedResult } from "@/lib/tmdb-types";
 import type { PublicProviderCapabilities } from "@/lib/providers/types";
+import { readSearchResponse, SearchResponseError } from "@/lib/search-response";
 import {
   anilistDiagnosticMessage,
   collectFulfilledSearchResults,
@@ -143,35 +144,25 @@ export default function GlobalSearch({ getLibraryStatus, onAddToLibrary, prefill
 
       if (capabilities.providers.tmdb.enabled && (activeCategory === "all" || activeCategory === "movie")) {
         const moviePipeline: Promise<GlobalSearchResult[]> = (async () => {
-          try {
-            const res = await fetch("/api/tmdb/search", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ query }),
-            });
-            const data = (await res.json().catch(() => ({ results: [] }))) as {
-              results?: TmdbNormalizedResult[];
-              error?: string;
-            };
-            if (res.ok) {
-              return (data.results || []).map((item): GlobalSearchResult => ({
-                source: "tmdb",
-                externalId: item.externalId,
-                type: "movie",
-                title: item.title,
-                subtitle: item.originalTitle,
-                overview: item.overview,
-                releaseYear: item.releaseYear,
-                coverUrl: item.coverUrl,
-                totalProgress: item.totalProgress,
-                sourceUrl: `https://www.themoviedb.org/movie/${encodeURIComponent(item.externalId)}`,
-                raw: item,
-              }));
-            }
-          } catch {
-            return [];
-          }
-          return [];
+          const res = await fetch("/api/tmdb/search", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ query }),
+          });
+          const data = await readSearchResponse<TmdbNormalizedResult>(res);
+          return data.results.map((item): GlobalSearchResult => ({
+            source: "tmdb",
+            externalId: item.externalId,
+            type: "movie",
+            title: item.title,
+            subtitle: item.originalTitle,
+            overview: item.overview,
+            releaseYear: item.releaseYear,
+            coverUrl: item.coverUrl,
+            totalProgress: item.totalProgress,
+            sourceUrl: `https://www.themoviedb.org/movie/${encodeURIComponent(item.externalId)}`,
+            raw: item,
+          }));
         })();
 
         fetchPromises.push(moviePipeline);
@@ -184,7 +175,7 @@ export default function GlobalSearch({ getLibraryStatus, onAddToLibrary, prefill
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ query }),
           })
-            .then((res) => (res.ok ? res.json() : { results: [] }))
+            .then((res) => readSearchResponse<TvmazeNormalizedResult>(res))
             .then((data: { results: TvmazeNormalizedResult[] }) => {
               const resArray = data.results || [];
               return resArray.map((item): GlobalSearchResult => ({
@@ -201,7 +192,6 @@ export default function GlobalSearch({ getLibraryStatus, onAddToLibrary, prefill
                 raw: item,
               }));
             })
-            .catch(() => [])
         );
       }
 
@@ -248,7 +238,7 @@ export default function GlobalSearch({ getLibraryStatus, onAddToLibrary, prefill
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ query }),
           })
-            .then((res) => (res.ok ? res.json() : { results: [] }))
+            .then((res) => readSearchResponse<OpenLibraryNormalizedResult>(res))
             .then((data: { results: OpenLibraryNormalizedResult[] }) => {
               const resArray = data.results || [];
               return resArray.map((item): GlobalSearchResult => ({
@@ -267,16 +257,14 @@ export default function GlobalSearch({ getLibraryStatus, onAddToLibrary, prefill
                 raw: item,
               }));
             })
-            .catch(() => [])
         );
       }
 
       const resultsArrays = await Promise.allSettled(fetchPromises);
-      if (activeCategory === "movie") {
-        const rejected = resultsArrays.find((result) => result.status === "rejected");
-        if (rejected && rejected.reason instanceof Error) {
-          throw rejected.reason;
-        }
+      const rejected = resultsArrays.find((result) => result.status === "rejected");
+      if (rejected?.status === "rejected") {
+        setError(rejected.reason instanceof SearchResponseError ? rejected.reason.message
+          : "Arama kaynaklarından birine ulaşılamadı. Tekrar deneyin.");
       }
 
       const combined = collectFulfilledSearchResults(resultsArrays);
@@ -524,9 +512,13 @@ export default function GlobalSearch({ getLibraryStatus, onAddToLibrary, prefill
           </div>
         )}
 
-        {error ? (
-          <div className="text-center py-8 text-red-400 text-sm">{error}</div>
-        ) : isSearching ? (
+        {error && (
+          <div role="alert" className="text-center py-8 text-red-400 text-sm">
+            {error}
+            <button type="button" onClick={() => handleSearch(null, category)} disabled={isSearching} className="ml-3 underline">Tekrar Dene</button>
+          </div>
+        )}
+        {isSearching ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="w-6 h-6 text-violet-500 animate-spin" />
             <span className="ml-3 text-sm text-zinc-400">Aranıyor...</span>
@@ -566,12 +558,12 @@ export default function GlobalSearch({ getLibraryStatus, onAddToLibrary, prefill
                   })}
               </div>
             )
-          ) : (
+          ) : !error ? (
             <div className="text-center py-12">
               <p className="text-sm text-zinc-400">Sonuç bulunamadı.</p>
               <p className="text-xs text-zinc-600 mt-1">Başka bir arama terimi deneyin.</p>
             </div>
-          )
+          ) : null
         ) : null}
       </div>
     </div>

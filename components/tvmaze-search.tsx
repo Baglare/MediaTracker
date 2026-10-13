@@ -13,6 +13,7 @@ import { useState, useCallback } from "react";
 import { Search, Tv, Loader2, X, ChevronDown, ChevronUp } from "lucide-react";
 import { TvmazeNormalizedResult, TvmazeNormalizedDetail } from "@/lib/tvmaze-types";
 import TvmazeResultCard from "./tvmaze-result-card";
+import { readSearchResponse, SearchResponseError } from "@/lib/search-response";
 
 interface TvmazeSearchProps {
   // Belirli bir TVmaze ID'sinin zaten listede olup olmadığını kontrol eder
@@ -58,18 +59,10 @@ export default function TvmazeSearch({
         body: JSON.stringify({ query: trimmed }),
       });
 
-      if (!response.ok) {
-        const data = await response.json().catch(() => null);
-        const message = data?.error || `Hata: ${response.status}`;
-        setError(message);
-        setResults([]);
-        return;
-      }
-
-      const data = await response.json();
-      setResults(data.results || []);
-    } catch {
-      setError("Arama sırasında bir bağlantı hatası oluştu.");
+      const data = await readSearchResponse<TvmazeNormalizedResult>(response);
+      setResults(data.results);
+    } catch (error) {
+      setError(error instanceof SearchResponseError ? error.message : "Arama sırasında bir bağlantı hatası oluştu. Tekrar deneyin.");
       setResults([]);
     } finally {
       setIsLoading(false);
@@ -221,8 +214,9 @@ export default function TvmazeSearch({
 
           {/* Hata mesajı */}
           {error && (
-            <div className="px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-sm text-red-400">
+            <div role="alert" className="px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-sm text-red-400">
               {error}
+              <button type="button" onClick={handleSearch} disabled={isLoading} className="ml-3 underline">Tekrar Dene</button>
             </div>
           )}
 

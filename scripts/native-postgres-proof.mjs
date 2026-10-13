@@ -8,9 +8,11 @@ import { nativeMigrationSteps } from './native-migrations.mjs';
 import { startDisposableRelay, validateDisposableTarget, verifyDisposableRelay } from './native-disposable-relay.mjs';
 import { Client } from 'pg';
 import { performance } from 'node:perf_hooks';
-const p2 = process.argv[2] === '--p2';
-if (process.argv.slice(2).some(arg => arg !== '--p2') || process.argv.length > 3) throw new Error('proof_target_arguments_denied');
-const image = 'postgres:17-alpine';
+import { prepareReleaseUpgrade, verifyReleaseUpgrade, proveReleaseConcurrency } from './native-release-pg18.mjs';
+const release = process.argv[2] === '--release';
+const p2 = process.argv[2] === '--p2' || release;
+if (process.argv.slice(2).some(arg => !['--p2','--release'].includes(arg)) || process.argv.length > 3) throw new Error('proof_target_arguments_denied');
+const image = 'postgres:18-alpine';
 const name = `mt-p1-${randomUUID()}`;
 let localEndpoint;
 let interrupted=false,cleaning=false,activeChild;
@@ -97,7 +99,8 @@ try {
   network=docker(['network','create','--internal','--label',`mt.p1.proof=${name}`,name]);
   stage='CONTAINER_CREATE';
   id=docker(['run','--detach','--name',name,'--label',`mt.p1.proof=${name}`,
-    '--network',name,'--mount','type=tmpfs,destination=/var/lib/postgresql/data',
+    '--network',name,'--mount','type=tmpfs,destination=/var/lib/postgresql',
+    '--mount','type=tmpfs,destination=/var/lib/postgresql/data','-e','PGDATA=/var/lib/postgresql/data/pgdata',
     '-e',`POSTGRES_PASSWORD=${password}`,'-e','POSTGRES_DB=mt_p1_proof',image]);
   stage='CONTAINER_INSPECT';
   const inspect=JSON.parse(docker(['inspect',id]))[0];
@@ -115,14 +118,31 @@ try {
   stage='SQL_PROOF';
   let output;
   if(p2) {
+    let upgrade;
     for(const step of nativeMigrationSteps()) {
+      if(release && step.name.startsWith('013_')) {
+        stage='PG18_UPGRADE_SEED';
+        p2Sql(`ALTER ROLE mt_runtime PASSWORD '${password}';`);
+        upgrade=await prepareReleaseUpgrade({host:'127.0.0.1',port:relay.descriptor.port,password,database:'mt_p1_proof'});
+      }
       stage=step.name==='LEDGER_SETUP' ? 'P2_LEDGER_SETUP' : `P2_MIGRATION_${step.name.slice(0,3)}`;
       p2Sql(step.sql);
       console.log(`PASS: disposable proof; stage=${stage}`);
     }
+    if(release) {
+      stage='PG18_UPGRADE_PRESERVATION';
+      await verifyReleaseUpgrade(upgrade);
+      stage='PG18_CONCURRENCY';
+      await proveReleaseConcurrency(upgrade);
+      console.log('PASS: PG18 012-to-013 preservation, independent connection concurrency, limiter, RLS, CAS and tombstone');
+    }
     stage='P2_FUNCTIONAL_PROOF';
     output=p2Sql(readFileSync(new URL('../database/native/cloud-goals-proof.sql',import.meta.url),'utf8'));
     if(!output.includes('P2_CLOUD_GOALS_PROOF_PASS')) throw new Error('proof_failed');
+    console.log(`PASS: disposable proof; stage=${stage}`);
+    stage='P2_TVMAZE_GUEST_PROOF';
+    output=p2Sql(readFileSync(new URL('../database/native/tvmaze-guest-proof.sql',import.meta.url),'utf8'));
+    if(!output.includes('TVMAZE_GUEST_POOL_PROOF_PASS'))throw new Error('proof_failed');
     console.log(`PASS: disposable proof; stage=${stage}`);
     stage='P2_RUNTIME_PASSWORD';
     p2Sql(`ALTER ROLE mt_runtime PASSWORD '${password}';`);
@@ -140,7 +160,7 @@ try {
   try {await client.connect();await client.query('SELECT 1');} finally {await client.end();}
   if(interrupted) throw new Error('proof_interrupted');
   if (p2) {
-    console.log('PASS: disposable native Cloud/Goals SQL, receipts, owner reads and lifecycle admission; other P2 domains NOT PROVED');
+    console.log('PASS: disposable native Cloud/Goals and TVMaze guest pool SQL, receipts, owner reads and lifecycle admission; other P2 domains NOT PROVED');
   } else {
   stage='AUTH_INTEGRATION';
   const result=await new Promise((resolve,reject)=>{

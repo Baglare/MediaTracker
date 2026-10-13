@@ -47,6 +47,10 @@
     {
       "name": "012_public_signup.sql",
       "checksum": "ab8d1553c140a92f3becdc045c38d7dff99a52377faeeb8e89e422a9812e25cd"
+    },
+    {
+      "name": "013_tvmaze_guest_pool.sql",
+      "checksum": "55060f437092636fed2b6cf283425da23d96a8c8f4830f062ff82d08433aa9b4"
     }
   ],
   "hosting-production": [
@@ -97,6 +101,10 @@
     {
       "name": "012_public_signup.sql",
       "checksum": "ba40f2d2d99377744f6e1f40a065c59977526cc3db3f2f5f6f0e879bbd31a359"
+    },
+    {
+      "name": "013_tvmaze_guest_pool.sql",
+      "checksum": "53a21caea54afd58b51e50d974183d8f8f4381ce6f83097dc495b52b0fdc18c9"
     }
   ]
 }

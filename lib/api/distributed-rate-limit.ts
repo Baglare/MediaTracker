@@ -2,7 +2,7 @@ import "server-only";
 import { createHmac, randomBytes, randomUUID } from "node:crypto";
 import { getSupabaseEnv } from "@/lib/supabase/status";
 import { enforceRateLimit } from "./request-security";
-import { canonicalRateLimitIp, identityEpochs, subjectDigest, trustedRateLimitIp, type LimiterIdentity } from "./rate-limit-identity";
+import { canonicalRateLimitIp, identityEpochs, subjectDigest, trustedRateLimitIp, TVMAZE_GUEST_POOL, type LimiterIdentity } from "./rate-limit-identity";
 import { getBackendProvider } from '../backend/provider';
 
 // Policy values belong to SQL. HTTP input never chooses policy, cost, limits or windows.
@@ -33,7 +33,7 @@ const unavailable = (): RateLimitDecision => ({ allowed: false, retryAfterSecond
 const localSmoothingKey = randomBytes(32).toString("hex"); // RAM only, never DB authority/provisioning.
 
 // Explicit server policy: only these native APIs may use a verified session
-// without ingress proof. Anonymous traffic and all other policies stay closed.
+// without ingress proof. Guest search uses its separate SQL pool below.
 function nativeSessionPolicy(policy: RateLimitPolicy) {
   return policy === 'tvmaze_search' || policy === 'tvmaze_details' || policy === 'tvmaze_calendar'
     || policy === 'social_read' || policy === 'social_write'
@@ -131,10 +131,13 @@ async function consumeWithinDeadline(request: Request, policy: RateLimitPolicy, 
     // Never use an unverified user ID.
   }
   if (nativeCloud && identity?.kind !== 'user') return unavailable();
+  // All native anonymous searches share one admission pool, even with trusted
+  // ingress. Never let rotating IPs/cookies bypass its daily/provider reserve.
+  if (native && !identity && policy === 'tvmaze_search') identity = { kind: 'guest_pool', value: TVMAZE_GUEST_POOL };
   if (!identity && ip) identity = { kind: "ip", value: ip };
   if (!identity) return unavailable();
   if (performance.now() >= deadline) return unavailable();
-  const decision = await signedRpc("consume", policy, identity, ip, 0, deadline - performance.now());
+  const decision = await signedRpc("consume", policy, identity, identity.kind === 'guest_pool' ? null : ip, 0, deadline - performance.now());
   if(native)return decision;
   if (decision.source !== "unavailable" || (policy !== "interpret" && policy !== "recommend")) return decision;
   // Only bounded deterministic library work may fail soft. This is BEST_EFFORT_SMOOTHING.
@@ -189,15 +192,16 @@ async function reportCooldownWithinDeadline(request: Request, policy: RateLimitP
   const wait = providerRetryAfter(response.headers.get("retry-after"));
   const ip = trustedRateLimitIp(request);
   let identity: LimiterIdentity | null = ip ? { kind: 'ip', value: ip } : null;
-  if (!ip && getBackendProvider() === 'native' && nativeSessionPolicy(policy)) {
+  if (getBackendProvider() === 'native' && nativeSessionPolicy(policy) && (!ip || policy === 'tvmaze_search')) {
     try {
       const { getCurrentUser } = await import('../auth/current-user');
       const user = await getCurrentUser();
       if (user) identity = { kind: 'user', value: user.id.toLowerCase() };
+      else if (policy === 'tvmaze_search') identity = { kind: 'guest_pool', value: TVMAZE_GUEST_POOL };
     } catch { return unavailable(); }
   }
   if (!identity || performance.now() >= deadline) return unavailable();
-  const result = await signedRpc("cooldown", policy, identity, ip, wait, deadline - performance.now());
+  const result = await signedRpc("cooldown", policy, identity, identity.kind === 'guest_pool' ? null : ip, wait, deadline - performance.now());
   if (result.source === "unavailable") return result;
   return { allowed: false, source: "distributed", retryAfterSeconds: result.retryAfterSeconds || wait };
 }

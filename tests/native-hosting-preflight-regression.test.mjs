@@ -53,9 +53,10 @@ for(const profile of ['hosting-test','hosting-production']) {
     const history=present?manifest.slice(0,2).map(({name,checksum})=>({name,checksum})):[];
     const f=fixture({profile,present,history});
     assert.deepEqual(await migrationHistory(f.client,roles),history);
-    assert.equal(manifest.length,12);
-    assert.equal(manifest.at(-1).name,'012_public_signup.sql');
-    assert.equal(validateHistory(history,manifest).length,present?10:12);
+    assert.equal(manifest.length,13);
+    assert.equal(manifest.at(-2).name,'012_public_signup.sql');
+    assert.equal(manifest.at(-1).name,'013_tvmaze_guest_pool.sql');
+    assert.equal(validateHistory(history,manifest).length,present?11:13);
     assert.equal(f.role,roles.migrator);assert.equal(f.closed,false);
     assert.ok(f.calls.indexOf(`SET ROLE ${roles.ledger_owner}`)<f.calls.indexOf(ledgerProbe));
     assert.equal(f.calls.at(-1),'RESET ROLE');
@@ -123,8 +124,9 @@ for(const server of ['127.0.0.1/32','::1/128'])test(`preflight and operator fing
   assert.equal(preflight.target.server,server.split('/')[0]);
   assert.equal(preflight.target.fingerprint,target.fingerprint);
   assert.equal(preflight.contract,'PASS');assert.equal(preflight.empty,true);
-  assert.equal(preflight.history,'EMPTY');assert.equal(preflight.pending.length,12);
-  assert.equal(preflight.pending.at(-1),'012_public_signup.sql');
+  assert.equal(preflight.history,'EMPTY');assert.equal(preflight.pending.length,13);
+  assert.ok(preflight.pending.includes('012_public_signup.sql'));
+  assert.equal(preflight.pending.at(-1),'013_tvmaze_guest_pool.sql');
   assert.equal(preflight.mutation,'NOT_PERFORMED');
   assert.equal(f.role,f.roles.migrator);
   assert.ok(f.calls.indexOf('RESET ROLE')<f.calls.indexOf('ROLLBACK'));

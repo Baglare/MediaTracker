@@ -165,9 +165,10 @@ export default function PrivacyPage() {
           </p>
           {native && (
             <p>
-              Bu dağıtım için seçilen native mimari aşağıda açıklanır. Supabase alternatifi korunmaktadır;
-              native production geçişi henüz tamamlanmamıştır. Gerçek veritabanı, kimlik doğrulama ve erişim
-              denetimlerinin kabulü ile sağlayıcı veri bölgesi ve yedekleme koşulları henüz doğrulanmamıştır.
+              Bu dağıtımda native PostgreSQL, Better Auth ve özel dosya depolaması kullanılır.
+              Supabase alternatifi korunmaktadır. Altyapının işletilmesi yeni sürümün bütün kullanıcı
+              akışlarının kabul edildiği anlamına gelmez. Sağlayıcı veri bölgesi, erişim ve yedek saklama
+              koşulları için ayrı operatör ve hukuk doğrulaması gerekir.
             </p>
           )}
         </Section>

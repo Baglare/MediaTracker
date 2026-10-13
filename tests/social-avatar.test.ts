@@ -2,7 +2,7 @@ import "./helpers/admitted-rate-limit";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DEFAULT_PROFILE_PREFERENCES } from "@/lib/profile-preferences";
-import { migrateLocalAvatar, resolveAvatarSource, shouldOfferLocalAvatarMigration } from "@/lib/social/avatar";
+import { localAvatarDataUrlToFile, migrateLocalAvatar, resolveAvatarSource, shouldOfferLocalAvatarMigration } from "@/lib/social/avatar";
 import { prefillSocialProfile } from "@/lib/social/snapshots";
 
 const { getSupabaseServerClientMock } = vi.hoisted(() => ({
@@ -54,6 +54,42 @@ function setupClient(data: unknown) {
 
 describe("social avatar boundary", () => {
   beforeEach(() => vi.clearAllMocks());
+
+  it("migrates local bytes without a data URL network request under the strict CSP", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockRejectedValue(new TypeError("Failed to fetch"));
+    try {
+      const original = "data:image/png;base64,AQID";
+      const upload = vi.fn(async (dataUrl: string) => {
+        const file = localAvatarDataUrlToFile(dataUrl);
+        expect(file.type).toBe("image/png");
+        expect(file.name).toBe("profile-avatar.png");
+        expect(new Uint8Array(await file.arrayBuffer())).toEqual(new Uint8Array([1, 2, 3]));
+        return "/api/backend/assets?key=synthetic";
+      });
+      await expect(migrateLocalAvatar({ confirmed: true, localAvatarDataUrl: original, upload }))
+        .resolves.toEqual({ status: "uploaded", value: "/api/backend/assets?key=synthetic" });
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(original).toBe("data:image/png;base64,AQID");
+    } finally { fetchMock.mockRestore(); }
+  });
+
+  it("rejects remote, executable, malformed and oversized avatar inputs before decoding", () => {
+    for (const value of ["https://example.test/avatar.png", "data:image/svg+xml;base64,AQID",
+      "data:image/png;base64,", "data:image/png;base64,A", "data:image/png;base64,%%",
+      `data:image/png;base64,${"A".repeat(7 * 1024 * 1024)}`]) {
+      expect(() => localAvatarDataUrlToFile(value)).toThrow();
+    }
+    expect(localAvatarDataUrlToFile("data:image/jpeg;base64,AQID").type).toBe("image/jpeg");
+    expect(localAvatarDataUrlToFile("data:image/webp;base64,AQID").type).toBe("image/webp");
+  });
+
+  it("propagates a failed upload without changing the local avatar or declaring success", async () => {
+    const original = "data:image/png;base64,AQID";
+    const upload = vi.fn().mockRejectedValue(new TypeError("Failed to fetch"));
+    await expect(migrateLocalAvatar({ confirmed: true, localAvatarDataUrl: original, upload })).rejects.toThrow("Failed to fetch");
+    expect(original).toBe("data:image/png;base64,AQID");
+    expect(upload).toHaveBeenCalledOnce();
+  });
 
   it("omits avatarUrl when avatar_path is null", async () => {
     const { createSignedUrl } = setupClient(availableProfile(null));

@@ -15,7 +15,9 @@ const source=readFileSync(new URL('./native-postgres-proof.mjs',import.meta.url)
   .replaceAll('import.meta.url',"'file:///synthetic/scripts/native-postgres-proof.mjs'");
 const id='a'.repeat(64),network='b'.repeat(64),name=`mt-p1-${'c'.repeat(36)}`;
 const privateDiagnostic='synthetic-private-diagnostic';
-async function run({fail,sqlFailure,sqlStatus=3,sqlSignal=null,sqlSpawnError,sqlError=`ERROR:  42601\n${privateDiagnostic}`,missingProof=false,mutate=()=>{},p2=false,endpoint='unix:///var/run/docker.sock',interrupt=false,readinessFailures=0,queryFailures=0,badReady=false,interruptReady=false,lateReady=false,cleanupFailure=false}={}) {
+const guestProofSource=readFileSync(new URL('../database/native/tvmaze-guest-proof.sql',import.meta.url),'utf8');
+async function run({fail,sqlFailure,sqlStatus=3,sqlSignal=null,sqlSpawnError,sqlError=`ERROR:  42601\n${privateDiagnostic}`,missingProof=false,missingGuestProof=false,mutate=()=>{},p2=false,release=false,endpoint='unix:///var/run/docker.sock',interrupt=false,readinessFailures=0,queryFailures=0,badReady=false,interruptReady=false,lateReady=false,cleanupFailure=false}={}) {
+  p2 ||= release;
   const calls=[],logs=[];
   let sqlCall=0,elapsed=0,attempt=0,timerId=0;
   const timers=new Map();
@@ -24,7 +26,7 @@ async function run({fail,sqlFailure,sqlStatus=3,sqlSignal=null,sqlSpawnError,sql
     Mounts:[{Type:'tmpfs',Destination:'/var/lib/postgresql/data'}]};
   const net={Id:network,Name:name,Driver:'bridge',Internal:true,Labels:{'mt.p1.proof':name},Containers:{[id]:{Name:name,IPv4Address:'172.20.0.2/16'}}};
   mutate(target,net);
-  const process=Object.assign(new EventEmitter(),{argv:['node','proof.mjs',...(p2?['--p2']:[])],env:{NODE_OPTIONS:'--existing-option'},execPath:'node',cwd:()=>'/synthetic'});
+  const process=Object.assign(new EventEmitter(),{argv:['node','proof.mjs',...(release?['--release']:p2?['--p2']:[])],env:{NODE_OPTIONS:'--existing-option'},execPath:'node',cwd:()=>'/synthetic'});
   const spawnSync=(command,args,options)=>{
     if(command==='docker' && args[0]==='--host') args=args.slice(2);
     assert.equal(command,'docker','Vitest must be asynchronous so the relay can run');
@@ -40,7 +42,8 @@ async function run({fail,sqlFailure,sqlStatus=3,sqlSignal=null,sqlSpawnError,sql
     if(key==='exec -i') {
       sqlCall++;
       if(sqlCall===sqlFailure) return {...response,status:sqlStatus,signal:sqlSignal,error:sqlSpawnError,stdout:privateDiagnostic,stderr:sqlError};
-      response.stdout=missingProof ? '' : p2?'P2_CLOUD_GOALS_PROOF_PASS':'P1_RLS_PROOF_PASS';
+      const guest=options.input.includes('TVMAZE_GUEST_POOL_PROOF_PASS');
+      response.stdout=missingProof || (guest && missingGuestProof) ? '' : p2?(guest?'TVMAZE_GUEST_POOL_PROOF_PASS':'P2_CLOUD_GOALS_PROOF_PASS'):'P1_RLS_PROOF_PASS';
     }
     return response;
   };
@@ -55,7 +58,10 @@ async function run({fail,sqlFailure,sqlStatus=3,sqlSignal=null,sqlSpawnError,sql
       async end(){calls.push({key:'pg end',attempt:this.attempt});if(this.probe && cleanupFailure)throw Error(privateDiagnostic);}
     },
     spawn:(command,args,options)=>{calls.push({key:'auth',args:Array.from(args),options});const child=new EventEmitter();child.kill=signal=>{assert.equal(signal,'SIGKILL');queueMicrotask(()=>child.emit('close',null));};queueMicrotask(()=>interrupt?process.emit('SIGTERM'):child.emit('close',fail==='auth'?1:0));return child;},randomUUID:()=>name.slice(6),randomBytes:()=>({toString:()=>privateDiagnostic}),
-    readFileSync:()=>privateDiagnostic,nativeMigrationSteps,
+    readFileSync:file=>file.pathname.endsWith('/tvmaze-guest-proof.sql')?guestProofSource:privateDiagnostic,nativeMigrationSteps,
+    prepareReleaseUpgrade:async()=>{calls.push({key:'upgrade seed'});if(fail==='upgrade seed')throw Error(privateDiagnostic);return {};},
+    verifyReleaseUpgrade:async()=>{calls.push({key:'upgrade verify'});if(fail==='upgrade verify')throw Error(privateDiagnostic);},
+    proveReleaseConcurrency:async()=>{calls.push({key:'concurrency'});if(fail==='concurrency')throw Error(privateDiagnostic);},
     pathToFileURL:()=>({href:'file:///synthetic/offline.mjs'}),performance:{now:()=>elapsed},
     setTimeout:(callback,ms)=>{if(callback.toString().includes('[native code]')){elapsed+=ms;callback();return 0;}timers.set(++timerId,{callback,ms});return timerId;},clearTimeout:id=>timers.delete(id),
     console:{log:line=>logs.push(line),error:line=>logs.push(line)},
@@ -86,6 +92,24 @@ for(const [stage,options] of [
     assert.deepEqual(result.logs,[`FAIL: disposable proof; stage=${stage}; diagnostics redacted`]);
     assert.deepEqual(result.calls.slice(-2).map(call=>call.args),[['rm','--force',id],['network','rm',network]]);
     if(stage==='TARGET_VALIDATION') assert.ok(!result.calls.some(call=>call.key.startsWith('exec')));
+  });
+}
+
+test('release seed precedes only 013; preservation and concurrency cannot be skipped',async()=>{
+  const r=await run({release:true});
+  assert.equal(r.process.exitCode,undefined);
+  const seed=r.calls.findIndex(c=>c.key==='upgrade seed');
+  const migration=r.calls.findIndex(c=>c.options?.input?.includes("name='013_tvmaze_guest_pool.sql'"));
+  assert.ok(seed>0&&seed<migration);
+  assert.ok(r.calls.findIndex(c=>c.key==='upgrade verify')>migration);
+  assert.ok(r.calls.findIndex(c=>c.key==='concurrency')>migration);
+});
+for(const [fail,stage] of [['upgrade seed','PG18_UPGRADE_SEED'],['upgrade verify','PG18_UPGRADE_PRESERVATION'],['concurrency','PG18_CONCURRENCY']]) {
+  test(`release ${fail} failure prevents acceptance and cleans resources`,async()=>{
+    const r=await run({release:true,fail});
+    assert.equal(r.process.exitCode,1);
+    assert.ok(r.logs.includes(`FAIL: disposable proof; stage=${stage}; diagnostics redacted`));
+    assert.deepEqual(r.calls.slice(-2).map(c=>c.key),['rm --force','network rm']);
   });
 }
 test('container cleanup failure still attempts network cleanup and remains redacted',async()=>{
@@ -123,7 +147,10 @@ for(const p2 of [false,true]) {
     assert.ok(result.calls.find(call=>call.key==='relay verify'));
     assert.ok(result.calls.find(call=>call.key==='pg connect'));
     assert.ok(result.calls.find(call=>call.key==='relay close'));
-    assert.equal(create[create.indexOf('--mount')+1],'type=tmpfs,destination=/var/lib/postgresql/data');
+    assert.equal(create[create.indexOf('--mount')+1],'type=tmpfs,destination=/var/lib/postgresql');
+    assert.ok(create.includes('type=tmpfs,destination=/var/lib/postgresql/data'));
+    assert.ok(create.includes('PGDATA=/var/lib/postgresql/data/pgdata'));
+    assert.ok(create.includes('postgres:18-alpine'));
     const auth=result.calls.find(call=>call.key==='auth');
     assert.equal(!!auth,!p2);
     if(auth) {assert.equal(auth.options.stdio,'ignore');assert.ok(auth.options.env.NODE_OPTIONS.startsWith('--existing-option '));assert.match(auth.options.env.DATABASE_URL,/@127\.0\.0\.1:54321\/mt_p1_proof$/);}
@@ -142,7 +169,7 @@ test('interruption kills Vitest and closes relay before Docker cleanup',async()=
   assert.equal(result.process.exitCode,1);
   assert.deepEqual(result.calls.slice(-3).map(c=>c.key),['relay close','rm --force','network rm']);
 });
-const p2PassStages=[...nativeMigrationSteps().map(step=>step.name==='LEDGER_SETUP'?'P2_LEDGER_SETUP':`P2_MIGRATION_${step.name.slice(0,3)}`),'P2_FUNCTIONAL_PROOF'];
+const p2PassStages=[...nativeMigrationSteps().map(step=>step.name==='LEDGER_SETUP'?'P2_LEDGER_SETUP':`P2_MIGRATION_${step.name.slice(0,3)}`),'P2_FUNCTIONAL_PROOF','P2_TVMAZE_GUEST_PROOF'];
 test('P2 rejects an unverified relay and cleans every owned resource',async()=>{
   const result=await run({p2:true,fail:'relay verify'});
   assert.equal(result.process.exitCode,1);
@@ -176,6 +203,12 @@ test('P2 functional proof cannot pass on a zero exit without its success sentine
   assert.equal(result.logs.at(-1),'FAIL: disposable proof; stage=P2_FUNCTIONAL_PROOF; diagnostics redacted');
   assert.ok(!result.logs.includes('PASS: disposable proof; stage=P2_FUNCTIONAL_PROOF'));
 });
+test('P2 guest proof cannot pass on a zero exit without its own success sentinel',async()=>{
+  const result=await run({p2:true,missingGuestProof:true});
+  assert.equal(result.process.exitCode,1);
+  assert.equal(result.logs.at(-1),'FAIL: disposable proof; stage=P2_TVMAZE_GUEST_PROOF; diagnostics redacted');
+  assert.ok(!result.logs.includes('PASS: disposable proof; stage=P2_TVMAZE_GUEST_PROOF'));
+});
 test('P2 password failure is separate from migrations and functional proof',async()=>{
   const result=await run({p2:true,sqlFailure:p2PassStages.length+1,sqlError:'ERROR:  42501'});
   assert.equal(result.process.exitCode,1);
@@ -190,7 +223,8 @@ test('P2 sends the actual ordered transactional plans and preserves SQLSTATE-onl
     assert.ok(calls[i].args.includes('VERBOSITY=sqlstate'));
     assert.equal(calls[i].options.timeout,15000);
   }
-  assert.equal(calls.length,steps.length+2);
+  assert.equal(calls.length,steps.length+3);
+  assert.equal(calls[steps.length+1].options.input,guestProofSource);
   assert.deepEqual(result.logs.slice(0,p2PassStages.length),p2PassStages.map(stage=>`PASS: disposable proof; stage=${stage}`));
 });
 for(const failure of [{sqlStatus:null,sqlSignal:'SIGTERM'},{sqlStatus:0,sqlSpawnError:Error(privateDiagnostic)},{sqlStatus:1}]) {

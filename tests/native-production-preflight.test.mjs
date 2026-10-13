@@ -17,7 +17,7 @@ test('empty target inspection stays read-only and finishes with rollback',async(
     return {rows:[]};
   }};
   const result=await productionInspection(client,{roles:nativeRoles('hosting-production','shared-managed'),url:new URL('postgresql://mt_prod_migrator:x@127.0.0.1:5433/mediatracker_prod'),kind:'migrator'},{});
-  assert.equal(result.data,'EMPTY');assert.equal(result.pending.length,12);
+  assert.equal(result.data,'EMPTY');assert.equal(result.pending.length,13);
   assert.equal(calls[0],'BEGIN READ ONLY');assert.equal(calls.at(-1),'ROLLBACK');
   assert.equal(calls.some(s=>/\b(?:INSERT|UPDATE|DELETE|CREATE|ALTER|DROP)\b/.test(s)),false);
 });
