@@ -5,7 +5,11 @@ LANGUAGE sql AS $$ SELECT jsonb_build_object('version',1,'operation',p_operation
   'policy_id',p_policy,'identity_class','guest_pool','subjects',jsonb_build_array(jsonb_build_object('epoch',floor(extract(epoch FROM clock_timestamp())/86400),'digest',p_digest)),
   'ingress','[]'::jsonb,'nonce',gen_random_uuid(),'issued_at',floor(extract(epoch FROM clock_timestamp())),
   'expires_at',floor(extract(epoch FROM clock_timestamp()))+10,'cost',1,'cooldown',CASE WHEN p_operation='cooldown' THEN 30 ELSE 0 END)::text $$;
-GRANT USAGE ON SCHEMA pg_temp TO mt_runtime;
+-- GRANT resolves a catalog schema name, not the pg_temp search-path alias.
+DO $$ BEGIN
+  EXECUTE format('GRANT USAGE ON SCHEMA %I TO mt_runtime',
+    (SELECT nspname FROM pg_namespace WHERE oid=pg_my_temp_schema()));
+END $$;
 GRANT EXECUTE ON FUNCTION pg_temp.guest_envelope(text,text,text) TO mt_runtime;
 UPDATE private_rate_limit.global_state SET tokens=capacity,refilled_at=clock_timestamp(),blocked_until='-infinity',disabled=false,daily_count=0,daily_epoch=0;
 UPDATE private_rate_limit.tvmaze_guest_pool SET next_attempt_at='-infinity',daily_epoch=0,daily_attempts=0,admitted_total=0;
