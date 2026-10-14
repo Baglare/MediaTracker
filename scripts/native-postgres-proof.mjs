@@ -34,6 +34,7 @@ let id, network, relay;
 let stage='DOCKER_CONTEXT';
 let sqlstate;
 let assertion;
+let authLine;
 const fixtureAssertions=new Set([...readFileSync(new URL('../database/native/tvmaze-guest-proof.sql',import.meta.url),'utf8').matchAll(/RAISE EXCEPTION '(guest_[a-z_]+)'/g)].map(match=>match[1]));
 // Only a five-character code from PostgreSQL's fixed error-class vocabulary may
 // leave the runner. Never relay messages, query text, context, paths or values.
@@ -171,7 +172,7 @@ try {
   stage='AUTH_INTEGRATION';
   const result=await new Promise((resolve,reject)=>{
   const child=activeChild=spawn(process.execPath,['node_modules/vitest/vitest.mjs','run','tests/native-postgres-live.integration.test.ts','--maxWorkers=1'],
-    {stdio:'ignore',env:{...dockerEnv,DOCKER_HOST:localEndpoint,BACKEND_PROVIDER:'native',DATABASE_URL:databaseUrl,
+    {stdio:['ignore','pipe','pipe'],env:{...dockerEnv,DOCKER_HOST:localEndpoint,BACKEND_PROVIDER:'native',DATABASE_URL:databaseUrl,
       DATABASE_SSL_MODE:'disable',DATABASE_POOL_MAX:'1',BETTER_AUTH_URL:'http://localhost:3000',BETTER_AUTH_SECRET:randomBytes(32).toString('hex'),
       NATIVE_P1_PROOF_CONTAINER:id,NATIVE_P1_PROOF_NAME:name,NATIVE_P1_PROOF_NETWORK:network,NATIVE_P1_RELAY_PROOF:JSON.stringify(relay.proof),
       NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED:release?'true':'false',
@@ -180,6 +181,14 @@ try {
       ...(release?{TRUSTED_INGRESS_MODE:'unconfigured',RATE_LIMIT_IDENTITY_HMAC_KEY:randomBytes(32).toString('hex'),
         RATE_LIMIT_RPC_SIGNING_KEY:randomBytes(32).toString('hex'),RATE_LIMIT_RPC_KEY_VERSION:'v1',RATE_LIMIT_RPC_AUDIENCE:'mt:signup-proof'}:{}),
       NODE_OPTIONS:`${dockerEnv.NODE_OPTIONS??''} --import=${pathToFileURL(`${process.cwd()}/scripts/ci-offline.mjs`).href}`},timeout:60000,killSignal:'SIGKILL'});
+  // Keep raw Auth/SQL diagnostics private. Only the fixed test file's numeric
+  // assertion line can leave the runner; retain a bounded tail for split chunks.
+  let authFrames='';
+  for(const stream of [child.stdout,child.stderr]) stream.on('data',chunk=>{
+    authFrames=(authFrames+chunk.toString()).slice(-4096);
+    const frame=authFrames.match(/tests\/native-postgres-live\.integration\.test\.ts:([1-9][0-9]{0,5}):[0-9]{1,6}\b/);
+    if(frame)authLine=frame[1];
+  });
   child.once('error',reject);
   child.once('close',(status)=>resolve({status}));
   });
@@ -191,7 +200,7 @@ try {
   const checks=new Set(['connections','guest_lock_contention','guest_race','replay_and_ten_seconds','utc_daily_limit','provider_reserve','disabled_global_capacity','cooldown','envelope_negatives','authenticated_quota','authenticated_race','cloud_cas','tombstone','rls']);
   const check=checks.has(error.releaseCheck)?error.releaseCheck:undefined;
   if(check&&/^[0-9A-Z]{5}$/.test(error.code??'')&&allowedSqlstateClasses.has(error.code.slice(0,2)))sqlstate=error.code;
-  console.error(`${id?'FAIL: disposable proof':'BLOCKED_ENVIRONMENT: disposable proof'}; stage=${stage}${check?`; check=${check}`:''}${sqlstate?`; sqlstate=${sqlstate}`:''}${assertion?`; assertion=${assertion}`:''}; diagnostics redacted`);
+  console.error(`${id?'FAIL: disposable proof':'BLOCKED_ENVIRONMENT: disposable proof'}; stage=${stage}${check?`; check=${check}`:''}${sqlstate?`; sqlstate=${sqlstate}`:''}${assertion?`; assertion=${assertion}`:''}${stage==='AUTH_INTEGRATION'&&authLine?`; auth_line=${authLine}`:''}; diagnostics redacted`);
   process.exitCode=1;
 } finally {
   cleaning=true;

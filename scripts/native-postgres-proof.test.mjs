@@ -16,7 +16,7 @@ const source=readFileSync(new URL('./native-postgres-proof.mjs',import.meta.url)
 const id='a'.repeat(64),network='b'.repeat(64),name=`mt-p1-${'c'.repeat(36)}`;
 const privateDiagnostic='synthetic-private-diagnostic';
 const guestProofSource=readFileSync(new URL('../database/native/tvmaze-guest-proof.sql',import.meta.url),'utf8');
-async function run({fail,sqlFailure,sqlStatus=3,sqlSignal=null,sqlSpawnError,sqlError=`ERROR:  42601\n${privateDiagnostic}`,missingProof=false,missingGuestProof=false,mutate=()=>{},p2=false,release=false,endpoint='unix:///var/run/docker.sock',interrupt=false,readinessFailures=0,queryFailures=0,badReady=false,interruptReady=false,lateReady=false,cleanupFailure=false}={}) {
+async function run({fail,authOutput='',sqlFailure,sqlStatus=3,sqlSignal=null,sqlSpawnError,sqlError=`ERROR:  42601\n${privateDiagnostic}`,missingProof=false,missingGuestProof=false,mutate=()=>{},p2=false,release=false,endpoint='unix:///var/run/docker.sock',interrupt=false,readinessFailures=0,queryFailures=0,badReady=false,interruptReady=false,lateReady=false,cleanupFailure=false}={}) {
   p2 ||= release;
   const calls=[],logs=[];
   let sqlCall=0,elapsed=0,attempt=0,timerId=0;
@@ -57,7 +57,7 @@ async function run({fail,sqlFailure,sqlStatus=3,sqlSignal=null,sqlSpawnError,sql
       async query(sql){calls.push({key:'pg query',sql,attempt:this.attempt});if(this.probe){if(interruptReady)process.emit('SIGTERM');if(lateReady)elapsed+=65000;if(this.attempt<=queryFailures){elapsed+=this.config.query_timeout;throw Error(privateDiagnostic);}return {rows:[{ready:badReady?0:1}]};}}
       async end(){calls.push({key:'pg end',attempt:this.attempt});if(this.probe && cleanupFailure)throw Error(privateDiagnostic);}
     },
-    spawn:(command,args,options)=>{calls.push({key:'auth',args:Array.from(args),options});const child=new EventEmitter();child.kill=signal=>{assert.equal(signal,'SIGKILL');queueMicrotask(()=>child.emit('close',null));};queueMicrotask(()=>interrupt?process.emit('SIGTERM'):child.emit('close',fail==='auth'?1:0));return child;},randomUUID:()=>name.slice(6),randomBytes:()=>({toString:()=>privateDiagnostic}),
+    spawn:(command,args,options)=>{calls.push({key:'auth',args:Array.from(args),options});const child=new EventEmitter();child.stdout=new EventEmitter();child.stderr=new EventEmitter();child.kill=signal=>{assert.equal(signal,'SIGKILL');queueMicrotask(()=>child.emit('close',null));};queueMicrotask(()=>{child.stderr.emit('data',authOutput);interrupt?process.emit('SIGTERM'):child.emit('close',fail==='auth'?1:0);});return child;},randomUUID:()=>name.slice(6),randomBytes:()=>({toString:()=>privateDiagnostic}),
     readFileSync:file=>file.pathname.endsWith('/tvmaze-guest-proof.sql')?guestProofSource:privateDiagnostic,nativeMigrationSteps,
     prepareReleaseUpgrade:async()=>{calls.push({key:'upgrade seed'});if(fail==='upgrade seed')throw Error(privateDiagnostic);return {};},
     verifyReleaseUpgrade:async()=>{calls.push({key:'upgrade verify'});if(fail==='upgrade verify')throw Error(privateDiagnostic);},
@@ -163,7 +163,7 @@ for(const p2 of [false,true]) {
     assert.ok(create.includes('postgres:18-alpine'));
     const auth=result.calls.find(call=>call.key==='auth');
     assert.equal(!!auth,!p2);
-    if(auth) {assert.equal(auth.options.stdio,'ignore');assert.ok(auth.options.env.NODE_OPTIONS.startsWith('--existing-option '));assert.match(auth.options.env.DATABASE_URL,/@127\.0\.0\.1:54321\/mt_p1_proof$/);}
+    if(auth) {assert.deepEqual(Array.from(auth.options.stdio),['ignore','pipe','pipe']);assert.ok(auth.options.env.NODE_OPTIONS.startsWith('--existing-option '));assert.match(auth.options.env.DATABASE_URL,/@127\.0\.0\.1:54321\/mt_p1_proof$/);}
   });
 }
 
@@ -172,6 +172,14 @@ test('relay cleanup failure still cleans container and network and fails closed'
   assert.equal(result.process.exitCode,1);
   assert.ok(result.logs.includes('FAIL: disposable proof; stage=RELAY_CLEANUP; diagnostics redacted'));
   assert.deepEqual(result.calls.slice(-2).map(call=>call.args),[['rm','--force',id],['network','rm',network]]);
+});
+
+test('Auth failure emits only a bounded assertion line, never private child diagnostics',async()=>{
+  const result=await run({fail:'auth',authOutput:`${privateDiagnostic}\n tests/native-postgres-live.integration.test.ts:102:57\n${privateDiagnostic}`});
+  assert.deepEqual(result.logs,['FAIL: disposable proof; stage=AUTH_INTEGRATION; auth_line=102; diagnostics redacted']);
+  for(const authOutput of ['tests/other.test.ts:102:57','tests/native-postgres-live.integration.test.ts:1000000:1',privateDiagnostic]) {
+    assert.deepEqual((await run({fail:'auth',authOutput})).logs,['FAIL: disposable proof; stage=AUTH_INTEGRATION; diagnostics redacted']);
+  }
 });
 
 test('interruption kills Vitest and closes relay before Docker cleanup',async()=>{
