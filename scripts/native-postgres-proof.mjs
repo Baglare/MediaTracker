@@ -36,6 +36,7 @@ let sqlstate;
 let assertion;
 let authLine;
 let authStatus;
+let authError;
 const fixtureAssertions=new Set([...readFileSync(new URL('../database/native/tvmaze-guest-proof.sql',import.meta.url),'utf8').matchAll(/RAISE EXCEPTION '(guest_[a-z_]+)'/g)].map(match=>match[1]));
 // Only a five-character code from PostgreSQL's fixed error-class vocabulary may
 // leave the runner. Never relay messages, query text, context, paths or values.
@@ -193,6 +194,8 @@ try {
     if(status)authStatus=status[1];
     const state=authFrames.match(/PG18_AUTH_SQLSTATE=([0-9A-Z]{5})\b/);
     if(state&&allowedSqlstateClasses.has(state[1].slice(0,2)))sqlstate=state[1];
+    const category=authFrames.match(/PG18_AUTH_ERROR=(pool_acquisition_timeout|schema_mismatch|api_error|unknown)\b/);
+    if(category)authError=category[1];
   });
   child.once('error',reject);
   child.once('close',(status)=>resolve({status}));
@@ -205,7 +208,7 @@ try {
   const checks=new Set(['connections','guest_lock_contention','guest_race','replay_and_ten_seconds','utc_daily_limit','provider_reserve','disabled_global_capacity','cooldown','envelope_negatives','authenticated_quota','authenticated_race','cloud_cas','tombstone','rls']);
   const check=checks.has(error.releaseCheck)?error.releaseCheck:undefined;
   if(check&&/^[0-9A-Z]{5}$/.test(error.code??'')&&allowedSqlstateClasses.has(error.code.slice(0,2)))sqlstate=error.code;
-  console.error(`${id?'FAIL: disposable proof':'BLOCKED_ENVIRONMENT: disposable proof'}; stage=${stage}${check?`; check=${check}`:''}${sqlstate?`; sqlstate=${sqlstate}`:''}${assertion?`; assertion=${assertion}`:''}${stage==='AUTH_INTEGRATION'&&authLine?`; auth_line=${authLine}`:''}${stage==='AUTH_INTEGRATION'&&authStatus?`; auth_status=${authStatus}`:''}; diagnostics redacted`);
+  console.error(`${id?'FAIL: disposable proof':'BLOCKED_ENVIRONMENT: disposable proof'}; stage=${stage}${check?`; check=${check}`:''}${sqlstate?`; sqlstate=${sqlstate}`:''}${assertion?`; assertion=${assertion}`:''}${stage==='AUTH_INTEGRATION'&&authLine?`; auth_line=${authLine}`:''}${stage==='AUTH_INTEGRATION'&&authStatus?`; auth_status=${authStatus}`:''}${stage==='AUTH_INTEGRATION'&&authError?`; auth_error=${authError}`:''}; diagnostics redacted`);
   process.exitCode=1;
 } finally {
   cleaning=true;

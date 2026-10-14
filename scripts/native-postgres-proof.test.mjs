@@ -198,6 +198,15 @@ test('Auth adapter diagnostics expose only recognized SQLSTATE classes',async()=
   }
 });
 
+test('Auth error categories never relay arbitrary messages',async()=>{
+  for(const category of ['pool_acquisition_timeout','schema_mismatch','api_error','unknown']) {
+    assert.deepEqual((await run({fail:'auth',authOutput:`PG18_AUTH_ERROR=${category}\n${privateDiagnostic}`})).logs,
+      [`FAIL: disposable proof; stage=AUTH_INTEGRATION; auth_error=${category}; diagnostics redacted`]);
+  }
+  assert.deepEqual((await run({fail:'auth',authOutput:`PG18_AUTH_ERROR=${privateDiagnostic}`})).logs,
+    ['FAIL: disposable proof; stage=AUTH_INTEGRATION; diagnostics redacted']);
+});
+
 test('interruption kills Vitest and closes relay before Docker cleanup',async()=>{
   const result=await run({interrupt:true});
   assert.equal(result.process.exitCode,1);

@@ -36,6 +36,13 @@ describe.runIf(configured)('runner-owned disposable native DB proof',()=>{
     await assertDisposable();
     approved=true;
     await getNativePool().query('SELECT 1'); // onConnect verifies role separation.
+    getNativeAuth().options.onAPIError={onError(error){
+      const value=error as {code?:unknown;name?:unknown;message?:unknown};
+      if(typeof value.code==='string'&&/^[0-9A-Z]{5}$/.test(value.code)) console.error(`PG18_AUTH_SQLSTATE=${value.code}`);
+      const category=value.message==='timeout exceeded when trying to connect'?'pool_acquisition_timeout'
+        :value.name==='SchemaMismatchError'?'schema_mismatch':value.name==='APIError'?'api_error':'unknown';
+      console.error(`PG18_AUTH_ERROR=${category}`);
+    }};
   });
   afterAll(async()=>{if(approved) await getNativePool().end();});
   it.runIf(process.env.NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED !== 'true')('creates only fresh synthetic users through Better Auth credentials; validates cookie/session and pooled RLS',async()=>{

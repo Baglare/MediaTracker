@@ -39,6 +39,8 @@ async function create() {
       if(authLine)console.error(`PG18_AUTH_ASSERTION_LINE=${authLine}`);
       const authStatus=r.stderr?.match(/auth_status=([1-5][0-9]{2})(?:;|$)/)?.[1];
       if(authStatus)console.error(`PG18_AUTH_RESPONSE_STATUS=${authStatus}`);
+      const authError=r.stderr?.match(/auth_error=(pool_acquisition_timeout|schema_mismatch|api_error|unknown)(?:;|$)/)?.[1];
+      if(authError)console.error(`PG18_AUTH_ERROR=${authError}`);
       throw new Error('release_pg18_failed');
     }
     console.log(`PG18_${argument[0]??'P1'}=PASS`);
