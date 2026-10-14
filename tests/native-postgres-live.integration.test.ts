@@ -11,6 +11,8 @@ import { getNativePool } from '@/lib/backend/postgres';
 import { getNativeAuth } from '@/lib/auth/native';
 import { getCurrentUser } from '@/lib/auth/current-user';
 import { withAuthenticatedTransaction } from '@/lib/backend/transaction';
+import { GET as authGET, POST as authPOST } from '@/app/api/auth/[...all]/route';
+import { POST as cloudPOST } from '@/app/api/backend/cloud/route';
 
 // Re-inspect the pinned local container and authenticate the runner's live relay
 // before obtaining a DB client. Environment metadata alone is insufficient.
@@ -32,7 +34,7 @@ describe.runIf(configured)('runner-owned disposable native DB proof',()=>{
     await getNativePool().query('SELECT 1'); // onConnect verifies role separation.
   });
   afterAll(async()=>{if(approved) await getNativePool().end();});
-  it('creates only fresh synthetic users through Better Auth credentials; validates cookie/session and pooled RLS',async()=>{
+  it.runIf(process.env.NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED !== 'true')('creates only fresh synthetic users through Better Auth credentials; validates cookie/session and pooled RLS',async()=>{
     const pool=getNativePool();
     // Test-only provisioner: no HTTP listener, no production signup override.
     const fixture=betterAuth({...nativeAuthOptions(process.env),database:pool,emailAndPassword:{enabled:true,disableSignUp:false}});
@@ -74,5 +76,63 @@ describe.runIf(configured)('runner-owned disposable native DB proof',()=>{
     expect((await pool.query('SELECT app.current_user_id() AS id')).rows[0].id).toBe(null);
     context.headers=new Headers();expect(await getCurrentUser()).toBe(null);
     await expect(withAuthenticatedTransaction(async()=>{})).rejects.toThrow('authentication_required');
+  },30000);
+  it.runIf(process.env.NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED === 'true')('public signup, login, session, Cloud refresh, second-owner denial, logout and shared signup quota on PG18 001–013',async()=>{
+    const origin='http://localhost:3000',password=`Synthetic-${randomUUID()}`;
+    const call=(path:string,body:unknown,cookie='')=>authPOST(new Request(`${origin}/api/auth/${path}`,{
+      method:'POST',headers:{Origin:origin,'Content-Type':'application/json',Cookie:cookie,
+        'X-Forwarded-For':`198.51.100.${Math.floor(Math.random()*200)+1}`,'X-Real-IP':'192.0.2.1'},body:JSON.stringify(body)}));
+    const cookies=(r:Response)=>r.headers.getSetCookie().map(c=>c.split(';')[0]).join('; ');
+    const users: {id:string;email:string;cookie:string}[]=[];
+    for(const name of ['A','B']) {
+      const email=`${randomUUID()}@example.invalid`;
+      const signup=await call('sign-up/email',{name,email,password});
+      expect(signup.status).toBe(200);
+      const created=await signup.json();expect(created.user.emailVerified).toBe(false);
+      const signupCookie=cookies(signup);
+      expect(signupCookie).toContain('mt-native');
+      expect((await call('sign-out',{},signupCookie)).status).toBe(200);
+      const login=await call('sign-in/email',{email,password});expect(login.status).toBe(200);
+      const cookie=cookies(login);expect(login.headers.getSetCookie().join(';')).toContain('HttpOnly');
+      context.headers=new Headers({Cookie:cookie});
+      expect((await getCurrentUser())?.id).toBe(created.user.id);
+      users.push({id:created.user.id,email,cookie});
+    }
+    const cloud=(body:unknown,cookie:string)=>{
+      context.headers=new Headers({Cookie:cookie});
+      return cloudPOST(new Request(`${origin}/api/backend/cloud`,{method:'POST',headers:{Origin:origin,'Content-Type':'application/json',Cookie:cookie},body:JSON.stringify(body)}));
+    };
+    const [a,b]=users;
+    const args={p_operation_id:randomUUID(),p_record_id:'signup-sentinel',p_operation_type:'upsert',p_expected_revision:0,
+      p_payload:{title:'Private signup sentinel',type:'movie',status:'planning',current_progress:0,total_progress:1,favorite:false,tags:[],metadata:{},identity_status:'unresolved'}};
+    const write=await cloud({action:'rpc',expectedUserId:a.id,name:'apply_media_item_sync_operation',args},a.cookie);
+    expect(write.status).toBe(200);expect((await write.json()).data.ok).toBe(true);
+    const read={action:'read',expectedUserId:a.id,table:'media_items',includeDeleted:false};
+    // Fresh request context/session verification models reload without cached client identity.
+    context.headers=new Headers({Cookie:a.cookie});
+    const session=await authGET(new Request(`${origin}/api/auth/get-session`,{headers:context.headers}));
+    expect((await session.json()).user.id).toBe(a.id);
+    const refreshed=await cloud(read,a.cookie);expect(refreshed.status).toBe(200);
+    expect((await refreshed.json()).data).toEqual([expect.objectContaining({id:'signup-sentinel',user_id:a.id,revision:1})]);
+    const ownB=await cloud({...read,expectedUserId:b.id},b.cookie);
+    expect(ownB.status).toBe(200);expect((await ownB.json()).data).toEqual([]);
+    expect((await cloud(read,b.cookie)).status).toBe(503);
+    expect((await cloud({action:'rpc',expectedUserId:a.id,name:'apply_media_item_sync_operation',args},b.cookie)).status).toBe(503);
+    await withAuthenticatedTransaction(async tx=>{
+      expect((await tx.query('SELECT * FROM app.media_items WHERE user_id=$1',[a.id])).rows).toHaveLength(0);
+      await expect(tx.query('UPDATE app.media_items SET title=$1 WHERE user_id=$2',['forged',a.id])).rejects.toThrow();
+    }).catch(error=>{expect(error.message).toBe('database_operation_failed');});
+    expect((await call('sign-out',{},a.cookie)).status).toBe(200);
+    expect((await cloud(read,a.cookie)).status).toBe(401);
+    const revoked=await authGET(new Request(`${origin}/api/auth/get-session`,{headers:{Cookie:a.cookie}}));
+    expect(await revoked.json()).toBeNull();
+    // Keep admitted concurrent hashes within the existing two-slot capacity guard.
+    expect((await call('sign-up/email',{name:'Quota seed',email:`${randomUUID()}@example.invalid`,password})).status).toBe(200);
+    // Three attempts consumed quota. Forged IPs cannot split the atomic DB counter.
+    const race=await Promise.all(Array.from({length:3},()=>call('sign-up/email',{name:'Quota',email:`${randomUUID()}@example.invalid`,password})));
+    expect(race.filter(r=>r.status===200)).toHaveLength(2);
+    expect(race.filter(r=>r.status===429)).toHaveLength(1);
+    const limited=await call('sign-up/email',{name:'Denied',email:`${randomUUID()}@example.invalid`,password});
+    expect(limited.status).toBe(429);expect(Number(limited.headers.get('Retry-After'))).toBeGreaterThan(3500);
   },30000);
 });

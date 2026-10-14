@@ -3,6 +3,12 @@
 process.env.NODE_ENV = 'production';
 const manifest = require('./deployment-manifest.json');
 if (process.env.BACKEND_PROVIDER !== manifest.backendProvider) throw new Error('deployment_provider_mismatch');
+// Legacy manifests remain usable for the existing signup-closed rollback release.
+if (Object.hasOwn(manifest, 'publicSignupEnabled')
+  && (typeof manifest.publicSignupEnabled !== 'boolean'
+    || process.env.NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED !== String(manifest.publicSignupEnabled))) {
+  throw new Error('deployment_signup_mismatch');
+}
 // Passenger must supply PORT or its Node integration must intercept listen().
 // Panel-specific interception is an unproven P4 gate, never a guessed socket path.
 if (process.env.PORT && !/^\d{1,5}$/.test(process.env.PORT)) throw new Error('deployment_port_invalid');

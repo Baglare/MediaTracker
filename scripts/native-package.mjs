@@ -407,6 +407,7 @@ export async function packageNative(destination) {
   stage='build_metadata';
   const manifest={format:'MediaTrackerDeploymentV1',sourceGitSha,branch,
     dirtyWorktree,sourceTreeFingerprint:source.digest('hex'),backendProvider:'native',
+    publicSignupEnabled:process.env.NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED==='true',
     nodeTarget:'24.x',nextVersion:JSON.parse(await readFile(join(cwd,'node_modules/next/package.json'),'utf8')).version,
     buildPlatform:process.platform,buildArchitecture:process.arch,
     buildLibc:process.platform==='linux'?(process.report.getReport().header.glibcVersionRuntime??'musl-or-unknown'):null,

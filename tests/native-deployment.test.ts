@@ -21,10 +21,10 @@ const env={NODE_ENV:'production' as const,BACKEND_PROVIDER:'native',DATABASE_URL
   D7_RESEARCH_EVIDENCE_CACHE_ENABLED:'0',MEDIA_TRACKER_PERSISTENT_EMBEDDING_CACHE:'off'};
 const researchFlags = ['D7_RESEARCH_SHADOW_ENABLED', 'D7_RESEARCH_PUBLIC_CITATIONS_ENABLED', 'D7_RESEARCH_EVIDENCE_CACHE_ENABLED'] as const;
 const passengerSource = readFileSync(new URL('../scripts/passenger-start.cjs', import.meta.url), 'utf8');
-function startPassenger(runtimeEnv: Record<string, string | undefined>) {
+function startPassenger(runtimeEnv: Record<string, string | undefined>, manifest: Record<string, unknown> = { backendProvider: 'native' }) {
   const server = vi.fn(() => nativeDeploymentConfig(runtimeEnv));
   runInNewContext(passengerSource, { process: { env: runtimeEnv }, require: (path: string) => {
-    if (path === './deployment-manifest.json') return { backendProvider: 'native' };
+    if (path === './deployment-manifest.json') return manifest;
     if (path === './server.js') return server();
     throw new Error('unexpected_passenger_dependency');
   } });
@@ -67,6 +67,16 @@ describe('Passenger research flag defaults', () => {
 });
 
 describe('native production deployment boundary',()=>{
+  it('requires signup build/runtime agreement before starting Passenger',()=>{
+    for (const enabled of [true,false]) {
+      const manifest={backendProvider:'native',publicSignupEnabled:enabled};
+      startPassenger({...env,NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED:String(enabled)},manifest);
+      for (const value of [undefined,'invalid',String(!enabled)])
+        expect(()=>startPassenger({...env,NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED:value},manifest)).toThrow('deployment_signup_mismatch');
+    }
+    expect(()=>startPassenger({...env,NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED:'true'},
+      {backendProvider:'native',publicSignupEnabled:'true'})).toThrow('deployment_signup_mismatch');
+  });
   it('accepts an explicit complete contract without Supabase or operator credentials',()=>{
     expect(nativeDeploymentConfig(env).max).toBe(2);
   });

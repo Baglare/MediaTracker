@@ -113,6 +113,8 @@ describe('auth foundation', () => {
     expect(() => nativeAuthOptions({...env,NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED:'yes'})).toThrow('native_configuration_invalid');
     expect(options.session.cookieCache.enabled).toBe(false);
     expect(options.rateLimit.storage).toBe('database');
+    expect(options.rateLimit.customRules).toEqual({'/sign-up/email':{window:3600,max:5}});
+    expect(options.advanced.ipAddress.ipAddressHeaders).toEqual([]);
   });
   it('returns minimal UUID identity without privilege/session data', () => {
     const raw = { id, email: 'synthetic@example.invalid', role: 'admin', app_metadata: { role: 'admin' }, token: 'secret' };

@@ -8,7 +8,7 @@ import vm from 'node:vm';
 const publicKeys = ['NEXT_PUBLIC_CLOUD_MEDIA_SCHEMA_STAGE', 'NEXT_PUBLIC_CLOUD_MEDIA_V2_ENABLED',
   'NEXT_PUBLIC_CLOUD_GOALS_SCHEMA_STAGE', 'NEXT_PUBLIC_CLOUD_GOALS_V1_ENABLED',
   'NEXT_PUBLIC_CLOUD_MEDIA_MAINTENANCE', 'NEXT_PUBLIC_CLOUD_MEDIA_DEPLOYMENT_EPOCH',
-  'NEXT_PUBLIC_CLOUD_MEDIA_MINIMUM_CLIENT_VERSION'];
+  'NEXT_PUBLIC_CLOUD_MEDIA_MINIMUM_CLIENT_VERSION', 'NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED'];
 
 // Execute only the compiled contract exports in a browser-like sandbox with no
 // process.env. Chunk registration does not mount React or start network work.
@@ -30,7 +30,7 @@ export function checkClientChunks(sources, sha) {
   for (const registration of context.TURBOPACK) {
     for (const factory of registration) {
       if (typeof factory !== 'function'
-        || !/"get(?:GoalCloud|Cloud)RolloutContract",0,/.test(factory.toString())) continue;
+        || !/"(?:get(?:GoalCloud|Cloud)RolloutContract|nativePublicSignupEnabled)",0,/.test(factory.toString())) continue;
       // Imports are deliberately inert. These pure getters must depend only on
       // their compiled literals, never on runtime env or imported services.
       context.factory = factory;
@@ -38,7 +38,7 @@ export function checkClientChunks(sources, sha) {
       vm.runInContext(`factory({ i: () => ({}), s: values => {
         for (let i = 0; i < values.length; i += 3) exports[values[i]] = values[i + 2];
       } });`, context, { timeout: 1000 });
-      for (const name of ['getCloudRolloutContract', 'getGoalCloudRolloutContract']) {
+      for (const name of ['getCloudRolloutContract', 'getGoalCloudRolloutContract', 'nativePublicSignupEnabled']) {
         if (!context.exports[name]) continue;
         context.getter = context.exports[name];
         const result = JSON.parse(vm.runInContext('JSON.stringify(getter())', context, { timeout: 1000 }));
@@ -52,6 +52,7 @@ export function checkClientChunks(sources, sha) {
   assert.deepEqual(contracts.get('getGoalCloudRolloutContract'), {
     enabled: true, schemaStage: 'v1', status: 'ready', code: null, message: null,
   });
+  assert.equal(contracts.get('nativePublicSignupEnabled'), true, 'client_signup_disabled');
   return epoch;
 }
 

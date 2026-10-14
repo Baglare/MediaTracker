@@ -36,7 +36,7 @@ async function handle(request: Request) {
     // Never forward adapter/SQL diagnostics to clients.
     if (response.status >= 500) return apiError('auth_unavailable', 503);
     if (response.status >= 400) return apiError(response.status === 429 ? 'rate_limited' : 'auth_rejected', response.status,
-      response.status === 429 ? { 'Retry-After': response.headers.get('Retry-After') ?? '60' } : undefined);
+      response.status === 429 ? { 'Retry-After': response.headers.get('Retry-After') ?? response.headers.get('X-Retry-After') ?? '60' } : undefined);
     return response;
   } catch { return apiError('auth_unavailable', 503); }
 }

@@ -103,6 +103,16 @@ test('release seed precedes only 013; preservation and concurrency cannot be ski
   assert.ok(seed>0&&seed<migration);
   assert.ok(r.calls.findIndex(c=>c.key==='upgrade verify')>migration);
   assert.ok(r.calls.findIndex(c=>c.key==='concurrency')>migration);
+  const auth=r.calls.find(c=>c.key==='auth');
+  assert.ok(auth);
+  assert.equal(auth.options.env.NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED,'true');
+  assert.equal(auth.options.env.TRUSTED_INGRESS_MODE,'unconfigured');
+});
+test('release public signup regression failure prevents acceptance and cleans resources',async()=>{
+  const r=await run({release:true,fail:'auth'});
+  assert.equal(r.process.exitCode,1);
+  assert.ok(r.logs.includes('FAIL: disposable proof; stage=AUTH_INTEGRATION; diagnostics redacted'));
+  assert.deepEqual(r.calls.slice(-2).map(c=>c.key),['rm --force','network rm']);
 });
 for(const [fail,stage] of [['upgrade seed','PG18_UPGRADE_SEED'],['upgrade verify','PG18_UPGRADE_PRESERVATION'],['concurrency','PG18_CONCURRENCY']]) {
   test(`release ${fail} failure prevents acceptance and cleans resources`,async()=>{

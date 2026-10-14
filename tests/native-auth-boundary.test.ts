@@ -51,6 +51,14 @@ it('Supabase mode does not expose Better Auth', async () => {
   expect((await POST(request('sign-in/email'))).status).toBe(404);
   expect(mock.handler).not.toHaveBeenCalled();
 });
+it('keeps the signup limiter retry window and redacts its body',async()=>{
+  vi.stubEnv('NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED','true');
+  mock.handler.mockResolvedValue(new Response('private limiter diagnostics',{status:429,headers:{'X-Retry-After':'3600'}}));
+  const response=await POST(request('sign-up/email',{name:'Synthetic',email:'synthetic@example.invalid',password:'synthetic-password'}));
+  expect(response.status).toBe(429);
+  expect(response.headers.get('Retry-After')).toBe('3600');
+  expect(await response.json()).toEqual({code:'rate_limited'});
+});
 it('current user verifies native server session and strips provider privileges', async () => {
   mock.session.mockResolvedValue({user:{id,email:'synthetic@example.invalid',role:'admin'},session:{token:'secret'}});
   expect(await getCurrentUser()).toEqual({id,email:'synthetic@example.invalid'});

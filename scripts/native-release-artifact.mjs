@@ -8,7 +8,7 @@ export async function assertReleaseArtifact(directory,sha) {
   if(!/^[a-f0-9]{40}$/.test(sha??'')||m.sourceGitSha!==sha||m.dirtyWorktree
     ||migrations.length!==13||!migrations[12].name.startsWith('013_')
     ||JSON.stringify(m.migrations)!==JSON.stringify(migrations)
-    ||m.buildPlatform!=='linux'||m.buildArchitecture!=='x64')throw new Error('release_artifact_identity_invalid');
+    ||m.buildPlatform!=='linux'||m.buildArchitecture!=='x64'||m.publicSignupEnabled!==true)throw new Error('release_artifact_identity_invalid');
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href) {
   try {

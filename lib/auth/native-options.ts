@@ -12,7 +12,9 @@ export function nativeAuthOptions(env: Record<string, string | undefined>) {
       // until the native deployment has a verified ingress identity contract.
       ipAddress: { ipAddressHeaders: [] },
       cookiePrefix: 'mt-native', defaultCookieAttributes: { httpOnly: true, sameSite: 'lax' as const, secure: config.production } },
-    rateLimit: { enabled: true, storage: 'database' as const },
+    rateLimit: { enabled: true, storage: 'database' as const,
+      // Shared across all visitors/processes; never keyed by submitted identity.
+      customRules: { '/sign-up/email': { window: 3600, max: 5 } } },
     logger: { disabled: true },
   };
 }

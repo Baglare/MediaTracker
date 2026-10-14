@@ -81,7 +81,7 @@ for (const key of ['NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED', 'NEXT_PUBLIC_CLOUD_MEDIA
   'NEXT_PUBLIC_CLOUD_GOALS_V1_ENABLED', 'NEXT_PUBLIC_CLOUD_MEDIA_MAINTENANCE',
   'NEXT_PUBLIC_CLOUD_MEDIA_MINIMUM_CLIENT_VERSION']) {
   test(`native artifact rejects absent or incorrect ${key}`, () => {
-    for (const value of [undefined, 'invalid']) {
+    for (const value of [undefined, 'invalid', ...(key === 'NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED' ? ['false'] : [])]) {
       const workflow = yaml.load(readFileSync('.github/workflows/ci.yml', 'utf8'));
       const env = workflow.jobs['native-linux-artifact'].steps.find(step => step.run?.includes('npm run build')).env;
       if (value === undefined) delete env[key];

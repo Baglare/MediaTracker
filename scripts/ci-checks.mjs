@@ -190,7 +190,7 @@ export function checkWorkflow(text) {
     'Native artifact action pin/retention contract');
   const build = artifact.steps.find(step => step.run?.includes('npm run build'));
   for (const [name, value] of Object.entries({
-    NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED: 'false',
+    NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED: 'true',
     NEXT_PUBLIC_CLOUD_MEDIA_SCHEMA_STAGE: 'd2c1', NEXT_PUBLIC_CLOUD_MEDIA_V2_ENABLED: 'true',
     NEXT_PUBLIC_CLOUD_GOALS_SCHEMA_STAGE: 'v1', NEXT_PUBLIC_CLOUD_GOALS_V1_ENABLED: 'true',
     NEXT_PUBLIC_CLOUD_MEDIA_MAINTENANCE: 'false', NEXT_PUBLIC_CLOUD_MEDIA_MINIMUM_CLIENT_VERSION: 'd2c2',

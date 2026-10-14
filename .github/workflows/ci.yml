@@ -107,7 +107,7 @@ jobs:
           RATE_LIMIT_RPC_AUDIENCE: mt-native-build
           NATIVE_STORAGE_ROOT: /tmp/mediatracker-native-build-data
           TRUSTED_INGRESS_MODE: unconfigured
-          NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED: 'false'
+          NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED: 'true'
           NEXT_PUBLIC_CLOUD_MEDIA_SCHEMA_STAGE: d2c1
           NEXT_PUBLIC_CLOUD_MEDIA_V2_ENABLED: 'true'
           NEXT_PUBLIC_CLOUD_GOALS_SCHEMA_STAGE: v1
