@@ -190,6 +190,14 @@ test('Auth failure exposes only an HTTP status from a numeric assertion',async()
   }
 });
 
+test('Auth adapter diagnostics expose only recognized SQLSTATE classes',async()=>{
+  assert.deepEqual((await run({fail:'auth',authOutput:`PG18_AUTH_SQLSTATE=22P02\n${privateDiagnostic}`})).logs,
+    ['FAIL: disposable proof; stage=AUTH_INTEGRATION; sqlstate=22P02; diagnostics redacted']);
+  for(const authOutput of ['PG18_AUTH_SQLSTATE=ZZ999','PG18_AUTH_SQLSTATE=22000private',privateDiagnostic]) {
+    assert.deepEqual((await run({fail:'auth',authOutput})).logs,['FAIL: disposable proof; stage=AUTH_INTEGRATION; diagnostics redacted']);
+  }
+});
+
 test('interruption kills Vitest and closes relay before Docker cleanup',async()=>{
   const result=await run({interrupt:true});
   assert.equal(result.process.exitCode,1);

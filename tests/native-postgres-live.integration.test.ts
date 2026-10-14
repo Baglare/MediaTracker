@@ -12,6 +12,7 @@ async function verificationToken() { await Promise.all(context.tasks.splice(0).m
 vi.mock('next/headers',()=>({headers:async()=>context.headers}));
 import { getNativePool } from '@/lib/backend/postgres';
 import { getNativeAuth } from '@/lib/auth/native';
+import { verificationIdentifier } from '@/lib/auth/native-email';
 import { getCurrentUser } from '@/lib/auth/current-user';
 import { withAuthenticatedTransaction } from '@/lib/backend/transaction';
 import { GET as authGET, POST as authPOST } from '@/app/api/auth/[...all]/route';
@@ -100,6 +101,12 @@ describe.runIf(configured)('runner-owned disposable native DB proof',()=>{
       expect(signupCookie).toBe('');
       const token=await verificationToken();
       expect((await call('verify-email',{token})).status).toBe(200);
+      const adapter=(await getNativeAuth().$context).internalAdapter;
+      const marker=await adapter.consumeVerificationValue(verificationIdentifier(token)).catch(error=>{
+        const code=error?.code;
+        throw new Error(typeof code==='string'&&/^[0-9A-Z]{5}$/.test(code)?`PG18_AUTH_SQLSTATE=${code}`:'PG18_AUTH_DRIVER_FAILURE');
+      });
+      expect(marker).toBeNull();
       expect((await call('verify-email',{token})).status).toBe(400);
       const login=await call('sign-in/email',{email,password});expect(login.status).toBe(200);
       const cookie=cookies(login);expect(login.headers.getSetCookie().join(';')).toContain('HttpOnly');

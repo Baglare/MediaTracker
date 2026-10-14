@@ -191,6 +191,8 @@ try {
     if(frame)authLine=frame[1];
     const status=authFrames.match(/AssertionError: expected ([1-5][0-9]{2}) to be [1-5][0-9]{2}\b/);
     if(status)authStatus=status[1];
+    const state=authFrames.match(/PG18_AUTH_SQLSTATE=([0-9A-Z]{5})\b/);
+    if(state&&allowedSqlstateClasses.has(state[1].slice(0,2)))sqlstate=state[1];
   });
   child.once('error',reject);
   child.once('close',(status)=>resolve({status}));
