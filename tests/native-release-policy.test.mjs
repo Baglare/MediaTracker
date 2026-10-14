@@ -8,6 +8,15 @@ const env={BACKEND_PROVIDER:'native',DATABASE_URL:'postgresql://mt_runtime:synth
   RATE_LIMIT_IDENTITY_HMAC_KEY:'h'.repeat(40),RATE_LIMIT_RPC_SIGNING_KEY:'k'.repeat(40),RATE_LIMIT_RPC_KEY_VERSION:'v1',RATE_LIMIT_RPC_AUDIENCE:'mt-native',
   AI_SERVER_ACCESS_MODE:'disabled',D7_RESEARCH_ROLLOUT_MODE:'disabled',D7_RESEARCH_SHADOW_ENABLED:'0',
   D7_RESEARCH_PUBLIC_CITATIONS_ENABLED:'0',D7_RESEARCH_EVIDENCE_CACHE_ENABLED:'0',MEDIA_TRACKER_PERSISTENT_EMBEDDING_CACHE:'off'};
+test('native verification env pairs stay server-only, independent and absent from credential-free CI',()=>{
+  const pair={NATIVE_EMAIL_VERIFICATION_KEY:'ab'.repeat(32),NATIVE_EMAIL_VERIFICATION_EPOCH:'1'};
+  assert.equal(validateReleaseEnvironment({...env,...pair},'PRODUCTION').valid,true);
+  for(const patch of [{NATIVE_EMAIL_VERIFICATION_KEY:''},{NATIVE_EMAIL_VERIFICATION_EPOCH:''},{NATIVE_EMAIL_VERIFICATION_EPOCH:'0'},
+    {BETTER_AUTH_SECRET:pair.NATIVE_EMAIL_VERIFICATION_KEY},{BACKEND_PROVIDER:'supabase'}])
+    assert.equal(validateReleaseEnvironment({...env,...pair,...patch},'PRODUCTION').valid,false);
+  for(const name of Object.keys(pair))assert.throws(()=>checkEnvironment(['package.json'],{[name]:pair[name]}));
+  assert.equal(environmentContract().find(e=>e.name==='NATIVE_EMAIL_VERIFICATION_KEY').visibility,'server secret');
+});
 test('native production env requires reviewed selector, native secrets and safe transport',()=>{
   assert.equal(validateReleaseEnvironment(env,'PRODUCTION').valid,true);
   for(const key of ['BACKEND_PROVIDER','DATABASE_URL','DATABASE_SSL_MODE','BETTER_AUTH_URL','BETTER_AUTH_SECRET']) {

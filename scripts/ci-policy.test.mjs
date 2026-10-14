@@ -239,7 +239,7 @@ test("migration timestamps, source hashes and documentation references consisten
 test("CI refuses local env, targets, live flags and credentials without printing values", () => {
   checkEnvironment([".env.example", "package.json"], { CI: "true", NEXT_TELEMETRY_DISABLED: "1" });
   assert.throws(() => checkEnvironment([".env.local"], {}));
-  for (const key of ["SUPABASE_TEST_URL", "SUPABASE_SERVICE_ROLE_KEY", "RATE_LIMIT_RPC_SIGNING_KEY", "D7_RESEARCH_LIVE_SMOKE", "VERCEL_TOKEN"]) {
+  for (const key of ["NATIVE_EMAIL_VERIFICATION_KEY", "NATIVE_EMAIL_VERIFICATION_EPOCH", "SUPABASE_TEST_URL", "SUPABASE_SERVICE_ROLE_KEY", "RATE_LIMIT_RPC_SIGNING_KEY", "D7_RESEARCH_LIVE_SMOKE", "VERCEL_TOKEN"]) {
     assert.throws(() => checkEnvironment([], { [key]: "dummy-value" }), (error) => !error.message.includes("dummy-value"));
   }
 });

@@ -4,9 +4,14 @@ No production operation has been performed. Public signup remains disabled.
 Better Auth 1.7.7 issues HS256 JWTs containing email/iat/exp. Native verification
 accepts only canonical base64url, the normal verification purpose, a matching
 account and a live token. Only then does Node sign the bounded proof with a
-separate 32-byte HMAC key. SQL verifies it with RFC 2104 HMAC using PG18 SHA256.
-Runtime verification-table rows are not trusted. The protected replay insert and
-verified update commit together; the existing freeze/lifecycle trigger remains.
+separate 32-byte HMAC key. Before SMTP delivery, a purpose-separated authenticated
+issuance binds the canonical JWT identity to the issuing UUID. Verification must
+consume that protected issuance for the same UUID/epoch/time, so an old token
+cannot verify a replacement account with the same email. SQL verifies HMAC using
+RFC 2104 and PG18 SHA256. Runtime verification-table rows are not trusted. Issuance
+consumption, replay insertion and verified update commit together; the existing
+freeze/lifecycle trigger remains. Missing signing configuration or failed issuance
+prevents delivery without changing generic HTTP address-existence responses.
 
 ## Controlled installation and rotation
 
@@ -55,6 +60,9 @@ restart and test before unfreezing. Alternatively authorize a new rotation with
 a newer cutoff; all older outstanding verification links then expire by policy.
 Never roll back to a 013 runtime against a 014 ledger. Existing Cloud/user data
 and password hashes are preserved. A disposable proof is not hosted acceptance.
+Issuance rows cascade on account deletion; replay receipts contain only a token
+digest and expiry, with no account/email. Auth-owner maintenance may purge expired
+issuances and receipts after their JWT expiry; never purge still-live receipts.
 
 References: [PG18 binary functions](https://www.postgresql.org/docs/18/functions-binarystring.html),
 [RFC 2104](https://www.rfc-editor.org/rfc/rfc2104),

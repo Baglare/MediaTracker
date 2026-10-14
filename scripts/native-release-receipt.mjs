@@ -34,6 +34,8 @@ async function create() {
       const sqlstate=r.stderr?.match(/sqlstate=([0-9A-Z]{5})(?:;|$)/)?.[1];
       const assertion=r.stderr?.match(/assertion=(guest_[a-z_]{1,64})(?:;|$)/)?.[1];
       if(sqlstate)console.error(`PG18_SQLSTATE=${sqlstate}`);
+      const sqlLine=r.stderr?.match(/sql_line=([1-9][0-9]{0,5})(?:;|$)/)?.[1];
+      if(sqlLine)console.error(`PG18_SQL_LINE=${sqlLine}`);
       if(assertion)console.error(`PG18_ASSERTION=${assertion}`);
       const authLine=r.stderr?.match(/auth_line=([1-9][0-9]{0,5})(?:;|$)/)?.[1];
       if(authLine)console.error(`PG18_AUTH_ASSERTION_LINE=${authLine}`);

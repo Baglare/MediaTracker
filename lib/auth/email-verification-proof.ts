@@ -4,7 +4,8 @@ import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 // Better Auth 1.7.7 signs { email, iat, exp } with HS256; email changes are
 // deliberately outside the native HTTP contract. Accept one encoding per JWT.
 export function emailVerificationProof(token: string, secret: string, user: { id: string; email: string },
-  env: Record<string, string | undefined>, now = Math.floor(Date.now() / 1000)) {
+  env: Record<string, string | undefined>, now = Math.floor(Date.now() / 1000),
+  purpose: 'email-verification' | 'email-verification-issue' = 'email-verification') {
   const parts = token.split('.');
   if (parts.length !== 3 || parts.some(p => !p || !/^[A-Za-z0-9_-]+$/.test(p)
     || Buffer.from(p, 'base64url').toString('base64url') !== p)) throw new Error('invalid_verification_token');
@@ -24,6 +25,6 @@ export function emailVerificationProof(token: string, secret: string, user: { id
     throw new Error('native_email_verification_configuration_invalid');
   if (payload.iat < Number(epoch)) throw new Error('invalid_verification_token');
   const replay = createHash('sha256').update(parts[0] + '.' + parts[1] + '.').update(signature).digest('hex');
-  const envelope = JSON.stringify([1, user.id, user.email, 'email-verification', payload.iat, payload.exp, Number(epoch), replay]);
+  const envelope = JSON.stringify([1, user.id, user.email, purpose, payload.iat, payload.exp, Number(epoch), replay]);
   return { envelope, signature: createHmac('sha256', Buffer.from(key, 'hex')).update(envelope).digest('hex') };
 }

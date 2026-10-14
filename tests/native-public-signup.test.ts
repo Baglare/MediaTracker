@@ -5,6 +5,7 @@ vi.mock('server-only',()=>({}));
 const mock=vi.hoisted(()=>({handler:vi.fn(),store:{} as Record<string,Record<string,unknown>[]>,mail:[] as {text:string}[],tasks:[] as (()=>Promise<void>)[]}));
 vi.mock('@/lib/backend/postgres',()=>({getNativePool:()=>Object.assign(memoryAdapter(mock.store),{query:async(_sql:string,args:string[])=>{
   const p=JSON.parse(args[0]),user=mock.store.user.find(u=>u.id===p[1]&&u.email===p[2]);
+  if(_sql.includes('register_email_verification'))return {rows:[]};
   if(!user||user.emailVerified)throw new Error('rejected');
   user.emailVerified=true;return {rows:[]};
 }})}));

@@ -19,9 +19,10 @@ export function smtpMailTransport(env: Record<string, string | undefined>): Mail
 // The official Better Auth callbacks own token issuance. SMTP runs after the HTTP
 // response so delivery time/failure cannot disclose whether an address exists.
 export function nativeEmailOptions(origin: string,
-  send: MailTransport, schedule: (task: () => Promise<void>) => void) {
-  const enqueue = (mail: Mail) => schedule(async () => {
-    try { await send(mail); }
+  send: MailTransport, schedule: (task: () => Promise<void>) => void,
+  register: (user: { id: string; email: string }, token: string) => Promise<void>) {
+  const enqueue = (mail: Mail, beforeSend?: () => Promise<void>) => schedule(async () => {
+    try { await beforeSend?.(); await send(mail); }
     catch { safeRouteLog({ event: 'native_auth_mail_delivery_failed', errorCode: 'operation_failed' }); }
   });
   return {
@@ -30,7 +31,7 @@ export function nativeEmailOptions(origin: string,
       expiresIn: EMAIL_VERIFICATION_TTL,
       async sendVerificationEmail({ user, token }: { user: { id: string; email: string }; token: string }) {
         enqueue({ to: user.email, subject: 'MediaTracker — E-posta doğrulaması',
-          text: `E-posta adresini doğrulamak için bağlantıyı aç ve Doğrula düğmesine bas. Bağlantı 1 saat geçerlidir.\n${origin}/auth/verify#token=${encodeURIComponent(token)}\nBu işlemi istemediysen bu mesajı yok say.` });
+          text: `E-posta adresini doğrulamak için bağlantıyı aç ve Doğrula düğmesine bas. Bağlantı 1 saat geçerlidir.\n${origin}/auth/verify#token=${encodeURIComponent(token)}\nBu işlemi istemediysen bu mesajı yok say.` }, () => register(user, token));
       },
     },
     emailAndPassword: {

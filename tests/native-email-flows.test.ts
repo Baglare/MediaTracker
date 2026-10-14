@@ -3,10 +3,11 @@ import { memoryAdapter } from 'better-auth/adapters/memory';
 import { createHmac, randomBytes } from 'node:crypto';
 import { nativeSmtpConfig } from '@/lib/auth/smtp-config';
 vi.mock('server-only', () => ({}));
-const mock = vi.hoisted(() => ({ store: {} as Record<string, Record<string, unknown>[]>, replays: new Set<string>(), tasks: [] as (() => Promise<void>)[], send: vi.fn() }));
+const mock = vi.hoisted(() => ({ store: {} as Record<string, Record<string, unknown>[]>, issued: new Map<string,string>(), replays: new Set<string>(), tasks: [] as (() => Promise<void>)[], send: vi.fn() }));
 vi.mock('@/lib/backend/postgres', () => ({ getNativePool: () => Object.assign(memoryAdapter(mock.store), { query: async (_sql: string, args: string[]) => {
   const p = JSON.parse(args[0]); const user = mock.store.user.find(u => u.id === p[1] && u.email === p[2]);
-  if (!user || user.emailVerified || mock.replays.has(p[7])) throw new Error('rejected');
+  if (_sql.includes('register_email_verification')) { mock.issued.set(p[7],p[1]); return { rows: [] }; }
+  if (!user || user.emailVerified || mock.replays.has(p[7]) || mock.issued.get(p[7]) !== p[1]) throw new Error('rejected');
   mock.replays.add(p[7]); user.emailVerified = true; return { rows: [] };
 } }) }));
 vi.mock('nodemailer', () => ({ default: { createTransport: () => ({ sendMail: mock.send }) } }));
@@ -14,7 +15,7 @@ vi.mock('next/server', async importOriginal => ({ ...await importOriginal<typeof
 const smtp = { NATIVE_SMTP_HOST: 'smtp.example.invalid', NATIVE_SMTP_PORT: '465', NATIVE_SMTP_SECURITY: 'tls', NATIVE_SMTP_USER: 'synthetic', NATIVE_SMTP_PASSWORD: 'synthetic-only', NATIVE_SMTP_FROM: 'auth@example.invalid' };
 const origin = 'https://app.example.invalid', email = 'synthetic@example.invalid', password = 'Synthetic-password-only';
 beforeEach(() => {
-  vi.resetModules(); mock.replays = new Set(); mock.store = { user: [], account: [], session: [], verification: [], rateLimit: [] }; mock.tasks = [];
+  vi.resetModules(); mock.issued = new Map(); mock.replays = new Set(); mock.store = { user: [], account: [], session: [], verification: [], rateLimit: [] }; mock.tasks = [];
   mock.send.mockReset().mockResolvedValue({ accepted: [email], rejected: [] });
   for (const [key, value] of Object.entries({ ...smtp, NATIVE_EMAIL_VERIFICATION_KEY: randomBytes(32).toString('hex'), NATIVE_EMAIL_VERIFICATION_EPOCH: '1', BACKEND_PROVIDER: 'native', DATABASE_URL: 'postgresql://mt_runtime:synthetic@localhost/mt_test', DATABASE_SSL_MODE: 'disable', BETTER_AUTH_URL: origin, BETTER_AUTH_SECRET: randomBytes(32).toString('hex'), NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED: 'true' })) vi.stubEnv(key, value);
 });
@@ -86,6 +87,20 @@ it('generic request responses and shared forged-IP-resistant quotas include SMTP
   const quota = await call('request-password-reset', { email }); expect(quota.status).toBe(429); expect(Number(quota.headers.get('Retry-After'))).toBeGreaterThan(3500);
   // All verification rows are removable by the existing Auth-last privacy cleanup.
   expect(mock.store.verification.every(row => row.value === mock.store.user[0].id)).toBe(true);
+});
+it('binds the token to its issuing UUID, and missing signing configuration never sends verification mail', async () => {
+  const { call } = await runtime();
+  await call('sign-up/email', { email, password, name: 'Synthetic' }); await drain();
+  const token = tokenFromMail();
+  mock.store.user[0].id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  expect((await call('verify-email', { token })).status).toBe(400);
+  expect(mock.store.user[0].emailVerified).toBe(false);
+  vi.stubEnv('NATIVE_EMAIL_VERIFICATION_KEY', '');
+  mock.send.mockClear();
+  const existing = await call('send-verification-email', { email });
+  const absent = await call('send-verification-email', { email: 'absent@example.invalid' });
+  expect(existing.status).toBe(200); expect(await existing.json()).toEqual(await absent.json());
+  await drain(); expect(mock.send).not.toHaveBeenCalled();
 });
 it('rejects origin, redirect, query/body identity and malformed tokens before mail work; SMTP absence fails closed', async () => {
   const { call, GET } = await runtime();

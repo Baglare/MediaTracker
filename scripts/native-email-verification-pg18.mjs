@@ -23,7 +23,7 @@ export async function emailVerificationPg18(config,key,epoch,lifecycle=true) {
     await admin.query('INSERT INTO native_auth.email_verification_key(epoch,key) VALUES($1,$2)',[epoch,Buffer.from(key,'hex')]);
     await admin.query('INSERT INTO native_auth.email_verification_epoch(epoch,key_hash) VALUES($1,sha256($2::bytea))',[epoch,Buffer.from(key,'hex')]);
     const denied=async(q,args=[])=>assert.rejects(a.query(q,args));
-    for(const table of ['email_verification_key','email_verification_epoch','email_verification_replay']) {
+    for(const table of ['email_verification_key','email_verification_epoch','email_verification_replay','email_verification_issuance']) {
       await denied(`SELECT * FROM native_auth.${table}`);
       await denied(`DELETE FROM native_auth.${table}`);
       await denied(`UPDATE native_auth.${table} SET singleton=true`);
@@ -31,14 +31,19 @@ export async function emailVerificationPg18(config,key,epoch,lifecycle=true) {
     await denied("SELECT native_auth.hmac_sha256('a'::bytea,'b'::bytea)");
     const fresh=async()=>{const id=randomUUID(),email=id+'@example.invalid';await a.query('INSERT INTO native_auth."user"(id,name,email,"emailVerified") VALUES($1,$2,$3,false)',[id,'Synthetic verification',email]);return {id,email};};
     const now=Math.floor(Date.now()/1000);
-    const envelope=(u,patch={})=>JSON.stringify(Object.assign([1,u.id,u.email,'email-verification',now,now+3600,Number(epoch),randomUUID().replaceAll('-','').padEnd(64,'0')],patch));
+    const envelope=(u,patch={})=>{const issued=Math.floor(Date.now()/1000);return JSON.stringify(Object.assign([1,u.id,u.email,'email-verification',issued,issued+3600,Number(epoch),randomUUID().replaceAll('-','').padEnd(64,'0')],patch));};
     const sign=text=>createHmac('sha256',Buffer.from(key,'hex')).update(text).digest('hex');
     const verify=(c,text,sig=sign(text))=>c.query('SELECT native_auth.verify_email($1,$2)',[text,sig]);
+    const issue=async(text)=>{const p=JSON.parse(text);p[3]='email-verification-issue';const t=JSON.stringify(p);await a.query('SELECT native_auth.register_email_verification($1,$2)',[t,sign(t)]);};
     const user=await fresh(),other=await fresh();
     await denied('INSERT INTO native_auth."user"(id,name,email,"emailVerified") VALUES($1,$2,$3,true)',[randomUUID(),'Forged',randomUUID()+'@example.invalid']);
     await denied('UPDATE native_auth."user" SET "emailVerified"=true WHERE id=$1',[user.id]);
     await denied('UPDATE native_auth."user" SET "emailVerified"=false WHERE id=$1',[user.id]);
     const text=envelope(user);
+    await assert.rejects(verify(a,text)); // valid signature without trusted issuance
+    await issue(text);
+    const otherAccount=JSON.parse(text);otherAccount[1]=other.id;otherAccount[2]=other.email;
+    await assert.rejects(verify(a,JSON.stringify(otherAccount))); // even a correctly signed different UUID cannot consume it
     await assert.rejects(verify(a,text,'0'.repeat(64)));
     await assert.rejects(verify(a,text.replace(user.id,other.id),sign(text)));
     for(const patch of [{2:other.email},{3:'password-reset'},{4:now-7200,5:now-3600},{6:Number(epoch)+1},{4:0},{5:now+3601}])await assert.rejects(verify(a,envelope(user,patch)));
@@ -52,9 +57,10 @@ export async function emailVerificationPg18(config,key,epoch,lifecycle=true) {
     assert.equal((await a.query('SELECT "emailVerified" AS v FROM native_auth."user" WHERE id=$1',[other.id])).rows[0].v,false);
     if(lifecycle) {
       const guarded=await fresh(),p=envelope(guarded);
+      await issue(p);
       await admin.query('UPDATE app.release_write_state SET frozen=true WHERE singleton');
       await assert.rejects(verify(a,p));
-      assert.equal((await admin.query('SELECT count(*)::int AS n FROM native_auth.email_verification_replay WHERE user_id=$1',[guarded.id])).rows[0].n,0);
+      assert.equal((await admin.query('SELECT count(*)::int AS n FROM native_auth.email_verification_replay WHERE replay=$1',[JSON.parse(p)[7]])).rows[0].n,0);
       await admin.query('UPDATE app.release_write_state SET frozen=false WHERE singleton');
       await admin.query("UPDATE app.account_lifecycle SET state='ERASURE_PENDING' WHERE user_id=$1",[guarded.id]);
       await assert.rejects(verify(a,p));
@@ -63,6 +69,7 @@ export async function emailVerificationPg18(config,key,epoch,lifecycle=true) {
     }
     // Restored, missing, stale and wrong secret pins all fail closed.
     const p=envelope(other);
+    await issue(p);
     await admin.query('DELETE FROM native_auth.email_verification_key');await assert.rejects(verify(a,p));
     await admin.query('INSERT INTO native_auth.email_verification_key(epoch,key) VALUES($1,$2)',[epoch,Buffer.alloc(32)]);await assert.rejects(verify(a,p));
     await admin.query('UPDATE native_auth.email_verification_key SET key=$1,epoch=epoch+1',[Buffer.from(key,'hex')]);await assert.rejects(verify(a,p));

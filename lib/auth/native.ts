@@ -11,7 +11,10 @@ import { emailVerificationProof } from './email-verification-proof';
 function createNativeAuth() {
   const options = nativeAuthOptions(process.env);
   const mail = nativeEmailOptions(options.baseURL,
-    async message => smtpMailTransport(process.env)(message), task => after(task));
+    async message => smtpMailTransport(process.env)(message), task => after(task), async (user, token) => {
+      const proof = emailVerificationProof(token, options.secret, user, process.env, undefined, 'email-verification-issue');
+      await getNativePool().query('SELECT native_auth.register_email_verification($1,$2)', [proof.envelope, proof.signature]);
+    });
   const instance = betterAuth({ ...options, emailVerification: mail.emailVerification,
     emailAndPassword: { ...options.emailAndPassword, ...mail.emailAndPassword, password: nativePassword },
     databaseHooks: { session: { create: { before: async session => {

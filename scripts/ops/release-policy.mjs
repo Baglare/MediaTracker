@@ -18,8 +18,11 @@ const core = ["NEXT_PUBLIC_SUPABASE_URL","NEXT_PUBLIC_SUPABASE_ANON_KEY","NEXT_P
   "NEXT_PUBLIC_CLOUD_MEDIA_MINIMUM_CLIENT_VERSION","RATE_LIMIT_IDENTITY_HMAC_KEY",
   "RATE_LIMIT_RPC_SIGNING_KEY","RATE_LIMIT_RPC_KEY_VERSION","RATE_LIMIT_RPC_AUDIENCE"];
 const optional=["MEDIA_TRACKER_PROVIDER_USER_AGENT","RATE_LIMIT_IDENTITY_HMAC_PREVIOUS_KEY","MEDIA_TRACKER_EMBEDDING_CACHE","NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED"];
-const nativeVariables=["DATABASE_URL","DATABASE_SSL_MODE","DATABASE_POOL_MAX","BETTER_AUTH_SECRET","BETTER_AUTH_URL","NATIVE_HOSTING_CAPABILITY",...nativeDeploymentVariables,...nativeSmtpVariables];
+const emailVerificationVariables=['NATIVE_EMAIL_VERIFICATION_KEY','NATIVE_EMAIL_VERIFICATION_EPOCH'];
+const nativeVariables=["DATABASE_URL","DATABASE_SSL_MODE","DATABASE_POOL_MAX","BETTER_AUTH_SECRET","BETTER_AUTH_URL","NATIVE_HOSTING_CAPABILITY",...nativeDeploymentVariables,...nativeSmtpVariables,...emailVerificationVariables];
 const nativeAllowed={
+  NATIVE_EMAIL_VERIFICATION_KEY:'32 independent random bytes encoded as 64 lowercase hex; server-only; required for verification; absent denies',
+  NATIVE_EMAIL_VERIFICATION_EPOCH:'positive Unix issuance cutoff matching protected DB key pin; required for verification; absent denies',
   NATIVE_SMTP_HOST:"operator-confirmed SMTP DNS hostname matching valid TLS certificate; no URL",
   NATIVE_SMTP_PORT:"465 with tls, or 587 with mandatory starttls; no plaintext",
   NATIVE_SMTP_SECURITY:"tls or starttls; certificate validation always enabled",
@@ -47,7 +50,7 @@ export const forbidden = /^(?:SUPABASE_SERVICE_ROLE_KEY|SUPABASE_TEST_.*|SUPABAS
 export function environmentContract() {
   const nativeOptional=['DATABASE_POOL_MAX','DATABASE_CONNECTION_TIMEOUT_MS','DATABASE_IDLE_TIMEOUT_MS','DATABASE_STATEMENT_TIMEOUT_MS',
     'NATIVE_ROLE_PROFILE','NATIVE_HOSTING_CAPABILITY','DATABASE_SSL_CA_FILE',
-    'TRUSTED_INGRESS_HEADER','TRUSTED_INGRESS_PROOF_SHA256','TRUSTED_INGRESS_DIRECT_ACCESS_BLOCKED',...nativeSmtpVariables];
+    'TRUSTED_INGRESS_HEADER','TRUSTED_INGRESS_PROOF_SHA256','TRUSTED_INGRESS_DIRECT_ACCESS_BLOCKED',...nativeSmtpVariables,...emailVerificationVariables];
   return [...core,...Object.keys(fixed),...optional,"BACKEND_PROVIDER",...nativeVariables].map(name => ({name,
     LOCAL:nativeVariables.includes(name)?"required only for native; pool max optional; isolated disposable target":"optional isolated offline/local; explicit values required for enabled Cloud/distributed mode",
     CI:"absent: credential-free offline suite",
@@ -71,6 +74,11 @@ export function validateReleaseEnvironment(env,scope) {
   try { provider=resolveBackendProvider(env.BACKEND_PROVIDER,hosted); }
   catch { errors.push({name:"BACKEND_PROVIDER",reason:"missing or invalid provider"}); }
   if(provider==="native") {
+    if(emailVerificationVariables.some(name=>env[name]!==undefined)
+      && (!/^[0-9a-f]{64}$/.test(env.NATIVE_EMAIL_VERIFICATION_KEY??'')
+        || !/^[1-9][0-9]{0,9}$/.test(env.NATIVE_EMAIL_VERIFICATION_EPOCH??'')
+        || [env.BETTER_AUTH_SECRET,env.RATE_LIMIT_RPC_SIGNING_KEY,env.RATE_LIMIT_IDENTITY_HMAC_KEY,env.NATIVE_SMTP_PASSWORD].includes(env.NATIVE_EMAIL_VERIFICATION_KEY)))
+      errors.push({name:'native_email_verification',reason:'independent complete key/epoch pair required; no value recorded'});
     try { nativeConfig({...env,NODE_ENV:hosted?"production":"development"}); }
     catch { errors.push({name:"native",reason:"invalid native contract"}); }
     if(nativeSmtpVariables.some(name=>env[name]!==undefined) || env.NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED==='true') {

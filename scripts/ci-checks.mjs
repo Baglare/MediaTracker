@@ -274,7 +274,7 @@ function git(...args) {
 export function checkEnvironment(names, environment) {
   requireContract(names.every((name) => !/^\.env(?:\.|$)/.test(name) || name === ".env.example"),
     "Use a clean checkout without local env files for CI validation");
-  requireContract(Object.keys(environment).every((name) => !/^(?:SUPABASE_|NEXT_PUBLIC_SUPABASE_|D8_STAGING_|RATE_LIMIT_|D7_|D6_PROVIDER_LIVE_SMOKE|AI_SERVER_|MEDIA_TRACKER_|OPENAI_|GROQ_|GEMINI_|OPENROUTER_|TMDB_|OMDB_|DATABASE_|PG|BETTER_AUTH_|(?:NEXT_PUBLIC_)?NATIVE_SMTP_|BACKEND_PROVIDER|NEXT_PUBLIC_BACKEND_PROVIDER|VERCEL_TOKEN|PRIVACY_(?!TEST_BASELINE_REPO$)|MEDIATRACKER_DR_)/.test(name)),
+  requireContract(Object.keys(environment).every((name) => !/^(?:SUPABASE_|NEXT_PUBLIC_SUPABASE_|D8_STAGING_|RATE_LIMIT_|D7_|D6_PROVIDER_LIVE_SMOKE|AI_SERVER_|MEDIA_TRACKER_|OPENAI_|GROQ_|GEMINI_|OPENROUTER_|TMDB_|OMDB_|DATABASE_|PG|BETTER_AUTH_|NATIVE_EMAIL_VERIFICATION_|(?:NEXT_PUBLIC_)?NATIVE_SMTP_|BACKEND_PROVIDER|NEXT_PUBLIC_BACKEND_PROVIDER|VERCEL_TOKEN|PRIVACY_(?!TEST_BASELINE_REPO$)|MEDIATRACKER_DR_)/.test(name)),
     "Unexpected application/live/credential environment in CI validation");
 }
 

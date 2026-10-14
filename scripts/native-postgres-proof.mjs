@@ -35,6 +35,7 @@ function docker(args, input) {
 let id, network, relay;
 let stage='DOCKER_CONTEXT';
 let sqlstate;
+let sqlLine;
 let assertion;
 let authLine;
 let authStatus;
@@ -48,6 +49,7 @@ function p2Sql(sql,fixture=false) {
   const r=spawnSync('docker',['--host',localEndpoint,'exec','-i',id,'psql','-X','-v','ON_ERROR_STOP=1','-v',fixture?'VERBOSITY=verbose':'VERBOSITY=sqlstate','-U','postgres','-d','mt_p1_proof'],
     {input:sql,env:dockerEnv,encoding:'utf8',timeout:15000});
   if(r.status!==0 || r.error || r.signal) {
+    sqlLine=(r.stderr??'').match(/^psql:<stdin>:([1-9][0-9]{0,5}): ERROR:/m)?.[1];
     const codes=[...(r.stderr??'').matchAll(/^(?:psql:<stdin>:\d+: )?ERROR:\s+([0-9A-Z]{5})(?::[^\n]*)?\s*$/gm)].map(match=>match[1]);
     if(r.status===3 && !r.error && !r.signal && codes.length===1 && allowedSqlstateClasses.has(codes[0].slice(0,2))) sqlstate=codes[0];
     const message=fixture?(r.stderr??'').match(/^(?:psql:<stdin>:\d+: )?ERROR:\s+P0001:\s+(guest_[a-z_]+)\s*$/m)?.[1]:undefined;
@@ -159,8 +161,7 @@ try {
   } else {
   const sql=['001_security_foundation.sql','002_better_auth.sql','003_account_admission.sql','012_public_signup.sql','014_secure_email_verification.sql','rls-proof.sql']
     .map(file=>readFileSync(new URL(`../database/native/${file}`,import.meta.url),'utf8')).join('\n');
-  output=docker(['exec','-i',id,'psql','-X','-v','ON_ERROR_STOP=1','-U','postgres','-d','mt_p1_proof'],
-    sql+`\nALTER ROLE mt_runtime PASSWORD '${password}';`);
+  output=p2Sql(sql+`\nALTER ROLE mt_runtime PASSWORD '${password}';`);
   if(!output.includes(p2 ? 'P2_CLOUD_GOALS_PROOF_PASS' : 'P1_RLS_PROOF_PASS')) throw new Error('proof_failed');
   }
   stage='RELAY_VALIDATION';
@@ -214,7 +215,7 @@ try {
   const checks=new Set(['connections','guest_lock_contention','guest_race','replay_and_ten_seconds','utc_daily_limit','provider_reserve','disabled_global_capacity','cooldown','envelope_negatives','authenticated_quota','authenticated_race','cloud_cas','tombstone','rls']);
   const check=checks.has(error.releaseCheck)?error.releaseCheck:undefined;
   if(check&&/^[0-9A-Z]{5}$/.test(error.code??'')&&allowedSqlstateClasses.has(error.code.slice(0,2)))sqlstate=error.code;
-  console.error(`${id?'FAIL: disposable proof':'BLOCKED_ENVIRONMENT: disposable proof'}; stage=${stage}${check?`; check=${check}`:''}${sqlstate?`; sqlstate=${sqlstate}`:''}${assertion?`; assertion=${assertion}`:''}${stage==='AUTH_INTEGRATION'&&authLine?`; auth_line=${authLine}`:''}${stage==='AUTH_INTEGRATION'&&authStatus?`; auth_status=${authStatus}`:''}${stage==='AUTH_INTEGRATION'&&authError?`; auth_error=${authError}`:''}; diagnostics redacted`);
+  console.error(`${id?'FAIL: disposable proof':'BLOCKED_ENVIRONMENT: disposable proof'}; stage=${stage}${check?`; check=${check}`:''}${sqlstate?`; sqlstate=${sqlstate}`:''}${sqlLine?`; sql_line=${sqlLine}`:''}${assertion?`; assertion=${assertion}`:''}${stage==='AUTH_INTEGRATION'&&authLine?`; auth_line=${authLine}`:''}${stage==='AUTH_INTEGRATION'&&authStatus?`; auth_status=${authStatus}`:''}${stage==='AUTH_INTEGRATION'&&authError?`; auth_error=${authError}`:''}; diagnostics redacted`);
   process.exitCode=1;
 } finally {
   cleaning=true;
