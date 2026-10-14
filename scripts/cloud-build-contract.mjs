@@ -8,7 +8,7 @@ import vm from 'node:vm';
 const publicKeys = ['NEXT_PUBLIC_CLOUD_MEDIA_SCHEMA_STAGE', 'NEXT_PUBLIC_CLOUD_MEDIA_V2_ENABLED',
   'NEXT_PUBLIC_CLOUD_GOALS_SCHEMA_STAGE', 'NEXT_PUBLIC_CLOUD_GOALS_V1_ENABLED',
   'NEXT_PUBLIC_CLOUD_MEDIA_MAINTENANCE', 'NEXT_PUBLIC_CLOUD_MEDIA_DEPLOYMENT_EPOCH',
-  'NEXT_PUBLIC_CLOUD_MEDIA_MINIMUM_CLIENT_VERSION', 'NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED'];
+  'NEXT_PUBLIC_CLOUD_MEDIA_MINIMUM_CLIENT_VERSION'];
 
 // Execute only the compiled contract exports in a browser-like sandbox with no
 // process.env. Chunk registration does not mount React or start network work.
@@ -18,6 +18,9 @@ export function checkClientChunks(sources, sha) {
   const context = vm.createContext({ TURBOPACK: [] });
   for (const source of sources) {
     for (const key of publicKeys) assert.ok(!source.includes(key), 'public_cloud_env_not_inlined');
+    // The shared policy module also exports the server's env-argument getter.
+    // Its property name may remain; the public getter must execute frozen below.
+    assert.ok(!source.includes('process.env.NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED'), 'public_signup_env_not_inlined');
     // The Turbopack runtime boots the browser; only registration chunks are
     // executable here. All chunks still undergo the unresolved-env check.
     if (/^(?:\(globalThis\.TURBOPACK|TURBOPACK\.push)/.test(source)
@@ -100,16 +103,18 @@ function chunkSources(directory) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+  let stage = 'client';
   try {
     const [directory, sha] = process.argv.slice(2);
     const root = resolve(directory);
     const epoch = checkClientChunks(chunkSources(join(root, 'static/chunks')), sha);
+    stage = 'runtime';
     const require = createRequire(import.meta.url);
     const route = require(join(root, 'server/app/api/cloud/rollout/route.js'));
     await checkRuntimeRoute(route.routeModule.userland.GET, epoch);
     console.info(JSON.stringify({ event: 'cloud_build_contract', client: 'PASS', runtime: 'PASS', epoch }));
   } catch {
-    console.error('cloud_build_contract_failed');
+    console.error(`cloud_build_contract_failed; stage=${stage}`);
     process.exitCode = 1;
   }
 }

@@ -14,6 +14,8 @@ function chunks(v2 = 'v2', goals = true, signup = true) {
 }
 test('compiled browser getters work without process.env', () => {
   assert.equal(checkClientChunks(chunks(), sha), epoch);
+  assert.equal(checkClientChunks([...chunks(), `TURBOPACK.push([4, e => e.s(["nativeSignupEnabled",0,
+    env => env.NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED === 'true'])]);`], sha), epoch);
 });
 test('missing, disabled or unresolved compiled public configuration fails', () => {
   for (const sources of [[], chunks('legacy'), chunks('v2', false), chunks('v2', true, false), chunks().slice(0,2),
