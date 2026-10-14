@@ -40,7 +40,7 @@ export async function prepareReleaseUpgrade(config) {
     assert.equal(Number((await admin.query('SHOW server_version_num')).rows[0].server_version_num)/10000|0,18);
     for(const [i,user] of users.entries()) {
       await admin.query('INSERT INTO native_auth."user"(id,name,email) VALUES($1,$2,$3)',[user,'Release '+i,'release-'+i+'@example.invalid']);
-      await admin.query('INSERT INTO native_auth.account("accountId","providerId","userId",password) VALUES($1,\'credential\',$1,$2)',[user,await hashPassword(preservedPassword)]);
+      await admin.query('INSERT INTO native_auth.account("accountId","providerId","userId",password) VALUES($1,\'credential\',$2,$3)',[user,user,await hashPassword(preservedPassword)]);
       if(i===0)await admin.query('UPDATE native_auth."user" SET "emailVerified"=true WHERE id=$1',[user]);
       await owner(runtime,user,async()=>{
         assert.equal((await media(runtime,'seed-'+user,'same-id','upsert',0,payload)).reason,'created');
