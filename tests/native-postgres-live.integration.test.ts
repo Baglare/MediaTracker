@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { verifyDisposableRelay } from '../scripts/native-disposable-relay.mjs';
-import { randomUUID } from 'node:crypto';
+import { createHmac, randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { betterAuth, type BetterAuthOptions } from 'better-auth';
 import { nativeAuthOptions } from '@/lib/auth/native-options';
@@ -12,7 +12,6 @@ async function verificationToken() { await Promise.all(context.tasks.splice(0).m
 vi.mock('next/headers',()=>({headers:async()=>context.headers}));
 import { getNativePool } from '@/lib/backend/postgres';
 import { getNativeAuth } from '@/lib/auth/native';
-import { verificationIdentifier } from '@/lib/auth/native-email';
 import { getCurrentUser } from '@/lib/auth/current-user';
 import { withAuthenticatedTransaction } from '@/lib/backend/transaction';
 import { GET as authGET, POST as authPOST } from '@/app/api/auth/[...all]/route';
@@ -90,7 +89,7 @@ describe.runIf(configured)('runner-owned disposable native DB proof',()=>{
     context.headers=new Headers();expect(await getCurrentUser()).toBe(null);
     await expect(withAuthenticatedTransaction(async()=>{})).rejects.toThrow('authentication_required');
   },30000);
-  it.runIf(process.env.NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED === 'true')('public signup, login, session, Cloud refresh, second-owner denial, logout and shared signup quota on PG18 001–013',async()=>{
+  it.runIf(process.env.NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED === 'true')('public signup, login, session, Cloud refresh, second-owner denial, logout and shared signup quota on PG18 001–014',async()=>{
     const origin='http://localhost:3000',password=`Synthetic-${randomUUID()}`;
     const call=(path:string,body:unknown,cookie='')=>authPOST(new Request(`${origin}/api/auth/${path}`,{
       method:'POST',headers:{Origin:origin,'Content-Type':'application/json',Cookie:cookie,
@@ -107,13 +106,27 @@ describe.runIf(configured)('runner-owned disposable native DB proof',()=>{
       const signupCookie=cookies(signup);
       expect(signupCookie).toBe('');
       const token=await verificationToken();
-      expect((await call('verify-email',{token})).status).toBe(200);
-      const adapter=(await getNativeAuth().$context).internalAdapter;
-      const marker=await adapter.consumeVerificationValue(verificationIdentifier(token)).catch(error=>{
-        const code=error?.code;
-        throw new Error(typeof code==='string'&&/^[0-9A-Z]{5}$/.test(code)?`PG18_AUTH_SQLSTATE=${code}`:'PG18_AUTH_DRIVER_FAILURE');
-      });
-      expect(marker).toBeNull();
+      expect((await call('sign-in/email',{email,password})).status).toBe(403);
+      if(name==='A') {
+        expect((await call('verify-email',{token:token+'tampered'})).status).toBe(400);
+        const header=token.split('.')[0],past=Math.floor(Date.now()/1000)-7200;
+        const expiredInput=header+'.'+Buffer.from(JSON.stringify({email,iat:past,exp:past+3600})).toString('base64url');
+        const expired=expiredInput+'.'+createHmac('sha256',process.env.BETTER_AUTH_SECRET!).update(expiredInput).digest('base64url');
+        expect((await call('verify-email',{token:expired})).status).toBe(400);
+        const alphabet='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+        const alias=token.slice(0,-1)+alphabet[alphabet.indexOf(token.at(-1)!)^1];
+        expect((await call('verify-email',{token:alias})).status).toBe(400);
+        const raced=await Promise.all([call('verify-email',{token}),call('verify-email',{token})]);
+        expect(raced.map(r=>r.status).sort()).toEqual([200,400]);
+      } else {
+        // A password reset must not turn an unverified user into a verified one.
+        expect((await call('request-password-reset',{email})).status).toBe(200);
+        const reset=await verificationToken();
+        expect((await call('reset-password',{token:reset,newPassword:password})).status).toBe(200);
+        expect((await getNativePool().query('SELECT "emailVerified" AS v FROM native_auth."user" WHERE id=$1',[created.user.id])).rows[0].v).toBe(false);
+        expect((await call('sign-in/email',{email,password})).status).toBe(403);
+        expect((await call('verify-email',{token})).status).toBe(200);
+      }
       expect((await call('verify-email',{token})).status).toBe(400);
       const login=await call('sign-in/email',{email,password});expect(login.status).toBe(200);
       const cookie=cookies(login);expect(login.headers.getSetCookie().join(';')).toContain('HttpOnly');

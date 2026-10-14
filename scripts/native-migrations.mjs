@@ -14,6 +14,7 @@ export const nativeMigrationFiles = [
   '011_backup_policy_role_scope.sql',
   '012_public_signup.sql',
   '013_tvmaze_guest_pool.sql',
+  '014_secure_email_verification.sql',
 ];
 export function nativeMigrationManifest(profile = 'local') {
   const roles = nativeRoles(profile);

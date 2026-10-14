@@ -11,7 +11,7 @@ export async function attestRecoveryRunner(client,identity,proof) {
   localRunners.set(client,digest({kind:'runner-owned-local',containerId:identity.containerId}));
 }
 export async function recoverySourceFingerprint() {
-  const files=['native-recovery.mjs','native-recovery-evidence.mjs','native-recovery-proof.mjs',
+  const files=['native-recovery.mjs','native-email-verification-key.mjs','native-recovery-evidence.mjs','native-recovery-proof.mjs',
     'native-recovery-proof-contract.mjs','native-hosting-contract.mjs','native-hosting-sql.mjs',
     'native-migrations.mjs','native-migration-runner.mjs','native-ops-target.mjs','native-disposable-relay.mjs','native-recovery-seal.mjs',
     '../lib/backend/native-roles.mjs','../lib/backend/filesystem-core.mjs','../lib/backend/postgres-tls.mjs'];

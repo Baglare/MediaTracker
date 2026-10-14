@@ -48,7 +48,7 @@ async function run({fail,authOutput='',sqlFailure,sqlStatus=3,sqlSignal=null,sql
     return response;
   };
   await runInNewContext(`(async()=>{${source}\n})()`,{
-    spawnSync,process,URL,validateDisposableTarget,
+    emailVerificationPg18:async()=>{calls.push({key:'email proof'});if(fail==='email proof')throw Error(privateDiagnostic);},spawnSync,process,URL,validateDisposableTarget,
     startDisposableRelay:async()=>{calls.push({key:'relay start'});if(fail==='relay start')throw Error('redacted');return {descriptor:{port:54321},proof:{controlPort:54322,token:'d'.repeat(64)},close:async()=>{calls.push({key:'relay close'});if(fail==='relay close')throw Error('redacted');}};},
     verifyDisposableRelay:async()=>{calls.push({key:'relay verify'});if(fail==='relay verify')throw Error('redacted');},
     Client:class extends EventEmitter {
@@ -82,6 +82,7 @@ for(const [stage,options] of [
   ['RELAY_START',{fail:'relay start'}],
   ['RELAY_VALIDATION',{fail:'relay verify'}],
   ['RELAY_VALIDATION',{fail:'pg connect'}],
+  ['EMAIL_VERIFICATION_PROOF',{fail:'email proof'}],
   ['DATABASE_READY',{readinessFailures:Infinity}],
   ['SQL_PROOF',{fail:'exec -i'}],
   ['AUTH_INTEGRATION',{fail:'auth'}],
@@ -95,11 +96,11 @@ for(const [stage,options] of [
   });
 }
 
-test('release seed precedes only 013; preservation and concurrency cannot be skipped',async()=>{
+test('release seed precedes only 014; preservation and concurrency cannot be skipped',async()=>{
   const r=await run({release:true});
   assert.equal(r.process.exitCode,undefined);
   const seed=r.calls.findIndex(c=>c.key==='upgrade seed');
-  const migration=r.calls.findIndex(c=>c.options?.input?.includes("name='013_tvmaze_guest_pool.sql'"));
+  const migration=r.calls.findIndex(c=>c.options?.input?.includes("name='014_secure_email_verification.sql'"));
   assert.ok(seed>0&&seed<migration);
   assert.ok(r.calls.findIndex(c=>c.key==='upgrade verify')>migration);
   assert.ok(r.calls.findIndex(c=>c.key==='concurrency')>migration);

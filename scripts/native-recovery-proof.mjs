@@ -13,12 +13,14 @@ import { inspectTarget } from './native-ops-target.mjs';
 import { digest } from './native-ops-target.mjs';
 import { recoverySourceFingerprint, attestRecoveryRunner } from './native-recovery-proof-contract.mjs';
 import { runMigrations, migrationHistory, validateHistory } from './native-migration-runner.mjs';
+import { installEmailVerificationKey } from './native-email-verification-key.mjs';
 import { nativeMigrationManifest } from './native-migrations.mjs';
 import { backupNative, verifyBackup, verifyNativeDatabase, fileDigest, assetsVerified } from './native-recovery.mjs';
 import { inspectBackupCoverage, recoveryInventory, recoveryRoles, recoveryDatabaseContract, assertRecoveryInventory, quoteIdentifier as qi } from './native-recovery-evidence.mjs';
 const quote=value=>"'"+value.replaceAll("'","''")+"'";
 const args=process.argv.slice(2),synthetic=args.length===1&&args[0]==='--proof';
 if(!synthetic && !(args.length===4&&args[0]==='--input'&&args[2]==='--backup-fingerprint'))throw new Error('native_recovery_proof_arguments_invalid');
+const emailKey=randomBytes(32).toString('hex'),emailEpoch='1';
 const image='postgres:18-alpine',runName=`mt-p1-${randomUUID()}`,password=randomBytes(32).toString('hex');
 const env={...process.env};for(const k of ['DOCKER_HOST','DOCKER_CONTEXT','DOCKER_TLS_VERIFY','DOCKER_CERT_PATH'])delete env[k];
 let localEndpoint,containerId,networkId,relay,workspace,stage='DOCKER',started=false,result,interrupted=false,lastConnectionCode,sourceCatalog,restoredCatalog,inventoryDifferences;
@@ -185,6 +187,10 @@ try {
     const target=await inspectTarget(migrator,configuration);configuration.expected=target.fingerprint;
     stage='SOURCE_MIGRATIONS';
     await runMigrations(migrator,configuration,target,{apply:true,confirmation:`MIGRATE disposable ${target.fingerprint}`});
+    stage='SOURCE_EMAIL_KEY';
+    await setup.query('UPDATE app.release_write_state SET frozen=true WHERE singleton');
+    await installEmailVerificationKey(migrator,roles,{key:emailKey,epoch:emailEpoch,mode:'install'});
+    await setup.query('UPDATE app.release_write_state SET frozen=false WHERE singleton');
     stage='SOURCE_AUTH_FIXTURES';
     await setup.query(`INSERT INTO native_auth."user"(id,name,email) VALUES($1,'Recovery A','recovery-a@example.invalid'),($2,'Recovery B','recovery-b@example.invalid')`,[a,b]);
     stage='SOURCE_BUSINESS_FIXTURES';
@@ -215,6 +221,7 @@ try {
     const backup=await connect(roles.backup,roles.database);
     stage='SOURCE_BACKUP_COVERAGE';
     await inspectBackupCoverage(backup,roles);
+    if((await backup.query('SELECT * FROM native_auth.email_verification_key')).rows.length)throw new Error('native_recovery_key_exposed');
     if((await backup.query('SELECT count(*)::integer AS n FROM app.media_items')).rows[0]?.n!==2)throw new Error('native_recovery_fixture_failed');
     stage='SOURCE_NEGATIVE_OWNERSHIP_PROBES';
     await verifyNativeDatabase(backup,roles);
@@ -259,7 +266,9 @@ try {
     await backupNative(backup,bc,bt,{apply:true,confirmation:`BACKUP disposable ${bt.fingerprint}`,quiesced:'ALL_WORKERS_AND_OPERATORS_STOPPED',storage,output},async(tool,config,path)=>{
       inspectDisposableTarget({containerId,networkId,runName,localEndpoint});
       const version=docker(['exec',containerId,'pg_dump','--version']);if(!/^pg_dump \(PostgreSQL\) 18\./.test(version))throw new Error('native_postgres_18_required');
-      const bytes=docker(['exec',containerId,'pg_dump','-U',roles.backup,'-d',roles.database,'--no-password','--format=custom','--enable-row-security','--exclude-schema=public',`--snapshot=${config.snapshot}`],undefined,true);
+      const bytes=docker(['exec',containerId,'pg_dump','-U',roles.backup,'-d',roles.database,'--no-password','--format=custom','--enable-row-security','--exclude-schema=public','--exclude-table-data=native_auth.email_verification_key',`--snapshot=${config.snapshot}`],undefined,true);
+      const plain=docker(['exec','-i',containerId,'pg_restore','--file=-'],bytes);
+      if(plain.includes(emailKey) || plain.includes('COPY native_auth.email_verification_key'))throw new Error('native_recovery_key_leak');
       await writeFile(path,bytes,{flag:'wx',mode:0o600});
     });
     stage='SOURCE_BACKUP_VERIFY';
@@ -309,6 +318,17 @@ try {
   if(JSON.stringify(await recoveryRoles(restored,roles))!==JSON.stringify(manifest.roleState))throw new Error('native_restore_roles_mismatch');
   if(JSON.stringify(await recoveryDatabaseContract(restored))!==JSON.stringify(manifest.databaseContract))throw new Error('native_restore_database_acl_invalid');
   await restored.query('ROLLBACK');
+  if(synthetic) {
+    stage='RESTORE_EMAIL_KEY';
+    if((await restored.query('SELECT count(*)::int AS n FROM native_auth.email_verification_key')).rows[0].n!==0)throw new Error('native_recovery_key_leak');
+    const migrate=await connect(roles.migrator,roles.database);
+    for(const patch of [{key:randomBytes(32).toString('hex')},{epoch:'2'}]) {
+      let rejected=false;
+      try {await installEmailVerificationKey(migrate,roles,{key:emailKey,epoch:emailEpoch,mode:'restore',...patch});}catch {rejected=true;}
+      if(!rejected)throw new Error('native_recovery_key_pin_bypass');
+    }
+    await installEmailVerificationKey(migrate,roles,{key:emailKey,epoch:emailEpoch,mode:'restore'});
+  }
     stage='RESTORE_ASSETS';
   const storage=join(workspace,'private-restored');await mkdir(storage,{mode:0o700});
   for(const file of manifest.files.filter(f=>f.path.startsWith('storage/'))) {

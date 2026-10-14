@@ -9,6 +9,8 @@ import { startDisposableRelay, validateDisposableTarget, verifyDisposableRelay }
 import { Client } from 'pg';
 import { performance } from 'node:perf_hooks';
 import { prepareReleaseUpgrade, verifyReleaseUpgrade, proveReleaseConcurrency } from './native-release-pg18.mjs';
+import { emailVerificationPg18 } from './native-email-verification-pg18.mjs';
+const emailKey=randomBytes(32).toString('hex'),emailEpoch='1';
 const release = process.argv[2] === '--release';
 const p2 = process.argv[2] === '--p2' || release;
 if (process.argv.slice(2).some(arg => !['--p2','--release'].includes(arg)) || process.argv.length > 3) throw new Error('proof_target_arguments_denied');
@@ -128,7 +130,7 @@ try {
   if(p2) {
     let upgrade;
     for(const step of nativeMigrationSteps()) {
-      if(release && step.name.startsWith('013_')) {
+      if(release && step.name.startsWith('014_')) {
         stage='PG18_UPGRADE_SEED';
         p2Sql(`ALTER ROLE mt_runtime PASSWORD '${password}';`);
         upgrade=await prepareReleaseUpgrade({host:'127.0.0.1',port:relay.descriptor.port,password,database:'mt_p1_proof'});
@@ -142,7 +144,7 @@ try {
       await verifyReleaseUpgrade(upgrade);
       stage='PG18_CONCURRENCY';
       await proveReleaseConcurrency(upgrade);
-      console.log('PASS: PG18 012-to-013 preservation, independent connection concurrency, limiter, RLS, CAS and tombstone');
+      console.log('PASS: PG18 013-to-014 preservation, independent connection concurrency, limiter, RLS, CAS and tombstone');
     }
     stage='P2_FUNCTIONAL_PROOF';
     output=p2Sql(readFileSync(new URL('../database/native/cloud-goals-proof.sql',import.meta.url),'utf8'));
@@ -155,12 +157,15 @@ try {
     stage='P2_RUNTIME_PASSWORD';
     p2Sql(`ALTER ROLE mt_runtime PASSWORD '${password}';`);
   } else {
-  const sql=['001_security_foundation.sql','002_better_auth.sql','rls-proof.sql']
+  const sql=['001_security_foundation.sql','002_better_auth.sql','003_account_admission.sql','014_secure_email_verification.sql','rls-proof.sql']
     .map(file=>readFileSync(new URL(`../database/native/${file}`,import.meta.url),'utf8')).join('\n');
   output=docker(['exec','-i',id,'psql','-X','-v','ON_ERROR_STOP=1','-U','postgres','-d','mt_p1_proof'],
     sql+`\nALTER ROLE mt_runtime PASSWORD '${password}';`);
   if(!output.includes(p2 ? 'P2_CLOUD_GOALS_PROOF_PASS' : 'P1_RLS_PROOF_PASS')) throw new Error('proof_failed');
   }
+  stage='RELAY_VALIDATION';
+  stage='EMAIL_VERIFICATION_PROOF';
+  await emailVerificationPg18({host:'127.0.0.1',port:relay.descriptor.port,password,database:'mt_p1_proof'},emailKey,emailEpoch,true);
   stage='RELAY_VALIDATION';
   const databaseUrl=`postgresql://mt_runtime:${password}@127.0.0.1:${relay.descriptor.port}/mt_p1_proof`;
   await verifyDisposableRelay(identity,relay.proof,'127.0.0.1',relay.descriptor.port);
@@ -178,6 +183,7 @@ try {
       DATABASE_SSL_MODE:'disable',DATABASE_POOL_MAX:'1',BETTER_AUTH_URL:'http://localhost:3000',BETTER_AUTH_SECRET:randomBytes(32).toString('hex'),
       NATIVE_P1_PROOF_CONTAINER:id,NATIVE_P1_PROOF_NAME:name,NATIVE_P1_PROOF_NETWORK:network,NATIVE_P1_RELAY_PROOF:JSON.stringify(relay.proof),
       NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED:release?'true':'false',
+      NATIVE_EMAIL_VERIFICATION_KEY:emailKey,NATIVE_EMAIL_VERIFICATION_EPOCH:emailEpoch,
       NATIVE_SMTP_HOST:'smtp.example.invalid',NATIVE_SMTP_PORT:'465',NATIVE_SMTP_SECURITY:'tls',
       NATIVE_SMTP_USER:'synthetic-only',NATIVE_SMTP_PASSWORD:'synthetic-only',NATIVE_SMTP_FROM:'auth@example.invalid',
       ...(release?{TRUSTED_INGRESS_MODE:'unconfigured',RATE_LIMIT_IDENTITY_HMAC_KEY:randomBytes(32).toString('hex'),

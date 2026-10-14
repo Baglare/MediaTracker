@@ -1,18 +1,22 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { memoryAdapter } from 'better-auth/adapters/memory';
-import { randomBytes } from 'node:crypto';
+import { createHmac, randomBytes } from 'node:crypto';
 import { nativeSmtpConfig } from '@/lib/auth/smtp-config';
 vi.mock('server-only', () => ({}));
-const mock = vi.hoisted(() => ({ store: {} as Record<string, Record<string, unknown>[]>, tasks: [] as (() => Promise<void>)[], send: vi.fn() }));
-vi.mock('@/lib/backend/postgres', () => ({ getNativePool: () => memoryAdapter(mock.store) }));
+const mock = vi.hoisted(() => ({ store: {} as Record<string, Record<string, unknown>[]>, replays: new Set<string>(), tasks: [] as (() => Promise<void>)[], send: vi.fn() }));
+vi.mock('@/lib/backend/postgres', () => ({ getNativePool: () => Object.assign(memoryAdapter(mock.store), { query: async (_sql: string, args: string[]) => {
+  const p = JSON.parse(args[0]); const user = mock.store.user.find(u => u.id === p[1] && u.email === p[2]);
+  if (!user || user.emailVerified || mock.replays.has(p[7])) throw new Error('rejected');
+  mock.replays.add(p[7]); user.emailVerified = true; return { rows: [] };
+} }) }));
 vi.mock('nodemailer', () => ({ default: { createTransport: () => ({ sendMail: mock.send }) } }));
 vi.mock('next/server', async importOriginal => ({ ...await importOriginal<typeof import('next/server')>(), after: (task: () => Promise<void>) => mock.tasks.push(task) }));
 const smtp = { NATIVE_SMTP_HOST: 'smtp.example.invalid', NATIVE_SMTP_PORT: '465', NATIVE_SMTP_SECURITY: 'tls', NATIVE_SMTP_USER: 'synthetic', NATIVE_SMTP_PASSWORD: 'synthetic-only', NATIVE_SMTP_FROM: 'auth@example.invalid' };
 const origin = 'https://app.example.invalid', email = 'synthetic@example.invalid', password = 'Synthetic-password-only';
 beforeEach(() => {
-  vi.resetModules(); mock.store = { user: [], account: [], session: [], verification: [], rateLimit: [] }; mock.tasks = [];
+  vi.resetModules(); mock.replays = new Set(); mock.store = { user: [], account: [], session: [], verification: [], rateLimit: [] }; mock.tasks = [];
   mock.send.mockReset().mockResolvedValue({ accepted: [email], rejected: [] });
-  for (const [key, value] of Object.entries({ ...smtp, BACKEND_PROVIDER: 'native', DATABASE_URL: 'postgresql://mt_runtime:synthetic@localhost/mt_test', DATABASE_SSL_MODE: 'disable', BETTER_AUTH_URL: origin, BETTER_AUTH_SECRET: randomBytes(32).toString('hex'), NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED: 'true' })) vi.stubEnv(key, value);
+  for (const [key, value] of Object.entries({ ...smtp, NATIVE_EMAIL_VERIFICATION_KEY: randomBytes(32).toString('hex'), NATIVE_EMAIL_VERIFICATION_EPOCH: '1', BACKEND_PROVIDER: 'native', DATABASE_URL: 'postgresql://mt_runtime:synthetic@localhost/mt_test', DATABASE_SSL_MODE: 'disable', BETTER_AUTH_URL: origin, BETTER_AUTH_SECRET: randomBytes(32).toString('hex'), NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED: 'true' })) vi.stubEnv(key, value);
 });
 afterEach(() => { vi.unstubAllEnvs(); vi.restoreAllMocks(); });
 async function runtime() {
@@ -44,8 +48,10 @@ it('rejects tampered/expired verification; expired and replayed reset; revokes a
   await call('sign-up/email', { email, password, name: 'Synthetic' }); await drain();
   const verificationToken = tokenFromMail();
   expect((await call('verify-email', { token: verificationToken + 'tampered' })).status).toBe(400);
-  mock.store.verification.forEach(v => { v.expiresAt = new Date(Date.now() - 1000); });
-  expect((await call('verify-email', { token: verificationToken })).status).toBe(400);
+  const [header, payload] = verificationToken.split('.');
+  const expired = Buffer.from(JSON.stringify({ ...JSON.parse(Buffer.from(payload, 'base64url').toString()), iat: 1, exp: 2 })).toString('base64url');
+  const expiredToken = header + '.' + expired + '.' + createHmac('sha256', process.env.BETTER_AUTH_SECRET!).update(header + '.' + expired).digest('base64url');
+  expect((await call('verify-email', { token: expiredToken })).status).toBe(400);
   await call('send-verification-email', { email }); await drain();
   const freshToken = tokenFromMail(1);
   expect((await call('verify-email', { token: freshToken })).status).toBe(200);

@@ -103,7 +103,7 @@ export async function postgresTool(tool,config,path) {
     ...(config.caFile?{PGSSLROOTCERT:config.caFile}:{}),
     PGSSLMODE:config.ssl?'verify-full':'disable',PGCONNECT_TIMEOUT:'3',PGOPTIONS:'-c statement_timeout=120000 -c lock_timeout=2000'};
   if(config.snapshot && !/^[0-9A-Fa-f-]+$/.test(config.snapshot))throw new Error('native_backup_snapshot_invalid');
-  const args=tool==='pg_dump'?['--format=custom','--no-password',...(config.roles?.hosted?['--exclude-schema=public']:[]),
+  const args=tool==='pg_dump'?['--format=custom','--no-password','--exclude-table-data=native_auth.email_verification_key',...(config.roles?.hosted?['--exclude-schema=public']:[]),
     ...(config.roles?.capability==='shared-managed'?['--enable-row-security']:[]),...(config.snapshot?[`--snapshot=${config.snapshot}`]:[])]:['--exit-on-error','--single-transaction','--no-password','--dbname',env.PGDATABASE,path];
   const child=spawn(tool,args,{env,stdio:['ignore',tool==='pg_dump'?'pipe':'ignore','ignore'],windowsHide:true});
   let deadline;

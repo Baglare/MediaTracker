@@ -50,5 +50,9 @@
   {
     "name": "013_tvmaze_guest_pool.sql",
     "checksum": "c580cee37465589ed606f858592f7254d3a0cb314afa8ca852505fcb190dc303"
+  },
+  {
+    "name": "014_secure_email_verification.sql",
+    "checksum": "b03c3e8be5a7cff9101303e6ba915859d5e5d2ced767365fe2702b734b95fc26"
   }
 ]

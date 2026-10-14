@@ -50,6 +50,8 @@ export async function inspectBackupCoverage(client,roles) {
     AND NOT EXISTS(SELECT FROM pg_roles r WHERE r.rolname<>$1 AND pg_has_role($1,r.oid,'USAGE'))
     AND NOT EXISTS(SELECT FROM pg_namespace n WHERE n.nspname=ANY($2::text[]) AND NOT has_schema_privilege($1,n.oid,'USAGE'))
     AND NOT EXISTS(SELECT FROM pg_namespace n WHERE has_schema_privilege($1,n.oid,'CREATE'))
+    AND NOT EXISTS(SELECT FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='native_auth' AND c.relname='email_verification_key' AND (NOT c.relrowsecurity OR NOT c.relforcerowsecurity))
     AND NOT EXISTS(SELECT FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
       WHERE n.nspname=ANY($2::text[]) AND has_function_privilege($1,p.oid,'EXECUTE')
         AND NOT (n.nspname='app' AND p.proname IN ('native_ops_state','native_ops_assets','native_ops_lifecycle_state') AND p.pronargs=0))
@@ -61,9 +63,9 @@ export async function inspectBackupCoverage(client,roles) {
           ELSE NOT has_table_privilege($1,c.oid,'SELECT') OR has_table_privilege($1,c.oid,'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
             OR has_any_column_privilege($1,c.oid,'INSERT,UPDATE,REFERENCES') END))
     AND NOT EXISTS(SELECT FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname=ANY($2::text[])
-      AND c.relkind IN ('r','p') AND c.relrowsecurity AND (NOT c.relforcerowsecurity OR NOT EXISTS(
+      AND c.relkind IN ('r','p') AND c.relrowsecurity AND (NOT c.relforcerowsecurity OR (NOT (n.nspname='native_auth' AND c.relname='email_verification_key') AND NOT EXISTS(
         SELECT FROM pg_policy p WHERE p.polrelid=c.oid AND p.polname='native_backup_select' AND p.polcmd='r'
-          AND p.polpermissive AND p.polroles=ARRAY[$1::regrole::oid] AND pg_get_expr(p.polqual,p.polrelid)=$3)))
+          AND p.polpermissive AND p.polroles=ARRAY[$1::regrole::oid] AND pg_get_expr(p.polqual,p.polrelid)=$3))))
     AND NOT EXISTS(SELECT FROM pg_policy p JOIN pg_class c ON c.oid=p.polrelid JOIN pg_namespace n ON n.oid=c.relnamespace
       WHERE n.nspname=ANY($2::text[]) AND NOT p.polpermissive AND p.polcmd IN ('r','*')
         AND EXISTS(SELECT FROM unnest(p.polroles) role_id WHERE role_id=0 OR pg_has_role($1,role_id,'USAGE')))
@@ -102,7 +104,7 @@ export async function recoveryInventory(client,roles) {
   await client.query("SET LOCAL timezone='UTC'; SET LOCAL datestyle='ISO, YMD'; SET LOCAL extra_float_digits=3");
   const tables=(await client.query(`SELECT n.nspname AS schema,c.relname AS name FROM pg_class c
     JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname=ANY($1::text[]) AND c.relkind IN ('r','p')
-    AND NOT c.relispartition ORDER BY n.nspname COLLATE "C",c.relname COLLATE "C"`,[schemas])).rows;
+    AND NOT c.relispartition AND NOT (n.nspname='native_auth' AND c.relname='email_verification_key') ORDER BY n.nspname COLLATE "C",c.relname COLLATE "C"`,[schemas])).rows;
   if(!tables.length || tables.length>1000)throw new Error('native_recovery_inventory_invalid');
   const inventory=[];let bytes=0,total=0;
   for(const table of tables) {

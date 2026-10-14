@@ -21,13 +21,13 @@ async function snapshot(c) {
   const result={};
   // Include all pre-existing business rows, receipts, Auth/lifecycle, limiter state,
   // ledger timestamps, ownership/ACLs and RLS policies, not just sentinel counts.
-  const tables=(await c.query("SELECT schemaname,tablename FROM pg_tables WHERE schemaname IN ('app','native_auth','private_rate_limit','private_privacy_ops','native_migrations') AND tablename<>'tvmaze_guest_pool' ORDER BY 1,2")).rows;
+  const tables=(await c.query("SELECT schemaname,tablename FROM pg_tables WHERE schemaname IN ('app','native_auth','private_rate_limit','private_privacy_ops','native_migrations') AND tablename<>'tvmaze_guest_pool' AND tablename NOT LIKE 'email_verification_%' ORDER BY 1,2")).rows;
   for(const {schemaname,tablename} of tables) {
     assert.match(schemaname,/^[a-z_]+$/);assert.match(tablename,/^[a-zA-Z_]+$/);
     result[schemaname+'.'+tablename]=(await c.query(`SELECT to_jsonb(t) AS r FROM "${schemaname}"."${tablename}" t ORDER BY ${schemaname==='native_migrations'&&tablename==='ledger'?'name':'to_jsonb(t)::text'}`)).rows;
   }
-  result.policies=(await c.query("SELECT schemaname,tablename,policyname,permissive,roles,cmd,qual,with_check FROM pg_policies WHERE schemaname IN ('app','native_auth','private_rate_limit','private_privacy_ops') AND tablename<>'tvmaze_guest_pool' ORDER BY 1,2,3")).rows;
-  result.acl=(await c.query("SELECT n.nspname,c.relname,c.relowner::regrole::text,c.relacl::text,c.relrowsecurity,c.relforcerowsecurity FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname IN ('app','native_auth','private_rate_limit','private_privacy_ops') AND c.relname NOT IN ('tvmaze_guest_pool','tvmaze_guest_pool_pkey') ORDER BY 1,2")).rows;
+  result.policies=(await c.query("SELECT schemaname,tablename,policyname,permissive,roles,cmd,qual,with_check FROM pg_policies WHERE schemaname IN ('app','native_auth','private_rate_limit','private_privacy_ops') AND tablename<>'tvmaze_guest_pool' AND tablename NOT LIKE 'email_verification_%' ORDER BY 1,2,3")).rows;
+  result.acl=(await c.query("SELECT n.nspname,c.relname,c.relowner::regrole::text,c.relacl::text,c.relrowsecurity,c.relforcerowsecurity FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname IN ('app','native_auth','private_rate_limit','private_privacy_ops') AND c.relname NOT LIKE 'email_verification_%' AND c.relname NOT IN ('tvmaze_guest_pool','tvmaze_guest_pool_pkey') ORDER BY 1,2")).rows;
   result.roles=(await c.query("SELECT rolname,rolsuper,rolbypassrls,rolcanlogin,rolinherit,rolconfig FROM pg_roles WHERE rolname LIKE 'mt_%' ORDER BY 1")).rows;
   return result;
 }
@@ -49,7 +49,7 @@ export async function prepareReleaseUpgrade(config) {
       const asset=i===0?'12121212-1212-4212-8212-121212121212':'34343434-3434-4434-8434-343434343434';
       await admin.query("INSERT INTO app.native_asset_objects(id,user_id,kind,file_key,state,mime,size) VALUES($1,$2,'avatar',$3,'published','image/jpeg',32)",[asset,user,`${user}/avatar/${asset}.jpg`]);
     }
-    assert.equal((await admin.query('SELECT count(*)::int AS n FROM native_migrations.ledger')).rows[0].n,12);
+    assert.equal((await admin.query('SELECT count(*)::int AS n FROM native_migrations.ledger')).rows[0].n,13);
     return {config,before:await snapshot(admin)};
   } finally {await runtime?.end();await admin.end();}
 }
@@ -57,7 +57,7 @@ export async function verifyReleaseUpgrade({config,before}) {
   const c=await connection(config);
   try {
     const after=await snapshot(c);
-    assert.deepEqual(after['native_migrations.ledger'].slice(0,12),before['native_migrations.ledger']);
+    assert.deepEqual(after['native_migrations.ledger'].slice(0,13),before['native_migrations.ledger']);
     after['native_migrations.ledger']=before['native_migrations.ledger'];
     assert.deepEqual(after,before);
     const ledger=(await c.query('SELECT name,checksum FROM native_migrations.ledger ORDER BY name')).rows;

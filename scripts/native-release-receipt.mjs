@@ -7,7 +7,7 @@ import { pathToFileURL } from 'node:url';
 import { digest } from './native-ops-target.mjs';
 const directory='dist/release-proof';
 async function releaseSourceFingerprint() {
-  const files=['native-postgres-proof.mjs','native-release-pg18.mjs','native-release-receipt.mjs'];
+  const files=['native-postgres-proof.mjs','native-release-pg18.mjs','native-release-receipt.mjs','native-email-verification-pg18.mjs','../lib/auth/email-verification-proof.ts','../lib/auth/native.ts','../tests/native-postgres-live.integration.test.ts'];
   return digest(await Promise.all(files.map(async file=>({file,checksum:digest((await readFile(new URL(file,import.meta.url),'utf8')).replaceAll('\r\n','\n'))}))));
 }
 export async function verifyReceipt(directory) {
@@ -16,7 +16,7 @@ export async function verifyReceipt(directory) {
   const release=JSON.parse(await readFile(`${directory}/release.json`,'utf8'));
   const migrations=nativeMigrationManifest().map(({name,checksum})=>({name,checksum}));
   if(release.format!=='MediaTrackerReleasePg18V1'||release.status!=='PASS'||release.pgMajor!==18
-    ||JSON.stringify(release.migrations)!==JSON.stringify(migrations)||migrations.length!==13
+    ||JSON.stringify(release.migrations)!==JSON.stringify(migrations)||migrations.length!==14
     ||release.recoveryFingerprint!==proof.fingerprint||release.sourceFingerprint!==await releaseSourceFingerprint()
     ||release.fingerprint!==digest({...release,fingerprint:undefined})
     ||['fresh','upgrade','independentConnections','guestLimits','authenticatedQuotas','rlsCasTombstone'].some(k=>release[k]!=='PASS')
