@@ -133,6 +133,9 @@ describe.runIf(configured)('runner-owned disposable native DB proof',()=>{
       context.headers=new Headers({Cookie:cookie});
       expect((await getCurrentUser())?.id).toBe(created.user.id);
       users.push({id:created.user.id,email,cookie});
+      // Better Auth's built-in sign-in rule is shared (no trusted IP): three
+      // attempts / ten seconds. Preserve it while testing both accounts' denials.
+      if(name==='A')await new Promise(resolve=>setTimeout(resolve,11000));
     }
     const cloud=(body:unknown,cookie:string)=>{
       context.headers=new Headers({Cookie:cookie});
