@@ -2,9 +2,11 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { Client } from 'pg';
+import { hashPassword, verifyPassword } from 'better-auth/crypto';
 import { nativeMigrationManifest } from './native-migrations.mjs';
 
 const users=['eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee','ffffffff-ffff-4fff-8fff-ffffffffffff'];
+const preservedPassword='Synthetic-upgrade-'+randomUUID();
 const payload={title:'Release sentinel',type:'movie',status:'planning',current_progress:0,total_progress:1,favorite:false,tags:[],metadata:{},identity_status:'unresolved'};
 async function connection(config,user='postgres') {
   const c=new Client({...config,user,ssl:false,connectionTimeoutMillis:3000,query_timeout:5000});
@@ -38,6 +40,8 @@ export async function prepareReleaseUpgrade(config) {
     assert.equal(Number((await admin.query('SHOW server_version_num')).rows[0].server_version_num)/10000|0,18);
     for(const [i,user] of users.entries()) {
       await admin.query('INSERT INTO native_auth."user"(id,name,email) VALUES($1,$2,$3)',[user,'Release '+i,'release-'+i+'@example.invalid']);
+      await admin.query('INSERT INTO native_auth.account("accountId","providerId","userId",password) VALUES($1,\'credential\',$1,$2)',[user,await hashPassword(preservedPassword)]);
+      if(i===0)await admin.query('UPDATE native_auth."user" SET "emailVerified"=true WHERE id=$1',[user]);
       await owner(runtime,user,async()=>{
         assert.equal((await media(runtime,'seed-'+user,'same-id','upsert',0,payload)).reason,'created');
         if(i===0)assert.equal((await media(runtime,'seed-a-only-record','a-only-id','upsert',0,payload)).reason,'created');
@@ -60,6 +64,10 @@ export async function verifyReleaseUpgrade({config,before}) {
     assert.deepEqual(after['native_migrations.ledger'].slice(0,13),before['native_migrations.ledger']);
     after['native_migrations.ledger']=before['native_migrations.ledger'];
     assert.deepEqual(after,before);
+    for(const user of users) {
+      const hash=(await c.query('SELECT password FROM native_auth.account WHERE "userId"=$1 AND "providerId"=\'credential\'',[user])).rows[0]?.password;
+      assert.equal(await verifyPassword({hash,password:preservedPassword}),true);
+    }
     const ledger=(await c.query('SELECT name,checksum FROM native_migrations.ledger ORDER BY name')).rows;
     assert.deepEqual(ledger,nativeMigrationManifest().map(({name,checksum})=>({name,checksum})));
     assert.equal((await c.query("SELECT to_regclass('private_rate_limit.tvmaze_guest_pool_pkey') IS NOT NULL AS present")).rows[0].present,true);
