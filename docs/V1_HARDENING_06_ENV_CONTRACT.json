@@ -449,5 +449,71 @@
     "visibility": "server non-secret",
     "owner": "release operator",
     "failure": "unset/invalid keeps capability disabled or blocks acceptance; no substitute target"
+  },
+  {
+    "name": "NATIVE_SMTP_HOST",
+    "LOCAL": "required only for native; pool max optional; isolated disposable target",
+    "CI": "absent: credential-free offline suite",
+    "PREVIEW": "native only; optional; forbidden in supabase",
+    "PRODUCTION": "native only; optional; forbidden in supabase",
+    "allowed": "operator-confirmed SMTP DNS hostname matching valid TLS certificate; no URL",
+    "visibility": "server secret",
+    "owner": "release operator",
+    "failure": "unset/invalid keeps capability disabled or blocks acceptance; no substitute target"
+  },
+  {
+    "name": "NATIVE_SMTP_PORT",
+    "LOCAL": "required only for native; pool max optional; isolated disposable target",
+    "CI": "absent: credential-free offline suite",
+    "PREVIEW": "native only; optional; forbidden in supabase",
+    "PRODUCTION": "native only; optional; forbidden in supabase",
+    "allowed": "465 with tls, or 587 with mandatory starttls; no plaintext",
+    "visibility": "server secret",
+    "owner": "release operator",
+    "failure": "unset/invalid keeps capability disabled or blocks acceptance; no substitute target"
+  },
+  {
+    "name": "NATIVE_SMTP_SECURITY",
+    "LOCAL": "required only for native; pool max optional; isolated disposable target",
+    "CI": "absent: credential-free offline suite",
+    "PREVIEW": "native only; optional; forbidden in supabase",
+    "PRODUCTION": "native only; optional; forbidden in supabase",
+    "allowed": "tls or starttls; certificate validation always enabled",
+    "visibility": "server secret",
+    "owner": "release operator",
+    "failure": "unset/invalid keeps capability disabled or blocks acceptance; no substitute target"
+  },
+  {
+    "name": "NATIVE_SMTP_USER",
+    "LOCAL": "required only for native; pool max optional; isolated disposable target",
+    "CI": "absent: credential-free offline suite",
+    "PREVIEW": "native only; optional; forbidden in supabase",
+    "PRODUCTION": "native only; optional; forbidden in supabase",
+    "allowed": "server-only SMTP authentication identity; no CR/LF/NUL",
+    "visibility": "server secret",
+    "owner": "release operator",
+    "failure": "unset/invalid keeps capability disabled or blocks acceptance; no substitute target"
+  },
+  {
+    "name": "NATIVE_SMTP_PASSWORD",
+    "LOCAL": "required only for native; pool max optional; isolated disposable target",
+    "CI": "absent: credential-free offline suite",
+    "PREVIEW": "native only; optional; forbidden in supabase",
+    "PRODUCTION": "native only; optional; forbidden in supabase",
+    "allowed": "server-only SMTP credential; no CR/LF/NUL; never public/build-time",
+    "visibility": "server secret",
+    "owner": "release operator",
+    "failure": "unset/invalid keeps capability disabled or blocks acceptance; no substitute target"
+  },
+  {
+    "name": "NATIVE_SMTP_FROM",
+    "LOCAL": "required only for native; pool max optional; isolated disposable target",
+    "CI": "absent: credential-free offline suite",
+    "PREVIEW": "native only; optional; forbidden in supabase",
+    "PRODUCTION": "native only; optional; forbidden in supabase",
+    "allowed": "single bare authorized sender mailbox, <=254 chars; no display name/header injection",
+    "visibility": "server secret",
+    "owner": "release operator",
+    "failure": "unset/invalid keeps capability disabled or blocks acceptance; no substitute target"
   }
 ]
