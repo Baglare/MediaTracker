@@ -157,7 +157,7 @@ try {
     stage='P2_RUNTIME_PASSWORD';
     p2Sql(`ALTER ROLE mt_runtime PASSWORD '${password}';`);
   } else {
-  const sql=['001_security_foundation.sql','002_better_auth.sql','003_account_admission.sql','014_secure_email_verification.sql','rls-proof.sql']
+  const sql=['001_security_foundation.sql','002_better_auth.sql','003_account_admission.sql','012_public_signup.sql','014_secure_email_verification.sql','rls-proof.sql']
     .map(file=>readFileSync(new URL(`../database/native/${file}`,import.meta.url),'utf8')).join('\n');
   output=docker(['exec','-i',id,'psql','-X','-v','ON_ERROR_STOP=1','-U','postgres','-d','mt_p1_proof'],
     sql+`\nALTER ROLE mt_runtime PASSWORD '${password}';`);
