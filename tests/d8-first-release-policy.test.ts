@@ -28,7 +28,9 @@ describe("D8 first-release fail-closed policy", () => {
 
     expect(panel).toContain("İlk sürümde yeni hesap kaydı kapalıdır.");
     expect(panel).toContain('const registering = register && signupEnabled');
-    expect(auth).toContain("native && process.env.NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED === 'true'");
+    expect(auth).toContain('native && nativePublicSignupEnabled()');
+    expect(auth).toContain('import { nativePublicSignupEnabled } from "@/lib/auth/signup-policy"');
+    expect(source('lib/auth/signup-policy.ts')).toContain("return process.env.NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED === 'true'");
     expect(auth).toContain('if (!signupEnabled) return { ok: false');
     expect(auth).not.toContain('auth.signUp');
     expect(auth).toContain("signInWithPassword");
