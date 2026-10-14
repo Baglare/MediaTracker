@@ -14,7 +14,7 @@ const processingGroups = (native: boolean) => [
   {
     title: "Hesap ve kimlik doğrulama",
     data: native
-      ? "E-posta, görünen ad, hesap kimliği ve oturum bilgileri; girişte şifre işlenir, şifre özeti ve oturum kayıtları Better Auth'un özel PostgreSQL şemasında tutulur."
+      ? "E-posta, görünen ad, hesap kimliği, e-posta doğrulama durumu ve oturum bilgileri; girişte şifre işlenir, şifre özeti ve oturum kayıtları Better Auth'un özel PostgreSQL şemasında tutulur. Doğrulama ve şifre sıfırlama için süreli bağlantılar işlenir."
       : "E-posta, hesap kimliği ve oturum bilgileri; girişte şifre işlenir, uygulama tablosunda tutulmaz.",
     purpose: "Mevcut kullanıcıların girişini ve oturum güvenliğini sağlamak; kayıt açılırsa hesabı oluşturmak.",
     method: native
@@ -231,6 +231,12 @@ export default function PrivacyPage() {
             görünürlük veya etkileşim kapsamında ilgili kullanıcılara gösterilebilir. Bu servislerin hukuki
             rol sınıflandırması ayrıca incelenmelidir.
           </p>
+          {native && <p>
+            E-posta doğrulama ve şifre sıfırlama taleplerinde alıcı adresi ve süreli işlem bağlantısı,
+            operatörün yapılandırdığı SMTP posta altyapısına iletilir. Bu posta hizmetinin sağlayıcısı,
+            işleme yeri, saklama ve yedek koşulları ayrıca doğrulanmalıdır; barındırma yanıtı tek başına
+            bu posta akışının koşullarını kanıtlamaz.
+          </p>}
           <p>
             TVMaze arama/ayrıntı/takvim erişimi v1 kaynak politikasında teknik olarak açıktır; ayrı hukuki/lisans
             değerlendirmesi yayın kapısıdır. Open Library yalnız geçerli sağlayıcı kimliği/iletişimi yapılandırılırsa
@@ -296,7 +302,7 @@ export default function PrivacyPage() {
           </p>
           {native && (
             <p>
-              Mevcut native akışta e-posta sahipliği doğrulaması ve e-postayla şifre kurtarma yoktur.
+              Native akışta giriş için e-posta doğrulaması gerekir. Yapılandırılmış SMTP üzerinden doğrulama ve şifre sıfırlama bağlantıları gönderilir; gerçek teslimat ayrıca doğrulanmalıdır.
               Kayıtta yazılmış adres veya o adresten gelen mesaj tek başına hesap sahipliğini kanıtlamaz;
               hesap verisi açıklama, silme ve sahiplik değişiklikleri için ayrıca güvenli doğrulama gerekir.
             </p>

@@ -39,7 +39,7 @@ export async function checkNativeArtifact(directory, reportPath) {
     throw new Error('artifact_public_selector');
   const lock = JSON.parse(await readFile('package-lock.json', 'utf8'));
   const devOnlyPackages = Object.entries(lock.packages).filter(([name, entry]) => name && entry.dev === true).map(([name]) => name);
-  const secrets = ['DATABASE_URL', 'BETTER_AUTH_SECRET', 'RATE_LIMIT_IDENTITY_HMAC_KEY', 'RATE_LIMIT_RPC_SIGNING_KEY']
+  const secrets = ['NATIVE_SMTP_PASSWORD', 'NATIVE_SMTP_USER', 'DATABASE_URL', 'BETTER_AUTH_SECRET', 'RATE_LIMIT_IDENTITY_HMAC_KEY', 'RATE_LIMIT_RPC_SIGNING_KEY']
     .map(key => process.env[key]).filter(Boolean);
   const binaries = [];
   for (const { path } of [...manifest.files, { path: 'deployment-manifest.json' }, { path: 'DEPLOYMENT.txt' }]) {

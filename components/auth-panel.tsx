@@ -18,6 +18,7 @@ export default function AuthPanel() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [register, setRegister] = useState(false);
   const [name, setName] = useState('');
@@ -110,6 +111,7 @@ export default function AuthPanel() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setNotice(null);
     const validation = validate();
     if (validation) {
       setError(validation);
@@ -123,6 +125,7 @@ export default function AuthPanel() {
       setError(res.error ?? "İşlem başarısız.");
       return;
     }
+    if (registering) { setNotice('Adres uygunsa doğrulama bağlantısı gönderilecek. Girişten önce e-postanı doğrula.'); setPassword(''); }
   };
 
   const inputCls =
@@ -178,9 +181,10 @@ export default function AuthPanel() {
             {error}
           </p>
         )}
+        {notice && <p role="status" className="text-sm text-[var(--app-text-secondary)]">{notice}</p>}
         {registering && <p className="text-xs text-[var(--app-text-secondary)] leading-relaxed">
           Hesap oluşturmadan önce <Link href="/privacy" className="underline underline-offset-4">KVKK aydınlatma metnini</Link> inceleyebilirsin.
-          Bu bilgilendirme açık rıza talebi değildir. E-posta sahipliği doğrulanmaz; e-postayla şifre kurtarma henüz yoktur.
+          Bu bilgilendirme açık rıza talebi değildir. Girişten önce e-posta doğrulaması gerekir.
         </p>}
         <button
           type="submit"
@@ -195,6 +199,7 @@ export default function AuthPanel() {
         </button> : <p className="text-[11px] text-zinc-500 leading-relaxed pt-1">
           İlk sürümde yeni hesap kaydı kapalıdır. Mevcut hesabınla giriş yapabilir; giriş yapmadan yerel-first kullanıma devam edebilirsin.
         </p>}
+        <Link href="/auth/recovery" className="block text-center text-xs text-[var(--app-accent-strong)] underline underline-offset-4">Şifremi unuttum / Doğrulama e-postası</Link>
         <Link href="/privacy" className="block text-center text-xs text-[var(--app-accent-strong)] underline underline-offset-4">
           Gizlilik ve veri kullanımı
         </Link>

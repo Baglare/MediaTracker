@@ -1,3 +1,4 @@
+import { nativeSmtpConfig, nativeSmtpVariables } from '../../lib/auth/smtp-config.ts';
 import { requireSafe } from "./recovery.mjs";
 import { isValidProviderUserAgent } from "../../lib/api/provider-identity.ts";
 import { resolveBackendProvider } from "../../lib/backend/provider.ts";
@@ -17,8 +18,14 @@ const core = ["NEXT_PUBLIC_SUPABASE_URL","NEXT_PUBLIC_SUPABASE_ANON_KEY","NEXT_P
   "NEXT_PUBLIC_CLOUD_MEDIA_MINIMUM_CLIENT_VERSION","RATE_LIMIT_IDENTITY_HMAC_KEY",
   "RATE_LIMIT_RPC_SIGNING_KEY","RATE_LIMIT_RPC_KEY_VERSION","RATE_LIMIT_RPC_AUDIENCE"];
 const optional=["MEDIA_TRACKER_PROVIDER_USER_AGENT","RATE_LIMIT_IDENTITY_HMAC_PREVIOUS_KEY","MEDIA_TRACKER_EMBEDDING_CACHE","NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED"];
-const nativeVariables=["DATABASE_URL","DATABASE_SSL_MODE","DATABASE_POOL_MAX","BETTER_AUTH_SECRET","BETTER_AUTH_URL","NATIVE_HOSTING_CAPABILITY",...nativeDeploymentVariables];
-const nativeAllowed={DATABASE_URL:"postgresql URL; closed profile runtime/database pair; no query/hash; server secret",
+const nativeVariables=["DATABASE_URL","DATABASE_SSL_MODE","DATABASE_POOL_MAX","BETTER_AUTH_SECRET","BETTER_AUTH_URL","NATIVE_HOSTING_CAPABILITY",...nativeDeploymentVariables,...nativeSmtpVariables];
+const nativeAllowed={
+  NATIVE_SMTP_HOST:"operator-confirmed SMTP DNS hostname matching valid TLS certificate; no URL",
+  NATIVE_SMTP_PORT:"465 with tls, or 587 with mandatory starttls; no plaintext",
+  NATIVE_SMTP_SECURITY:"tls or starttls; certificate validation always enabled",
+  NATIVE_SMTP_USER:"server-only SMTP authentication identity; no CR/LF/NUL",
+  NATIVE_SMTP_PASSWORD:"server-only SMTP credential; no CR/LF/NUL; never public/build-time",
+  NATIVE_SMTP_FROM:"single bare authorized sender mailbox, <=254 chars; no display name/header injection",DATABASE_URL:"postgresql URL; closed profile runtime/database pair; no query/hash; server secret",
   NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED:"false or absent: closed; true: only after legal/vendor release approval and 012; rebuild with matching runtime value",
   NATIVE_ROLE_PROFILE:"local (loopback only), hosting-test, hosting-production; fixed database/login pairs",
   NATIVE_HOSTING_CAPABILITY:"dedicated (default) or shared-managed (hosted only); provider recovery unverified; no native backup/restore",
@@ -40,7 +47,7 @@ export const forbidden = /^(?:SUPABASE_SERVICE_ROLE_KEY|SUPABASE_TEST_.*|SUPABAS
 export function environmentContract() {
   const nativeOptional=['DATABASE_POOL_MAX','DATABASE_CONNECTION_TIMEOUT_MS','DATABASE_IDLE_TIMEOUT_MS','DATABASE_STATEMENT_TIMEOUT_MS',
     'NATIVE_ROLE_PROFILE','NATIVE_HOSTING_CAPABILITY','DATABASE_SSL_CA_FILE',
-    'TRUSTED_INGRESS_HEADER','TRUSTED_INGRESS_PROOF_SHA256','TRUSTED_INGRESS_DIRECT_ACCESS_BLOCKED'];
+    'TRUSTED_INGRESS_HEADER','TRUSTED_INGRESS_PROOF_SHA256','TRUSTED_INGRESS_DIRECT_ACCESS_BLOCKED',...nativeSmtpVariables];
   return [...core,...Object.keys(fixed),...optional,"BACKEND_PROVIDER",...nativeVariables].map(name => ({name,
     LOCAL:nativeVariables.includes(name)?"required only for native; pool max optional; isolated disposable target":"optional isolated offline/local; explicit values required for enabled Cloud/distributed mode",
     CI:"absent: credential-free offline suite",
@@ -48,7 +55,7 @@ export function environmentContract() {
     PRODUCTION:nativeVariables.includes(name)?`native only; ${nativeOptional.includes(name)?'optional':'required'}; forbidden in supabase`:name.startsWith('NEXT_PUBLIC_SUPABASE_')?'required supabase only; forbidden native':optional.includes(name)?"optional":"required independently verified target",
     allowed:nativeAllowed[name] ?? fixed[name] ?? (name.includes("HMAC") || name.includes("SIGNING") ? ">=32 chars; independent; secret never recorded"
       : name.includes("SCHEMA_STAGE") ? "matches verified ledger" : "source-validated value class; see 06D"),
-    visibility:name.startsWith("NEXT_PUBLIC_")?"public build-time":/(?:KEY|SECRET)$/.test(name) || name==="DATABASE_URL"?"server secret":"server non-secret",
+    visibility:nativeSmtpVariables.includes(name)?'server secret':name.startsWith("NEXT_PUBLIC_")?"public build-time":/(?:KEY|SECRET)$/.test(name) || name==="DATABASE_URL"?"server secret":"server non-secret",
     owner:/RATE_LIMIT/.test(name)?"security operator":/PROVIDER/.test(name)?"provider operator":"release operator",
     failure:"unset/invalid keeps capability disabled or blocks acceptance; no substitute target"}));
 }
@@ -66,6 +73,9 @@ export function validateReleaseEnvironment(env,scope) {
   if(provider==="native") {
     try { nativeConfig({...env,NODE_ENV:hosted?"production":"development"}); }
     catch { errors.push({name:"native",reason:"invalid native contract"}); }
+    if(nativeSmtpVariables.some(name=>env[name]!==undefined) || env.NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED==='true') {
+      try {nativeSmtpConfig(env);} catch {errors.push({name:'native_smtp',reason:'complete validated TLS SMTP required; mail operations disabled otherwise'});}
+    }
     if(hosted) {
       try { nativeDeploymentConfig({...env,NODE_ENV:'production'}); }
       catch { errors.push({name:'native_deployment',reason:'invalid native deployment contract'}); }

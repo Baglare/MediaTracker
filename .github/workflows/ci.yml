@@ -101,6 +101,12 @@ jobs:
           BETTER_AUTH_URL: https://mediatracker.baglare.com.tr
           NEXT_PUBLIC_APP_URL: https://mediatracker.baglare.com.tr
           BETTER_AUTH_SECRET: synthetic-build-auth-aaaaaaaaaaaaaaaaaaaaaaaa
+          NATIVE_SMTP_HOST: smtp.example.invalid
+          NATIVE_SMTP_PORT: '465'
+          NATIVE_SMTP_SECURITY: tls
+          NATIVE_SMTP_USER: synthetic-build-only
+          NATIVE_SMTP_PASSWORD: synthetic-build-mail-dddddddddddddddddddddd
+          NATIVE_SMTP_FROM: auth@example.invalid
           RATE_LIMIT_IDENTITY_HMAC_KEY: synthetic-build-identity-bbbbbbbbbbbbbbbbbbbb
           RATE_LIMIT_RPC_SIGNING_KEY: synthetic-build-signing-cccccccccccccccccccc
           RATE_LIMIT_RPC_KEY_VERSION: v1
@@ -122,7 +128,7 @@ jobs:
           MEDIA_TRACKER_PERSISTENT_EMBEDDING_CACHE: off
         run: |
           export NEXT_PUBLIC_CLOUD_MEDIA_DEPLOYMENT_EPOCH="v1-${GITHUB_SHA:0:12}"
-          node --input-type=module -e "import {validateReleaseEnvironment} from './scripts/ops/release-policy.mjs'; const env=Object.fromEntries(Object.entries(process.env).filter(([key])=>/^(BACKEND_PROVIDER|NEXT_PUBLIC_APP_URL|NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED|NATIVE_STORAGE_ROOT|TRUSTED_INGRESS_MODE|AI_SERVER_ACCESS_MODE|MEDIA_TRACKER_PERSISTENT_EMBEDDING_CACHE)$|^(DATABASE_|BETTER_AUTH_|RATE_LIMIT_|D7_RESEARCH_|NEXT_PUBLIC_CLOUD_)/.test(key))); if(!validateReleaseEnvironment(env,'PRODUCTION').valid) throw new Error('synthetic_build_contract_invalid');"
+          node --input-type=module -e "import {validateReleaseEnvironment} from './scripts/ops/release-policy.mjs'; const env=Object.fromEntries(Object.entries(process.env).filter(([key])=>/^(BACKEND_PROVIDER|NEXT_PUBLIC_APP_URL|NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED|NATIVE_STORAGE_ROOT|TRUSTED_INGRESS_MODE|AI_SERVER_ACCESS_MODE|MEDIA_TRACKER_PERSISTENT_EMBEDDING_CACHE)$|^(DATABASE_|BETTER_AUTH_|NATIVE_SMTP_|RATE_LIMIT_|D7_RESEARCH_|NEXT_PUBLIC_CLOUD_)/.test(key))); if(!validateReleaseEnvironment(env,'PRODUCTION').valid) throw new Error('synthetic_build_contract_invalid');"
           npm run build
           node --test scripts/cloud-build-contract.test.mjs
           node scripts/cloud-build-contract.mjs .next "$GITHUB_SHA"

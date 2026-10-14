@@ -82,7 +82,7 @@ describe.each(["supabase", "native"] as const)("05B public factual notice and ma
     expect(disclosure).toBeLessThan(panel.indexOf('type="submit"'));
     expect(panel.slice(disclosure, panel.indexOf('type="submit"'))).toContain('href="/privacy"');
     expect(panel).toContain("Bu bilgilendirme açık rıza talebi değildir");
-    expect(panel).toContain("E-posta sahipliği doğrulanmaz; e-postayla şifre kurtarma henüz yoktur");
+    expect(panel).toContain("Girişten önce e-posta doğrulaması gerekir");
     expect(panel).not.toMatch(/type="checkbox"|privacyConsent|consentRequired/);
   });
 

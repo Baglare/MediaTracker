@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { validateReleaseEnvironment } from '../scripts/ops/release-policy.mjs';
+import { validateReleaseEnvironment, environmentContract } from '../scripts/ops/release-policy.mjs';
 import { checkFile, checkEnvironment } from '../scripts/ci-checks.mjs';
 const env={BACKEND_PROVIDER:'native',DATABASE_URL:'postgresql://mt_runtime:synthetic@localhost/mt_test',DATABASE_SSL_MODE:'verify-full',
   BETTER_AUTH_URL:'https://app.example.invalid',BETTER_AUTH_SECRET:'s'.repeat(40),NEXT_PUBLIC_APP_URL:'https://app.example.invalid',
@@ -41,4 +41,16 @@ test('Supabase and invalid mode forbid DATABASE_URL; PG* stays forbidden in nati
   assert.equal(validateReleaseEnvironment({BACKEND_PROVIDER:'supabase'},'PRODUCTION').valid,false);
   for(const name of ['BETTER_AUTH_SECRET','DATABASE_POOL_MAX','PGHOST','BACKEND_PROVIDER'])
     assert.throws(()=>checkEnvironment(['package.json'],{[name]:'synthetic'}));
+});
+
+test('native SMTP allowlist is server-only and requires exact complete encrypted configuration',()=>{
+  const smtp={NATIVE_SMTP_HOST:'smtp.example.invalid',NATIVE_SMTP_PORT:'465',NATIVE_SMTP_SECURITY:'tls',NATIVE_SMTP_USER:'synthetic',NATIVE_SMTP_PASSWORD:'synthetic-only',NATIVE_SMTP_FROM:'auth@example.invalid'};
+  assert.equal(validateReleaseEnvironment({...env,...smtp},'PRODUCTION').valid,true);
+  for(const patch of [{NATIVE_SMTP_PORT:'25'},{NATIVE_SMTP_PASSWORD:''},{NATIVE_SMTP_PORT:'587'},{NEXT_PUBLIC_NATIVE_SMTP_PASSWORD:'synthetic-only'},{BACKEND_PROVIDER:'supabase'}])
+    assert.equal(validateReleaseEnvironment({...env,...smtp,...patch},'PRODUCTION').valid,false);
+  assert.equal(validateReleaseEnvironment({...env,NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED:'true'},'PRODUCTION').valid,false);
+  assert.equal(validateReleaseEnvironment({...env,...smtp,NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED:'true'},'PRODUCTION').valid,true);
+  assert.throws(()=>checkEnvironment(['package.json'],{NATIVE_SMTP_PASSWORD:'synthetic-only'}));
+  assert.throws(()=>checkEnvironment(['package.json'],{NEXT_PUBLIC_NATIVE_SMTP_PASSWORD:'synthetic-only'}));
+  for(const entry of environmentContract().filter(e=>e.name.startsWith('NATIVE_SMTP_'))) assert.equal(entry.visibility,'server secret');
 });

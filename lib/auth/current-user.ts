@@ -8,7 +8,7 @@ export async function getCurrentUser(): Promise<ApplicationUser | null> {
     const { headers } = await import('next/headers');
     const { getNativeAuth } = await import('./native');
     const session = await getNativeAuth().api.getSession({ headers: await headers(), query: { disableRefresh: true } });
-    return applicationUser(session?.user ?? null);
+    return applicationUser(session?.user.emailVerified === true ? session.user : null);
   }
   const { getSupabaseServerClient } = await import('../supabase/server');
   const client = await getSupabaseServerClient();

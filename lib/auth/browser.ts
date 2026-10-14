@@ -8,7 +8,7 @@ export const nativeBrowserAuth = {
   async currentUser() {
     const { data, error } = await client.getSession({ fetchOptions: { method: 'POST' } });
     if (error) throw new Error('auth_unavailable');
-    return applicationUser(data?.user ?? null);
+    return applicationUser(data?.user.emailVerified === true ? data.user : null);
   },
   async signIn(email: string, password: string) {
     const { error } = await client.signIn.email({ email, password });
@@ -17,6 +17,23 @@ export const nativeBrowserAuth = {
   async signUp(email: string, password: string, name: string) {
     const { error } = await client.signUp.email({ email, password, name });
     return { ok: !error, ...(error ? { error: 'Hesap oluşturulamadı.' } : {}) };
+  },
+  async requestPasswordReset(email: string) {
+    const { error } = await client.requestPasswordReset({ email });
+    return { ok: !error, ...(error ? { error: 'İşlem şu anda tamamlanamadı. Daha sonra tekrar dene.' } : {}) };
+  },
+  async resendVerification(email: string) {
+    const { error } = await client.sendVerificationEmail({ email });
+    return { ok: !error, ...(error ? { error: 'İşlem şu anda tamamlanamadı. Daha sonra tekrar dene.' } : {}) };
+  },
+  async verifyEmail(token: string) {
+    const response = await fetch('/api/auth/verify-email', { method: 'POST',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token }) });
+    return { ok: response.ok };
+  },
+  async resetPassword(token: string, newPassword: string) {
+    const { error } = await client.resetPassword({ token, newPassword });
+    return { ok: !error };
   },
   async signOut() {
     const { error } = await client.signOut({ fetchOptions: { body: {} } });

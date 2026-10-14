@@ -2,6 +2,9 @@
 
 This companion is the execution plan for `native-auth-rls-acceptance.mjs`.
 No hosted acceptance has been run during development. Production is excluded.
+The isolated, run-scoped A/B fixtures are seeded as verified synthetic identities
+so this harness tests session/RLS isolation; it does not prove mailbox ownership
+or SMTP delivery. Real accounts must use the verification flow; no bulk verification.
 
 ## Required operator approval
 

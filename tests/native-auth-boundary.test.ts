@@ -7,7 +7,7 @@ vi.mock('next/headers', () => ({ headers: async () => new Headers({ cookie: 'syn
 import { GET, POST } from '@/app/api/auth/[...all]/route';
 import { getCurrentUser } from '@/lib/auth/current-user';
 const id='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
-beforeEach(() => { vi.clearAllMocks(); vi.stubEnv('BACKEND_PROVIDER','native'); mock.handler.mockResolvedValue(Response.json({ ok: true })); });
+beforeEach(() => { vi.clearAllMocks(); vi.stubEnv('BACKEND_PROVIDER','native'); for (const [name,value] of Object.entries({NATIVE_SMTP_HOST:'smtp.example.invalid',NATIVE_SMTP_PORT:'465',NATIVE_SMTP_SECURITY:'tls',NATIVE_SMTP_USER:'synthetic',NATIVE_SMTP_PASSWORD:'synthetic-only',NATIVE_SMTP_FROM:'auth@example.invalid'})) vi.stubEnv(name,value); mock.handler.mockResolvedValue(Response.json({ ok: true })); });
 afterEach(() => vi.unstubAllEnvs());
 function request(path: string, body: unknown={}, origin: string | null='https://app.example.invalid') {
   return new Request(`https://app.example.invalid/api/auth/${path}`, { method:'POST',
@@ -60,7 +60,7 @@ it('keeps the signup limiter retry window and redacts its body',async()=>{
   expect(await response.json()).toEqual({code:'rate_limited'});
 });
 it('current user verifies native server session and strips provider privileges', async () => {
-  mock.session.mockResolvedValue({user:{id,email:'synthetic@example.invalid',role:'admin'},session:{token:'secret'}});
+  mock.session.mockResolvedValue({user:{id,email:'synthetic@example.invalid',emailVerified:true,role:'admin'},session:{token:'secret'}});
   expect(await getCurrentUser()).toEqual({id,email:'synthetic@example.invalid'});
   expect(mock.session).toHaveBeenCalledWith({headers:expect.any(Headers),query:{disableRefresh:true}});
   expect(mock.supabase).not.toHaveBeenCalled();
@@ -79,4 +79,11 @@ it('Supabase current user keeps authoritative getUser, not client session data',
   const getUser=vi.fn().mockResolvedValue({data:{user:{id}},error:null});mock.supabase.mockResolvedValue({auth:{getUser}});
   expect(await getCurrentUser()).toEqual({id,email:undefined});expect(getUser).toHaveBeenCalledOnce();expect(mock.session).not.toHaveBeenCalled();
   getUser.mockResolvedValue({data:{user:{id}},error:new Error('invalid')});expect(await getCurrentUser()).toBe(null);
+});
+
+it('rejects unverified native server sessions including previously issued cookies',async()=>{
+  mock.session.mockResolvedValue({user:{id,email:'synthetic@example.invalid',emailVerified:false},session:{token:'stale'}});
+  expect(await getCurrentUser()).toBeNull();
+  mock.handler.mockResolvedValue(Response.json({user:{id,emailVerified:false},session:{token:'stale'}}));
+  expect(await (await POST(request('get-session'))).json()).toBeNull();
 });

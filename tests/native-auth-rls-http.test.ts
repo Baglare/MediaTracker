@@ -19,7 +19,7 @@ it('real local HTTP + real Better Auth hashing, session cookies and revocation t
   const now=new Date();
   const store:Record<string,Record<string,unknown>[]>={user:[],account:[],session:[],verification:[],rateLimit:[]};
   for(const user of users) {
-    store.user.push({id:user.id,name:user.name,email:user.email,emailVerified:false,createdAt:now,updatedAt:now});
+    store.user.push({id:user.id,name:user.name,email:user.email,emailVerified:true,createdAt:now,updatedAt:now});
     store.account.push({id:randomUUID(),accountId:user.id,providerId:'credential',userId:user.id,
       password:await hashPassword(user.password),createdAt:now,updatedAt:now});
   }

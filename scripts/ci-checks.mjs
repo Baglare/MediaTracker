@@ -191,6 +191,8 @@ export function checkWorkflow(text) {
   const build = artifact.steps.find(step => step.run?.includes('npm run build'));
   for (const [name, value] of Object.entries({
     NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED: 'true',
+    NATIVE_SMTP_HOST: 'smtp.example.invalid', NATIVE_SMTP_PORT: '465', NATIVE_SMTP_SECURITY: 'tls',
+    NATIVE_SMTP_USER: 'synthetic-build-only', NATIVE_SMTP_PASSWORD: 'synthetic-build-mail-dddddddddddddddddddddd', NATIVE_SMTP_FROM: 'auth@example.invalid',
     NEXT_PUBLIC_CLOUD_MEDIA_SCHEMA_STAGE: 'd2c1', NEXT_PUBLIC_CLOUD_MEDIA_V2_ENABLED: 'true',
     NEXT_PUBLIC_CLOUD_GOALS_SCHEMA_STAGE: 'v1', NEXT_PUBLIC_CLOUD_GOALS_V1_ENABLED: 'true',
     NEXT_PUBLIC_CLOUD_MEDIA_MAINTENANCE: 'false', NEXT_PUBLIC_CLOUD_MEDIA_MINIMUM_CLIENT_VERSION: 'd2c2',
@@ -272,7 +274,7 @@ function git(...args) {
 export function checkEnvironment(names, environment) {
   requireContract(names.every((name) => !/^\.env(?:\.|$)/.test(name) || name === ".env.example"),
     "Use a clean checkout without local env files for CI validation");
-  requireContract(Object.keys(environment).every((name) => !/^(?:SUPABASE_|NEXT_PUBLIC_SUPABASE_|D8_STAGING_|RATE_LIMIT_|D7_|D6_PROVIDER_LIVE_SMOKE|AI_SERVER_|MEDIA_TRACKER_|OPENAI_|GROQ_|GEMINI_|OPENROUTER_|TMDB_|OMDB_|DATABASE_|PG|BETTER_AUTH_|BACKEND_PROVIDER|NEXT_PUBLIC_BACKEND_PROVIDER|VERCEL_TOKEN|PRIVACY_(?!TEST_BASELINE_REPO$)|MEDIATRACKER_DR_)/.test(name)),
+  requireContract(Object.keys(environment).every((name) => !/^(?:SUPABASE_|NEXT_PUBLIC_SUPABASE_|D8_STAGING_|RATE_LIMIT_|D7_|D6_PROVIDER_LIVE_SMOKE|AI_SERVER_|MEDIA_TRACKER_|OPENAI_|GROQ_|GEMINI_|OPENROUTER_|TMDB_|OMDB_|DATABASE_|PG|BETTER_AUTH_|(?:NEXT_PUBLIC_)?NATIVE_SMTP_|BACKEND_PROVIDER|NEXT_PUBLIC_BACKEND_PROVIDER|VERCEL_TOKEN|PRIVACY_(?!TEST_BASELINE_REPO$)|MEDIATRACKER_DR_)/.test(name)),
     "Unexpected application/live/credential environment in CI validation");
 }
 

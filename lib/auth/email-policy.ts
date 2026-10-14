@@ -1,0 +1,2 @@
+export const EMAIL_VERIFICATION_TTL = 3600;
+export const PASSWORD_RESET_TTL = 1800;

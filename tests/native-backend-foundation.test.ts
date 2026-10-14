@@ -108,12 +108,12 @@ describe('auth foundation', () => {
     expect(options.trustedOrigins).toEqual(['https://app.example.invalid']);
     expect(options.advanced.defaultCookieAttributes).toEqual({ httpOnly: true, sameSite: 'lax', secure: true });
     expect(options.advanced.database.generateId).toBe('uuid');
-    expect(options.emailAndPassword).toEqual({ enabled: true, disableSignUp: true });
-    expect(nativeAuthOptions({...env,NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED:'true'}).emailAndPassword.disableSignUp).toBe(false);
+    expect(options.emailAndPassword).toMatchObject({ enabled: true, disableSignUp: true, requireEmailVerification: true, autoSignIn: false, revokeSessionsOnPasswordReset: true });
+    expect(() => nativeAuthOptions({...env,NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED:'true'})).toThrow('native_smtp_configuration_invalid');
     expect(() => nativeAuthOptions({...env,NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED:'yes'})).toThrow('native_configuration_invalid');
     expect(options.session.cookieCache.enabled).toBe(false);
     expect(options.rateLimit.storage).toBe('database');
-    expect(options.rateLimit.customRules).toEqual({'/sign-up/email':{window:3600,max:5}});
+    expect(options.rateLimit.customRules).toMatchObject({'/sign-up/email':{window:3600,max:5},'/request-password-reset':{window:3600,max:5},'/send-verification-email':{window:3600,max:5}});
     expect(options.advanced.ipAddress.ipAddressHeaders).toEqual([]);
   });
   it('returns minimal UUID identity without privilege/session data', () => {

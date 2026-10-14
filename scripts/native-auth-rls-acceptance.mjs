@@ -110,7 +110,7 @@ export async function seed(client, config, users) {
     check((await client.query('SELECT count(*)::integer AS count FROM native_auth."user"')).rows[0]?.count === 0,
       'acceptance_nonempty_auth_database');
     for (const user of users) {
-      await client.query('INSERT INTO native_auth."user"(id,name,email) VALUES($1,$2,$3)',[user.id,user.name,user.email]);
+      await client.query('INSERT INTO native_auth."user"(id,name,email,"emailVerified") VALUES($1,$2,$3,true)',[user.id,user.name,user.email]);
       const hash = await hashPassword(user.password);
       await client.query(`INSERT INTO native_auth.account(id,"accountId","providerId","userId",password)
         VALUES($1,$2,'credential',$2::uuid,$3)`,[randomUUID(),user.id,hash]);

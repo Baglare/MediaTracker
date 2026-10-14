@@ -5,7 +5,10 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { betterAuth } from 'better-auth';
 import { nativeAuthOptions } from '@/lib/auth/native-options';
 vi.mock('server-only',()=>({}));
-const context=vi.hoisted(()=>({headers:new Headers()}));
+const context=vi.hoisted(()=>({headers:new Headers(),mail:[] as string[],tasks:[] as (()=>Promise<void>)[]}));
+vi.mock('@/lib/auth/native-email',async importOriginal=>({...await importOriginal<typeof import('@/lib/auth/native-email')>(),smtpMailTransport:()=>async (mail:{text:string})=>{context.mail.push(mail.text);}}));
+vi.mock('next/server',async importOriginal=>({...await importOriginal<typeof import('next/server')>(),after:(task:()=>Promise<void>)=>context.tasks.push(task)}));
+async function verificationToken() { await Promise.all(context.tasks.splice(0).map(task=>task())); return new URLSearchParams(new URL(context.mail.at(-1)!.split('\n')[1]).hash.slice(1)).get('token')!; }
 vi.mock('next/headers',()=>({headers:async()=>context.headers}));
 import { getNativePool } from '@/lib/backend/postgres';
 import { getNativeAuth } from '@/lib/auth/native';
@@ -43,6 +46,8 @@ describe.runIf(configured)('runner-owned disposable native DB proof',()=>{
     for(const name of ['A','B']) {
       const email=`${randomUUID()}@example.invalid`;
       const created=await fixture.api.signUpEmail({body:{name,email,password}});
+      await getNativeAuth().api.sendVerificationEmail({body:{email}});
+      await getNativeAuth().api.verifyEmail({query:{token:await verificationToken()}});
       users.push({id:created.user.id,email});
       expect(created.user.id).toMatch(/^[a-f0-9-]{36}$/);
     }
@@ -88,10 +93,14 @@ describe.runIf(configured)('runner-owned disposable native DB proof',()=>{
       const email=`${randomUUID()}@example.invalid`;
       const signup=await call('sign-up/email',{name,email,password});
       expect(signup.status).toBe(200);
-      const created=await signup.json();expect(created.user.emailVerified).toBe(false);
+      expect(await signup.json()).toEqual({status:true});
+      const created={user:(await getNativePool().query('SELECT id,email,"emailVerified" FROM native_auth."user" WHERE email=$1',[email])).rows[0]};
+      expect(created.user.emailVerified).toBe(false);
       const signupCookie=cookies(signup);
-      expect(signupCookie).toContain('mt-native');
-      expect((await call('sign-out',{},signupCookie)).status).toBe(200);
+      expect(signupCookie).toBe('');
+      const token=await verificationToken();
+      expect((await call('verify-email',{token})).status).toBe(200);
+      expect((await call('verify-email',{token})).status).toBe(400);
       const login=await call('sign-in/email',{email,password});expect(login.status).toBe(200);
       const cookie=cookies(login);expect(login.headers.getSetCookie().join(';')).toContain('HttpOnly');
       context.headers=new Headers({Cookie:cookie});

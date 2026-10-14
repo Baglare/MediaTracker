@@ -175,6 +175,8 @@ try {
       DATABASE_SSL_MODE:'disable',DATABASE_POOL_MAX:'1',BETTER_AUTH_URL:'http://localhost:3000',BETTER_AUTH_SECRET:randomBytes(32).toString('hex'),
       NATIVE_P1_PROOF_CONTAINER:id,NATIVE_P1_PROOF_NAME:name,NATIVE_P1_PROOF_NETWORK:network,NATIVE_P1_RELAY_PROOF:JSON.stringify(relay.proof),
       NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED:release?'true':'false',
+      NATIVE_SMTP_HOST:'smtp.example.invalid',NATIVE_SMTP_PORT:'465',NATIVE_SMTP_SECURITY:'tls',
+      NATIVE_SMTP_USER:'synthetic-only',NATIVE_SMTP_PASSWORD:'synthetic-only',NATIVE_SMTP_FROM:'auth@example.invalid',
       ...(release?{TRUSTED_INGRESS_MODE:'unconfigured',RATE_LIMIT_IDENTITY_HMAC_KEY:randomBytes(32).toString('hex'),
         RATE_LIMIT_RPC_SIGNING_KEY:randomBytes(32).toString('hex'),RATE_LIMIT_RPC_KEY_VERSION:'v1',RATE_LIMIT_RPC_AUDIENCE:'mt:signup-proof'}:{}),
       NODE_OPTIONS:`${dockerEnv.NODE_OPTIONS??''} --import=${pathToFileURL(`${process.cwd()}/scripts/ci-offline.mjs`).href}`},timeout:60000,killSignal:'SIGKILL'});
