@@ -10,16 +10,20 @@ const publicKeys = ['NEXT_PUBLIC_CLOUD_MEDIA_SCHEMA_STAGE', 'NEXT_PUBLIC_CLOUD_M
   'NEXT_PUBLIC_CLOUD_MEDIA_MAINTENANCE', 'NEXT_PUBLIC_CLOUD_MEDIA_DEPLOYMENT_EPOCH',
   'NEXT_PUBLIC_CLOUD_MEDIA_MINIMUM_CLIENT_VERSION'];
 
-// Execute only the compiled contract exports in a browser-like sandbox with no
-// process.env. Chunk registration does not mount React or start network work.
+// Execute compiled contract getters and useAuth with inert imports, without
+// mounting React/session subscriptions or permitting network work.
 export function checkClientChunks(sources, sha) {
   assert.match(sha, /^[a-f0-9]{40}$/);
   const epoch = `v1-${sha.slice(0, 12)}`;
-  const context = vm.createContext({ TURBOPACK: [] });
+  const inert = function () {};
+  inert.env = {};
+  const imports = new Proxy({ default: inert, useSyncExternalStore: () => ({ configured: true, loading: false, user: null, session: null }) },
+    { get: (target, key) => target[key] ?? inert });
+  const context = vm.createContext({ TURBOPACK: [], URL, Headers, Request, Response, AbortController, TextEncoder, TextDecoder,
+    imports, fetch: () => { throw new Error('compiled_contract_network_denied'); } });
   for (const source of sources) {
     for (const key of publicKeys) assert.ok(!source.includes(key), 'public_cloud_env_not_inlined');
-    // The shared policy module also exports the server's env-argument getter.
-    // Its property name may remain; the public getter must execute frozen below.
+    // Signup must be frozen in the hook; its runtime server policy is separate.
     assert.ok(!source.includes('process.env.NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED'), 'public_signup_env_not_inlined');
     // The Turbopack runtime boots the browser; only registration chunks are
     // executable here. All chunks still undergo the unresolved-env check.
@@ -33,18 +37,18 @@ export function checkClientChunks(sources, sha) {
   for (const registration of context.TURBOPACK) {
     for (const factory of registration) {
       if (typeof factory !== 'function'
-        || !/"(?:get(?:GoalCloud|Cloud)RolloutContract|nativePublicSignupEnabled)",0,/.test(factory.toString())) continue;
+        || !/"(?:get(?:GoalCloud|Cloud)RolloutContract|useAuth)",0,/.test(factory.toString())) continue;
       // Imports are deliberately inert. These pure getters must depend only on
       // their compiled literals, never on runtime env or imported services.
       context.factory = factory;
       context.exports = {};
-      vm.runInContext(`factory({ i: () => ({}), s: values => {
+      vm.runInContext(`factory({ i: () => imports, s: values => {
         for (let i = 0; i < values.length; i += 3) exports[values[i]] = values[i + 2];
       } });`, context, { timeout: 1000 });
-      for (const name of ['getCloudRolloutContract', 'getGoalCloudRolloutContract', 'nativePublicSignupEnabled']) {
+      for (const name of ['getCloudRolloutContract', 'getGoalCloudRolloutContract', 'useAuth']) {
         if (!context.exports[name]) continue;
         context.getter = context.exports[name];
-        const result = JSON.parse(vm.runInContext('JSON.stringify(getter())', context, { timeout: 1000 }));
+        const result = JSON.parse(vm.runInContext(name === 'useAuth' ? 'JSON.stringify(getter().signupEnabled)' : 'JSON.stringify(getter())', context, { timeout: 1000 }));
         contracts.set(name, result);
       }
     }
@@ -55,7 +59,7 @@ export function checkClientChunks(sources, sha) {
   assert.deepEqual(contracts.get('getGoalCloudRolloutContract'), {
     enabled: true, schemaStage: 'v1', status: 'ready', code: null, message: null,
   });
-  assert.equal(contracts.get('nativePublicSignupEnabled'), true, 'client_signup_disabled');
+  assert.equal(contracts.get('useAuth'), true, 'client_signup_disabled');
   return epoch;
 }
 

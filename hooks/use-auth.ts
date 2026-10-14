@@ -13,7 +13,6 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { getBackendProvider } from "@/lib/backend/provider";
 import type { ApplicationUser } from "@/lib/auth/identity";
 import { nativeBrowserAuth } from "@/lib/auth/browser";
-import { nativePublicSignupEnabled } from "@/lib/auth/signup-policy";
 
 export interface UseAuthState {
   configured: boolean;
@@ -152,7 +151,7 @@ export function useAuth(): UseAuthApi {
     return { ok: true };
   };
 
-  const signupEnabled = native && nativePublicSignupEnabled();
+  const signupEnabled = native && process.env.NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED === 'true';
   const signUp = async (email: string, password: string, name: string): Promise<AuthActionResult> => {
     if (!signupEnabled) return { ok: false, error: 'Yeni hesap kaydı kapalıdır.' };
     const result = await nativeBrowserAuth.signUp(email, password, name);

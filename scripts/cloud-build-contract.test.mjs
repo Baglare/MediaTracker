@@ -10,12 +10,17 @@ function chunks(v2 = 'v2', goals = true, signup = true) {
   })])]); const epoch = ${JSON.stringify(epoch)};`,
   `TURBOPACK.push([2, e => e.s(["getGoalCloudRolloutContract",0, () => ({
     enabled: ${goals}, schemaStage: "v1", status: "ready", code: null, message: null
-  })])]);`, `TURBOPACK.push([3, e => e.s(["nativePublicSignupEnabled",0, () => ${signup}])]);`];
+  })])]);`, `TURBOPACK.push([3, e => e.s(["useAuth",0, () => ({signupEnabled:${signup}})])]);`];
 }
-test('compiled browser getters work without process.env', () => {
+test('compiled browser getters and actual signup hook work without process.env', () => {
   assert.equal(checkClientChunks(chunks(), sha), epoch);
   assert.equal(checkClientChunks([...chunks(), `TURBOPACK.push([4, e => e.s(["nativeSignupEnabled",0,
     env => env.NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED === 'true'])]);`], sha), epoch);
+});
+test('unresolved signup in the hook cannot pass through inert imports',()=>{
+  const unresolved=chunks().slice(0,2).concat(`TURBOPACK.push([3,e=>{const p=e.i(1);e.s(["useAuth",0,
+    ()=>({signupEnabled:p.default.env.NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED==='true'})]);}]);`);
+  assert.throws(()=>checkClientChunks(unresolved,sha),/client_signup_disabled/);
 });
 test('missing, disabled or unresolved compiled public configuration fails', () => {
   for (const sources of [[], chunks('legacy'), chunks('v2', false), chunks('v2', true, false), chunks().slice(0,2),
