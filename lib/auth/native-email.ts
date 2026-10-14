@@ -3,6 +3,7 @@ import nodemailer from 'nodemailer';
 import { createHash } from 'node:crypto';
 import { nativeSmtpConfig } from './smtp-config';
 import { EMAIL_VERIFICATION_TTL } from './email-policy';
+import { safeRouteLog } from '../api/safe-route';
 export const verificationIdentifier = (token: string) => `email-verification:${createHash('sha256').update(token).digest('hex')}`;
 type Mail = { to: string; subject: string; text: string };
 export type MailTransport = (mail: Mail) => Promise<void>;
@@ -28,7 +29,7 @@ export function nativeEmailOptions(origin: string, store: () => Promise<Verifica
   send: MailTransport, schedule: (task: () => Promise<void>) => void) {
   const enqueue = (mail: Mail) => schedule(async () => {
     try { await send(mail); }
-    catch { console.error('native_auth_mail_delivery_failed'); }
+    catch { safeRouteLog({ event: 'native_auth_mail_delivery_failed', errorCode: 'operation_failed' }); }
   });
   return {
     emailVerification: {

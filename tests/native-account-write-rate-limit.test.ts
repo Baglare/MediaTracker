@@ -44,7 +44,7 @@ beforeEach(() => {
   vi.stubEnv('RATE_LIMIT_IDENTITY_HMAC_KEY', key); vi.stubEnv('RATE_LIMIT_IDENTITY_HMAC_PREVIOUS_KEY', '');
   vi.stubEnv('RATE_LIMIT_RPC_SIGNING_KEY', signingKey); vi.stubEnv('RATE_LIMIT_RPC_KEY_VERSION', 'offline-v1'); vi.stubEnv('RATE_LIMIT_RPC_AUDIENCE', 'mt:offline');
   m.headers.mockResolvedValue(new Headers({ cookie: 'synthetic-session' }));
-  m.session.mockResolvedValue({ user: { id: owner } });
+  m.session.mockResolvedValue({ user: { id: owner, emailVerified: true } });
   m.connect.mockResolvedValue({ query: m.query, release: m.release });
   m.query.mockImplementation(async (sql: string) => ({ rows: [{ result: sql.includes('consume_application_rate_limit_v1') ? allowed : { ok: true, deleted: true, state: themeState } }] }));
   m.asset.mockResolvedValue({ ok: true });
@@ -73,7 +73,7 @@ for (const [name, policy, route] of routes) describe(`${name}: ingress absent (o
     expect(m.query).toHaveBeenCalledWith("SELECT set_config('app.user_id', $1, true)", [owner]);
     expect(domainCalls().length + m.asset.mock.calls.length).toBe(1);
   });
-  it.each([null, { user: { id: 'forged' } }])('denies anonymous/invalid session %j without DB work', async session => {
+  it.each([null, { user: { id: 'forged', emailVerified: true } }])('denies anonymous/invalid session %j without DB work', async session => {
     m.session.mockResolvedValue(session); expect((await route()).status).toBe(session === null ? 401 : 500);
     expect(m.connect).not.toHaveBeenCalled(); expectNoWrite();
     expect(await consumeRateLimit(request('GET'), policy)).toMatchObject({ allowed: false, source: 'unavailable' });
@@ -83,16 +83,21 @@ for (const [name, policy, route] of routes) describe(`${name}: ingress absent (o
     const response = await route(); expect(response.status).toBeGreaterThanOrEqual(500);
     expect(await response.text()).not.toContain('PRIVATE_AUTH_CANARY'); expect(m.connect).not.toHaveBeenCalled(); expectNoWrite();
   });
+  it.each([false, undefined, 'true'])('denies unverified session emailVerified=%s before DB work', async emailVerified => {
+    m.session.mockResolvedValue({ user: { id: owner, emailVerified } });
+    expect((await route()).status).toBe(401);
+    expect(m.connect).not.toHaveBeenCalled(); expectNoWrite();
+  });
   it('limiter session failure denies after route authentication', async () => {
     // Assets also perform an authenticated account barrier before the limiter.
     const initialSessions = policy === 'asset_write' ? 2 : 1;
-    for (let i = 0; i < initialSessions; i++) m.session.mockResolvedValueOnce({ user: { id: owner } });
+    for (let i = 0; i < initialSessions; i++) m.session.mockResolvedValueOnce({ user: { id: owner, emailVerified: true } });
     m.session.mockRejectedValueOnce(new Error('PRIVATE_AUTH_CANARY'));
     expect((await route()).status).toBe(503); expect(limiterCalls()).toHaveLength(0); expectNoWrite();
   });
-  it.each([null, { user: { id: other } }])('limiter transaction session loss/change %j denies before RPC', async session => {
+  it.each([null, { user: { id: other, emailVerified: true } }])('limiter transaction session loss/change %j denies before RPC', async session => {
     const initialSessions = policy === 'asset_write' ? 3 : 2;
-    for (let i = 0; i < initialSessions; i++) m.session.mockResolvedValueOnce({ user: { id: owner } });
+    for (let i = 0; i < initialSessions; i++) m.session.mockResolvedValueOnce({ user: { id: owner, emailVerified: true } });
     m.session.mockResolvedValueOnce(session);
     expect((await route()).status).toBe(503); expect(limiterCalls()).toHaveLength(0); expectNoWrite();
     expect(m.query).toHaveBeenCalledWith('ROLLBACK');
@@ -128,8 +133,8 @@ for (const [name, policy, route] of routes) describe(`${name}: ingress absent (o
   it('limiter auth timeout starts no late reservation', async () => {
     vi.useFakeTimers();
     const initialSessions = policy === 'asset_write' ? 2 : 1;
-    for (let i = 0; i < initialSessions; i++) m.session.mockResolvedValueOnce({ user: { id: owner } });
-    m.session.mockImplementation(() => new Promise(resolve => setTimeout(() => resolve({ user: { id: owner } }), 1000)));
+    for (let i = 0; i < initialSessions; i++) m.session.mockResolvedValueOnce({ user: { id: owner, emailVerified: true } });
+    m.session.mockImplementation(() => new Promise(resolve => setTimeout(() => resolve({ user: { id: owner, emailVerified: true } }), 1000)));
     const pending = route(); await vi.advanceTimersByTimeAsync(751); expect((await pending).status).toBe(503);
     await vi.advanceTimersByTimeAsync(500); expect(limiterCalls()).toHaveLength(0); expectNoWrite();
   });

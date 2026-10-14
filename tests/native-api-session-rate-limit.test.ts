@@ -39,7 +39,7 @@ beforeEach(() => {
   vi.stubEnv('RATE_LIMIT_IDENTITY_HMAC_KEY', key); vi.stubEnv('RATE_LIMIT_IDENTITY_HMAC_PREVIOUS_KEY', '');
   vi.stubEnv('RATE_LIMIT_RPC_SIGNING_KEY', signingKey); vi.stubEnv('RATE_LIMIT_RPC_KEY_VERSION', 'offline-v1'); vi.stubEnv('RATE_LIMIT_RPC_AUDIENCE', 'mt:offline');
   mocks.headers.mockResolvedValue(new Headers({ cookie: 'synthetic-session' }));
-  mocks.session.mockResolvedValue({ user: { id: owner } });
+  mocks.session.mockResolvedValue({ user: { id: owner, emailVerified: true } });
   mocks.connect.mockResolvedValue({ query: mocks.query, release: mocks.release });
   mocks.query.mockImplementation(async () => ({ rows: [{ result: allowed }] }));
   mocks.notifications.mockResolvedValue({ notifications: [] }); mocks.rpc.mockResolvedValue({ data: {}, error: null });
@@ -63,7 +63,7 @@ for (const [name, route, policy, downstream] of routes) describe(`${name}: nativ
     expect(mocks.query).toHaveBeenCalledWith("SELECT set_config('app.user_id', $1, true)", [owner]);
     expect(downstream()).toHaveBeenCalledTimes(1);
   });
-  it.each([null, { user: { id: 'forged' } }])('missing/invalid session %j only admits the bounded search pool', async session => {
+  it.each([null, { user: { id: 'forged', emailVerified: true } }])('missing/invalid session %j only admits the bounded search pool', async session => {
     mocks.session.mockResolvedValue(session);
     const response = await route();
     if (policy === 'tvmaze_search' && session === null) {
@@ -82,8 +82,22 @@ for (const [name, route, policy, downstream] of routes) describe(`${name}: nativ
     mocks.session.mockRejectedValue(new Error('PRIVATE_AUTH_CANARY'));
     expect((await route()).status).toBe(503); expect(mocks.connect).not.toHaveBeenCalled(); expect(downstream()).not.toHaveBeenCalled();
   });
-  it.each([null, { user: { id: other } }])('denies session loss/change during transaction %j', async session => {
-    mocks.session.mockResolvedValueOnce({ user: { id: owner } }).mockResolvedValueOnce(session);
+  it.each([false, undefined, 'true'])('unverified session emailVerified=%s never grants user admission', async emailVerified => {
+    mocks.session.mockResolvedValue({ user: { id: owner, emailVerified } });
+    const response = await route();
+    if (policy === 'tvmaze_search') {
+      expect(response.status).toBe(200);
+      const call = mocks.query.mock.calls.find(([sql]) => sql.includes('app.tvmaze_guest_rate_limit_v1'))!;
+      expect(JSON.parse(call[1][0])).toMatchObject({ identity_class: 'guest_pool', ingress: [], policy_id: 'tvmaze_search' });
+      expect(calls()).toHaveLength(0);
+      expect(mocks.query).not.toHaveBeenCalledWith("SELECT set_config('app.user_id', $1, true)", [owner]);
+    } else {
+      expect(response.status).toBe(503);
+      expect(mocks.connect).not.toHaveBeenCalled(); expect(downstream()).not.toHaveBeenCalled();
+    }
+  });
+  it.each([null, { user: { id: other, emailVerified: true } }])('denies session loss/change during transaction %j', async session => {
+    mocks.session.mockResolvedValueOnce({ user: { id: owner, emailVerified: true } }).mockResolvedValueOnce(session);
     expect((await route()).status).toBe(503); expect(calls()).toHaveLength(0); expect(downstream()).not.toHaveBeenCalled();
     expect(mocks.query).toHaveBeenCalledWith('ROLLBACK');
   });
@@ -106,7 +120,7 @@ for (const [name, route, policy, downstream] of routes) describe(`${name}: nativ
     expect(calls()).toHaveLength(1); expect(downstream()).not.toHaveBeenCalled();
   });
   it('auth timeout cannot start a late reservation', async () => {
-    vi.useFakeTimers(); mocks.session.mockImplementation(() => new Promise(resolve => setTimeout(() => resolve({ user: { id: owner } }), 1000)));
+    vi.useFakeTimers(); mocks.session.mockImplementation(() => new Promise(resolve => setTimeout(() => resolve({ user: { id: owner, emailVerified: true } }), 1000)));
     const pending = route(); await vi.advanceTimersByTimeAsync(751); expect((await pending).status).toBe(503);
     await vi.advanceTimersByTimeAsync(500); expect(mocks.connect).not.toHaveBeenCalled(); expect(downstream()).not.toHaveBeenCalled();
   });
@@ -159,7 +173,7 @@ describe('TVMaze native shared cooldown without ingress', () => {
     const response = await search(request()); expect(response.status).toBe(503); expect(await response.json()).toEqual({ code: 'rate_limit_unavailable' });
   });
   it('cooldown auth timeout starts no late SQL', async () => {
-    vi.useFakeTimers(); mocks.session.mockImplementation(() => new Promise(resolve => setTimeout(() => resolve({ user: { id: owner } }), 1000)));
+    vi.useFakeTimers(); mocks.session.mockImplementation(() => new Promise(resolve => setTimeout(() => resolve({ user: { id: owner, emailVerified: true } }), 1000)));
     const pending = reportProviderCooldown(request(), 'tvmaze_search', new Response(null, { status: 429 }));
     await vi.advanceTimersByTimeAsync(751); expect((await pending)?.status).toBe(503);
     await vi.advanceTimersByTimeAsync(500); expect(mocks.connect).not.toHaveBeenCalled();
@@ -170,8 +184,8 @@ describe('TVMaze native shared cooldown without ingress', () => {
     const call=mocks.query.mock.calls.find(([sql])=>sql.includes('app.tvmaze_guest_rate_limit_v1'))!;
     expect(JSON.parse(call[1][0])).toMatchObject({ operation: 'cooldown', identity_class: 'guest_pool', ingress: [], policy_id: 'tvmaze_search' });
   });
-  it.each([null, { user: { id: other } }])('cooldown session loss/change fails closed %j', async session => {
-    mocks.session.mockResolvedValueOnce({ user: { id: owner } }).mockResolvedValueOnce(session);
+  it.each([null, { user: { id: other, emailVerified: true } }])('cooldown session loss/change fails closed %j', async session => {
+    mocks.session.mockResolvedValueOnce({ user: { id: owner, emailVerified: true } }).mockResolvedValueOnce(session);
     expect((await reportProviderCooldown(request(), 'tvmaze_search', new Response(null, { status: 429 })))?.status).toBe(503);
     expect(calls('cooldown')).toHaveLength(0); expect(mocks.query).toHaveBeenCalledWith('ROLLBACK');
   });

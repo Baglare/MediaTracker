@@ -9,6 +9,17 @@ import { supabaseApplicationError } from "@/lib/supabase/safe-error";
 const secrets = ["Bearer credential-fixture", "cookie-session-fixture", "eyJhbGciOiJIUzI1NiJ9.fixture.signature", "private@example.test", "sb_secret_fixture", "postgres://owner:password-fixture@project-ref.test/db", "personal-note-fixture", "raw-search-fixture"];
 afterEach(() => vi.restoreAllMocks());
 describe("allowlisted telemetry", () => {
+  it("preserves Auth correlation for static mail failure telemetry without mail data", async () => {
+    const sink = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const response = await runSafeApiRoute("/api/auth/[...all]", "POST", async () => {
+      safeRouteLog({ event: "native_auth_mail_delivery_failed", errorCode: "operation_failed" });
+      return Response.json({ status: true });
+    });
+    expect(sink).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(sink.mock.calls[0][0])).toEqual({ event: "native_auth_mail_delivery_failed", errorCode: "operation_failed",
+      timestamp: expect.any(String), route: "/api/auth/[...all]", method: "POST", requestId: response.headers.get("X-Request-Id") });
+    expect(response.headers.get("X-Request-Id")).toMatch(/^[0-9a-f-]{36}$/);
+  });
   it("drops secrets, nested objects and oversize values without serialization", () => {
     const sink = vi.spyOn(console, "warn").mockImplementation(() => {});
     const value = { event: "route_error", route: "/api/xp", method: "POST", status: 500, latencyMs: 7, errorCode: "internal_error", Authorization: secrets[0], Cookie: secrets[1], token: secrets[2], email: secrets[3], serviceRole: secrets[4], databaseUrl: secrets[5], note: secrets[6], query: secrets[7], nested: { headers: secrets, toJSON() { throw Error("must not serialize"); } }, provider: "x".repeat(10000) };

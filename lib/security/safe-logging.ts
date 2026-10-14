@@ -1,6 +1,6 @@
 /** Application telemetry only. Unknown keys and values are dropped, never stringified. */
 export type SafeLogEvent = {
-  event: "route_error" | "provider_error" | "cloud_error" | "client_error" | "storage_error" | "social_parse_skipped";
+  event: "route_error" | "provider_error" | "cloud_error" | "client_error" | "storage_error" | "social_parse_skipped" | "native_auth_mail_delivery_failed";
   requestId?: string;
   route?: string;
   method?: string;
@@ -13,11 +13,12 @@ export type SafeLogEvent = {
   rateLimited?: boolean;
 };
 
-const EVENTS = new Set(["route_error", "provider_error", "cloud_error", "client_error", "storage_error", "social_parse_skipped"]);
+const EVENTS = new Set(["route_error", "provider_error", "cloud_error", "client_error", "storage_error", "social_parse_skipped", "native_auth_mail_delivery_failed"]);
 const CODES = new Set(["request_rejected", "unauthorized", "forbidden", "rate_limited", "upstream_error", "internal_error", "operation_failed"]);
 const PROVIDERS = new Set(["tvmaze", "openlibrary", "tmdb", "anilist", "omdb", "openai", "groq", "gemini", "openrouter", "supabase"]);
 const METHODS = new Set(["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]);
 const ROUTES = new Set([
+  "/api/auth/[...all]",
   "/api/ai/interpret", "/api/ai/recommend", "/api/anilist/details", "/api/anilist/search",
   "/api/calendar/anilist", "/api/calendar/tmdb", "/api/calendar/tvmaze",
   "/api/cloud/rollout", "/api/ai/capabilities", "/api/providers/capabilities", "/api/social/profile/[username]", "/api/social/profile/hero", "/api/social/profile/summary", "/api/dev/recommendation-annotation", "/api/omdb/details", "/api/omdb/search",

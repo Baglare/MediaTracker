@@ -67,5 +67,5 @@ async function handle(request: Request) {
     return response;
   } catch { return apiError('auth_unavailable', 503); }
 }
-export function GET(request: Request) { return runSafeApiRoute('/api/auth/[...all]', 'GET', () => handle(request)); }
-export function POST(request: Request) { return runSafeApiRoute('/api/auth/[...all]', 'POST', () => handle(request)); }
+export function GET(request: Request) { return runSafeApiRoute("/api/auth/[...all]", 'GET', () => handle(request)); }
+export function POST(request: Request) { return runSafeApiRoute("/api/auth/[...all]", 'POST', () => handle(request)); }

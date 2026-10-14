@@ -36,7 +36,7 @@ beforeEach(() => {
   vi.stubEnv('RATE_LIMIT_RPC_SIGNING_KEY', 'offline-signing-key-not-a-secret-0002');
   vi.stubEnv('RATE_LIMIT_RPC_KEY_VERSION', 'offline-v1'); vi.stubEnv('RATE_LIMIT_RPC_AUDIENCE', 'mt:offline');
   mocks.headers.mockResolvedValue(new Headers({ cookie: 'synthetic-session' }));
-  mocks.session.mockResolvedValue({ user: { id: owner } });
+  mocks.session.mockResolvedValue({ user: { id: owner, emailVerified: true } });
   mocks.connect.mockResolvedValue({ query: mocks.query, release: mocks.release });
   mocks.query.mockImplementation(async (sql: string) => ({ rows: sql.includes('app.consume_application_rate_limit_v1')
     ? [{ result: { allowed: true, reason: 'allowed', retry_after_seconds: 0 } }] : [] }));
@@ -67,9 +67,15 @@ describe('native Cloud admission through session verification and SQL transport 
     expect(domainCalls()).toHaveLength(0);
     expect(mocks.query).toHaveBeenCalledWith('ROLLBACK');
   });
-  it.each([null, { user: { id: other } }])('denies session loss/change during limiter transaction: %s', async session => {
-    mocks.session.mockResolvedValueOnce({ user: { id: owner } })
-      .mockResolvedValueOnce({ user: { id: owner } }).mockResolvedValueOnce(session);
+  it.each([false, undefined, 'true'])('denies unverified session emailVerified=%s before Cloud or SQL work', async emailVerified => {
+    mocks.session.mockResolvedValue({ user: { id: owner, emailVerified } });
+    expect((await POST(request())).status).toBe(401);
+    expect((await enforceNativeCloudRateLimit(request()))?.status).toBe(503);
+    expect(mocks.connect).not.toHaveBeenCalled(); expect(domainCalls()).toHaveLength(0);
+  });
+  it.each([null, { user: { id: other, emailVerified: true } }])('denies session loss/change during limiter transaction: %s', async session => {
+    mocks.session.mockResolvedValueOnce({ user: { id: owner, emailVerified: true } })
+      .mockResolvedValueOnce({ user: { id: owner, emailVerified: true } }).mockResolvedValueOnce(session);
     const response = await POST(request());
     expect(response.status).toBe(503);
     expect(await response.json()).toEqual({ code: 'rate_limit_unavailable' });

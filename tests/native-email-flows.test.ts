@@ -70,9 +70,11 @@ it('generic request responses and shared forged-IP-resistant quotas include SMTP
   const existing = await call('request-password-reset', { email });
   const absent = await call('request-password-reset', { email: 'absent@example.invalid' });
   expect(existing.status).toBe(absent.status); expect(await existing.json()).toEqual(await absent.json());
-  const logs = vi.spyOn(console, 'error').mockImplementation(() => {});
+  const logs = vi.spyOn(console, 'warn').mockImplementation(() => {});
   mock.send.mockRejectedValue(new Error('private SMTP password and address'));
-  await drain(); expect(logs).toHaveBeenCalledWith('native_auth_mail_delivery_failed');
+  await drain(); expect(logs).toHaveBeenCalledTimes(1);
+  expect(JSON.parse(logs.mock.calls[0][0])).toEqual({ event: 'native_auth_mail_delivery_failed', errorCode: 'operation_failed', timestamp: expect.any(String) });
+  for (const privateValue of [email, tokenFromMail(0), smtp.NATIVE_SMTP_PASSWORD, 'private SMTP password and address']) expect(logs.mock.calls[0][0]).not.toContain(privateValue);
   expect(mock.store.session).toHaveLength(0);
   for (let i = 0; i < 3; i++) expect((await call('request-password-reset', { email: `absent-${i}@example.invalid` })).status).toBe(200);
   const quota = await call('request-password-reset', { email }); expect(quota.status).toBe(429); expect(Number(quota.headers.get('Retry-After'))).toBeGreaterThan(3500);
