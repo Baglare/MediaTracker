@@ -2,7 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { verifyDisposableRelay } from '../scripts/native-disposable-relay.mjs';
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { betterAuth } from 'better-auth';
+import { betterAuth, type BetterAuthOptions } from 'better-auth';
 import { nativeAuthOptions } from '@/lib/auth/native-options';
 vi.mock('server-only',()=>({}));
 const context=vi.hoisted(()=>({headers:new Headers(),mail:[] as string[],tasks:[] as (()=>Promise<void>)[]}));
@@ -36,7 +36,7 @@ describe.runIf(configured)('runner-owned disposable native DB proof',()=>{
     await assertDisposable();
     approved=true;
     await getNativePool().query('SELECT 1'); // onConnect verifies role separation.
-    getNativeAuth().options.onAPIError={onError(error){
+    (getNativeAuth().options as BetterAuthOptions).onAPIError={onError(error){
       const value=error as {code?:unknown;name?:unknown;message?:unknown};
       if(typeof value.code==='string'&&/^[0-9A-Z]{5}$/.test(value.code)) console.error(`PG18_AUTH_SQLSTATE=${value.code}`);
       const category=value.message==='timeout exceeded when trying to connect'?'pool_acquisition_timeout'
