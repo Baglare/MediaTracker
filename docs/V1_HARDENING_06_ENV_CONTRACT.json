@@ -515,5 +515,27 @@
     "visibility": "server secret",
     "owner": "release operator",
     "failure": "unset/invalid keeps capability disabled or blocks acceptance; no substitute target"
+  },
+  {
+    "name": "NATIVE_EMAIL_VERIFICATION_KEY",
+    "LOCAL": "required only for native; pool max optional; isolated disposable target",
+    "CI": "absent: credential-free offline suite",
+    "PREVIEW": "native only; optional; forbidden in supabase",
+    "PRODUCTION": "native only; optional; forbidden in supabase",
+    "allowed": "32 independent random bytes encoded as 64 lowercase hex; server-only; required for verification; absent denies",
+    "visibility": "server secret",
+    "owner": "release operator",
+    "failure": "unset/invalid keeps capability disabled or blocks acceptance; no substitute target"
+  },
+  {
+    "name": "NATIVE_EMAIL_VERIFICATION_EPOCH",
+    "LOCAL": "required only for native; pool max optional; isolated disposable target",
+    "CI": "absent: credential-free offline suite",
+    "PREVIEW": "native only; optional; forbidden in supabase",
+    "PRODUCTION": "native only; optional; forbidden in supabase",
+    "allowed": "positive Unix issuance cutoff matching protected DB key pin; required for verification; absent denies",
+    "visibility": "server non-secret",
+    "owner": "release operator",
+    "failure": "unset/invalid keeps capability disabled or blocks acceptance; no substitute target"
   }
 ]
