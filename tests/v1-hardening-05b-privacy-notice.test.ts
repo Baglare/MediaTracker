@@ -39,7 +39,12 @@ describe.each(["supabase", "native"] as const)("05B public factual notice and ma
       expect(recipients).toContain("erişim denetimli dosya uçları");
       expect(recipients).toContain("özel depolama doğrudan herkese açık değildir");
       expect(recipients).not.toMatch(/Supabase|Vercel/);
-      for (const phrase of ["Supabase alternatifi korunmaktadır", "gerçek veritabanı kabulünün", "Altyapının işletilmesi yeni sürümün bütün kullanıcı", "akışlarının kabul edildiği anlamına gelmez", "Sağlayıcı veri bölgesi, erişim ve yedek saklama", "ayrı operatör ve hukuk doğrulaması gerekir", "yalnız Türkiye&#x27;de işlendiğini göstermez", "yedek saklama süreleri henüz doğrulanmamıştır", "loglarının saklama süresi de kesinleşmemiştir"]) expect(html).toContain(phrase);
+      for (const phrase of ["Supabase alternatifi korunmaktadır", "gerçek veritabanı kabulünün", "Altyapının işletilmesi yeni sürümün bütün kullanıcı", "akışlarının kabul edildiği anlamına gelmez", "Operatörün bildirdiği TürkHosting yazılı yanıtına göre", "bağımsız olarak doğrulanmış sözleşme kanıtı değildir", "yabancı alt işleyen kullanılmaz", "Türkiye merkezlidir", "yaklaşık dört haftalık", "hosting rotasyonu bu kopyaları temizlemez", "loglarının saklama süresi de kesinleşmemiştir"]) expect(html).toContain(phrase);
+      expect(recipients).toContain("Yanıt Gmail, TVMaze, dış görsel/CDN, tarayıcı veya operatörün bağımsız yedek kopyalarını kapsamaz");
+      expect(html).toContain("belirli bir hesabın son kopyasının");
+      expect(html).toContain("kesin silinme tarihi veya özel dosyaların tutarlı yedeklendiği/geri yüklenebildiği kanıtı değildir");
+      expect(html).toContain("IP, zaman, istek ve User-Agent");
+      expect(html).toContain("Kayıtta yazılmış adres veya o adresten gelen mesaj tek başına hesap sahipliğini kanıtlamaz");
       expect(html).not.toContain("native production geçişi henüz tamamlanmamıştır");
     } else {
       for (const phrase of ["Supabase Auth", "şifre işlenir, uygulama tablosunda tutulmaz", "Supabase Postgres/Storage", "Supabase sınırlandırma/sosyal kayıtları", "Vercel"]) expect(groups).toContain(phrase);
@@ -68,6 +73,17 @@ describe.each(["supabase", "native"] as const)("05B public factual notice and ma
     for (const path of ["components/auth-panel.tsx", "features/settings/components/settings-feature.tsx", "components/app-shell/public-topbar.tsx"]) {
       expect(readFileSync(path, "utf8"), path).toContain('href="/privacy"');
     }
+  });
+
+  it("keeps registration disclosure before submission without a mandatory consent control", () => {
+    const panel = readFileSync("components/auth-panel.tsx", "utf8");
+    const disclosure = panel.indexOf("{registering && <p");
+    expect(disclosure).toBeGreaterThan(-1);
+    expect(disclosure).toBeLessThan(panel.indexOf('type="submit"'));
+    expect(panel.slice(disclosure, panel.indexOf('type="submit"'))).toContain('href="/privacy"');
+    expect(panel).toContain("Bu bilgilendirme açık rıza talebi değildir");
+    expect(panel).toContain("E-posta sahipliği doğrulanmaz; e-postayla şifre kurtarma henüz yoktur");
+    expect(panel).not.toMatch(/type="checkbox"|privacyConsent|consentRequired/);
   });
 
   it("renders both notice sections and all ten understandable processing groups", () => {

@@ -167,7 +167,7 @@ export default function AuthPanel() {
               autoComplete={registering ? 'new-password' : 'current-password'}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="En az 6 karakter"
+              placeholder={registering ? 'En az 8 karakter' : 'En az 6 karakter'}
               className={inputCls}
             />
           </div>
@@ -178,6 +178,10 @@ export default function AuthPanel() {
             {error}
           </p>
         )}
+        {registering && <p className="text-xs text-[var(--app-text-secondary)] leading-relaxed">
+          Hesap oluşturmadan önce <Link href="/privacy" className="underline underline-offset-4">KVKK aydınlatma metnini</Link> inceleyebilirsin.
+          Bu bilgilendirme açık rıza talebi değildir. E-posta sahipliği doğrulanmaz; e-postayla şifre kurtarma henüz yoktur.
+        </p>}
         <button
           type="submit"
           disabled={submitting}

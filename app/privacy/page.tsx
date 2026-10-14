@@ -14,9 +14,9 @@ const processingGroups = (native: boolean) => [
   {
     title: "Hesap ve kimlik doğrulama",
     data: native
-      ? "E-posta, hesap kimliği ve oturum bilgileri; girişte şifre işlenir, şifre özeti ve oturum kayıtları Better Auth'un özel PostgreSQL şemasında tutulur."
+      ? "E-posta, görünen ad, hesap kimliği ve oturum bilgileri; girişte şifre işlenir, şifre özeti ve oturum kayıtları Better Auth'un özel PostgreSQL şemasında tutulur."
       : "E-posta, hesap kimliği ve oturum bilgileri; girişte şifre işlenir, uygulama tablosunda tutulmaz.",
-    purpose: "Mevcut kullanıcıların girişini ve oturum güvenliğini sağlamak.",
+    purpose: "Mevcut kullanıcıların girişini ve oturum güvenliğini sağlamak; kayıt açılırsa hesabı oluşturmak.",
     method: native
       ? "Giriş ve kayıt formu, uygulamanın Better Auth uçları ve oturum çerezleri; otomatik işlemler."
       : "Giriş formu ve hesap/oturum SDK'sı; otomatik işlemler.",
@@ -167,8 +167,8 @@ export default function PrivacyPage() {
             <p>
               Bu dağıtımda native PostgreSQL, Better Auth ve özel dosya depolaması kullanılır.
               Supabase alternatifi korunmaktadır. Altyapının işletilmesi yeni sürümün bütün kullanıcı
-              akışlarının kabul edildiği anlamına gelmez. Sağlayıcı veri bölgesi, erişim ve yedek saklama
-              koşulları için ayrı operatör ve hukuk doğrulaması gerekir.
+              akışlarının kabul edildiği anlamına gelmez. TürkHosting koşulları aşağıda operatörün bildirdiği
+              yazılı yanıt olarak ayrılmıştır; bağımsız sözleşme veya canlı kabul doğrulaması değildir.
             </p>
           )}
         </Section>
@@ -207,6 +207,18 @@ export default function PrivacyPage() {
             rıza kanıtı değildir. Açık rıza genel bir yedek dayanak olarak kullanılmaz; madde 6 kapsamına giren
             içerikler varsa ayrıca değerlendirilir.
           </p>
+          <p>
+            Amaç bazında değerlendirme: kayıt/giriş ve talep edilen Cloud/hedef işlemleri için madde 5/2(c);
+            profil/sosyal etkileşim için gerekli hizmet işlemleri bakımından 5/2(c), kişinin alenileştirme
+            amacıyla sınırlı yayın için 5/2(d); güvenlik için gereklilik ve dengeleme şartıyla 5/2(f), somut
+            hukuki yükümlülük varsa 5/2(ç); kurtarma yedekleri için gerekli hizmet sürekliliği bakımından
+            5/2(c) veya dengeleme şartıyla 5/2(f); destek için 5/2(c), hak başvuruları için 5/2(ç), gerekli
+            uyuşmazlık kanıtı için 5/2(e); sağlayıcı/görsel istekleri için talep edilen hizmete gereklilik
+            bakımından 5/2(c) adaydır. Her adayın gerekliliği ayrıca onaylanmalıdır; isteğe bağlı dış görsel
+            ve yayın işlemlerinde bu şartlar yoksa ayrı, özgür ve belirli açık rıza veya işlemi sınırlama
+            değerlendirilir. Özel nitelikli veri için madde 5 yeterli değildir; uygulanabilir madde 6/3
+            şartı ve ek önlemler ayrıca belirlenmelidir.
+          </p>
         </Section>
 
         <Section title="Alıcılar, dış servisler ve yurt dışı işleme">
@@ -234,7 +246,7 @@ export default function PrivacyPage() {
           </p>
           <p>
             {native
-              ? "TürkHosting adı verilerin yalnız Türkiye'de işlendiğini göstermez. Barındırma, veritabanı, dosya depolaması, posta ve diğer dış servisler gerçek altyapı/yapılandırmaya göre Türkiye dışında veri işleyebilir."
+              ? "Operatörün bildirdiği TürkHosting yazılı yanıtına göre belirtilen barındırma hizmetinin uygulama, veritabanı, dosya, log ve yedek işlemleri Türkiye'dedir; bu hizmette yabancı alt işleyen kullanılmaz ve yetkili altyapı personelinin erişimi Türkiye merkezlidir. Bu bilgi bağımsız olarak doğrulanmış sözleşme kanıtı değildir. Yanıt Gmail, TVMaze, dış görsel/CDN, tarayıcı veya operatörün bağımsız yedek kopyalarını kapsamaz; bu ayrı akışlar Türkiye dışında işleme içerebilir."
               : "Vercel, Supabase, posta ve diğer dış servisler gerçek altyapı/yapılandırmaya göre Türkiye dışında veri işleyebilir."}
             {" "}Tarayıcıdan doğrudan dış sunuculara yapılan istekler IP ve istek metadata’sını o sunucuya
             gösterebilir. Kesin bölge, platform logları ve saklama koşulları uygulama kaynak koduyla belirlenemez.
@@ -282,6 +294,13 @@ export default function PrivacyPage() {
             hesap verisi açıklanmaz. Kayıtlı e-postaya dayanan formal kanal kapsamı kısmidir; daha geniş kapsam
             ayrıca operatör/hukuk değerlendirmesi gerektirir.
           </p>
+          {native && (
+            <p>
+              Mevcut native akışta e-posta sahipliği doğrulaması ve e-postayla şifre kurtarma yoktur.
+              Kayıtta yazılmış adres veya o adresten gelen mesaj tek başına hesap sahipliğini kanıtlamaz;
+              hesap verisi açıklama, silme ve sahiplik değişiklikleri için ayrıca güvenli doğrulama gerekir.
+            </p>
+          )}
           <p>
             Başvuruda ad/soyad, talep konusu ve tebligata esas yerleşim veya iş yeri adresi; formal başvuru için
             mevzuatın gerektirdiği kimlik bilgileri (Türkiye Cumhuriyeti vatandaşları için T.C. kimlik numarası;
@@ -338,9 +357,14 @@ export default function PrivacyPage() {
           </p>
           {native && (
             <p>
-              Native PostgreSQL ve özel dosya depolaması için gerçek yedekleme/geri yükleme kabulü ve yedek
-              saklama süreleri henüz doğrulanmamıştır. Barındırma loglarının saklama süresi de kesinleşmemiştir;
-              özel dosya depolaması yedeklerin veya logların silindiğine ilişkin garanti değildir.
+              Operatörün bildirdiği TürkHosting yazılı yanıtına göre hosting yedekleri günlük alınır ve
+              yaklaşık dört haftalık saklama/rotasyona tabidir. Bu, belirli bir hesabın son kopyasının
+              kesin silinme tarihi veya özel dosyaların tutarlı yedeklendiği/geri yüklenebildiği kanıtı değildir.
+              Operatörün bağımsız şifreli yedek kopyaları ayrı saklama, erişim ve silme politikasına tabidir;
+              hosting rotasyonu bu kopyaları temizlemez. Silinen hesapların geri yüklemede yeniden açılmasını
+              önleyecek uzlaştırma ayrıca gerekir. Hosting web logları IP, zaman, istek ve User-Agent içerebilir;
+              barındırma loglarının saklama süresi de kesinleşmemiştir. Özel dosya depolaması yedeklerin veya
+              logların silindiğine ilişkin garanti değildir.
             </p>
           )}
         </Section>

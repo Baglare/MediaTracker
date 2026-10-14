@@ -4,6 +4,12 @@
 
 Baseline: `release/v1-hardening`, HEAD `b48f5ee1fa2c9a9277ce3b0852e49a1e9de9830e`, initially clean, local `origin/release/v1-hardening` equal; exact-SHA [Actions PASS](https://github.com/Baglare/MediaTracker/actions/runs/37373905546). Candidate source validation is separate from that remote baseline.
 
+2026-10-14 privacy/signup reconciliation: only the current legal/retention/vendor
+and public-signup rows below are updated. The dated validation, other gate rows
+and Production freeze statements retain their historical scope; this task does
+not re-audit global release/cutover status. Current narrow local checks and next
+signup step are recorded in [native signup release](NATIVE_PUBLIC_SIGNUP_RELEASE.md).
+
 Native V1 applicability update — 2026-10-09: this remains the single master hold
 table. The historical baseline/validation below is preserved; it is not fresh
 native acceptance. Current provider, recipient and retention source closure is
@@ -43,10 +49,11 @@ is scoped evidence, not legal/vendor/retention approval. Production remains froz
 | Full affected-write freeze | SOURCE_READY | 08 DB singleton/table-RPC/Auth/Storage/privacy containment + ops plans, postcheck-bound unfreeze; LIVE_VALIDATION_REQUIRED for hosted locks/managed services and bootstrap/data-migration containment |
 | Article 9 | MANUAL_LEGAL_GATE | Recipient/transfer mechanism evidence and legal approval; no filing/contact by this task |
 | VERBIS | BLOCKED_MANUAL | Operator/legal exemption/registration determination; no assumed exemption |
-| Legal basis / Article 10 final notice | MANUAL_LEGAL_GATE | Provisional matrix requires real controller/bases/recipients and approval |
-| Legal retention / restored erasure reconciliation | MANUAL_LEGAL_GATE | Native source TTL/cleanup inventory closed; purpose-based mailbox/content/log/DB/private-file backup periods and recovery quarantine/erase reconciliation require approval and actual proof. No new duration or user purge |
+| Legal basis / Article 10 final notice | MANUAL_LEGAL_GATE | 2026-10-14 native purpose-by-purpose candidate 5/6 matrix and factual notice reconciled in NATIVE_V1_PROVIDER_PRIVACY_RETENTION_GATE section 4; actual bases, controller/channel and enabled recipient/transfer/provider decisions still require operator/legal approval; no invented consent requirement |
+| Legal retention / restored erasure reconciliation | MANUAL_LEGAL_GATE | Native source TTL/cleanup inventory retained. Hosting daily/~four-week rotation OPERATOR_REPORTED_WRITTEN; exact hosting log retention UNKNOWN. Purpose-based content/mailbox/expired Auth/offsite criteria, private-file backup coherence, last-copy handling and restore quarantine/erasure reconciliation require approval/evidence; no new purge |
 | Request/mailbox operation | BLOCKED_MANUAL | Access, MFA, message receipt and reply user-confirmed 2026-10-09; not independently accessed by Codex. Remaining: authorized/backup handler, formal channel/deadline tracking, secure export delivery, minimization/retention and vendor/Article 9 evidence |
-| Vendor/DPA/regions/subprocessors | MANUAL_EXTERNAL_GATE | Account-specific evidence; DPA alone does not close Article 9 |
+| Vendor/DPA/regions/subprocessors | MANUAL_EXTERNAL_GATE | 2026-10-14 OPERATOR_REPORTED_WRITTEN: stated TürkHosting application/DB/files/logs/backups in Türkiye, no foreign subprocessors, authorized infrastructure personnel Türkiye-based; do not reopen these answered questions as UNKNOWN. Independent contractual/role evidence, exact log retention, file backup coverage/encryption/restore-erasure and separate Gmail/API/CDN/offsite transfer evidence remain; DPA alone does not close Article 9 |
+| Public signup opening | BLOCKED_MANUAL | Default closed; candidate/push is not opening authority. NATIVE_PUBLIC_SIGNUP_RELEASE: recommended email verification + safe recovery/reclamation, legal notice/retention/recipient approvals, shared quota availability decision, same-SHA release checks and separately authorized hosted A/B acceptance + cleanup; explicit operator opening approval required |
 | Enabled-provider manual/legal gates | MANUAL_LEGAL_GATE | Actual operator/contact/disclosures + TVMaze interpretation; Open Library can remain disabled if registration not closed |
 | Open Library registration | MANUAL_EXTERNAL_GATE | Explicit use-case registration plus manual usage suitability evidence before Production enablement; valid UA/contact or historical Preview result insufficient. Without evidence, leave UA unset to keep existing capability disabled; no new runtime gate |
 | TVMaze ShareAlike interpretation | MANUAL_LEGAL_GATE | Source attribution retained; persisted/normalized/season-derived/combined metadata, public projections and portable/account exports need license-scope decision; source links/tests alone do not settle ShareAlike |

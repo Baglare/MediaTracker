@@ -1,5 +1,9 @@
 # Native V1 — Provider, KVKK ve retention kaynak kapanışı
 
+Güncel ek — 2026-10-14: aşağıdaki 2026-10-09 envanter, test ve UNKNOWN kayıtları
+tarihli kanıttır. Bölüm 4, operatörün bildirdiği TürkHosting yazılı yanıtları ve
+mevcut signup adayını uzlaştırır; önceki synthetic/live statülerini değiştirmez.
+
 2026-10-09. `CURRENT_SOURCE_FACT` / `SOURCE_READY`; hukuki onay veya Production kabulü değildir.
 Başlangıç: `release/v1-hardening`, temiz çalışma ağacı, HEAD `2a922a7889e115e7e93b47aa319fe3845c9e108a`.
 Bu kayıt native ilk sürüm için güncel alan sözleşmesidir. Tek ana hold tablosu
@@ -207,3 +211,88 @@ API enablement, provider kayıt/başvuru, migration/deploy/commit/push yapılmad
 Vault read-only context `VAULT_GIT_INVALID` döndürdü; canonical veya tahmini aday
 yoluna yazı/commit/push yapılmadı. Bu belge kalıcı karar kaydıdır; Vault sync yapılmış
 sayılmaz.
+
+## 4. Final privacy / public signup uzlaştırması — 2026-10-14
+
+İncelenen temiz kaynak: `release/v1-hardening`,
+`aaf95f030e57d45ff73680d6888fe38ece7e394b`. Bu ek bir hukuk onayı değildir.
+`VERIFIED_SOURCE` kaynakta doğrulanan davranış; `OPERATOR_REPORTED_WRITTEN`
+operatörün aktardığı yazılı sağlayıcı yanıtı; `PROPOSED / LEGAL_APPROVAL_REQUIRED`
+henüz onaylanmamış karar anlamındadır. Ana hold tablosu 06E'dir.
+
+### Yeniden kullanılacak kanıt ve hosting sınırı
+
+05A/05B veri haritası/aydınlatma/hak başvurusu; 05C/05D export, bağımlılık ve
+retention sınıfları; 05E/05F barrier, Auth-last, katılımcı/residual ve ops sınırları
+korunur. Supabase/GoTrue/Storage/Vercel kanıtı eski veya fallback hedef içindir.
+Aktif native karşılıklar `lib/backend/privacy.ts`, `scripts/native-privacy-ops.mjs`,
+`database/native/008_privacy_lifecycle.sql`, `lib/backend/transaction.ts` ve özel
+filesystem akışıdır. Native source/disposable PG18 proof ve recovery receipts
+hostingde hesap silme/restore kabulü olarak yeniden etiketlenmez. Tam audit,
+migration ve recovery provası bu çalışma için tekrar gerekmez.
+
+TürkHosting'in operatörce aktarılan yazılı yanıtı: belirtilen hizmetin uygulama,
+DB, dosya, log ve yedek işlemleri Türkiye'de; yabancı alt işleyen yok; yetkili
+altyapı personeli Türkiye merkezli; yedek günlük, yaklaşık dört haftalık rotasyon;
+web loglarında IP/zaman/istek/User-Agent bulunabilir. Bunlar
+`OPERATOR_REPORTED_WRITTEN`, bağımsız doğrulanmış sözleşme/hesap kanıtı değildir.
+Bu sorular yeniden genel UNKNOWN olarak açılmaz. **Kesin log retention UNKNOWN**.
+Şifreleme ayrıntısı, özel dosyaların DB ile tutarlı backup kapsamı, restore-erasure
+prosedürü ve sözleşmedeki roller/ihlal/erişim yükümlülükleri henüz kanıtlanmış değildir.
+Yanıt Gmail, TVMaze, dış CDN, tarayıcı veya bağımsız offsite kopyalara genişletilmez.
+
+### Amaç bazında karar matrisi
+
+Her satırın teknik kısmı `VERIFIED_SOURCE`; TürkHosting coğrafya/rotation kısmı
+`OPERATOR_REPORTED_WRITTEN`; hukuki dayanak ve onaysız saklama kriterleri
+`PROPOSED / LEGAL_APPROVAL_REQUIRED`. KVKK madde 4 ölçülülük/amaç/süre,
+madde 7 imha ve madde 8/9 aktarım şartları ayrıca uygulanır. Madde 5 adayları
+birlikte otomatik dayanak listesi değildir; gerçek zorunluluğa göre seçim gerekir.
+
+| Faaliyet / veri ve amaç | Aday madde 5/6 dayanağı ve gerekçe | Alıcı / aktarım | Mevcut saklama/silme ve karar sınırı |
+| --- | --- | --- | --- |
+| Kayıt/Auth: e-posta, görünen ad, UUID, şifre özeti, session, UA; hesap ve giriş | 5/2(c): gerekli hesap hizmeti, kurulacak/ifa edilen hizmet ilişkisi gerçekten tanımlanırsa. Güvenlik alt amacı aşağıdaki satırda. Olağan veri; 6 dayanağı varsayılmaz | Aynı-origin Better Auth → TürkHosting native DB; yazılım ayrı SaaS değildir. Hosting Türkiye bilgisi operatör bildirimi | Hesap yaşam döngüsü, yaş purge'u yok. Session 7 gün/updateAge 1 gün: geçerlilik, tüm satırların silinme garantisi değil. Onaylı sona erme/inaktif hesap kriteri ve erasure icrası gerekir |
+| Cloud kütüphane/hedef: medya, not, ilerleme, ratings/favorites, goals, revision/operation/tombstone; isteğe bağlı eşitleme | 5/2(c): kullanıcının talep ettiği eşitlemeye gerekli alanlarla sınırlı; özellik seçimi tek başına açık rıza değildir. Hassas serbest metin için aşağıdaki 6 değerlendirmesi | Tarayıcı ↔ aynı-origin sunucu/native DB; backend owner UUID'yi doğrular | ACCOUNT_LIFETIME / USER_CONTROLLED. Tombstone mantıksal; güvenli offline replay ufku olmadığı için yaşa göre operation purge yok. Onaylı hesap erasure ve katılımcı/residual kontrolü; cihaz/indirilen kopyalar ayrı |
+| Profil/sosyal: ad/bio, username, avatar/banner, görünürlük/tema, takip/engel, mesaj/yorum, notifications/XP; yayın/etkileşim | 5/2(c): gerekli hizmet işlemleri; 5/2(d): yalnız kişinin alenileştirme amacıyla uyumlu yayın. Tüm özel/sosyal içeriğe alenileştirme dayanağı uygulanmaz. İsteğe bağlı işlemler için şart yoksa ayrı 5/1 rıza veya sınırlama değerlendirilir | Hosting DB/özel dosyalar → görünürlük/ilişki yetkili ziyaretçi/katılımcılar; cihaz ülke/bağımsız kopyaları bilinmez | Özellik/hesap yaşam döngüsü. Bağımsız katılımcı metni/XP korunur veya policy ile detach; blanket cascade yok. Rapor/uyuşmazlık hold'u kapsam/gerekçe/bitiş ve inceleme sahibi gerektirir |
+| Güvenlik/log/limit: route/code/time/request ID, pseudonymous özet, Auth sayaçları, hosting IP/UA/request; kötüye kullanım/erişim koruması | 5/2(f): zorunluluk ve hak dengesi belgelenirse; 5/2(ç): madde 12 güvenlik yükümlülüğüne gerçekten gerekli kapsam; somut uyuşmazlık kanıtı 5/2(e). Genel loglama yetkisi değildir | Native DB/safe app events; hosting log erişimi Türkiye bilgisi bildirildi; IP/header client kimlik yetkisi değildir | App receipt 60 sn/bucket 16 dk, bounded cleanup max 500 trafik/job'a bağlı. Auth signup 5/saat/login 3/10 sn; sayaç geçerliliği retention değil. Hosting log kesin süre UNKNOWN; amaç, erişim ve minimum süre vendor+legal kararı |
+| Yedek/hesap silme: DB/Auth/içerik + özel dosyalar; kurtarma ve doğrulanmış erasure | 5/2(c) veya gereklilik/dengeleme ile 5/2(f): hizmet sürekliliği. Yedek otomatik süresiz hold değildir; somut hak kanıtına 5/2(e) ayrı kapsam | Hosting backup Türkiye/daily/~4 hafta operatör bildirimi. Bağımsız şifreli offsite hedef/erişim/lokasyon/kopyalar ayrı; şifreleme aktarım dayanağı yerine geçmez | Erasure lock → session revoke → app/participant/XP/files → residual/barrier → Auth-last. Hosting rotasyon son kopya tarihi garantisi değil; offsite retention onaysız. Restore karantinasında silinmiş hesap listesi/gerekli minimal kayıtla tekrar silme, erişim açmadan residual doğrulama prosedürü ve gerçek kabul gerekir |
+| Destek/hak talebi: iletişim, gerekli kimlik kanıtı, metin/ek, yanıt/export; yardım ve hak kullanımı | Olağan destek 5/2(c) hizmete gerekli ise; Article 11/13 başvurusu 5/2(ç); gerekli uyuşmazlık kanıtı 5/2(e). Talep dışı ek veri tutulmaz | Kullanıcı → Gmail/yetkili operatör. Önceki mailbox erişim/MFA/alma/yanıt teyidi korunur; Gmail region/alt işleyen/aktarımı hosting yanıtına dahil değildir | Alınma ve en geç 30 günlük yanıt takibi retention süresi değildir. Ek/export minimizasyonu; kapanış sonrası silme/hold ölçütü, erişim/yedek handler ve güvenli teslim kararı gerekir. Doğrulanmamış e-posta tek başına sahiplik kanıtı değildir |
+| Provider/görsel: sorgu/show ID, server egress/UA; browser IP/UA/path/time/referrer; katalog ve cover gösterme | Talep edilen katalog hizmetine zorunluysa 5/2(c); otomatik dış görsel için zorunluluk ayrıca gerekçelendirilir. Şart yoksa ayrı özgür 5/1 rıza ya da aktarımı sınırlama; genel privacy kabulü yetmez. Madde 9 ayrıca | TVMaze; UA gate ile koşullu Open Library; browser-direct TVMaze/OpenLibrary ve legacy TMDB/AniList/Amazon/IMDb CDN. Özel notlar ordinary lookup payload'ı değildir; serbest sorgu kişisel olabilir | Process cache 5 dk/64 entry, browser Calendar 12 saat stale. Upstream log/recipient copy süreleri UNKNOWN. Kapalı metadata API eski görsel çağrısını engellemez; legal recipient/transfer ve TVMaze ShareAlike kapsamı açık |
+
+**Madde 6 istisnası:** özellikler hassas veri istemez; free-text/not/bio/rapor/ek
+özel nitelikli veri içerebilir. Madde 5/2(c)/(f) bu veriye otomatik uygulanamaz.
+2024 değişikliği sonrası 6/3(a) ancak ayrı geçerli açık rıza varsa; 6/3(ç) ancak
+kişinin alenileştirme iradesiyle uyumlu, 6/3(d) ancak somut hakkın
+tesisi/kullanılması/korunmasına gerekli kapsamda adaydır. Diğer şartlar ürün için
+varsayılmaz. Gereksiz hassas veriyi istememe/minimizasyon ve uygulanabilir Kurul
+önlemleri korunur; gerçek işleme için hukuk kararı gerekir.
+
+### Asgari operatör ve dış kanıt kararları
+
+- Mevcut veri sorumlusu/contact literalini, amaç başına dayanağı ve final Article 10
+  metnini onayla; somut VERBİS kriterlerine göre karar ver, muafiyet varsayma.
+- İçerik/inaktif hesap, social report/hold, Auth expired satır, log, mailbox/ek/export,
+  hosting son kopya ve bağımsız offsite için amaç/bitiş/tetikleyici, icra sahibi,
+  erişim/hold incelemesi ve restore-erasure sorumlusu belirle. Sabit gün uydurulmadı;
+  onaylı kriter dışında kullanıcı purge'u/migration eklenmedi.
+- Hosting'in cevaplanmış ülke/subprocessor/erişim/daily/~4 hafta sorularını tekrarlama;
+  kesin log rotasyonu, backup dosya kapsamı/tutarlılığı, erişim/şifreleme ve
+  sözleşme/restore-erasure kanıtını tamamla. Offsite envanterini ayrı doğrula.
+- Gmail, etkin API ve gerçekten gösterilen CDN için alıcı rolü/kişisel veri kapsamı
+  ve varsa madde 9 mekanizmasını somutlaştır. Güncel sistemde yeterlilik veya uygun
+  güvence gerekir; devamlı hizmet aktarımı otomatik arızi sayılmaz. İmzalanmamış
+  standart sözleşme, sırf DPA/EU SCC veya şifreleme kabul kanıtı değildir.
+- TVMaze ShareAlike kayıt/dönüştürme/yayın/export kapsamını kararlaştır; Open Library
+  onaylanmadıysa UA unset/kapalı kararıyla enablement'i post-release bırak.
+
+Kaynaklar 2026-10-14 resmî KVKK üzerinden kontrol edildi:
+[Kanun, güncel 5/6/9; Türkçe asıl üstün](https://www.kvkk.gov.tr/Icerik/6649/Personal-Data-Protection-Law),
+[madde 5](https://www.kvkk.gov.tr/Icerik/2050/Kisisel-Veriler),
+[güncel özel nitelikli veri](https://www.kvkk.gov.tr/Icerik/2051/Ozel-Nitelikli-Kisisel-Veriler),
+[aydınlatma ve ayrı rıza](https://www.kvkk.gov.tr/Icerik/6765/AYDINLATMA-YUKUMLULUGUNUN-YERINE-GETIRILMESI-HAKKINDA-KAMUOYU-DUYURUSU),
+[yurt dışı aktarım](https://www.kvkk.gov.tr/Icerik/2053/Yurtdisina-Aktarim).
+Değerlendirme profesyonel hukuk onayı yerine geçmez. Signup teknik güvenlik ve
+öncelikli açılış engelleri [native signup release](NATIVE_PUBLIC_SIGNUP_RELEASE.md)
+belgesindedir. Bu çalışmanın kontrolleri final raporda ayrı kaydedilir; tarihli
+05/06/PG18 sonuçları değiştirilmez. Vault retrieval yine `VAULT_GIT_INVALID`;
+canonical yazı/apply veya tahmini aday yolu yoktur.
