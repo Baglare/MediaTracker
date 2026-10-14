@@ -28,7 +28,7 @@ export async function installEmailVerificationKey(client, roles, { key, epoch, m
 }
 if(process.argv[1] && import.meta.url===pathToFileURL(process.argv[1]).href) {
   try {
-    const options=parseOperatorArgs(process.argv.slice(2),['mode']);
+    const options=parseOperatorArgs(process.argv.slice(2),['--mode']);
     if(!['install','rotate','restore'].includes(options.mode))throw new Error();
     if(!options.connect)console.log('EMAIL_KEY_PLAN=freeze; stop writers; verify logging; use existing migrator; install paired key/epoch; restart; verify; unfreeze');
     else await withOperator(process.env,async(client,config,target)=>{

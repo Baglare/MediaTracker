@@ -159,7 +159,9 @@ try {
     stage='P2_RUNTIME_PASSWORD';
     p2Sql(`ALTER ROLE mt_runtime PASSWORD '${password}';`);
   } else {
-  const sql=['001_security_foundation.sql','002_better_auth.sql','003_account_admission.sql','012_public_signup.sql','014_secure_email_verification.sql','rls-proof.sql']
+  // Keep the original P1 ACL assertions at the P1 boundary, then extend the
+  // same disposable DB for current Auth/lifecycle/verification integration.
+  const sql=['001_security_foundation.sql','002_better_auth.sql','rls-proof.sql','003_account_admission.sql','012_public_signup.sql','014_secure_email_verification.sql']
     .map(file=>readFileSync(new URL(`../database/native/${file}`,import.meta.url),'utf8')).join('\n');
   output=p2Sql(sql+`\nALTER ROLE mt_runtime PASSWORD '${password}';`);
   if(!output.includes(p2 ? 'P2_CLOUD_GOALS_PROOF_PASS' : 'P1_RLS_PROOF_PASS')) throw new Error('proof_failed');
