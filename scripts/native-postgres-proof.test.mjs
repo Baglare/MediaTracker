@@ -182,6 +182,14 @@ test('Auth failure emits only a bounded assertion line, never private child diag
   }
 });
 
+test('Auth failure exposes only an HTTP status from a numeric assertion',async()=>{
+  assert.deepEqual((await run({fail:'auth',authOutput:`AssertionError: expected 503 to be 400\n${privateDiagnostic}`})).logs,
+    ['FAIL: disposable proof; stage=AUTH_INTEGRATION; auth_status=503; diagnostics redacted']);
+  for(const authOutput of ['AssertionError: expected 999 to be 400','AssertionError: expected 503 to be private',privateDiagnostic]) {
+    assert.deepEqual((await run({fail:'auth',authOutput})).logs,['FAIL: disposable proof; stage=AUTH_INTEGRATION; diagnostics redacted']);
+  }
+});
+
 test('interruption kills Vitest and closes relay before Docker cleanup',async()=>{
   const result=await run({interrupt:true});
   assert.equal(result.process.exitCode,1);

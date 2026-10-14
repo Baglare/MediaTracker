@@ -37,6 +37,8 @@ async function create() {
       if(assertion)console.error(`PG18_ASSERTION=${assertion}`);
       const authLine=r.stderr?.match(/auth_line=([1-9][0-9]{0,5})(?:;|$)/)?.[1];
       if(authLine)console.error(`PG18_AUTH_ASSERTION_LINE=${authLine}`);
+      const authStatus=r.stderr?.match(/auth_status=([1-5][0-9]{2})(?:;|$)/)?.[1];
+      if(authStatus)console.error(`PG18_AUTH_RESPONSE_STATUS=${authStatus}`);
       throw new Error('release_pg18_failed');
     }
     console.log(`PG18_${argument[0]??'P1'}=PASS`);

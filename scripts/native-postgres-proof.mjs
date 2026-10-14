@@ -35,6 +35,7 @@ let stage='DOCKER_CONTEXT';
 let sqlstate;
 let assertion;
 let authLine;
+let authStatus;
 const fixtureAssertions=new Set([...readFileSync(new URL('../database/native/tvmaze-guest-proof.sql',import.meta.url),'utf8').matchAll(/RAISE EXCEPTION '(guest_[a-z_]+)'/g)].map(match=>match[1]));
 // Only a five-character code from PostgreSQL's fixed error-class vocabulary may
 // leave the runner. Never relay messages, query text, context, paths or values.
@@ -188,6 +189,8 @@ try {
     authFrames=(authFrames+chunk.toString()).slice(-4096);
     const frame=authFrames.match(/tests\/native-postgres-live\.integration\.test\.ts:([1-9][0-9]{0,5}):[0-9]{1,6}\b/);
     if(frame)authLine=frame[1];
+    const status=authFrames.match(/AssertionError: expected ([1-5][0-9]{2}) to be [1-5][0-9]{2}\b/);
+    if(status)authStatus=status[1];
   });
   child.once('error',reject);
   child.once('close',(status)=>resolve({status}));
@@ -200,7 +203,7 @@ try {
   const checks=new Set(['connections','guest_lock_contention','guest_race','replay_and_ten_seconds','utc_daily_limit','provider_reserve','disabled_global_capacity','cooldown','envelope_negatives','authenticated_quota','authenticated_race','cloud_cas','tombstone','rls']);
   const check=checks.has(error.releaseCheck)?error.releaseCheck:undefined;
   if(check&&/^[0-9A-Z]{5}$/.test(error.code??'')&&allowedSqlstateClasses.has(error.code.slice(0,2)))sqlstate=error.code;
-  console.error(`${id?'FAIL: disposable proof':'BLOCKED_ENVIRONMENT: disposable proof'}; stage=${stage}${check?`; check=${check}`:''}${sqlstate?`; sqlstate=${sqlstate}`:''}${assertion?`; assertion=${assertion}`:''}${stage==='AUTH_INTEGRATION'&&authLine?`; auth_line=${authLine}`:''}; diagnostics redacted`);
+  console.error(`${id?'FAIL: disposable proof':'BLOCKED_ENVIRONMENT: disposable proof'}; stage=${stage}${check?`; check=${check}`:''}${sqlstate?`; sqlstate=${sqlstate}`:''}${assertion?`; assertion=${assertion}`:''}${stage==='AUTH_INTEGRATION'&&authLine?`; auth_line=${authLine}`:''}${stage==='AUTH_INTEGRATION'&&authStatus?`; auth_status=${authStatus}`:''}; diagnostics redacted`);
   process.exitCode=1;
 } finally {
   cleaning=true;
