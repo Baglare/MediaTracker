@@ -3,6 +3,7 @@ import type { EvidenceClaim } from "../domain/evidence";
 import type { EvidenceConfidence, SemanticVerifierMode } from "../domain/types";
 import type { CandidateProviderEvidenceSnapshot } from "../providers/types";
 import type { SemanticEvidenceBundle } from "./aggregation";
+import { hasTmdbProvenance } from "@/lib/providers/tmdb-usage-policy";
 
 export const SEMANTIC_VERIFIER_TOP_N = 8;
 export const SEMANTIC_VERIFIER_CONCURRENCY = 2;
@@ -107,7 +108,12 @@ export async function runSemanticVerifier(input: {
   if (!endpoint) {
     return { requestedMode: input.mode, effectiveMode: "structured_only", status: "unavailable", evidenceByCandidateKey: new Map(), warnings: ["semantic_verifier_unavailable"] };
   }
-  const entries = [...input.snapshots.entries()].slice(0, SEMANTIC_VERIFIER_TOP_N);
+  const allowed = [...input.snapshots.entries()].filter(([, snapshot]) => !hasTmdbProvenance(snapshot));
+  const blocked = allowed.length !== input.snapshots.size;
+  if (allowed.length === 0) {
+    return { requestedMode: input.mode, effectiveMode: "structured_only", status: "unavailable", evidenceByCandidateKey: new Map(), warnings: blocked ? ["tmdb_model_use_forbidden"] : [] };
+  }
+  const entries = allowed.slice(0, SEMANTIC_VERIFIER_TOP_N);
   const evidence = new Map<string, SemanticEvidenceBundle>();
   let cursor = 0;
   let failures = 0;
@@ -122,8 +128,8 @@ export async function runSemanticVerifier(input: {
   return {
     requestedMode: input.mode,
     effectiveMode: input.mode,
-    status: failures === 0 ? "available" : evidence.size > 0 ? "partial" : "unavailable",
+    status: failures === 0 && !blocked ? "available" : evidence.size > 0 ? "partial" : "unavailable",
     evidenceByCandidateKey: evidence,
-    warnings: failures > 0 ? [`semantic_verifier_failures:${failures}`] : [],
+    warnings: [...(blocked ? ["tmdb_model_use_forbidden"] : []), ...(failures > 0 ? [`semantic_verifier_failures:${failures}`] : [])],
   };
 }

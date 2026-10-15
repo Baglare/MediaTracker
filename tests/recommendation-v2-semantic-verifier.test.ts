@@ -5,8 +5,8 @@ import type { CandidateProviderEvidenceSnapshot } from "@/features/recommendatio
 
 const snapshot: CandidateProviderEvidenceSnapshot = {
   schemaVersion: 1,
-  candidateIdentity: createVerifiedCandidateIdentity({ primaryProvider: "tmdb", primaryExternalId: "55", mediaType: "movie" }),
-  objectiveMetadata: { mediaType: "movie", genres: ["Fantasy"] }, rawEvidenceClaims: [], providerCoverage: { tmdb: "available" }, missingFields: [], fetchedAt: "2026-08-04T00:00:00.000Z", cacheStatus: "miss", warnings: [],
+  candidateIdentity: createVerifiedCandidateIdentity({ primaryProvider: "tvmaze", primaryExternalId: "55", mediaType: "tv" }),
+  objectiveMetadata: { mediaType: "tv", genres: ["Fantasy"] }, rawEvidenceClaims: [], providerCoverage: { tvmaze: "available" }, missingFields: [], fetchedAt: "2026-08-04T00:00:00.000Z", cacheStatus: "miss", warnings: [],
 };
 
 afterEach(() => vi.unstubAllEnvs());

@@ -162,8 +162,9 @@ describe("D8-4A.5C1 Discover layout and card contract", () => {
     const card = readFileSync("components/global-search-result-card.tsx", "utf8");
     expect(settings).toContain("CC BY-SA");
     expect(settings).toContain("Open Library");
-    expect(settings).toContain("This product uses the");
-    expect(settings).toContain("but is not endorsed or certified by TMDB.");
+    expect(settings).toContain("<TmdbAttribution />");
+    const attribution = readFileSync("components/tmdb-attribution.tsx", "utf8");
+    expect(attribution).toContain("This product uses the TMDB API but is not endorsed or certified by TMDB.");
     expect(card).toContain('rel="noopener noreferrer"');
     expect(card).toContain("result.sourceUrl");
   });

@@ -25,6 +25,7 @@
 
 import { openLibrarySourceUrl } from "@/lib/providers/openlibrary-source-url";
 import { tvmazeSourceUrl } from "@/lib/providers/tvmaze-source-url";
+import { tmdbSourceUrl } from "@/lib/providers/tmdb-usage-policy";
 import React, { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { safeExternalUrl } from "@/lib/safe-external-url";
@@ -129,6 +130,7 @@ function sourceLabelOf(source: MediaItem["externalSource"]): string {
 
 function resolveSourceLink(media: MediaItem): string | undefined {
   if (media.externalSource === "tvmaze") return tvmazeSourceUrl(media);
+  if (media.externalSource === "tmdb") return tmdbSourceUrl(media.externalId, media.type === "tv" ? "tv" : "movie");
   if (media.externalSource === "openlibrary") return openLibrarySourceUrl(media);
   if (media.siteUrl) return media.siteUrl;
   if (media.externalSource === "omdb" && media.externalId) {

@@ -30,6 +30,26 @@ function recommendRequest(body: Record<string, unknown>) {
 }
 
 describe("D8-1 server-funded AI entitlement", () => {
+  it("preserves deterministic library-only recommendations for legacy TMDB records with AI disabled", async () => {
+    process.env.AI_SERVER_ACCESS_MODE = "disabled";
+    authGetUser.mockResolvedValue({ data: { user: null }, error: null });
+    const fetcher = vi.fn();
+    vi.stubGlobal("fetch", fetcher);
+    const response = await recommendPost(recommendRequest({ researchMode: "library-only", message: "film öner", mediaItems: [{ id: "tmdb-55", externalSource: "tmdb", externalId: "55", type: "movie", title: "Synthetic library movie", status: "planning", currentProgress: 0, totalProgress: 1, coverImage: "/placeholders/movie.svg" }] }) as never);
+    expect(response.status).toBe(200);
+    expect((await response.json()).recommendations).toEqual(expect.arrayContaining([expect.objectContaining({ title: "Synthetic library movie" })]));
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+  it("rejects TMDB library metadata before model planning even for an authorized admin", async () => {
+    process.env.AI_SERVER_ACCESS_MODE = "admin_only";
+    authGetUser.mockResolvedValue({ data: { user: { id: "admin-1", app_metadata: { role: "admin" } } }, error: null });
+    const fetcher = vi.fn();
+    vi.stubGlobal("fetch", fetcher);
+    const response = await recommendPost(recommendRequest({ mediaItems: [{ id: "tmdb-55", externalSource: "tmdb", title: "Synthetic movie" }] }) as never);
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ code: "tmdb_model_use_forbidden" });
+    expect(fetcher).not.toHaveBeenCalled();
+  });
   beforeEach(() => {
     process.env.AI_SERVER_ACCESS_MODE = "admin_only";
     resetRateLimitsForTests();

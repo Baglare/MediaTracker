@@ -1,5 +1,6 @@
 import type { AiCandidate } from "@/lib/ai/types";
 import type { MediaItem } from "@/lib/types";
+import { hasTmdbProvenance } from "@/lib/providers/tmdb-usage-policy";
 import type { RecommendationRequestV2 } from "../../domain/codec";
 import type { AspectEvidence } from "../../domain/evidence";
 import { evaluateConstraintEligibility } from "../../domain/policies";
@@ -41,6 +42,7 @@ export function buildGroundedResearchShadowContext(input: {
   const seen = new Set<string>();
   const candidates: GroundedResearchShadowContext["candidates"][number][] = [];
   input.candidates.forEach((item, preResearchRank) => {
+    if (hasTmdbProvenance(item.candidate) || hasTmdbProvenance(item.snapshot)) return;
     const identity = item.snapshot.candidateIdentity;
     if (seen.has(identity.canonicalKey) || hasExactLibraryIdentity(item.snapshot, input.mediaItems)) return;
     const objectiveDecisions = input.request.objectiveConstraints.map((constraint) => evaluateObjectiveConstraint({ constraint, snapshot: item.snapshot }));

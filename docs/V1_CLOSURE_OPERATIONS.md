@@ -14,24 +14,27 @@ preparation, README/ROADMAP corrections and main CI contract. Its head is
 passed (3609 tests, 58 conditional skips). These are PR/source results, not main
 Linux artifact, PG18, recovery or hosting acceptance. Do not duplicate that patch.
 
-Repository Actions contain no deployment step. However, the connected GitHub API
-does not permit repository webhook/deployment administration reads, and Plesk Git
-configuration is unavailable. **MAIN_MERGE = BLOCKED_EXTERNAL_DEPLOY_TRIGGER_PROOF**.
-Absence of a workflow is not proof that external automation is absent. Before
-merging, obtain redacted read-only evidence of Plesk Git deployment mode, selected
-branch, deployment actions and automatic-deployment hooks; check GitHub delivery
-webhooks, installed deployment integrations and any outside CI. Do not share webhook
-secrets or signed URLs. If any target can deploy/restart, keep the merge blocked.
-No administrative setting is changed by this procedure.
+The initial merge hold was cleared on 2026-10-16 by operator-supplied read-only
+evidence: Plesk Git Depolari has no connected repository; GitHub Settings has no
+webhooks; Production uses an independent Plesk/Passenger release installation.
+Repository Actions were rechecked and contain no Production deployment step.
+**MAIN_MERGE = AUTHORIZED_GITHUB_ONLY** under that evidence and the operator's
+explicit sequential merge instruction. The panel evidence is operator supplied,
+not an API inspection claim. No Plesk setting or webhook was changed. Stop if an
+unexpected deployment trigger appears; GitHub acceptance never authorizes deploy,
+restart, freeze or Production migration.
 
-After that gate and a separately authorized merge, require the exact main merge
-SHA's Release validation, native PG18 proof/recovery receipts and Linux artifact
-jobs to succeed. Skipped jobs do not count. Inspect artifact source SHA, recovery
-fingerprint and all acceptance fields, including two-user isolation. A successful
-artifact build never authorizes deploying it. The new closure PR remains unmerged.
+PR #1 merged as `29e8414ab2bbc4989599b829077c8a6ca8a59cfb`.
+[Main CI 38814228183](https://github.com/Baglare/MediaTracker/actions/runs/38814228183)
+passed Release validation, real disposable PG18 proof/recovery (including separate
+receipt verification), and Linux artifact generation/upload. These are main/source
+CI results, not hosting or real-backup acceptance. PR #2 must merge current main
+without rewriting history, pass its new PR checks, and then receive the same full
+main checks after its separately authorized merge. Skipped jobs do not count.
+The Production release stays independent and unchanged by these GitHub operations.
 
-Keep `release/v1-hardening`: existing main-source CI still depends on that ref;
-PR #1 preserves it while adding main. Keep `develop` and `test`: no deletion is
+Keep `release/v1-hardening`: CI preserves that supported ref alongside main.
+Keep `develop` and `test`: no deletion is
 needed for v1, and remote preview/recovery dependencies are not proven absent.
 No branch is renamed or removed.
 

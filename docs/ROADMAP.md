@@ -1,5 +1,17 @@
 # MediaTracker Roadmap
 
+## Güncel durum — 2026-10-15
+
+Production v1 [mediatracker.baglare.com.tr](https://mediatracker.baglare.com.tr) üzerinde canlıdır: Next.js, native PostgreSQL 18, Better Auth ve Plesk/Passenger. Yeni kayıt ve zorunlu e-posta doğrulaması açıktır; bu durum operatör tarafından teyit edilmiştir, bu doküman turunda canlı servis yeniden test edilmemiştir. Supabase ayrı fallback'tir.
+
+Faz 1 temizliği tamamlandı. Faz 2, TMDB API erişimini kapalı tutarak attribution/logo/kaynak bağlantılarını, yeni kalıcı metadata yazımı ve AI/embedding sınırlarını, README'yi ve main/release CI zincirini hazırlar. [TMDB hazırlık sözleşmesi](TMDB_INTEGRATION_PREPARATION.md) açık enablement/retention sınırlarını tanımlar. Ücretli AI/research ve kalıcı embedding cache kapalı kalır.
+
+CI: `main` ve `release/v1-hardening` push'ları validation, disposable PG18 proof ve native Linux artifact işlerini çalıştırır; deploy yoktur. `develop`/uzak `test` sadeleştirme adayıdır; release dalı geçişte korunur. Dal silme/push bu fazın parçası değildir.
+
+## Tarihsel geliştirme ve kabul kayıtları
+
+Aşağıdaki D1–D8 tabloları eski Supabase/Preview/cutover aşamalarının tarihli bağlamıdır; “cutover başlamadı”, kapalı signup veya eski RC ifadeleri güncel native Production durumunu tanımlamaz. Operasyon ve kabul kanıtları yeniden yazılmamıştır.
+
 Current TMDB v1 policy — 2026-10-05: [V1-HARDENING-04B.4](V1_HARDENING_04B4.md) sets `TMDB_V1_LIVE_ACCESS = HARD_DISABLED` in LOCAL/DEVELOPMENT/CI/PREVIEW/PRODUCTION. Mode/token/logo cannot enable it. Historical live/UAT evidence below is retained, not current enablement authority. Offline/legacy compatibility remains; future legal/provider, retention, AI isolation and branding reviews, a separate source change and release acceptance are required.
 
 

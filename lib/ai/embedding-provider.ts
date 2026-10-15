@@ -3,6 +3,8 @@ import type {
   EmbeddingVectorPayload,
   EmbeddingVectorResult,
 } from "@/lib/ai/embedding-types";
+import { hasTmdbProvenance } from "@/lib/providers/tmdb-usage-policy";
+
 import {
   readEmbeddingCache,
   writeEmbeddingCache,
@@ -14,6 +16,10 @@ import {
   writePersistentEmbeddingCache,
   type PersistentEmbeddingCacheStats,
 } from "@/lib/ai/persistent-embedding-cache";
+
+function allowedPayloads(payloads: EmbeddingVectorPayload[]): EmbeddingVectorPayload[] {
+  return payloads.filter((payload) => !hasTmdbProvenance(payload) && !payload.signals?.includes("provider:tmdb"));
+}
 
 export interface EmbeddingProviderRunResult {
   provider: string;
@@ -70,7 +76,7 @@ export class LocalMockEmbeddingProvider implements EmbeddingProvider {
 
   async embedMany(payloads: EmbeddingVectorPayload[], _options?: { timeoutMs?: number }): Promise<EmbeddingVectorResult[]> {
     void _options;
-    return payloads.map((payload) => ({
+    return allowedPayloads(payloads).map((payload) => ({
       id: payload.id,
       hash: payload.hash,
       vector: mockVector(payload),
@@ -89,6 +95,8 @@ export class PythonServiceEmbeddingProvider implements EmbeddingProvider {
     payloads: EmbeddingVectorPayload[],
     options?: { timeoutMs?: number }
   ): Promise<EmbeddingVectorResult[]> {
+    payloads = allowedPayloads(payloads);
+    if (payloads.length === 0) return [];
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), options?.timeoutMs || DEFAULT_TIMEOUT_MS);
     try {
@@ -132,6 +140,8 @@ export async function embedManyWithFallback(
   payloads: EmbeddingVectorPayload[],
   options?: { timeoutMs?: number }
 ): Promise<EmbeddingProviderRunResult> {
+  // Filter before both cache reads and provider selection, including mock fallback.
+  payloads = allowedPayloads(payloads);
   const fallback = new LocalMockEmbeddingProvider();
   if (payloads.length === 0) {
     return {
