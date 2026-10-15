@@ -36,7 +36,7 @@ describe("D8 first-release public privacy route", () => {
       "Mock verilere sıfırla",
       "self-service hesap silme",
       "Yeni hesap kaydı ayrı yayın koşullarına bağlıdır",
-      "yeni kayıt varsayılan olarak kapalıdır",
+      "girişten önce e-posta doğrulaması zorunludur",
     ]) expect(page.toLocaleLowerCase("tr-TR"), phrase).toContain(phrase.toLocaleLowerCase("tr-TR"));
   });
 

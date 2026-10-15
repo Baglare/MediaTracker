@@ -33,6 +33,10 @@ describe.each(["supabase", "native"] as const)("05B public factual notice and ma
     if (provider === "native") {
       for (const phrase of ["Better Auth", "şifre özeti ve oturum kayıtları", "özel PostgreSQL şemasında", "oturum çerezleri", "native PostgreSQL", "TürkHosting/Plesk/Passenger", "özel dosya sistemi", "erişim uygulama üzerinden denetlenir"]) expect(groups).toContain(phrase);
       expect(groups).not.toMatch(/Supabase|Vercel/);
+      expect(groups).toContain("Hesap oluşturmak, e-posta doğrulamasını, parola sıfırlamayı");
+      expect(html).toContain("girişten önce e-posta doğrulaması zorunludur");
+      expect(html).toContain("Kayıt ayarının açılması hukuki değerlendirmelerin tamamlandığı anlamına gelmez");
+      expect(html).not.toContain("yeni kayıt varsayılan olarak kapalıdır");
       // All eight server-processing groups must identify their selected destination.
       expect(groups.match(/<dd>[^<]*native PostgreSQL/g)).toHaveLength(6);
       expect(groups.match(/<dd>[^<]*uygulama sunucusu/gi)).toHaveLength(8);

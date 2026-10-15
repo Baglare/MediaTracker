@@ -26,7 +26,7 @@ async function run({fail,authOutput='',sqlFailure,sqlStatus=3,sqlSignal=null,sql
     Mounts:[{Type:'tmpfs',Destination:'/var/lib/postgresql/data'}]};
   const net={Id:network,Name:name,Driver:'bridge',Internal:true,Labels:{'mt.p1.proof':name},Containers:{[id]:{Name:name,IPv4Address:'172.20.0.2/16'}}};
   mutate(target,net);
-  const process=Object.assign(new EventEmitter(),{argv:['node','proof.mjs',...(release?['--release']:p2?['--p2']:[])],env:{NODE_OPTIONS:'--existing-option'},execPath:'node',cwd:()=>'/synthetic'});
+  const process=Object.assign(new EventEmitter(),{platform:endpoint.startsWith('npipe:')?'win32':'linux',argv:['node','proof.mjs',...(release?['--release']:p2?['--p2']:[])],env:{NODE_OPTIONS:'--existing-option'},execPath:'node',cwd:()=>'/synthetic'});
   const spawnSync=(command,args,options)=>{
     if(command==='docker' && args[0]==='--host') args=args.slice(2);
     assert.equal(command,'docker','Vitest must be asynchronous so the relay can run');
@@ -49,7 +49,7 @@ async function run({fail,authOutput='',sqlFailure,sqlStatus=3,sqlSignal=null,sql
   };
   await runInNewContext(`(async()=>{${source}\n})()`,{
     emailVerificationPg18:async()=>{calls.push({key:'email proof'});if(fail==='email proof')throw Error(privateDiagnostic);},spawnSync,process,URL,validateDisposableTarget,
-    startDisposableRelay:async()=>{calls.push({key:'relay start'});if(fail==='relay start')throw Error('redacted');return {descriptor:{port:54321},proof:{controlPort:54322,token:'d'.repeat(64)},close:async()=>{calls.push({key:'relay close'});if(fail==='relay close')throw Error('redacted');}};},
+    startDisposableRelay:async(_identity,options)=>{calls.push({key:'relay start',transport:options?.transport});if(fail==='relay start')throw Error('redacted');return {descriptor:{port:54321},proof:{controlPort:54322,token:'d'.repeat(64)},close:async()=>{calls.push({key:'relay close'});if(fail==='relay close')throw Error('redacted');}};},
     verifyDisposableRelay:async()=>{calls.push({key:'relay verify'});if(fail==='relay verify')throw Error('redacted');},
     Client:class extends EventEmitter {
       constructor(config){super();this.config=config;this.probe=!config.connectionString;this.attempt=this.probe?++attempt:0;this.connection={stream:{destroy:()=>calls.push({key:'pg destroy',attempt:this.attempt})}};calls.push({key:'pg client',config,attempt:this.attempt});}
@@ -70,6 +70,14 @@ async function run({fail,authOutput='',sqlFailure,sqlStatus=3,sqlSignal=null,sql
   assert.equal(timers.size,0,'every readiness watchdog must be cleared');
   return {calls,logs,process,elapsed};
 }
+
+test('selects the existing attested exec relay on Windows and TCP on Linux',async()=>{
+  for(const [endpoint,transport] of [['npipe:////./pipe/docker_engine','docker-exec'],['unix:///var/run/docker.sock','tcp']]) {
+    const result=await run({endpoint});
+    assert.equal(result.calls.find(call=>call.key==='relay start')?.transport,transport);
+    assert.ok(result.logs.some(line=>line.startsWith('PASS:')));
+  }
+});
 
 for(const [stage,options] of [
   ['CONTAINER_INSPECT',{fail:`inspect ${id}`}],
