@@ -2,6 +2,7 @@ import type {
   RecommendationDecodeResult,
   RecommendationDomainIssue,
 } from "../../domain/types";
+import { hasTmdbProvenance } from "@/lib/providers/tmdb-usage-policy";
 import {
   forbiddenRetainedFields,
   provenanceIdentityKey,
@@ -46,6 +47,9 @@ export function validateDatasetPackage(value: DatasetPackage): RecommendationDec
       issues.push(issue("dataset_provenance_orphan", `provenance.${index}.recordId`, "Provenance mevcut bir recordId'ye bağlı olmalıdır."));
     }
     const policy = policies.get(provenance.sourceId);
+    if (hasTmdbProvenance(provenance) && provenance.contentOrigin !== "synthetic") {
+      issues.push(issue("dataset_tmdb_content_forbidden", `records.${index}.recordId`, "TMDB içerikleri annotation, evaluation veya training girdisi olamaz."));
+    }
     if (!policy) {
       issues.push(issue("dataset_source_policy_missing", `provenance.${index}.sourceId`, "Provenance sourceId manifest policy kaydıyla eşleşmelidir."));
       return;

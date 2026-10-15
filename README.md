@@ -4,7 +4,9 @@ MediaTracker; film, dizi, anime, manga, manhwa, manhua, novel ve kitap takibi i�
 
 Uygulamanın ana veri kaynağı tarayıcıdaki owner-scoped yerel depolamadır. Native V1; Better Auth, PostgreSQL ve özel dosya depolamasıyla isteğe bağlı hesap, kontrollü Cloud aktarımı ve sosyal özellikler sağlar. Supabase adapter'ı ayrı fallback olarak korunur; backend seçimi eski hesapları veya verileri otomatik taşımaz. Guest/local-first kullanım hesap gerektirmez.
 
-Native production altyapısı ile yeni Public V1 sürümünün kabulü ayrı değerlendirilir. Kaynakta hazırlanan anonim TVMaze ortak havuzu additive 013 migration gerektirir; yeni sürüm için gerçek PG18 migration/recovery kanıtı ve temiz SHA'ya bağlı Linux artifact kabulü gerekir. Bu README yeni sürümün deploy edildiği veya hukuk/sağlayıcı kapılarının kapandığı iddiası değildir. Tarihli D8/Supabase kayıtları kendi kapsamlarıyla korunur.
+Production v1 canlı adresi: **[mediatracker.baglare.com.tr](https://mediatracker.baglare.com.tr)**. Next.js uygulaması TürkHosting Plesk/Passenger üzerinde; native PostgreSQL 18, Better Auth ve özel dosya depolamasıyla çalışır. Yeni kullanıcı kaydı ve zorunlu e-posta doğrulaması açıktır; doğrulanmamış hesap oturum açamaz. Doğrulama ve parola sıfırlama e-postaları native SMTP adapter'ından gönderilir. Canlı sürüm, kayıt ve doğrulama durumu 2026-10-15 tarihinde operatör tarafından teyit edilmiştir; bu doküman güncellemesinde canlı servisler yeniden test edilmemiştir.
+
+Faz 1 repository temizliği tamamlandı. Faz 2; TMDB güvenli hazırlığı, güncel dokümantasyon ve main/release CI sürekliliğini kapsar. Tarihli D8/Supabase ve operasyon kabul kayıtları geçmiş bağlamlarıyla korunur; yeni bir değişikliğin Production'a uygulandığını göstermez.
 
 TMDB v1 env contract: `MEDIA_TRACKER_TMDB_MODE` retired/ignored; `TMDB_READ_ACCESS_TOKEN` normal LOCAL runtime için gereksiz, CI/PREVIEW/PRODUCTION için forbidden/unset. Legacy poster CDN compatibility live metadata API enablement değildir.
 
@@ -22,14 +24,14 @@ TMDB v1 env contract: `MEDIA_TRACKER_TMDB_MODE` retired/ignored; `TMDB_READ_ACCE
 | --- | --- |
 | D1 — Veri bütünlüğü ve portable backup | Tamamlandı |
 | D2 — Cloud Sync geliştirme ve testleri | Tamamlandı |
-| D2B.0 / D2B.1 production veritabanı | Tarihsel kayıt; güncel hosted ledger LIVE_UNVERIFIED |
-| D2C.1 production cutover | D8 release aşamasına bırakıldı |
+| D2B / D2C Supabase cutover | Tarihsel/fallback geliştirme kayıtları; aktif Production native PostgreSQL 18 |
 | D3 — Release Calendar | Tamamlandı |
 | D4 — Product Polish / Performance / UX Reliability | Tamamlandı |
-| D5 — Goals | Yerel/test kapsamı tamamlandı; Goal Cloud Production rollout D8'de |
+| D5 — Goals | Yerel ve kontrollü Cloud akışları mevcut; tarihli test kanıtları kendi kapsamlarında |
 | D6 — Recommendation V2 | Deterministik karar/fixture ve kayıtlı provider kabul kapsamı tamamlandı |
 | D7 — Grounded Research | Uygulandı; ilk Production release'te kapalı |
-| D8 — Release hardening | Code/Staging/Preview hazırlığı tamamlandı; D8-4B manuel/external kapıları açık |
+| Production v1 | Canlı; native kayıt ve e-posta doğrulaması operatör tarafından kabul edildi |
+| Faz 2 | TMDB kapalı tutularak güvenli hazırlık ve repository/CI düzeni |
 
 Ayrıntılı sıra ve sonraki aşamalar: [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
@@ -90,7 +92,7 @@ Ayrıntılı sıra ve sonraki aşamalar: [`docs/ROADMAP.md`](docs/ROADMAP.md).
   - Format ayrıntıları: [`docs/PORTABLE_BACKUP_FORMAT.md`](docs/PORTABLE_BACKUP_FORMAT.md)
 - Cloud:
   - Native Better Auth email/password oturumu; ayrı Supabase fallback
-  - Public V1 politikasında yeni kayıt kapalı; mevcut yetkili hesaplarla giriş ayrı kabul kapsamındadır
+  - Production v1'de yeni kayıt açık; oturum için e-posta doğrulaması zorunlu
   - Yerel -> Cloud aktarım
   - Cloud -> Yerel indirme
   - Cloud verisini yerel veriyle birleştirme
@@ -191,9 +193,9 @@ npm run dev
 http://localhost:3000
 ```
 
-## ML Servisi ile Başlatma
+## Legacy Yerel ML Geliştirme Yolu
 
-Embedding tabanlı benzerlik skorunu gerçek modelle çalıştırmak istersen Python servisini de açman gerekir.
+Bu bölüm yalnız ayrı yerel geliştirme içindir; Production v1'de AI/ML/research ve kalıcı embedding cache kapalıdır. TMDB içeriği bu servise veya model/cache/dataset yollarına aktarılamaz. Aşağıdaki kurulum normal uygulama kullanımı için gerekli değildir.
 
 1. Python sanal ortamını kur:
 
@@ -261,9 +263,11 @@ Temel yerel kullanım için hiçbir değişken zorunlu değildir. Provider anaht
 
 Güvenlik notu: Production v1 normal web runtime içinde service-role ve paid AI anahtarları yasaktır. Persistent embedding cache kapalıdır. Ayrı yetkili operasyonlarda kullanılan secret hiçbir client component, API yanıtı veya loga eklenmemeli ve `NEXT_PUBLIC_` prefix'i almamalıdır. `.env.local` ve gerçek anahtarlar Git'e gönderilmemelidir.
 
-## Supabase Kurulumu
+## Native Hesap/Cloud ve Ayrı Supabase Fallback
 
-Cloud özelliklerini kullanmak istiyorsan:
+Production v1 hesabı Better Auth, PostgreSQL 18 ve native özel dosya depolamasını kullanır. E-posta doğrulaması tamamlandıktan sonra giriş yapılır. Plesk/Passenger, PostgreSQL veya SMTP kurulumu bu README üzerinden değiştirilmez. Native mimari için [backend temeli](docs/NATIVE_BACKEND_P1_FOUNDATION.md) ve [e-posta akışı](docs/NATIVE_AUTH_EMAIL.md) incelenebilir; bu belgelerin tarihli kabul statüleri güncel canlı teyitle karıştırılmamalıdır.
+
+Aşağıdaki Supabase adımları yalnız ayrı fallback geliştirme ortamı içindir; aktif native Production kurulumu veya hesap taşıma yönergesi değildir:
 
 1. Supabase projesi oluştur.
 2. Yeni yerel/disposable kurulumda repository migration zincirini kendi izole ortamında doğrula. Eski D2B/D2C ledger ifadeleri tarihsel kanıttır; güncel hosted durum LIVE_UNVERIFIED. Production işlemleri README kapsamı değildir; güncel authority [06D release operations](docs/V1_HARDENING_06D_RELEASE_OPERATIONS.md) ve [06E release gates](docs/V1_HARDENING_06E_OPERATIONAL_RELEASE_GATE.md) içindedir. D8 dokümanları yalnız tarihsel kanıttır.
@@ -276,12 +280,12 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=...
 ```
 
 5. Uygulamayı yeniden başlat.
-6. Mevcut yetkili hesapla giriş ve cloud veri durumunu kontrol et. Public signup UI/action mevcut ilk release kapsamı içinde kapalıdır; hosted Auth ayarı ayrı manuel release kapısıdır.
+6. Ayrı fallback ortamının yetkili hesabıyla giriş ve Cloud veri durumunu kontrol et. Bu ortamın signup politikası native Production kaydından bağımsızdır.
 
 Cloud davranışı:
 
-- Supabase yoksa uygulama yerel modda kalır.
-- Supabase varsa auth paneli aktif olur.
+- Guest/local-first kullanım hesap gerektirmez.
+- Hesap/Cloud adapter'ı backend seçimine bağlıdır; Supabase değişkenlerinin olmaması native hesabı kapatmaz.
 - Yerel veri yine arayüzün ana kaynağıdır.
 - Cloud upload, download ve merge işlemleri kullanıcı onayıyla yapılır.
 - Giriş yapılmış ve online durumdaysan yerel mutasyonlar sync queue üzerinden cloud'a gönderilir; ağ veya oturum yoksa bekleyen işlemler kuyrukta kalır.
@@ -289,7 +293,7 @@ Cloud davranışı:
 - Rollout sözleşmesi bakım, sürüm veya bilinmeyen şema nedeniyle hazır değilse Cloud mutation gönderimi durur; yerel veri ve yerel kullanım etkilenmez.
 - Cloud'dan otomatik real-time pull yoktur; indirme ve birleştirme manuel aksiyonlarla yapılır.
 
-Local D2B.1 geliştirme örneği `.env.example` içindedir. D2C.1'i uygulanmış gibi gösterecek environment değeri veya production komutu bu README'de verilmez.
+Fallback D2B.1 geliştirme örneği `.env.example` içindedir. Ortamlar ve hesap verileri otomatik taşınmaz.
 
 ## Veri Saklama
 
@@ -341,7 +345,7 @@ Vitest'i izleme modunda veya tek seferlik test paketi olarak çalıştırır.
 
 ## API Route'ları
 
-- `GET /api/tmdb/search?q=...`
+- `POST /api/tmdb/search` — JSON `{ "query": "...", "mediaType": "movie" }`; `mediaType` ayrıca `tv` olabilir
 - `GET /api/tmdb/details?id=...`
 - `GET /api/omdb/search?q=...`
 - `GET /api/omdb/details?id=...`
@@ -403,8 +407,7 @@ Next.js tarafı `MEDIA_TRACKER_ML_SERVICE_URL` doluysa bu servisi kullanır. Ser
 
 ## Bilinen Sınırlamalar
 
-- Public frontend deployment henüz yapılmamıştır; repository bir production URL iddia etmez.
-- D2C.1 owner-scoped fiziksel primary key enforcement ve production cutover D8 aşamasındadır.
+- Production v1 canlıdır; bu çalışma ağacındaki Faz 2 değişiklikleri ayrıca yayınlanana kadar canlı sürümün parçası değildir.
 - Cloud'dan otomatik realtime pull yoktur; download/merge kullanıcı aksiyonudur.
 - Release Calendar otomatik provider ufku 90 gündür. Push/e-posta, ICS/Google Calendar ve streaming availability zorunlu kapsamda değildir.
 - TMDB v1 live erişimi env/token değerlerinden bağımsız hard-disabled; AniList v1 live erişimi env'den bağımsız tüm ortamlarda hard-disabled kalır; provider erişilemezse diğer kaynaklar ve geçerli stale Release Calendar cache'i korunur.
@@ -417,19 +420,13 @@ D7 ise explicit gate ile çalışan source-grounded research altyapısıdır. İ
 release'te library-only deterministik öneri açık kalabilir; server AI/research ve
 persistent embedding cache kapalı tutulur. LLM final sıralama yapmaz.
 
-D8-4A.5E code/Staging/Preview hazırlığı repository kayıtlarında tamamlanmıştır;
-D8-4B Production cutover başlamamıştır. D2C.1 ve Goal Cloud rollout, operator/privacy,
-Production Advisor, hedef/env ve backup/change-window gibi manuel/external kapılar
-tamamlanmadan uygulanmış kabul edilmez. Tek kanonik hold tablosu
-[release acceptance](docs/D8_RELEASE_CANDIDATE_ACCEPTANCE.md#d8-4a5d-kanonik-production-hold-tablosu),
-güncel aşama özeti [roadmap](docs/ROADMAP.md) içindedir. Tarihsel live kayıtları
-bu README güncellemesinde yeniden yürütülmemiştir.
+Native Production v1 canlıdır. D8/Supabase cutover ve kabul tabloları tarihsel kanıt olarak korunur. Güncel aşama özeti [roadmap](docs/ROADMAP.md), TMDB izin/saklama sınırları [Faz 2 hazırlık sözleşmesi](docs/TMDB_INTEGRATION_PREPARATION.md) içindedir. Production'da TMDB, ücretli AI/research ve kalıcı embedding cache kapalı kalır. CI, `main` ve `release/v1-hardening` push'larında validation → disposable PG18 proof → native Linux artifact zincirini çalıştırır; deployment yapmaz.
 
 ## Sorun Giderme
 
 ### Uygulama yerel modda açılıyor
 
-Bu normaldir. Supabase değişkenleri boşsa uygulama sadece tarayıcı verisini kullanır.
+Guest kullanımında bu normaldir. Native hesap için native backend yapılandırması gerekir; yalnız Supabase değişkenlerini eklemek native hesabı yapılandırmaz.
 
 ### Film araması sonuç vermiyor
 

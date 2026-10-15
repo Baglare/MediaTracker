@@ -135,6 +135,17 @@ function datasetPackage(overrides: Record<string, unknown> = {}) {
   };
 }
 
+it("rejects actual TMDB provenance for every dataset split despite a generic training policy", () => {
+  for (const split of ["pilot", "train", "validation", "test", "unassigned"]) {
+    const result = decodeDatasetPackage(datasetPackage({
+      records: [record({ split })],
+      provenance: [provenance({ contentOrigin: "provider_runtime_reference", exactProviderIdentity: createVerifiedCandidateIdentity({ primaryProvider: "tmdb", primaryExternalId: "55", mediaType: "movie" }) })],
+    }));
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.issues.some((issue) => issue.code === "dataset_tmdb_content_forbidden")).toBe(true);
+  }
+});
+
 function verifierOutput(overrides: Record<string, unknown> = {}) {
   return {
     version: 1,

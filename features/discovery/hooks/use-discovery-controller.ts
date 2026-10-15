@@ -1,6 +1,7 @@
 "use client";
 
 import { safeLog } from "@/lib/security/safe-logging";
+import { assertTmdbPersistenceAllowed } from "@/lib/providers/tmdb-usage-policy";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { AniListNormalizedResult } from "@/lib/anilist-types";
@@ -193,6 +194,7 @@ export function useDiscoveryController({
 
   const addTmdb = useCallback(
     (result: TmdbNormalizedDetail) => {
+      assertTmdbPersistenceAllowed();
       if (!isInLibrary("tmdb", result.externalId)) {
         commands.openQuickAdd({ singleItem: mapTmdbResult(result), seasonItems: null });
       }
@@ -221,6 +223,7 @@ export function useDiscoveryController({
           if (!response.ok || !detail) throw new Error("OMDb detay verisi alınamadı");
           addOmdb(detail);
         } else if (item.source === "tmdb") {
+          assertTmdbPersistenceAllowed();
           let detail: TmdbNormalizedDetail | null = null;
           const response = await fetch(`/api/tmdb/details?id=${encodeURIComponent(item.externalId)}`).catch(() => null);
           if (response?.ok) {

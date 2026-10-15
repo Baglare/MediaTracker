@@ -1,4 +1,5 @@
 import type { AiCandidate, EmbeddingTextPayload } from "@/lib/ai/types";
+import { hasTmdbProvenance } from "@/lib/providers/tmdb-usage-policy";
 import {
   inferMediaClassification,
   type MediaItem,
@@ -69,6 +70,7 @@ function finalize(lines: string[], signals: string[]): EmbeddingTextPayload {
 export function buildCandidateEmbeddingText(candidate: AiCandidate): EmbeddingTextPayload {
   const lines: string[] = [];
   const signals: string[] = ["candidate", `type:${candidate.type}`, `world:${worldFromType(candidate.type)}`];
+  if (hasTmdbProvenance(candidate)) signals.push("provider:tmdb");
   const genres = cleanList(candidate.genres);
   const authors = cleanList(candidate.authors);
   const overview = cleanText(candidate.overview);
@@ -101,6 +103,7 @@ export function buildLibraryItemEmbeddingText(item: MediaItem): EmbeddingTextPay
     `mediaType:${item.mediaType || classification.mediaType}`,
     `subType:${item.subType || classification.subType}`,
   ];
+  if (hasTmdbProvenance(item)) signals.push("provider:tmdb");
   const genres = cleanList(item.genres);
   const tags = cleanList(item.tags);
   const subjects = cleanList(item.subjects);

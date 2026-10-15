@@ -68,7 +68,7 @@ describe("V1 TMDB hard-disable", () => {
     expect(body.providers.tmdb).toEqual({ enabled: false, reason: "disabled_by_policy" });
     expect(categoriesForCapabilities(body).map((entry) => entry.value)).not.toContain("movie");
     expect(readFileSync("components/global-search.tsx", "utf8")).toContain('capabilities.providers.tmdb.enabled && (activeCategory === "all" || activeCategory === "movie")');
-    expect(readFileSync("features/settings/components/settings-feature.tsx", "utf8")).toContain("capabilities.providers.tmdb.enabled && <li>");
+    expect(readFileSync("features/settings/components/settings-feature.tsx", "utf8")).toContain("<TmdbAttribution />");
   });
 
   it("cannot acquire recommendation candidates or new evidence through live proxies", async () => {
