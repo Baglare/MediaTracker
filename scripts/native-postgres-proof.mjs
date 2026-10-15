@@ -122,7 +122,7 @@ try {
   const identity={containerId:id,runName:name,localEndpoint,networkId:network};
   validateDisposableTarget(inspect,net,identity);
   stage='RELAY_START';
-  relay=await startDisposableRelay(identity);
+  relay=await startDisposableRelay(identity,{transport:process.platform==='win32'?'docker-exec':'tcp'});
   stage='RELAY_VALIDATION';
   await verifyDisposableRelay(identity,relay.proof,'127.0.0.1',relay.descriptor.port);
   stage='DATABASE_READY';

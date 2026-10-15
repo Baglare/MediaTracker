@@ -54,12 +54,29 @@ Production or real PostgreSQL concurrency acceptance; the fix is not deployed.
 Existing owner-RLS, privacy/Auth-last, CSRF and limiter contracts are preserved.
 
 Local typecheck, lint (two existing warnings) and synthetic offline native build
-passed. The complete Windows test run encountered link-permission failures and
-source-copy path/git-context failures under `dist`; it is not a full-suite PASS.
-Use the exact closure PR's Linux CI for authoritative full-suite results. Local
-Docker CLI exists but the explicit local engine pipe is unavailable; disposable
-PG18 and real-copy restore were NOT_RUN. Do not substitute earlier CI or backup
-evidence for those missing results.
+passed. Full Windows and Linux CI regression: 3602 passed, 58 conditional skips.
+Initial Windows copies failed due to link permissions and `dist`/Git context;
+those attempts are not PASS. A secret-free copy with correct path/Git context and
+link permissions completed the full suite without weakening any assertion.
+The initial closure CI is [run 38810924982](https://github.com/Baglare/MediaTracker/actions/runs/38810924982);
+the final PR head must independently pass after the runner update.
+
+After the operator started Docker, the existing local PG18 image was verified.
+The PostgreSQL proof runner needed the same attested `docker-exec` transport on
+Windows already used by recovery; Linux keeps TCP. Its 72 targeted regression
+checks pass. The corrected disposable runner completed P1/P2/release with all
+14 migrations, fresh/upgrade, independent connections, owner RLS/CAS/tombstones,
+guest/authenticated quotas and synthetic dump/restore. Recovery ledger, content,
+ownership/ACL, private-file hashes and post-restore two-user isolation passed;
+`live` remains `NOT_RUN`. Use the source/fingerprint-bound receipt for the final
+commit, not an intermediate working-tree receipt. No existing real backup was
+opened, recreated or restored. These local results do not run the main-only Linux
+artifact job or establish Production acceptance.
+
+Runtime dependency audit in CI: zero vulnerabilities. The existing full-audit
+exception `V1-SEC-EXCEPTION-001` covers five dev-only High entries (zero Critical),
+expires 2026-11-03 and must be reviewed/removed when an upstream fix is available;
+it is not a clean full dependency audit or a new exception granted by this task.
 
 ## Maintenance and monitoring — prepared, not installed
 
