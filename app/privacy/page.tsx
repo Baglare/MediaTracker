@@ -16,7 +16,9 @@ const processingGroups = (native: boolean) => [
     data: native
       ? "E-posta, görünen ad, hesap kimliği, e-posta doğrulama durumu ve oturum bilgileri; girişte şifre işlenir, şifre özeti ve oturum kayıtları Better Auth'un özel PostgreSQL şemasında tutulur. Doğrulama ve şifre sıfırlama için süreli bağlantılar işlenir."
       : "E-posta, hesap kimliği ve oturum bilgileri; girişte şifre işlenir, uygulama tablosunda tutulmaz.",
-    purpose: "Mevcut kullanıcıların girişini ve oturum güvenliğini sağlamak; kayıt açılırsa hesabı oluşturmak.",
+    purpose: native
+      ? "Hesap oluşturmak, e-posta doğrulamasını, parola sıfırlamayı ve oturum güvenliğini sağlamak."
+      : "Mevcut kullanıcıların girişini ve oturum güvenliğini sağlamak; kayıt açılırsa hesabı oluşturmak.",
     method: native
       ? "Giriş ve kayıt formu, uygulamanın Better Auth uçları ve oturum çerezleri; otomatik işlemler."
       : "Giriş formu ve hesap/oturum SDK'sı; otomatik işlemler.",
@@ -158,10 +160,9 @@ export default function PrivacyPage() {
             Bu aydınlatma metni açık rıza metni değildir; hizmet kullanımı bu metni kabul etme koşuluna bağlı değildir.
           </p>
           <p>
-            Mevcut yetkili hesaplar giriş yapabilir. Yeni hesap kaydı ayrı yayın koşullarına bağlıdır.
             {native
-              ? "Native modda yeni kayıt varsayılan olarak kapalıdır; yalnız teknik ve hukuki yayın koşulları tamamlanıp kayıt ayarı açıldığında kullanılabilir. Bu sayfa canlı Auth ayarlarının veya gerçek veritabanı kabulünün doğrulandığı anlamına gelmez."
-              : "Barındırılan Auth hizmetinde yeni kayıtların kapatılması ayrıca bir yayın yapılandırması gereğidir; bu sayfa canlı Auth ayarlarının doğrulandığı anlamına gelmez."}
+              ? "Native dağıtımda kayıt ayarı etkinleştirildiğinde yeni hesap oluşturulabilir; girişten önce e-posta doğrulaması zorunludur. Kayıt ayarının açılması hukuki değerlendirmelerin tamamlandığı anlamına gelmez. Bu sayfa canlı Auth ayarlarının veya gerçek veritabanı kabulünün doğrulandığı anlamına gelmez."
+              : "Mevcut yetkili hesaplar giriş yapabilir. Yeni hesap kaydı ayrı yayın koşullarına bağlıdır. Barındırılan Auth hizmetinde yeni kayıtların kapatılması ayrıca bir yayın yapılandırması gereğidir; bu sayfa canlı Auth ayarlarının doğrulandığı anlamına gelmez."}
           </p>
           {native && (
             <p>
