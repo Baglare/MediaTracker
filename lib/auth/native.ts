@@ -10,6 +10,8 @@ import { emailVerificationProof } from './email-verification-proof';
 
 function createNativeAuth() {
   const options = nativeAuthOptions(process.env);
+  // Each sign-in replaces its request-local verifier; never mutate the shared password object.
+  const verifiedCredentials = new WeakMap<object, string>();
   const mail = nativeEmailOptions(options.baseURL,
     async message => smtpMailTransport(process.env)(message), task => after(task), async (user, token) => {
       const proof = emailVerificationProof(token, options.secret, user, process.env, undefined, 'email-verification-issue');
@@ -23,6 +25,15 @@ function createNativeAuth() {
       return { data: session };
     } } } },
     hooks: { before: createAuthMiddleware(async ctx => {
+      if (ctx.path === '/sign-in/email') {
+        const verify: typeof nativePassword.verify = async data => {
+          const valid = await nativePassword.verify(data);
+          if (valid) verifiedCredentials.set(verify, data.hash);
+          return valid;
+        };
+        ctx.context.password = { ...ctx.context.password, verify };
+        return;
+      }
       if (ctx.path === '/verify-email') {
         const token = ctx.query?.token;
         try {
@@ -37,6 +48,22 @@ function createNativeAuth() {
         } catch {
           throw new APIError('BAD_REQUEST', { code: 'INVALID_TOKEN', message: 'Invalid token' });
         }
+      }
+    }), after: createAuthMiddleware(async ctx => {
+      const issued = ctx.context.newSession;
+      if (ctx.path !== '/sign-in/email' || !issued) return;
+      try {
+        // Read AFTER insertion: a later reset deletes this session; an earlier reset
+        // changes the hash and must prevent this pending sign-in from releasing it.
+        const hash = verifiedCredentials.get(ctx.context.password.verify);
+        const account = await ctx.context.internalAdapter.findCredentialAccount(issued.user.id);
+        if (!hash || account?.password !== hash) {
+          await ctx.context.internalAdapter.deleteSession(issued.session.token);
+          throw new Error('credential_changed');
+        }
+      } catch {
+        ctx.context.responseHeaders?.delete('set-cookie');
+        throw new APIError('UNAUTHORIZED', { code: 'AUTH_REJECTED', message: 'Authentication rejected' });
       }
     }) }, database: getNativePool() });
   const context: Promise<Pick<AuthContext, 'internalAdapter'>> = instance.$context;

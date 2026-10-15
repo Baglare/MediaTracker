@@ -88,6 +88,67 @@ it('generic request responses and shared forged-IP-resistant quotas include SMTP
   // All verification rows are removable by the existing Auth-last privacy cleanup.
   expect(mock.store.verification.every(row => row.value === mock.store.user[0].id)).toBe(true);
 });
+it('rejects cross-origin signout and revokes only the authenticated session on valid signout', async () => {
+  const { call } = await runtime();
+  await call('sign-up/email', { email, password, name: 'Synthetic' }); await drain();
+  await call('verify-email', { token: tokenFromMail() });
+  const cookies = [];
+  for (let i = 0; i < 2; i++) {
+    const login = await call('sign-in/email', { email, password });
+    expect(login.status).toBe(200);
+    cookies.push(login.headers.getSetCookie().map(c => c.split(';')[0]).join('; '));
+  }
+  expect(mock.store.session).toHaveLength(2);
+  expect((await call('sign-out', {}, cookies[0], 'https://attacker.invalid')).status).toBe(403);
+  expect(mock.store.session).toHaveLength(2);
+  expect((await call('sign-out', {}, cookies[0])).status).toBe(200);
+  expect(mock.store.session).toHaveLength(1);
+  expect(await (await call('get-session', {}, cookies[0])).json()).toBeNull();
+  expect((await (await call('get-session', {}, cookies[1])).json()).user.email).toBe(email);
+});
+it.each(['Replacement-password', password])('rejects a sign-in overlapping reset, including the same plaintext password (%s)', async newPassword => {
+  const { nativePassword } = await import('@/lib/auth/native-password');
+  const original = nativePassword.verify;
+  let release!: () => void, entered!: () => void;
+  const paused = new Promise<void>(resolve => { entered = resolve; });
+  const resume = new Promise<void>(resolve => { release = resolve; });
+  let waiting = true;
+  vi.spyOn(nativePassword, 'verify').mockImplementation(async data => {
+    const verified = await original(data);
+    if (waiting && data.password === password && verified) { waiting = false; entered(); await resume; }
+    return verified;
+  });
+  const { call } = await runtime();
+  await call('sign-up/email', { email, password, name: 'Synthetic' }); await drain();
+  await call('verify-email', { token: tokenFromMail() });
+  const pendingLogin = call('sign-in/email', { email, password });
+  try {
+    await paused;
+    await call('request-password-reset', { email }); await drain();
+    expect((await call('reset-password', { token: tokenFromMail(1), newPassword })).status).toBe(200);
+    expect(mock.store.session).toHaveLength(0);
+  } finally { release(); }
+  const response = await pendingLogin;
+  expect(response.status).toBe(401);
+  expect(response.headers.getSetCookie()).toHaveLength(0);
+  expect(mock.store.session).toHaveLength(0);
+  expect((await call('sign-in/email', { email, password: newPassword })).status).toBe(200);
+});
+it('keeps concurrent users credential checks request-local', async () => {
+  const { call } = await runtime();
+  const users = [{ email, password }, { email: 'other@example.invalid', password: 'Different-password' }];
+  for (let i = 0; i < users.length; i++) {
+    await call('sign-up/email', { ...users[i], name: 'Synthetic' }); await drain();
+    await call('verify-email', { token: tokenFromMail(i) });
+  }
+  const responses = await Promise.all(users.map(user => call('sign-in/email', user)));
+  for (let i = 0; i < responses.length; i++) {
+    expect(responses[i].status).toBe(200);
+    const cookie = responses[i].headers.getSetCookie().map(c => c.split(';')[0]).join('; ');
+    expect((await (await call('get-session', {}, cookie)).json()).user.email).toBe(users[i].email);
+  }
+  expect(mock.store.session).toHaveLength(2);
+});
 it('binds the token to its issuing UUID, and missing signing configuration never sends verification mail', async () => {
   const { call } = await runtime();
   await call('sign-up/email', { email, password, name: 'Synthetic' }); await drain();
