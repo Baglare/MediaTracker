@@ -89,6 +89,11 @@ describe("Phase 2 TMDB preparation", () => {
     expect(hasTmdbProvenance({ identity: { source: "tmdb" } })).toBe(true);
     expect(hasTmdbProvenance({ id: "tmdb-55" })).toBe(true);
     expect(hasTmdbProvenance({ source: "tvmaze", title: "TMDB" })).toBe(false);
+    expect(hasTmdbProvenance({ sourceId: "tmdb_runtime" })).toBe(true);
+    expect(hasTmdbProvenance({ sourceReference: "tmdb:movie:55" })).toBe(true);
+    expect(hasTmdbProvenance({ sourceReference: "https://www.themoviedb.org/movie/55" })).toBe(true);
+    expect(hasTmdbProvenance({ sourceReference: "https://www.tvmaze.com/shows/55/tmdb" })).toBe(false);
+    expect(hasTmdbProvenance({ sourceReference: "https://themoviedb.org.example.invalid/movie/55" })).toBe(false);
   });
 
   it("keeps structured deterministic evidence but never sends TMDB or mixed evidence to a verifier", async () => {
