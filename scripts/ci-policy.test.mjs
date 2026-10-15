@@ -4,6 +4,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { test } from "node:test";
 import { tmpdir } from "node:os";
 import net from "node:net";
+import { runInNewContext } from "node:vm";
 import yaml from "js-yaml";
 import { exception, verifyAudit, verifyUpstreamVersion } from "./ci-audit.mjs";
 import { checkEnvironment, checkFile, checkMigrations, checkTestIntegrity, checkWorkflow, criticalMigrations } from "./ci-checks.mjs";
@@ -76,6 +77,18 @@ for (const [label, mutate] of [
 test("workflow parses YAML and satisfies authority/stage contract", () => {
   checkWorkflow(readFileSync(".github/workflows/ci.yml", "utf8"));
 });
+for (const eventName of ["push", "pull_request"]) {
+  for (const branch of ["main", "release/v1-hardening", "develop", "test", "release/other"]) {
+    test(`native jobs admit only main/release pushes: ${eventName} ${branch}`, () => {
+      const workflow = yaml.load(readFileSync(".github/workflows/ci.yml", "utf8"));
+      for (const name of ["native-linux-artifact", "native-postgres-disposable-proof"]) {
+        const enabled = runInNewContext(workflow.jobs[name].if, { github: { event_name: eventName, ref: `refs/heads/${branch}` } });
+        assert.equal(enabled, eventName === "push" && ["main", "release/v1-hardening"].includes(branch));
+      }
+      assert.deepEqual(workflow.jobs['native-linux-artifact'].needs, ['validate', 'native-postgres-disposable-proof']);
+    });
+  }
+}
 for (const key of ['NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED', 'NEXT_PUBLIC_CLOUD_MEDIA_SCHEMA_STAGE',
   'NEXT_PUBLIC_CLOUD_MEDIA_V2_ENABLED', 'NEXT_PUBLIC_CLOUD_GOALS_SCHEMA_STAGE',
   'NEXT_PUBLIC_CLOUD_GOALS_V1_ENABLED', 'NEXT_PUBLIC_CLOUD_MEDIA_MAINTENANCE',
@@ -174,7 +187,7 @@ for (const provider of [undefined, "native", "invalid"]) {
   });
 }
 for (const [label, from, to] of [
-  ['PR/main artifact trigger', "github.event_name == 'push' && github.ref == 'refs/heads/release/v1-hardening'", 'always()'],
+  ['unconditional artifact trigger', "github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/release/v1-hardening')", 'always()'],
   ['validation dependency removed', 'needs: validate', 'needs: []'],
   ['floating upload action', 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02', 'actions/upload-artifact@v4'],
   ['extended retention', 'retention-days: 7', 'retention-days: 90'],

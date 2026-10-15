@@ -27,14 +27,17 @@ describe("D5 documentation consolidation", () => {
     expect(architecture.toLowerCase()).not.toContain("production-ready");
   });
 
-  it("records D5 as locally verified while keeping production cutover in D8", () => {
+  it("separates historical Goal rollout evidence from the current native Production summary", () => {
     const roadmap = read("docs/ROADMAP.md");
     const readme = read("README.md");
     expect(roadmap).toContain("D5 — Hedef sistemi");
     expect(roadmap).toContain("D8 — Release ve deployment");
     expect(roadmap).toContain("Goal Cloud V1 production migration/flag rollout");
     expect(readme).toContain("D1–D7");
-    expect(readme).toMatch(/D5 — Goals[^\n]*Yerel\/test kapsamı tamamlandı; Goal Cloud Production rollout D8/);
+    expect(readme).toMatch(/D5 — Goals[^\n]*Yerel ve kontrollü Cloud akışları mevcut; tarihli test kanıtları kendi kapsamlarında/);
+    expect(roadmap.split("## Tarihsel geliştirme ve kabul kayıtları")[1]).toContain("Goal Cloud V1 production migration/flag rollout");
+    expect(readme).toContain("Production v1 canlı adresi:");
+    expect(readme).not.toContain("Goal Cloud Production rollout D8'de");
     expect(readme).toContain("D8");
   });
 });

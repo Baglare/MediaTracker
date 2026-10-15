@@ -176,7 +176,7 @@ export function checkWorkflow(text) {
   requireContract(job.steps.find(step => step.run === "npm run build")?.env?.BACKEND_PROVIDER === "supabase", "Missing explicit offline build provider");
   const artifact = workflow.jobs['native-linux-artifact'];
   requireContract(isDeepStrictEqual(artifact.needs,['validate','native-postgres-disposable-proof'])
-    && artifact.if === "github.event_name == 'push' && github.ref == 'refs/heads/release/v1-hardening'"
+    && artifact.if === "github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/release/v1-hardening')"
     && artifact['runs-on'] === 'ubuntu-24.04' && artifact['timeout-minutes'] === 20
     && JSON.stringify(artifact.permissions) === JSON.stringify({contents:'read'})
     && !artifact.environment && !artifact.container, 'Unsafe native artifact job authority/trigger');
@@ -240,7 +240,7 @@ docker --host unix:///var/run/docker.sock image inspect postgres:18-alpine --for
   const expected = {
     name: 'Disposable native PostgreSQL P1/P2 proof',
     needs: 'validate',
-    if: "github.event_name == 'push' && github.ref == 'refs/heads/release/v1-hardening'",
+    if: "github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/release/v1-hardening')",
     'runs-on': 'ubuntu-24.04',
     'timeout-minutes': 20,
     permissions: {contents: 'read'},

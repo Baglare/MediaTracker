@@ -20,6 +20,7 @@ import type { useLayoutPreferences } from "@/hooks/use-layout-preferences";
 import type { MediaItem, ProgressLog } from "@/lib/types";
 import type { LocalOwnerScope } from "@/lib/local-owner-scope";
 import { useProviderCapabilities } from "@/hooks/use-provider-capabilities";
+import { TmdbAttribution } from "@/components/tmdb-attribution";
 
 type LayoutController = ReturnType<typeof useLayoutPreferences>;
 
@@ -183,13 +184,7 @@ export default function SettingsFeature({
                   Open Library
                 </a> üzerinden düşük hacimli kullanıcı aramalarında sağlanır.
               </li>}
-              {capabilities.providers.tmdb.enabled && <li>
-                <span lang="en">This product uses the{" "}</span>
-                <a href="https://www.themoviedb.org/" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-[var(--app-accent)]">
-                  TMDB API
-                </a>{" "}
-                <span lang="en">but is not endorsed or certified by TMDB.</span>
-              </li>}
+              <li><TmdbAttribution /></li>
               {!providerCapabilitiesLoading && !Object.values(capabilities.providers).some((provider) => provider.enabled) && <li>Aktif public veri kaynağı bulunmuyor.</li>}
             </ul>
           </div>

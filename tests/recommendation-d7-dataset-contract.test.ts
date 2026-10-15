@@ -135,6 +135,40 @@ function datasetPackage(overrides: Record<string, unknown> = {}) {
   };
 }
 
+it("rejects actual TMDB provenance for every dataset split despite a generic training policy", () => {
+  for (const split of ["pilot", "train", "validation", "test", "unassigned"]) {
+    const result = decodeDatasetPackage(datasetPackage({
+      records: [record({ split })],
+      provenance: [provenance({ contentOrigin: "provider_runtime_reference", exactProviderIdentity: createVerifiedCandidateIdentity({ primaryProvider: "tmdb", primaryExternalId: "55", mediaType: "movie" }) })],
+    }));
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.issues.some((issue) => issue.code === "dataset_tmdb_content_forbidden")).toBe(true);
+  }
+});
+
+it("rejects rewritten TMDB dataset source fields without exact provider identity", () => {
+  for (const source of [
+    { sourceId: "tmdb_runtime", sourceReference: "rewritten:movie:55" },
+    { sourceId: "rewritten_source", sourceReference: "tmdb:movie:55" },
+    { sourceId: "rewritten_source", sourceReference: "https://www.themoviedb.org/movie/55" },
+  ]) {
+    for (const split of ["pilot", "train", "validation", "test", "unassigned"]) {
+      const result = decodeDatasetPackage(datasetPackage({
+        manifest: manifest({ sourcePolicies: [sourcePolicy({ sourceId: source.sourceId, sourceType: "human_rewritten" })] }),
+        records: [record({ split })],
+        provenance: [provenance({ ...source, sourceType: "human_rewritten", contentOrigin: "human_rewritten" })],
+      }));
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.issues.some((issue) => issue.code === "dataset_tmdb_content_forbidden")).toBe(true);
+    }
+  }
+  const allowed = decodeDatasetPackage(datasetPackage({
+    manifest: manifest({ sourcePolicies: [sourcePolicy({ sourceId: "rewritten_source", sourceType: "human_rewritten" })] }),
+    provenance: [provenance({ sourceId: "rewritten_source", sourceReference: "project:original-story", sourceType: "human_rewritten", contentOrigin: "human_rewritten" })],
+  }));
+  expect(allowed.ok).toBe(true);
+});
+
 function verifierOutput(overrides: Record<string, unknown> = {}) {
   return {
     version: 1,

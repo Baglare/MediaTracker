@@ -10,6 +10,7 @@ import { runSafeApiRoute } from "@/lib/api/safe-route";
 import { NextRequest, NextResponse } from "next/server";
 import { getPlanningProviderPolicy, getProviderSequence, mockProvider } from "@/lib/ai/provider";
 import { buildLibraryProfile } from "@/lib/ai/profile-builder";
+import { hasTmdbProvenance } from "@/lib/providers/tmdb-usage-policy";
 import { analyzeIntent } from "@/lib/ai/intent-analyzer";
 import { scoreCandidates } from "@/lib/ai/candidate-scorer";
 import { applyFeedbackAwareScoring } from "@/lib/ai/feedback-aware-scorer";
@@ -1243,6 +1244,9 @@ export async function POST(req: NextRequest) {
   const researchMode = (body as { researchMode?: string }).researchMode || "library-only";
   if (researchMode !== "library-only" && !entitlement.canUseServerProviders) {
     return apiError("ai_server_provider_forbidden", 403);
+  }
+  if (researchMode !== "library-only" && hasTmdbProvenance(mediaItems)) {
+    return apiError("tmdb_model_use_forbidden", 403);
   }
   if (researchMode !== "library-only") {
     const boundaryError = validateAuthenticatedMutationRequest(req);
