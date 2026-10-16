@@ -36,7 +36,7 @@ describe("D5 documentation consolidation", () => {
     expect(readme).toContain("D1–D7");
     expect(readme).toMatch(/D5 — Goals[^\n]*Yerel ve kontrollü Cloud akışları mevcut; tarihli test kanıtları kendi kapsamlarında/);
     expect(roadmap.split("## Tarihsel geliştirme ve kabul kayıtları")[1]).toContain("Goal Cloud V1 production migration/flag rollout");
-    expect(readme).toContain("Production v1 canlı adresi:");
+    expect(readme).toContain("## Production v1 (16 Ekim 2026)");
     expect(readme).not.toContain("Goal Cloud Production rollout D8'de");
     expect(readme).toContain("D8");
   });
