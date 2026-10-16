@@ -118,14 +118,16 @@ for(const [stage,options] of [
   });
 }
 
-test('release seed precedes only 014; preservation and concurrency cannot be skipped',async()=>{
+test('release seed precedes 014; preservation follows 015 and concurrency cannot be skipped',async()=>{
   const r=await run({release:true});
   assert.equal(r.process.exitCode,undefined);
   const seed=r.calls.findIndex(c=>c.key==='upgrade seed');
   const migration=r.calls.findIndex(c=>c.options?.input?.includes("name='014_secure_email_verification.sql'"));
+  const privacyMigration=r.calls.findIndex(c=>c.options?.input?.includes("name='015_privacy_cloud_policies.sql'"));
   assert.ok(seed>0&&seed<migration);
-  assert.ok(r.calls.findIndex(c=>c.key==='upgrade verify')>migration);
-  assert.ok(r.calls.findIndex(c=>c.key==='concurrency')>migration);
+  assert.ok(privacyMigration>migration);
+  assert.ok(r.calls.findIndex(c=>c.key==='upgrade verify')>privacyMigration);
+  assert.ok(r.calls.findIndex(c=>c.key==='concurrency')>privacyMigration);
   const auth=r.calls.find(c=>c.key==='auth');
   assert.ok(auth);
   assert.equal(auth.options.env.NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED,'true');

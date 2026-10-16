@@ -153,7 +153,7 @@ try {
       await verifyReleaseUpgrade(upgrade);
       stage='PG18_CONCURRENCY';
       await proveReleaseConcurrency(upgrade);
-      console.log('PASS: PG18 013-to-014 preservation, independent connection concurrency, limiter, RLS, CAS and tombstone');
+      console.log('PASS: PG18 013-to-015 preservation, independent connection concurrency, limiter, RLS, CAS and tombstone');
     }
     stage='P2_FUNCTIONAL_PROOF';
     output=p2Sql(readFileSync(new URL('../database/native/cloud-goals-proof.sql',import.meta.url),'utf8'));
