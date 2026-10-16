@@ -1,5 +1,35 @@
 # V1-HARDENING-05D — Retention technical policy and cleanup design
 
+## Native güncel politika eki — 16 Ekim 2026
+
+Aşağıdaki 5 Ekim Supabase teknik envanteri tarihsel kalır. Native TTL ve cleanup
+kaynağı [native gate](NATIVE_V1_PROVIDER_PRIVACY_RETENTION_GATE.md), gerçek işlem
+prosedürü [operasyon eki](V1_CLOSURE_OPERATIONS.md#kvkk-final-kapanış--16-ekim-2026).
+`MAILBOX_RETENTION = OPERATOR_APPROVED_MANUAL_POLICY` bu ek için geçerlidir;
+tarihli OPERATOR_POLICY_REQUIRED geçmiş karardır.
+
+| Kayıt | Saklama / başlangıç | İcra ve sınır |
+| --- | --- | --- |
+| Olağan destek yazışması | Kapanıştan 90 gün; kapanış yanıt/işlem tamamlanma tarihidir | Operatör Gmail ve özel kayıt/kopyaları aylık inceler, süresi dolanı manuel imha eder. Gmail trash ayrıca boşaltılır; Gmail iç yedekleri otomatik silindi sayılmaz |
+| KVKK başvuru, yanıt ve asgari kapanış kanıtı | Kapanıştan 12 takvim ayı | Operatör manuel imha; bu süre kanunen zorunlu saklama süresi değildir. Yanıt için 30 günlük saat received_at'ten işler, retention ile karıştırılmaz |
+| Kimlik doğrulama eki / export teslim kopyası | Doğrulama/teslim tamamlanınca gerekli olmayan içerik erken kaldırılır | Asgari doğrulama sonucu/tarih kalır; tam kimlik kopyası ve export'u 12 ay tutmak varsayılan değil. İlgili kişinin kendi kopyası ayrı |
+| Somut uyuşmazlık / yasal saklama / hak koruma istisnası | Gerekli kayıtla sınırlı, sebep ve bitiş/yeniden inceleme tarihi özel kayıtta | Operatör kapsam ve hukuki gerekliliği değerlendirir; süresiz genel hold yok. Gerekçe bittiğinde normal süre dolmuşsa imha |
+| Production silinmiş test hesabının privacy export'u ve silme öncesi backup'ları | OPERATOR_REPORTED mevcut, bu görevde koruma altında; süre/özel konum/kopya listesi operatör kaydına işlenecek | **Silme, taşıma, açma, Git'e yükleme yok.** Test hesabı da kişisel veri içerebilir. Ayrı envanter kimliği, hash/oluşturma zamanı, şifreleme, erişim/ülke, imha kararı ve review tarihi gerekir; hosting ~4 hafta rotasyonu bu kopyaları kapsamaz |
+| Minimal silme uzlaştırma kaydı | Hesabı içerebilecek son erişilebilir backup/export emekliye ayrılana veya temizlendiği doğrulanana kadar; en az aylık gözden geçirme | Eski UUID ve deletion timestamp, kapsam, kanıt referansı; içerik/parola/token/email ekleme. Bu pseudonymous kayıt da kişisel veridir. Özel bağımsız register, Git değil; 12 aylık genel talep imhasıyla yanlışlıkla kaybetme |
+| Native Auth session/doğrulama/reset/sayaç | Mevcut geçerlilik ve prune mekanizması | Session 7 gün/updateAge 1 gün; verification 1 saat/reset 30 dk; TTL fiziksel silme garantisi değil. Auth-last hesap erase ve traffic-driven pruning farklıdır; yeni scheduler/purge yok |
+| Native limiter ve dosyalar | Receipt 60 sn/bucket 16 dk, bounded ortak cleanup 500; dosya intent/staging mevcut maintenance sözleşmesi | Expiry erişimi keser; idle sistemde expired row kalabilir. Files fiziksel cleanup mevcut güvenli operator aracıyla, bütün storage'ı yaşa göre silme yok |
+| Kullanıcı Cloud içerik/XP/operasyon/tombstone | Hesap/özellik yaşam döngüsü; keyfî yaş purge'u yok | Katılımcı, immutable XP ve replay barrier korunur; veri talebi/hesap silme mevcut korumalı akışla |
+| Hosting logları | Kesin retention UNKNOWN | Plesk gerçek rotation/erişim/son kopya koşulları operatörce belgelenir; uydurulmuş 7/30/90 günlük süre yok |
+| Hosting backup / bağımsız offsite | Hosting daily/~4 hafta OPERATOR_REPORTED_WRITTEN; offsite ayrı | DB+private-file kapsam/tutarlılık, son-success ve son kişisel kopya imhası ayrı kanıt; restore öncesi reconciliation şart |
+| Browser/local recovery/download | Kullanıcı/site verisi ve cihaz kopyaları yaşam döngüsü | Logout veya hesap backend erase cihazı temizlemez; kullanıcıya tüm cihaz/site verisi/export temizliği bildirilir, recovery/quarantine sessizce silinmez |
+
+Bu paket genel kullanıcı verisi silme, mailbox otomasyonu veya cron kurmaz.
+İmha işlem kayıtlarının ilgili silme yönetmeliğindeki en az üç yıllık saklama
+yükümlülüğü ([Silme Yönetmeliği madde 7/3](https://www.kvkk.gov.tr/Icerik/5441/KISISEL-VERILERIN-SILINMESI-YOK-EDILMESI-VEYA-ANONIM-HALE-GETIRILMESI-HAKKINDA-YONETMELIK)), KVKK başvuru yazışmasının 12 aylık operatör politikasından ayrıdır:
+imha yöntemi/tarih/kapsam/sonuç/yetkili ve kanıt referansı asgari özel kayıtta
+tutulur; silinen içeriğin kopyası tutulmaz. Uygulanabilir diğer yükümlülük varsa
+ayrıca gerekçelendirilir. VERBİS istisnası imha yükümlülüğünü kaldırmaz.
+
 Date: 2026-10-05. Executed after the 05C source/synthetic acceptance checkpoint. 05C's operational erasure blocker remains open; this design does not close it. No age-based user-content deletion, remote cleanup or cron deployment.
 
 `RETENTION_TECHNICAL_POLICY = CLOSED` for source inventory, conservative lifecycle classes and synthetic bounded security cleanup design.
