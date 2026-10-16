@@ -1,14 +1,38 @@
 # MediaTracker
 
-MediaTracker; film, dizi, anime, manga, manhwa, manhua, novel ve kitap takibi için geliştirilmiş local-first bir medya takip uygulamasıdır. Proje Next.js 16 App Router, React 19, TypeScript ve Tailwind CSS 4 üzerine kuruludur.
+**Local-first medya takibi, isteğe bağlı Cloud Sync ve sosyal özellikleri bir araya getiren canlı full-stack web uygulaması.**
 
-Uygulamanın ana veri kaynağı tarayıcıdaki owner-scoped yerel depolamadır. Native V1; Better Auth, PostgreSQL ve özel dosya depolamasıyla isteğe bağlı hesap, kontrollü Cloud aktarımı ve sosyal özellikler sağlar. Supabase adapter'ı ayrı fallback olarak korunur; backend seçimi eski hesapları veya verileri otomatik taşımaz. Guest/local-first kullanım hesap gerektirmez.
+[Canlı uygulama](https://mediatracker.baglare.com.tr) · [ArtifactHub vaka çalışması](https://artifact-hub-xi.vercel.app/artifacts/media-tracker) · [Mimari ve demo senaryosu](docs/V1_PORTFOLIO_KIT.md) · [GitHub Actions](https://github.com/Baglare/MediaTracker/actions)
 
-Production v1 canlı adresi: **[mediatracker.baglare.com.tr](https://mediatracker.baglare.com.tr)**. Next.js uygulaması TürkHosting Plesk/Passenger üzerinde; native PostgreSQL 18, Better Auth ve özel dosya depolamasıyla çalışır. Yeni kullanıcı kaydı ve zorunlu e-posta doğrulaması açıktır; doğrulanmamış hesap oturum açamaz. Doğrulama ve parola sıfırlama e-postaları native SMTP adapter'ından gönderilir. Canlı sürüm, kayıt ve doğrulama durumu 2026-10-15 tarihinde operatör tarafından teyit edilmiştir; bu doküman güncellemesinde canlı servisler yeniden test edilmemiştir.
+**TR:** Film, dizi, anime, manga, manhwa, manhua ve kitaplarını tek kütüphanede takip et. Kayıt olmadan yerel kullanım; isteğe bağlı hesap, e-posta doğrulaması, cihazlar arası kontrollü eşitleme, ilerleme/hedef/takvim, sosyal etkileşimler ve deterministik öneriler.
 
-Faz 1 repository temizliği tamamlandı. Faz 2; TMDB güvenli hazırlığı, güncel dokümantasyon ve main/release CI sürekliliğini kapsar. Tarihli D8/Supabase ve operasyon kabul kayıtları geçmiş bağlamlarıyla korunur; yeni bir değişikliğin Production'a uygulandığını göstermez.
+**EN:** A live local-first media tracker for series, films, anime, manga, and books. It supports guest use without an account, optional authenticated Cloud Sync, progress and goal tracking, a calendar, social interactions, and deterministic recommendations.
 
-TMDB v1 env contract: `MEDIA_TRACKER_TMDB_MODE` retired/ignored; `TMDB_READ_ACCESS_TOKEN` normal LOCAL runtime için gereksiz, CI/PREVIEW/PRODUCTION için forbidden/unset. Legacy poster CDN compatibility live metadata API enablement değildir.
+## Production v1 (16 Ekim 2026)
+
+| Alan | Mevcut durum |
+| --- | --- |
+| Canlı adres | [mediatracker.baglare.com.tr](https://mediatracker.baglare.com.tr) |
+| Uygulama | Next.js 16, React 19, TypeScript, Tailwind CSS 4 |
+| Backend | Better Auth, PostgreSQL 18, sunucu tarafı API route'ları ve erişim kontrollü dosya depolaması |
+| Barındırma | TürkHosting / Plesk / Passenger, Node.js 24 |
+| Son kabul edilen kaynak | [`687b944814d1`](https://github.com/Baglare/MediaTracker/commit/687b944814d1a4441c3a430fbad9beee529046f5) |
+| Canlı doğrulama | Operatör tarafından LIVE/READY, giriş/oturum, Cloud Sync, kayıt/e-posta doğrulaması ve gizlilik sayfası PASS (16 Ekim 2026) |
+
+### Mühendislik açısından öne çıkanlar
+
+- **Local-first:** Tarayıcıdaki owner-scoped kütüphane ana kaynaktır. Misafir kullanımı hesap gerektirmez; Cloud bağlantısı olmadan yerel akışlar devam eder.
+- **Tutarlı eşitleme:** Onaylı Cloud upload/download/merge; revision, idempotency, tombstone, tekrar oynatma koruması ve conflict yönetimi.
+- **Veri bütünlüğü:** Sürümlü portable JSON yedekleri, SHA-256 kontrolü, doğrulamalı import ve kontrollü rollback/undo.
+- **Yetkilendirme:** Sunucuda doğrulanan oturumlar, PostgreSQL FORCE RLS, owner izolasyonu, erişim sınırları ve regresyon testleri.
+- **Ürün özellikleri:** Kütüphane, ilerleme, Release Calendar, hedefler, kişiselleştirme, sosyal profil/feed/yorum/bildirimler ve deterministik öneri motoru.
+- **Yayın disiplini:** GitHub Actions doğrulamaları, izole PostgreSQL 18 kabul testleri, SHA sabitli Linux artifact, migration uyumluluğu ve kontrollü rollback prosedürü.
+
+**İlk sürümün bilinçli sınırları:** Ücretli AI/grounded research sunucu akışları ve yeni TMDB/AniList/OMDb sorguları kapalıdır; Open Library koşulludur. Öneri mantığı aktif sürümde deterministiktir, canlı LLM önerileri olarak sunulmaz. Otomatik gerçek zamanlı Cloud indirmesi yoktur. KVKK veri aktarımı ve bazı operasyonel kapanış maddeleri ayrıca takip edilmektedir; canlı yayın bir genel hukuki uygunluk sertifikası değildir.
+
+> **Teknik belgeler:** [Portfolyo kiti](docs/V1_PORTFOLIO_KIT.md) · [Güncel kapanış/operasyon sınırları](docs/V1_CLOSURE_OPERATIONS.md) · [Gizlilik ve sağlayıcı envanteri](docs/NATIVE_V1_PROVIDER_PRIVACY_RETENTION_GATE.md). Ayrı Supabase adapter'ı ve eski D8 çalışma notları tarihsel/fallback geliştirme bağlamında korunur; Production altyapısı native PostgreSQL'dir.
+
+---
 
 ## Mevcut Durum
 
