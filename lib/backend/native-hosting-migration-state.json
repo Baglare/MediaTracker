@@ -55,6 +55,10 @@
     {
       "name": "014_secure_email_verification.sql",
       "checksum": "2638558d74d5d6cd20d791f5ed551718c3926d4c64a9e7c570ef24d147487492"
+    },
+    {
+      "name": "015_privacy_cloud_policies.sql",
+      "checksum": "239d483ed1bc47bc4455ac619a32f7bac66518f83000493fd8f2aee6763065f5"
     }
   ],
   "hosting-production": [
@@ -113,6 +117,10 @@
     {
       "name": "014_secure_email_verification.sql",
       "checksum": "97addefdfae1c0967cf118ed86fc005021e76f74113d3f7ce12cda33aaee536b"
+    },
+    {
+      "name": "015_privacy_cloud_policies.sql",
+      "checksum": "39bc897c26926fbcdbb441b445772ac65208fd1bd58826211f871f0bdf0a7a9e"
     }
   ]
 }

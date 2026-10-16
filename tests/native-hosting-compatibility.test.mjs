@@ -65,7 +65,7 @@ test('test preflight is read-only, fingerprints target and reports pending plan 
     return {rows:[]};
   }};
   const report=await hostingPreflight(client,c);
-  assert.equal(report.contract,'PASS');assert.equal(report.history,'EMPTY');assert.equal(report.pending.length,13);
+  assert.equal(report.contract,'PASS');assert.equal(report.history,'EMPTY');assert.equal(report.pending.length,15);
   assert.match(report.target.fingerprint,/^[a-f0-9]{64}$/);
   assert.equal(calls[0],'BEGIN READ ONLY');assert.equal(calls.at(-1),'ROLLBACK');
   assert.ok(calls.every(sql=>sql==='BEGIN READ ONLY'||sql==='ROLLBACK'||sql==='SET ROLE mt_test_ledger_owner'||sql==='RESET ROLE'||sql.startsWith('SELECT')||sql.startsWith('WITH')));
@@ -152,10 +152,10 @@ test('hosting bootstrap/retry is locked and transactional without provisioning m
     return {rows:[]};
   }};
   const options={apply:true,confirmation:`MIGRATE disposable ${fingerprint}`};
-  assert.equal((await runMigrations(client,c,target,options)).applied.length,13);
+  assert.equal((await runMigrations(client,c,target,options)).applied.length,15);
   assert.deepEqual((await runMigrations(client,c,target,options)).applied,[]);
-  assert.equal(calls.filter(s=>s==='COMMIT').length,13);
-  assert.equal(calls.filter(s=>s.startsWith('INSERT INTO native_migrations.ledger')).length,13);
+  assert.equal(calls.filter(s=>s==='COMMIT').length,15);
+  assert.equal(calls.filter(s=>s.startsWith('INSERT INTO native_migrations.ledger')).length,15);
   assert.ok(calls.at(-1).includes('pg_advisory_unlock'));
   assert.equal(validateHistory(history,entries).length,0);
   history[0].checksum='b'.repeat(64);

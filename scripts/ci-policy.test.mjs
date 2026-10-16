@@ -79,11 +79,12 @@ test("workflow parses YAML and satisfies authority/stage contract", () => {
 });
 for (const eventName of ["push", "pull_request"]) {
   for (const branch of ["main", "release/v1-hardening", "develop", "test", "release/other"]) {
-    test(`native jobs admit only main/release pushes: ${eventName} ${branch}`, () => {
+    test(`native artifact stays push-only; disposable proof also runs on PRs: ${eventName} ${branch}`, () => {
       const workflow = yaml.load(readFileSync(".github/workflows/ci.yml", "utf8"));
       for (const name of ["native-linux-artifact", "native-postgres-disposable-proof"]) {
         const enabled = runInNewContext(workflow.jobs[name].if, { github: { event_name: eventName, ref: `refs/heads/${branch}` } });
-        assert.equal(enabled, eventName === "push" && ["main", "release/v1-hardening"].includes(branch));
+        assert.equal(enabled, (name === 'native-postgres-disposable-proof' && eventName === 'pull_request')
+          || (eventName === "push" && ["main", "release/v1-hardening"].includes(branch)));
       }
       assert.deepEqual(workflow.jobs['native-linux-artifact'].needs, ['validate', 'native-postgres-disposable-proof']);
     });
@@ -145,7 +146,9 @@ for (const [label, mutate] of [
   ['other image', job => { job.steps[5].run = job.steps[5].run.replaceAll('postgres:18-alpine', 'postgres:latest'); }],
   ['PG17 cannot satisfy PG18', job => { job.steps[5].run = job.steps[5].run.replaceAll('postgres:18-alpine', 'postgres:17-alpine'); }],
   ['omitted recovery verifier', job => { job.steps.splice(7,1); }],
-  ['raw recovery upload', job => { job.steps[9].with.path='dist/**'; }],
+  ['raw recovery upload', job => { job.steps.find(step=>step.name==='Upload validated synthetic receipts only').with.path='dist/**'; }],
+  ['omitted privacy proof', job => { job.steps.splice(8,1); }],
+  ['conditional privacy skip', job => { job.steps[8].if='false'; }],
   ['unbounded image pull', job => { job.steps[5].run = job.steps[5].run.replace('timeout 180s ', ''); }],
   ['missing local image inspect', job => { job.steps[5].run = job.steps[5].run.split('\n').slice(0, -2).join('\n'); }],
   ['image preparation after proof', job => { [job.steps[5], job.steps[6]] = [job.steps[6], job.steps[5]]; }],

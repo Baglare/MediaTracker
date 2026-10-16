@@ -240,7 +240,7 @@ docker --host unix:///var/run/docker.sock image inspect postgres:18-alpine --for
   const expected = {
     name: 'Disposable native PostgreSQL P1/P2 proof',
     needs: 'validate',
-    if: "github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/release/v1-hardening')",
+    if: "github.event_name == 'pull_request' || (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/release/v1-hardening'))",
     'runs-on': 'ubuntu-24.04',
     'timeout-minutes': 20,
     permissions: {contents: 'read'},
@@ -256,6 +256,7 @@ docker --host unix:///var/run/docker.sock image inspect postgres:18-alpine --for
       {name: 'Prepare local PostgreSQL image before disposable tests', shell: 'bash', run: prepareImage},
       {name: 'PG18 fresh upgrade concurrency and source-bound recovery', run: 'node scripts/native-release-receipt.mjs'},
       {name: 'Independent receipt fingerprint verification', run: 'node scripts/native-release-receipt.mjs --verify'},
+      {name: 'PG18 privacy inventory erasure and role isolation', run: 'node scripts/native-postgres-proof.mjs --privacy'},
       {name: 'Guest HMAC and session spoofing negative tests (offline adapter)',
         env: {NODE_OPTIONS:'--import=${{ github.workspace }}/scripts/ci-offline.mjs'},
         run: 'node node_modules/vitest/vitest.mjs run tests/native-tvmaze-guest-pool.test.ts tests/native-api-session-rate-limit.test.ts --maxWorkers=1'},

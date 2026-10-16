@@ -16,7 +16,7 @@ export async function verifyReceipt(directory) {
   const release=JSON.parse(await readFile(`${directory}/release.json`,'utf8'));
   const migrations=nativeMigrationManifest().map(({name,checksum})=>({name,checksum}));
   if(release.format!=='MediaTrackerReleasePg18V1'||release.status!=='PASS'||release.pgMajor!==18
-    ||JSON.stringify(release.migrations)!==JSON.stringify(migrations)||migrations.length!==14
+    ||JSON.stringify(release.migrations)!==JSON.stringify(migrations)||migrations.length!==15
     ||release.recoveryFingerprint!==proof.fingerprint||release.sourceFingerprint!==await releaseSourceFingerprint()
     ||release.fingerprint!==digest({...release,fingerprint:undefined})
     ||['fresh','upgrade','independentConnections','guestLimits','authenticatedQuotas','rlsCasTombstone'].some(k=>release[k]!=='PASS')
