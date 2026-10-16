@@ -54,5 +54,9 @@
   {
     "name": "014_secure_email_verification.sql",
     "checksum": "7167d0fea66212e17c8454f38e81a6bec3dc9a4371525e3c8376d1fe78648aef"
+  },
+  {
+    "name": "015_privacy_cloud_policies.sql",
+    "checksum": "7bc89446e115d4745c4956914647387d0243b1d26d8275b8075054b2e8835aa9"
   }
 ]

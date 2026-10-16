@@ -147,7 +147,7 @@ test('read-only preflight reports the exact 010-013 suffix and always rolls back
     return {rows:[]};
   }};
   const result=await recoveryPreflight(client,config,target);
-  assert.deepEqual(result.pending,['010_backup_select_policies.sql','011_backup_policy_role_scope.sql','012_public_signup.sql','013_tvmaze_guest_pool.sql','014_secure_email_verification.sql']);assert.equal(result.coverage,'NOT_RUN');
+  assert.deepEqual(result.pending,['010_backup_select_policies.sql','011_backup_policy_role_scope.sql','012_public_signup.sql','013_tvmaze_guest_pool.sql','014_secure_email_verification.sql','015_privacy_cloud_policies.sql']);assert.equal(result.coverage,'NOT_RUN');
   assert.equal(calls[0],'BEGIN READ ONLY');assert.equal(calls.at(-1),'ROLLBACK');
   assert.ok(!calls.some(s=>/INSERT|UPDATE|set_release_freeze/.test(s)));
 });

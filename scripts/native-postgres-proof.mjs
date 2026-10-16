@@ -10,10 +10,12 @@ import { Client } from 'pg';
 import { performance } from 'node:perf_hooks';
 import { prepareReleaseUpgrade, verifyReleaseUpgrade, proveReleaseConcurrency } from './native-release-pg18.mjs';
 import { emailVerificationPg18 } from './native-email-verification-pg18.mjs';
+import { privacyCloudPg18 } from './native-privacy-cloud-pg18.mjs';
 const emailKey=randomBytes(32).toString('hex'),emailEpoch='1';
 const release = process.argv[2] === '--release';
+const privacy = process.argv[2] === '--privacy';
 const p2 = process.argv[2] === '--p2' || release;
-if (process.argv.slice(2).some(arg => !['--p2','--release'].includes(arg)) || process.argv.length > 3) throw new Error('proof_target_arguments_denied');
+if (process.argv.slice(2).some(arg => !['--p2','--release','--privacy'].includes(arg)) || process.argv.length > 3) throw new Error('proof_target_arguments_denied');
 const image = 'postgres:18-alpine';
 const name = `mt-p1-${randomUUID()}`;
 let localEndpoint;
@@ -128,6 +130,11 @@ try {
   stage='DATABASE_READY';
   await waitForDatabase();
   stage='SQL_PROOF';
+  if(privacy) {
+    stage='PG18_PRIVACY_CLOUD';
+    await privacyCloudPg18({host:'127.0.0.1',port:relay.descriptor.port,password,database:'mt_p1_proof'},p2Sql);
+    console.log('PASS: PG18 privacy baseline reproduction, inventory, cleanup, Auth-last, residual gates and two-user isolation');
+  } else {
   let output;
   if(p2) {
     let upgrade;
@@ -146,7 +153,7 @@ try {
       await verifyReleaseUpgrade(upgrade);
       stage='PG18_CONCURRENCY';
       await proveReleaseConcurrency(upgrade);
-      console.log('PASS: PG18 013-to-014 preservation, independent connection concurrency, limiter, RLS, CAS and tombstone');
+      console.log('PASS: PG18 013-to-015 preservation, independent connection concurrency, limiter, RLS, CAS and tombstone');
     }
     stage='P2_FUNCTIONAL_PROOF';
     output=p2Sql(readFileSync(new URL('../database/native/cloud-goals-proof.sql',import.meta.url),'utf8'));
@@ -213,7 +220,13 @@ try {
   if(result.status!==0 || interrupted) throw new Error('auth_or_pool_proof_failed');
   console.log('PASS: real disposable PostgreSQL RLS, Better Auth and pg transaction proof');
   }
+  }
 } catch(error) {
+  if(privacy) {
+    const line=error.stack?.match(/native-privacy-cloud-pg18\.mjs:([1-9][0-9]{0,5}):/)?.[1];
+    if(line)console.error(`FAIL: privacy assertion; source_line=${line}`);
+    if(/^[0-9A-Z]{5}$/.test(error.code??'')&&allowedSqlstateClasses.has(error.code.slice(0,2)))sqlstate=error.code;
+  }
   const checks=new Set(['connections','guest_lock_contention','guest_race','replay_and_ten_seconds','utc_daily_limit','provider_reserve','disabled_global_capacity','cooldown','envelope_negatives','authenticated_quota','authenticated_race','cloud_cas','tombstone','rls']);
   const check=checks.has(error.releaseCheck)?error.releaseCheck:undefined;
   if(check&&/^[0-9A-Z]{5}$/.test(error.code??'')&&allowedSqlstateClasses.has(error.code.slice(0,2)))sqlstate=error.code;

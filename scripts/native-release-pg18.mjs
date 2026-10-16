@@ -28,7 +28,7 @@ async function snapshot(c) {
     assert.match(schemaname,/^[a-z_]+$/);assert.match(tablename,/^[a-zA-Z_]+$/);
     result[schemaname+'.'+tablename]=(await c.query(`SELECT to_jsonb(t) AS r FROM "${schemaname}"."${tablename}" t ORDER BY ${schemaname==='native_migrations'&&tablename==='ledger'?'name':'to_jsonb(t)::text'}`)).rows;
   }
-  result.policies=(await c.query("SELECT schemaname,tablename,policyname,permissive,roles,cmd,qual,with_check FROM pg_policies WHERE schemaname IN ('app','native_auth','private_rate_limit','private_privacy_ops') AND tablename<>'tvmaze_guest_pool' AND tablename NOT LIKE 'email_verification_%' ORDER BY 1,2,3")).rows;
+  result.policies=(await c.query("SELECT schemaname,tablename,policyname,permissive,roles::text[] AS roles,cmd,qual,with_check FROM pg_policies WHERE schemaname IN ('app','native_auth','private_rate_limit','private_privacy_ops') AND tablename<>'tvmaze_guest_pool' AND tablename NOT LIKE 'email_verification_%' ORDER BY 1,2,3")).rows;
   result.acl=(await c.query("SELECT n.nspname,c.relname,c.relowner::regrole::text,c.relacl::text,c.relrowsecurity,c.relforcerowsecurity FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname IN ('app','native_auth','private_rate_limit','private_privacy_ops') AND c.relname NOT LIKE 'email_verification_%' AND c.relname NOT IN ('tvmaze_guest_pool','tvmaze_guest_pool_pkey') ORDER BY 1,2")).rows;
   result.roles=(await c.query("SELECT rolname,rolsuper,rolbypassrls,rolcanlogin,rolinherit,rolconfig FROM pg_roles WHERE rolname LIKE 'mt_%' ORDER BY 1")).rows;
   return result;
@@ -57,12 +57,26 @@ export async function prepareReleaseUpgrade(config) {
     return {config,before:await snapshot(admin)};
   } finally {await runtime?.end();await admin.end();}
 }
+export function assertPrivacyPolicyAddition(before,after) {
+  const key=p=>[p.schemaname,p.tablename,p.policyname].join('.');
+  const oldKeys=new Set(before.map(key));
+  assert.deepEqual(after.filter(p=>oldKeys.has(key(p))),before);
+  const qual="((CURRENT_USER = 'mt_owner'::name) AND (SESSION_USER <> 'mt_runtime'::name) AND pg_has_role(SESSION_USER, 'mt_privacy_operator'::name, 'MEMBER'::text) AND (app.current_user_id() IS NULL))";
+  const expected=['cloud_media_sync_operations','goal_sync_operations','goals','media_items','progress_logs']
+    .flatMap(tablename=>['DELETE','SELECT'].map(cmd=>({schemaname:'app',tablename,
+      policyname:'native_privacy_'+cmd.toLowerCase(),permissive:'PERMISSIVE',roles:['mt_owner'],cmd,qual,with_check:null})));
+  assert.deepEqual(after.filter(p=>!oldKeys.has(key(p))),expected);
+}
 export async function verifyReleaseUpgrade({config,before}) {
   const c=await connection(config);
   try {
     const after=await snapshot(c);
     assert.deepEqual(after['native_migrations.ledger'].slice(0,13),before['native_migrations.ledger']);
     after['native_migrations.ledger']=before['native_migrations.ledger'];
+    // 015 intentionally adds exactly ten gated policies. Every old policy,
+    // ACL, row and role must still be identical; no blanket catalog exclusion.
+    assertPrivacyPolicyAddition(before.policies,after.policies);
+    after.policies=before.policies;
     assert.deepEqual(after,before);
     for(const user of users) {
       const hash=(await c.query('SELECT password FROM native_auth.account WHERE "userId"=$1 AND "providerId"=\'credential\'',[user])).rows[0]?.password;

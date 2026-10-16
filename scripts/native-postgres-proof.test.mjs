@@ -16,7 +16,7 @@ const source=readFileSync(new URL('./native-postgres-proof.mjs',import.meta.url)
 const id='a'.repeat(64),network='b'.repeat(64),name=`mt-p1-${'c'.repeat(36)}`;
 const privateDiagnostic='synthetic-private-diagnostic';
 const guestProofSource=readFileSync(new URL('../database/native/tvmaze-guest-proof.sql',import.meta.url),'utf8');
-async function run({fail,authOutput='',sqlFailure,sqlStatus=3,sqlSignal=null,sqlSpawnError,sqlError=`ERROR:  42601\n${privateDiagnostic}`,missingProof=false,missingGuestProof=false,mutate=()=>{},p2=false,release=false,endpoint='unix:///var/run/docker.sock',interrupt=false,readinessFailures=0,queryFailures=0,badReady=false,interruptReady=false,lateReady=false,cleanupFailure=false}={}) {
+async function run({fail,authOutput='',sqlFailure,sqlStatus=3,sqlSignal=null,sqlSpawnError,sqlError=`ERROR:  42601\n${privateDiagnostic}`,missingProof=false,missingGuestProof=false,mutate=()=>{},p2=false,release=false,privacy=false,endpoint='unix:///var/run/docker.sock',interrupt=false,readinessFailures=0,queryFailures=0,badReady=false,interruptReady=false,lateReady=false,cleanupFailure=false}={}) {
   p2 ||= release;
   const calls=[],logs=[];
   let sqlCall=0,elapsed=0,attempt=0,timerId=0;
@@ -26,7 +26,7 @@ async function run({fail,authOutput='',sqlFailure,sqlStatus=3,sqlSignal=null,sql
     Mounts:[{Type:'tmpfs',Destination:'/var/lib/postgresql/data'}]};
   const net={Id:network,Name:name,Driver:'bridge',Internal:true,Labels:{'mt.p1.proof':name},Containers:{[id]:{Name:name,IPv4Address:'172.20.0.2/16'}}};
   mutate(target,net);
-  const process=Object.assign(new EventEmitter(),{platform:endpoint.startsWith('npipe:')?'win32':'linux',argv:['node','proof.mjs',...(release?['--release']:p2?['--p2']:[])],env:{NODE_OPTIONS:'--existing-option'},execPath:'node',cwd:()=>'/synthetic'});
+  const process=Object.assign(new EventEmitter(),{platform:endpoint.startsWith('npipe:')?'win32':'linux',argv:['node','proof.mjs',...(privacy?['--privacy']:release?['--release']:p2?['--p2']:[])],env:{NODE_OPTIONS:'--existing-option'},execPath:'node',cwd:()=>'/synthetic'});
   const spawnSync=(command,args,options)=>{
     if(command==='docker' && args[0]==='--host') args=args.slice(2);
     assert.equal(command,'docker','Vitest must be asynchronous so the relay can run');
@@ -48,6 +48,7 @@ async function run({fail,authOutput='',sqlFailure,sqlStatus=3,sqlSignal=null,sql
     return response;
   };
   await runInNewContext(`(async()=>{${source}\n})()`,{
+    privacyCloudPg18:async(config,sql)=>{calls.push({key:'privacy proof',config});assert.equal(typeof sql,'function');if(fail==='privacy proof')throw Error(privateDiagnostic);},
     emailVerificationPg18:async()=>{calls.push({key:'email proof'});if(fail==='email proof')throw Error(privateDiagnostic);},spawnSync,process,URL,validateDisposableTarget,
     startDisposableRelay:async(_identity,options)=>{calls.push({key:'relay start',transport:options?.transport});if(fail==='relay start')throw Error('redacted');return {descriptor:{port:54321},proof:{controlPort:54322,token:'d'.repeat(64)},close:async()=>{calls.push({key:'relay close'});if(fail==='relay close')throw Error('redacted');}};},
     verifyDisposableRelay:async()=>{calls.push({key:'relay verify'});if(fail==='relay verify')throw Error('redacted');},
@@ -70,6 +71,19 @@ async function run({fail,authOutput='',sqlFailure,sqlStatus=3,sqlSignal=null,sql
   assert.equal(timers.size,0,'every readiness watchdog must be cleared');
   return {calls,logs,process,elapsed};
 }
+
+test('privacy proof is isolated, awaited, fail-closed and always cleans runner resources',async()=>{
+  for(const fail of [undefined,'privacy proof']) {
+    const r=await run({privacy:true,fail});
+    assert.equal(r.calls.filter(c=>c.key==='privacy proof').length,1);
+    assert.ok(!r.calls.some(c=>['auth','email proof','upgrade seed'].includes(c.key)));
+    assert.ok(r.calls.some(c=>c.key==='relay close'));
+    assert.ok(r.calls.some(c=>c.key==='rm --force'));
+    assert.ok(r.calls.some(c=>c.key==='network rm'));
+    if(fail) {assert.equal(r.process.exitCode,1);assert.ok(!r.logs.some(l=>l.startsWith('PASS:')));}
+    else {assert.notEqual(r.process.exitCode,1);assert.ok(r.logs.some(l=>l.startsWith('PASS: PG18 privacy')));}
+  }
+});
 
 test('selects the existing attested exec relay on Windows and TCP on Linux',async()=>{
   for(const [endpoint,transport] of [['npipe:////./pipe/docker_engine','docker-exec'],['unix:///var/run/docker.sock','tcp']]) {
@@ -104,14 +118,16 @@ for(const [stage,options] of [
   });
 }
 
-test('release seed precedes only 014; preservation and concurrency cannot be skipped',async()=>{
+test('release seed precedes 014; preservation follows 015 and concurrency cannot be skipped',async()=>{
   const r=await run({release:true});
   assert.equal(r.process.exitCode,undefined);
   const seed=r.calls.findIndex(c=>c.key==='upgrade seed');
   const migration=r.calls.findIndex(c=>c.options?.input?.includes("name='014_secure_email_verification.sql'"));
+  const privacyMigration=r.calls.findIndex(c=>c.options?.input?.includes("name='015_privacy_cloud_policies.sql'"));
   assert.ok(seed>0&&seed<migration);
-  assert.ok(r.calls.findIndex(c=>c.key==='upgrade verify')>migration);
-  assert.ok(r.calls.findIndex(c=>c.key==='concurrency')>migration);
+  assert.ok(privacyMigration>migration);
+  assert.ok(r.calls.findIndex(c=>c.key==='upgrade verify')>privacyMigration);
+  assert.ok(r.calls.findIndex(c=>c.key==='concurrency')>privacyMigration);
   const auth=r.calls.find(c=>c.key==='auth');
   assert.ok(auth);
   assert.equal(auth.options.env.NEXT_PUBLIC_NATIVE_SIGNUP_ENABLED,'true');

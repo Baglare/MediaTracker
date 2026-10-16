@@ -34,7 +34,7 @@ test('every apply requires exact fingerprint, environment, capability and operat
   assert.throws(()=>authorizeTarget({...target,environment:'production'},{...proven,environment:'production'},{operation:'RESTORE'}));
 });
 test('ledger rejects historical checksum drift, holes, reordering and unknown future migrations',()=>{
-  assert.equal(validateHistory(manifest).length,0);assert.equal(validateHistory(manifest.slice(0,3)).length,10);
+  assert.equal(validateHistory(manifest).length,0);assert.equal(validateHistory(manifest.slice(0,3)).length,12);
   for(const rows of [[manifest[1]],[{...manifest[0],checksum:'b'.repeat(64)}],[...manifest,{name:'future',checksum:'a'.repeat(64)}]])assert.throws(()=>validateHistory(rows));
   assert.deepEqual(JSON.parse(readFileSync('lib/backend/native-migration-state.json','utf8')),manifest);
 });
