@@ -89,10 +89,13 @@ describe("D8-2 public profile theme privacy and contrast", () => {
     expect(reports.flatMap((report) => report.warnings.filter((warning) => warning.severity === "critical"))).toEqual([]);
   });
 
-  it("keeps invalid themes draft-saveable but blocks activation in Theme Studio", () => {
+  it("keeps invalid themes draft-saveable and requires explicit owner acknowledgement for activation", () => {
     const source = readFileSync("components/personalization/theme-studio.tsx", "utf8");
     expect(source).toContain("if (apply && !contrast.valid)");
-    expect(source).toContain("disabled={!contrast.valid}");
+    expect(source).toContain("Okunabilirlik uyarısını kabul et");
+    expect(source).toContain("Uyarıyla kaydet ve uygula");
+    expect(source).not.toContain("disabled={!contrast.valid}");
+    expect(source).not.toContain("disabled={!report.valid}");
   });
 
   it("maps only scoped semantic variables and leaves shell/root untouched", () => {

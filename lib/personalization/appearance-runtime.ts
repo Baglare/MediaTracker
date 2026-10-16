@@ -2,10 +2,7 @@ import {
   bestContrastingText,
   mixHexColors,
 } from "./color-utils";
-import {
-  deriveCustomThemeTokens,
-  evaluateThemeContrast,
-} from "./custom-theme-tokens";
+import { deriveCustomThemeTokens } from "./custom-theme-tokens";
 import type {
   AppAppearancePreferences,
   AppThemeTokens,
@@ -129,8 +126,10 @@ export function resolveRootAppearanceAttributes(
 ): RootAppearanceAttributes {
   let customTokens: AppThemeTokens | undefined;
   if (preferences.theme.kind === "custom" && customTheme?.id === preferences.theme.id) {
-    const derived = deriveCustomThemeTokens(customTheme.inputs, customTheme.corrections);
-    if (evaluateThemeContrast(derived).valid) customTokens = derived;
+    // Only an existing, matching owner theme can be activated here.
+    // Low contrast requires explicit UI acknowledgement; public snapshots
+    // retain their independent strict contrast gate.
+    customTokens = deriveCustomThemeTokens(customTheme.inputs, customTheme.corrections);
   }
 
   const effectiveSelection: ThemeSelection = customTokens

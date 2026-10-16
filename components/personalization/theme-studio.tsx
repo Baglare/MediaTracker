@@ -57,6 +57,7 @@ export function ThemeStudio({ onConfirm }: { onConfirm: ConfirmAction }) {
   const customThemes = useCustomThemesRuntime();
   const [draft, setDraft] = useState<ThemeDraft | null>(null);
   const [message, setMessage] = useState("Hazır veya özel bir tema seçebilirsin.");
+  const [correctionNotice, setCorrectionNotice] = useState("");
 
   const tokens = useMemo(() => (
     draft ? deriveCustomThemeTokens(draft.inputs, draft.corrections) : null
@@ -66,6 +67,7 @@ export function ThemeStudio({ onConfirm }: { onConfirm: ConfirmAction }) {
   ), [tokens]);
 
   const openPresetCopy = (presetId: PresetThemeId) => {
+    setCorrectionNotice("");
     const resolvedId = presetId === "system" ? "obsidian" : presetId;
     const definition = BASE_THEME_REGISTRY[presetId];
     setDraft({
@@ -75,6 +77,7 @@ export function ThemeStudio({ onConfirm }: { onConfirm: ConfirmAction }) {
   };
 
   const openCustom = (theme: CustomThemeDefinition) => {
+    setCorrectionNotice("");
     setDraft({
       id: theme.id,
       name: theme.name,
@@ -87,11 +90,43 @@ export function ThemeStudio({ onConfirm }: { onConfirm: ConfirmAction }) {
     key: K,
     value: CustomThemeInputs[K],
   ) => {
+    setCorrectionNotice("");
     setDraft((current) => current ? {
       ...current,
-          inputs: { ...current.inputs, [key]: value },
+      inputs: { ...current.inputs, [key]: value },
       corrections: undefined,
     } : current);
+  };
+
+  const applyAutomaticCorrection = () => {
+    if (!draft || !contrast?.corrections) return;
+    const nextDraft: ThemeDraft = {
+      ...draft,
+      corrections: { ...draft.corrections, ...contrast.corrections },
+    };
+    const nextReport = evaluateThemeContrast(
+      deriveCustomThemeTokens(nextDraft.inputs, nextDraft.corrections),
+    );
+    setDraft(nextDraft);
+    setCorrectionNotice(nextReport.valid
+      ? "Metin ve yardımcı renk düzeltmeleri uygulandı. Temayı etkinleştirebilirsin."
+      : "Otomatik düzeltme denendi fakat bu ana yüzey renkleriyle tüm kontrast sorunları giderilemedi. Temel renkleri değiştirebilir veya uyarıyı kabul ederek temayı kişisel görünümünde kullanabilirsin.");
+  };
+
+  const activateSavedTheme = (theme: CustomThemeDefinition) => {
+    const report = evaluateThemeContrast(
+      deriveCustomThemeTokens(theme.inputs, theme.corrections),
+    );
+    const activate = () => appearance.setThemeSelection({ kind: "custom", id: theme.id });
+    if (!report.valid) {
+      onConfirm(
+        "Okunabilirlik uyarısını kabul et",
+        "Bu temadaki bazı yazılar ve kontroller düşük kontrastlı olabilir. Yine de kişisel görünümünde etkinleştirmek istiyor musun? Bu onay temayı herkese açık profilde yayımlamak için geçerli değildir.",
+        activate,
+      );
+      return;
+    }
+    activate();
   };
 
   const save = (apply: boolean) => {
@@ -100,23 +135,31 @@ export function ThemeStudio({ onConfirm }: { onConfirm: ConfirmAction }) {
       setMessage("Tema adı 1–40 karakter olmalıdır.");
       return;
     }
+    const commit = () => {
+      try {
+        const saved = draft.id
+          ? customThemes.update(draft.id, draft)
+          : customThemes.create(draft);
+        if (apply) appearance.setThemeSelection({ kind: "custom", id: saved.id });
+        appearance.clearThemePreview();
+        setDraft(null);
+        setCorrectionNotice("");
+        setMessage(apply ? "Özel tema kaydedildi ve uygulandı." : "Özel tema kaydedildi.");
+      } catch (error) {
+        setMessage(error instanceof Error && error.message === "custom_theme_limit"
+          ? "En fazla 20 özel tema kaydedebilirsin."
+          : "Tema kaydedilemedi. Alanları kontrol et.");
+      }
+    };
     if (apply && !contrast.valid) {
-      setMessage("Kritik kontrast uyarılarını otomatik düzeltmeden tema etkinleştirilemez.");
+      onConfirm(
+        "Okunabilirlik uyarısını kabul et",
+        "Bu temadaki bazı yazılar ve kontroller düşük kontrastlı olabilir. Yine de kaydedip kendi görünümünde etkinleştirmek istiyor musun? Bu onay temanın herkese açık profilde yayımlanmasına izin vermez.",
+        commit,
+      );
       return;
     }
-    try {
-      const saved = draft.id
-        ? customThemes.update(draft.id, draft)
-        : customThemes.create(draft);
-      if (apply) appearance.setThemeSelection({ kind: "custom", id: saved.id });
-      appearance.clearThemePreview();
-      setDraft(null);
-      setMessage(apply ? "Özel tema kaydedildi ve uygulandı." : "Özel tema kaydedildi.");
-    } catch (error) {
-      setMessage(error instanceof Error && error.message === "custom_theme_limit"
-        ? "En fazla 20 özel tema kaydedebilirsin."
-        : "Tema kaydedilemedi. Alanları kontrol et.");
-    }
+    commit();
   };
 
   const removeTheme = (theme: CustomThemeDefinition) => {
@@ -147,7 +190,7 @@ export function ThemeStudio({ onConfirm }: { onConfirm: ConfirmAction }) {
         </div>
         <button
           type="button"
-          onClick={() => setDraft({ ...DEFAULT_DRAFT, inputs: { ...DEFAULT_DRAFT.inputs } })}
+          onClick={() => { setCorrectionNotice(""); setDraft({ ...DEFAULT_DRAFT, inputs: { ...DEFAULT_DRAFT.inputs } }); }}
           disabled={customThemes.themes.length >= 20}
           className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-[var(--app-accent)] px-3 text-sm font-semibold text-[var(--app-accent-contrast)] disabled:cursor-not-allowed disabled:bg-[var(--app-disabled-bg)] disabled:text-[var(--app-disabled-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-focus)]"
         >
@@ -248,7 +291,7 @@ export function ThemeStudio({ onConfirm }: { onConfirm: ConfirmAction }) {
                   {selected && <span className="rounded-full bg-[var(--app-selected-bg)] px-2 py-1 text-[11px] font-semibold text-[var(--app-selected-text)]">Aktif</span>}
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <button type="button" onClick={() => appearance.setThemeSelection({ kind: "custom", id: theme.id })} disabled={!report.valid} className="min-h-10 rounded-lg bg-[var(--app-accent)] px-3 text-xs font-semibold text-[var(--app-accent-contrast)] disabled:cursor-not-allowed disabled:bg-[var(--app-disabled-bg)] disabled:text-[var(--app-disabled-text)]">Aktif et</button>
+                  <button type="button" onClick={() => activateSavedTheme(theme)} className="min-h-10 rounded-lg bg-[var(--app-accent)] px-3 text-xs font-semibold text-[var(--app-accent-contrast)]">{report.valid ? "Aktif et" : "Uyarıyla etkinleştir"}</button>
                   <button type="button" onClick={() => openCustom(theme)} className="inline-flex min-h-10 items-center gap-1 rounded-lg border border-[var(--app-border)] px-3 text-xs hover:bg-[var(--app-hover)]"><Edit3 className="h-3.5 w-3.5" aria-hidden="true" />Düzenle / yeniden adlandır</button>
                   <button type="button" onClick={() => { try { customThemes.duplicate(theme.id); setMessage("Tema kopyalandı."); } catch { setMessage("Tema kopyalanamadı; 20 tema sınırını kontrol et."); } }} className="inline-flex min-h-10 items-center gap-1 rounded-lg border border-[var(--app-border)] px-3 text-xs hover:bg-[var(--app-hover)]"><Copy className="h-3.5 w-3.5" aria-hidden="true" />Kopyala</button>
                   <button type="button" onClick={() => removeTheme(theme)} className="inline-flex min-h-10 items-center gap-1 rounded-lg border border-[var(--app-danger)] px-3 text-xs text-[var(--app-danger)] hover:bg-[var(--app-danger-soft)]"><Trash2 className="h-3.5 w-3.5" aria-hidden="true" />Sil</button>
@@ -317,15 +360,17 @@ export function ThemeStudio({ onConfirm }: { onConfirm: ConfirmAction }) {
                   </ul>
                 )}
                 {contrast.corrections && (
-                  <button type="button" onClick={() => setDraft({ ...draft, corrections: contrast.corrections })} className="mt-3 min-h-10 rounded-lg border border-[var(--app-border-strong)] bg-[var(--app-surface-2)] px-3 text-xs font-semibold hover:bg-[var(--app-hover)]">
+                  <button type="button" onClick={applyAutomaticCorrection} className="mt-3 min-h-10 rounded-lg border border-[var(--app-border-strong)] bg-[var(--app-surface-2)] px-3 text-xs font-semibold hover:bg-[var(--app-hover)]">
                     Otomatik düzelt
                   </button>
                 )}
+                {correctionNotice && <p className="mt-3 text-xs text-[var(--app-text-secondary)]" role="status">{correctionNotice}</p>}
+                {!contrast.valid && <p className="mt-3 text-xs text-[var(--app-text-secondary)]">Kontrast sorunları devam etse bile açık onayınla bu temayı yalnızca kendi görünümünde etkinleştirebilirsin.</p>}
               </div>
               <div className="flex flex-wrap gap-2">
                 <button type="button" onClick={() => appearance.previewCustomTheme(draftTheme(draft))} className="min-h-11 rounded-lg border border-[var(--app-border-strong)] px-3 text-sm font-medium hover:bg-[var(--app-hover)]">Uygulamada geçici önizle</button>
                 <button type="button" onClick={() => save(false)} className="min-h-11 rounded-lg border border-[var(--app-border-strong)] bg-[var(--app-surface-2)] px-3 text-sm font-medium">Yalnız kaydet</button>
-                <button type="button" onClick={() => save(true)} disabled={!contrast.valid} className="min-h-11 rounded-lg bg-[var(--app-accent)] px-3 text-sm font-semibold text-[var(--app-accent-contrast)] disabled:cursor-not-allowed disabled:opacity-50">Kaydet ve uygula</button>
+                <button type="button" onClick={() => save(true)} className="min-h-11 rounded-lg bg-[var(--app-accent)] px-3 text-sm font-semibold text-[var(--app-accent-contrast)]">{contrast.valid ? "Kaydet ve uygula" : "Uyarıyla kaydet ve uygula"}</button>
                 <button type="button" onClick={() => { appearance.clearThemePreview(); setDraft(null); }} className="min-h-11 rounded-lg px-3 text-sm text-[var(--app-text-secondary)] hover:bg-[var(--app-hover)]">Vazgeç</button>
               </div>
             </div>
