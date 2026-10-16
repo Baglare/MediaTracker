@@ -37,6 +37,7 @@ import {
 } from "@/lib/personalization/custom-theme-tokens";
 import { DEFAULT_APP_APPEARANCE_PREFERENCES } from "@/lib/personalization/defaults";
 import { getBaseThemeDefinition } from "@/lib/personalization/theme-registry";
+import { buildPublicProfileThemeSnapshot } from "@/lib/personalization/public-profile-theme";
 import { normalizeAppearancePreferences } from "@/lib/personalization/validation";
 import type { CustomThemeDefinition, CustomThemeInputs } from "@/lib/personalization/types";
 
@@ -334,6 +335,35 @@ describe("P6 runtime and first paint contract", () => {
     expect(fixedWorld.inlineTokens?.accent).not.toBe(DARK_INPUTS.accent);
   });
 
+  it("allows an acknowledged low-contrast theme only in the owner runtime, not in public profile snapshots", () => {
+    const inputs: CustomThemeInputs = {
+      colorScheme: "light",
+      background: "#4169E1",
+      surface: "#FFDAB9",
+      accent: "#FFDAB9",
+      secondaryAccent: "#4169E1",
+    };
+    const custom = theme("ct_lowcontrast", inputs);
+    const tokens = deriveCustomThemeTokens(custom.inputs, custom.corrections);
+    const report = evaluateThemeContrast(tokens);
+    expect(report.valid).toBe(false);
+    expect(report.warnings.some(({ key }) => key === "text-primary")).toBe(true);
+
+    const preferences = {
+      ...DEFAULT_APP_APPEARANCE_PREFERENCES,
+      theme: { kind: "custom" as const, id: custom.id },
+    };
+    const attributes = resolveRootAppearanceAttributes(preferences, "neutral", false, custom);
+    expect(attributes).toMatchObject({ theme: "custom", themeSource: "custom", customThemeId: custom.id });
+    expect(attributes.inlineTokens?.background).toBe("#4169E1");
+    expect(attributes.inlineTokens?.surface1).toBe("#FFDAB9");
+
+    expect(buildPublicProfileThemeSnapshot({
+      visibility: "current_theme",
+      currentTheme: { kind: "custom", theme: custom },
+    })).toBeUndefined();
+  });
+
   it("falls back to Obsidian when a selected custom theme is unavailable", () => {
     const attributes = resolveRootAppearanceAttributes(
       { ...DEFAULT_APP_APPEARANCE_PREFERENCES, theme: { kind: "custom", id: "ct_missing00" } },
@@ -356,6 +386,12 @@ describe("P6 Theme Studio separation contracts", () => {
   it("contains registry-driven preset/custom controls and RGB/HEX synchronization", () => {
     expect(studio).toContain("Object.values(BASE_THEME_REGISTRY)");
     expect(studio).toMatch(/Kaydet ve uygula|Yalnız kaydet|Uygulamada geçici önizle/);
+    expect(studio).toContain("applyAutomaticCorrection");
+    expect(studio).toContain("nextReport.valid");
+    expect(studio).toContain("activateSavedTheme");
+    expect(studio).toContain("Okunabilirlik uyarısını kabul et");
+    expect(studio).not.toContain("disabled={!contrast.valid}");
+    expect(studio).not.toContain("disabled={!report.valid}");
     expect(studio).toMatch(/Düzenle \/ yeniden adlandır|Kopyala|Sil/);
     expect(colorField).toMatch(/type="color"|type="number"|HEX/);
     expect(colorField).toContain("COLOR_CATALOG");
