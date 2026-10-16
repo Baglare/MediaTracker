@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import Link from "next/link";
 
 import { AppearanceWorldScope } from "@/components/personalization/appearance-runtime";
 import { PublicTopbar } from "@/components/app-shell/public-topbar";
@@ -13,6 +14,10 @@ import type { UserProgression } from "@/lib/user-progression";
 import type { WorldThemeKey } from "@/lib/personalization/types";
 
 export type AppShellMode = "authenticated" | "public";
+
+function PrivacyFooter() {
+  return <footer className="px-4 py-4 text-center text-sm text-[var(--app-text-secondary)]"><Link href="/privacy" className="underline underline-offset-4">Gizlilik ve kişisel veriler</Link></footer>;
+}
 
 interface AppShellProps {
   mode: AppShellMode;
@@ -40,6 +45,7 @@ export function AppShell({ mode, activeNavigationId = "dashboard", onChangeTab, 
       <AppearanceWorldScope world={world} className="app-page min-h-screen" data-app-shell="public">
         {showPublicHeader && <PublicTopbar />}
         <main className={`mx-auto w-full ${fullWidthPublicContent ? "max-w-none" : "max-w-7xl"} ${resolvedContentClassName}`}>{children}</main>
+        <PrivacyFooter />
       </AppearanceWorldScope>
     );
   }
@@ -54,6 +60,7 @@ export function AppShell({ mode, activeNavigationId = "dashboard", onChangeTab, 
       <div className="flex min-w-0 flex-1 flex-col">
         <AppTopbar activeNavigationId={activeNavigationId} onChangeTab={onChangeTab} profileName={profileName} profilePreferences={profilePreferences} socialAvatarUrl={socialAvatarUrl} avatarTransform={avatarTransform} />
         <main className={`relative min-w-0 flex-1 ${resolvedContentClassName}`}>{children}</main>
+        <PrivacyFooter />
       </div>
       {rightRail}
     </AppearanceWorldScope>

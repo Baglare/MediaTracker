@@ -1,5 +1,174 @@
 # Production v1 closure — 2026-10-15
 
+## KVKK final kapanış — 16 Ekim 2026
+
+Bu güncel ek, belgenin aşağısındaki tarihli P014/NOT_RUN ve önceki Production
+SHA kayıtlarının yerine tarihsel sonuç yazmaz. Görev girdisi: Production v1.015,
+SHA `21d1f8ab14acec051a95ae84fa8b46bfbd23a60f`, migration 015 uygulanmış;
+LIVE/READY 200, maintenance false, epoch `v1-21d1f8ab14ac`; gerçek test hesabı
+silme 10/10 PASS, Auth/app/Storage kalıntısı yok: **OPERATOR_REPORTED**.
+Bu çalışma Production DB, Plesk veya Gmail'e bağlanmaz; mevcut export ve silme
+öncesi backup'ları korur. Yeni adayın CI sonucu ayrıca kaydedilir.
+
+### Talep işletimi (manuel)
+
+Sorumlu: mevcut veri sorumlusu Batuhan Parıltı. Kanal:
+`mediatracker.contact@gmail.com`; değiştirilmez. Kayıtlar GitHub/issues/PR/log
+ve Vault'a girmez; erişimi sınırlı şifreli operatör alanında tutulur.
+
+1. Gmail > Gelen Kutusu: ilk alım zamanı/timezone, benzersiz rastgele case ID,
+   talep türü, kapsam, sorumlu, **received_at +30 gün** due date, doğrulama
+   durumu ve yanıt/closure tarihlerini özel takip kaydına gir. Spam klasörünü de
+   kontrol et. Eksik bilgi istemek saati yeniden başlatmaz; gün 20 ve 27'de
+   manuel takip yap. Alındı yanıtı kimlik doğrulandığı anlamına gelmez.
+2. Kayıtlı e-postayı ve talep sahibini ölçülü doğrula: verified hesapta yeni
+   doğrulanmış oturum/hesap içi işlem veya kayıtlı adrese bağımsız doğrulama.
+   E-posta From alanı, gönderilmiş UUID, ekran görüntüsü tek başına yeterli değil.
+   Şifre/token/cookie isteme. Gerekli formal unsurlar için mevcut 05B başvuru
+   prosedürünü uygula; gereksiz kimlik kartı taraması toplama. Hesapsız/eşleşmeyen
+   talep intake olarak kaydedilir; güvenli doğrulama yolu kurulur, veri açıklanmaz.
+3. Kapsamı ayır: native DB/Auth/Storage, browser ve indirilen export, Gmail,
+   hosting log/backup, üçüncü alıcı. Somut yasal hold varsa gerekçe/kapsam/bitiş
+   ve review tarihini kaydet. Yanıt hakkını hold bahanesiyle erteleme.
+4. Export için mevcut `exportNativeAccount`/native privacy operator araçlarını
+   kullan; owner ve alıcıyı yeniden doğrula, başka katılımcı verisini incele.
+   Teslim tercihinde aynı-origin authenticated export öne çıkar. Operatör dosyası
+   gerekiyorsa şifreli, tek alıcı, süreli teslim ve anahtar ayrı doğrulanmış kanal;
+   Gmail'e açık JSON/backup veya kalıcı public link ekleme. Güvenli kanal yoksa
+   dosyayı göndermeden önce kanal düzenle ve 30 gün içinde gerekçeli yanıt ver.
+   Teslim tarihi/sonucu ve kopya kaldırma tarihini kaydet; payload'ı kayda kopyalama.
+5. Silme: exact target/hesap ve ayrı operator icra yetkisiyle önce plan/katılımcı
+   etkisi/hold; lifecycle kilidi, session revoke, application/XP/participant cleanup,
+   özel dosya temizliği, residual kontrolü ve **Auth-last** mevcut akışını kullan.
+   Bilinmeyen referans, symlink, dosya kalıntısı veya participant onayı eksikse STOP;
+   kapsamı genişleten SQL/cascade/rol gevşetme yok. Bu görev icra yetkisi vermez.
+6. Sonucu en geç 30 gün içinde yazılı/elektronik yanıtla: tamamlanan kapsam,
+   kısmi ret ve somut gerekçe, cihaz/vendor/yedek sınırları; ilgili alıcılara
+   düzeltme/silme bildirimini gerektiği ölçüde takip et. Kurula şikâyet yolu ve
+   kanuni süreleri (yanıtı öğrenmeden 30, her hâlde başvurudan 60 gün) açıkla.
+7. Case closure, işlem ve imha kanıtlarını özel kayda ekle. Destek kapanış+90 gün,
+   KVKK başvuru/yanıt kapanış+12 ay; fazla kimlik/export eki daha erken.
+   Aylık Gmail/özel kopya incelemesinde süresi dolanı kaldır, Gmail Çöp Kutusu ve
+   indirilmiş kopyaları kontrol et. İmha kaydı en az 3 yıl; backup reconciliation
+   register'ı restore riski bitene kadar ayrı kalır. Bunlar kanunen aynı süre değildir.
+
+### Restore karantinası ve silme uzlaştırması
+
+Bu prosedür operatörün yayın önkoşuludur; yeni otomatik runtime restore sistemi
+kurulmadı. `tests/privacy-restore-reconciliation.test.ts` yalnız sentetik model
+regresyonudur, PG18 veya gerçek backup kabulü değildir.
+
+1. Silme tamamlanınca restore edilen DB'nin **dışında**, erişimi sınırlı bağımsız
+   minimal register tut: eski account UUID, completed_at, case ID, silme kapsamı,
+   kanıt hash/ref, ilgili backup kümesi ve review tarihi. Email/not/şifre/token yok.
+   Dosya hash'i tek başına doğruluk kanıtı değil; yetkili bağımsız son sürüm kaydı
+   ve kopya bütünlüğü gerekir. Register da yedeklenir; eski DB ile geri sarılmaz.
+2. Herhangi bir restore öncesi source SHA, ledger **015 dahil**, fingerprint,
+   backup oluşturma zamanı ve DB+dosya tutarlılığını doğrula. Kaynak hash/fingerprint
+   uyuşmazlığı, eksik register veya backup kapsamı bilinmiyorsa **STOP**.
+3. Yetkili izole PG18 hedef/boş özel storage, internet/public ingress ve SMTP/provider
+   çıkışı kapalı olarak restore et. Production bağlantı değerleri kullanılmaz.
+   Uygulamayı/mail işlerini halka açma; eski session/cookie/reset/doğrulama
+   kayıtlarının kullanılabilirliğini engelle. Tüm restore oturumları ve bekleyen
+   token'ları yetkili prosedürle geçersizleştir; yeniden giriş ve taze işlem gerektir.
+4. Backup zamanından önce/sonra ayırıp kayıt kaçırmamak için **register'daki tüm
+   silinen UUID'leri** restored snapshot ile karşılaştır. Native privacy plan ve
+   mevcut guarded erasure ile kalanları tekrar işle; mevcut Auth yoksa dahi app/
+   asset kalıntısını kontrol et. Participant etkisi ayrıca onaylı olmalı. UUID'yi
+   email'e bakıp başka/yeni hesaba eşleme; yeniden kayıt farklı UUID'dir.
+5. Auth/session/token, bütün app/Cloud/revision/participant referansları, filesystem
+   ve staged assets için yokluğu doğrula; bilinmeyen residual=FAIL. Bağımsız A/B
+   owner okuma/yazma izolasyonu ve Cloud eski epoch/replay davranışını doğrula.
+   Eski client queue/import/export kullanıcı kontrollü yeniden yükleme riski
+   ayrıca bildirilir; backend erasure bütün cihaz kopyalarını yok etmez.
+6. Her UUID PASS ve dosya/role/ledger/oturum kontrolleri tamamlanmadan service açma.
+   Hash/fingerprint, zaman, case refs ve PASS/FAIL özetini kaydet; içerik kaydetme.
+   Yeni temiz backup oluşturulması ve eski kopyaların emekliye ayrılması ayrı
+   kontrollü adımdır; orijinal delili sessizce silme. Başarısız kısmi işlemde
+   karantina ve write barrier korunur; tekrar çalıştırıp yeniden doğrula.
+
+Mevcut silinmiş Production test hesabının export ve silme öncesi backup'ları bu
+register/kopya envanterine özel olarak eklenir; **bu görevde silinmez**. Konum,
+ülke, oluşturma zamanı/hash, erişim, encryption ve retention review operatörce
+özel kayda girilir. Kimlik ve backup adı/yolu PR'a yazılmaz.
+
+### Veri ihlali müdahalesi
+
+Sorumlu veri sorumlusudur; hosting olayı operatöre gecikmeksizin iletir. Tespit
+kaynağı ve **öğrenme anı** özel olay kaydına girilir; salt şüphe ve doğrulanmış
+yetkisiz elde etme ayrılır. Erişimi daralt, ilgili token/credential'ı yetkili
+prosedürle iptal et, salt gerekli log/delili koru; kanıtı yok edecek toplu cleanup
+yapma. Etkilenen kişi/veri/adet/olası sonuç, zaman aralığı, alıcı ve alınan önlemleri
+belirle; sır veya kullanıcı içeriğini GitHub'a taşıma.
+
+Kanuni olmayan elde etme varsa madde 12/5 ve [2019/10 Kurul
+kararı](https://www.kvkk.gov.tr/Icerik/5362/Veri-Ihlali-Bildirimi) gereği öğrenmeden
+itibaren gecikmeksizin, **en geç 72 saat** içinde Kurula bildirim: resmî sayfa >
+Veri İhlali Bildirim Formu (İnternet). Bütün ayrıntı yoksa mevcut bilgiyle bildir,
+eksikleri aşamalı tamamla; gecikme varsa sebebini açıkla. Etkilenenler belirlenince
+makul en kısa sürede doğrudan güvenli iletişim; ulaşılamıyorsa uygun web duyurusu.
+GDPR'daki risk eşiğini otomatik Türk bildirim muafiyeti sayma. Bildirmeme kararı
+gerekçesi/kanıtı da kaydedilir. Sonrasında kök neden, erişim/backup değerlendirmesi,
+bildirim receipt'leri, düzeltme doğrulaması ve kapanış kaydı; plan her olay sonrası
+ve düzenli gözden geçirilir. Bu görevde olay veya resmî bildirim yapılmadı.
+
+### Paket doğrulaması
+
+16 Ekim 2026 yerel, secretsiz kaynak kopyası ve `scripts/ci-offline.mjs` dış ağ
+engeliyle: hedefli privacy/route/restore 25 PASS; typegen ve typecheck PASS;
+lint PASS (iki mevcut uyarı); tam Vitest **3615 PASS / 58 koşullu SKIP**;
+ek Node testleri **194 PASS**; CI politika testleri **122 PASS**. Offline Supabase
+ve sentetik Native production build PASS. Windows sandbox link/junction engeli
+ilk denemeyi başarısız yaptı; aynı kontrollere izin verilen yerel çalıştırmada
+PASS alındı, test/ürün korumaları değiştirilmedi. Bu Windows build'ler Linux
+artifact veya host ABI kabulü değildir.
+
+Runtime npm audit: 0 vulnerability. Full audit: mevcut
+`V1-SEC-EXCEPTION-001` kapsamında beş dev-only High / sıfır Critical doğrulandı,
+son tarih 2026-11-03; yeni exception/upgrade yok. Repository/migration/test integrity
+ve secret signature kontrolü ile `git diff --check` PASS. Canlı testler/GUI/browser
+smoke/gerçek restore NOT RUN; tarihli operatör silme kanıtı ayrı kalır. PR exact-head
+CI sonucu PR checks üzerinden ayrıca doğrulanır; burada önceden PASS yazılmaz.
+Vault read-only context `VAULT_GIT_INVALID` döndürdü; kalıcı kararlar bu mevcut
+belgelere işlendi, canonical Vault yazısı veya sync yapılmış sayılmadı.
+
+### Tek güncel KVKK yayın kapısı ve operatör kontrol listesi
+
+Bu tablo yalnız bu paketin güncel KVKK kararını tutar; aşağıdaki tarihsel genel
+release sonuçlarını yeniden açmaz. **KVKK_RELEASE_READY = NO**: kaynak/CI PASS
+olsa da dış aktarım kanıtı ve formal kanal/işletim olguları tamamlanmış değildir.
+
+| Sınıf | Kapanış için somut işlem |
+| --- | --- |
+| EXTERNAL_BLOCKER | Gmail için gerçek alıcı/rol/ülke ve uygulanabilir madde 9 güvencesini sağlayıcı/hukuk incelemesiyle belgele. Genel Google DPA veya EU SCC yeterli kabul edilmez; adres değişmez |
+| EXTERNAL_BLOCKER | Plesk > Websites & Domains > ilgili domain > Node.js > Environment Variables içinde **yalnız NATIVE_SMTP_HOST ve FROM metadata'sını** özel olarak kontrol et; parolayı/kalan env'yi kopyalama. Hostun gerçek hizmet sözleşmesi, işlem/queue/log/backup ülkesi ve varsa madde 9 güvencesi alınır; Auth'u kapatma |
+| EXTERNAL_BLOCKER | Etkin TVMaze sorgu/direct CDN ve legacy dış görseller için kişisel veri/ülke/aktarımı belgelemek veya opsiyonel resimleri durdurma seçeneğine karar vermek gerekir; lisans/attribution aktarım yerine geçmez |
+| MANUAL_ACTION | VERBİS çalışan/defter/bilanço/ana faaliyet bilgisini özel gerekçeli karara işle. Mevcut gerçek kişi/contact doğrulanır; uygulanabilir alternatif formal başvuru kanalı/tebligat bilgisi yoksa eksikliği gider; adres/telefon uydurma |
+| MANUAL_ACTION | Gmail > Ayarlar > Filtreler ve Engellenen Adresler / Yönlendirme: yetkisiz yönlendirme yokluğunu kontrol et; Google Hesabı > Güvenlik: erişim/MFA kontrolü. Case due-date takibi, 90 gün/12 ay imha ve hold kayıtlarını başlat. Bu menüler hesaba göre değişebilir; erişilmiş sayılmaz |
+| MANUAL_ACTION | Plesk > Websites & Domains > Logs > Log Rotation: gerçek dönem/boyut/kopya sayısı/erişim; Tools & Settings veya abonelik > Backup Manager: son-success, DB ve private-storage kapsam/tutarlılık, şifreleme/restore yetkisi. Redakte metadata kaydet; full log/user data alma |
+| MANUAL_ACTION | Korunan test export/pre-delete backup/offsite envanteri, bağımsız erasure register ve izole gerçek restore uzlaştırma kabulünü tamamla; bu paket dosya veya DB açmaz |
+| POST_RELEASE_GATE | Open Library kanıt yoksa UA unset; TVMaze etkin, TMDB/AniList/yeni OMDb/paid AI/research kapalı. Disabled sağlayıcılar için yeni key/servis yok |
+
+**Tek Production yayın sırası (operatör):**
+
+1. Yukarıdaki ilgili dış/manual kapıları kapat; PR exact-head CI başarılı ve son
+   inceleme tamam olmadan merge/release-ready yok. Bu dalın normal PR CI'si
+   validate+PG18 proof çalıştırır; Linux artifact yalnız uygun main push'ta üretilir.
+2. Merge sonrası exact main SHA CI ve native Linux artifact/job sonuçlarını doğrula;
+   artifact manifest/host Node ABI eşleşmesi gerekir. Windows yerel build hosting
+   artifact kabulü değildir. Bu PR yeni migration içermez; **015'i yeniden apply etme**.
+3. Ayrı kontrollü yayın penceresinde mevcut Plesk/Passenger release prosedürüyle
+   hedef/domain/storage/DB fingerprint, ledger=015, coherent backup ve rollback
+   SHA/artifact'ını doğrula. Bu paket deployment yetkisi veya uygulaması değildir.
+4. Onaylı exact artifact'ı ayrı release dizinine koy, mevcut env/permissions/storage
+   sözleşmesini koru; freeze/epoch ve Passenger restart adımlarını mevcut native
+   production runbook'una göre uygula. Plesk menüsü veya restart otomasyonu bu
+   görevde çalıştırılmadı; sırf doküman yayımlamak için DB silme/cleanup yapma.
+5. LIVE/READY, epoch/maintenance, kayıt/giriş/doğrulama/reset, `/privacy` kayıt/altbilgi
+   erişimi ve Cloud bounded smoke yap; gerçek mail teslimi ve görsel/network davranışı
+   operatör kontrolü. Hata varsa aynı 015 ledger ile uyumlu önceki artifact'a kontrollü
+   rollback veya fail-forward; migration downgrade yok. Zaman/SHA/sonucu kaydet.
+
 This current overlay does not rewrite dated acceptance records. Production SHA
 `f50efbe370778d0757ca665f97e28989554cb282` is operator supplied; this work makes no
 Production request, deployment, restart, migration, backup or configuration change.

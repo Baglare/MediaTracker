@@ -1,5 +1,123 @@
 # Native V1 — Provider, KVKK ve retention kaynak kapanışı
 
+## Güncel kapanış kararı — 16 Ekim 2026
+
+Bu bölüm aşağıdaki tarihli aday değerlendirmelerinin güncel karşılığıdır; tarihsel
+PASS/NOT_RUN kayıtları değişmez. Production v1.015 / SHA
+`21d1f8ab14acec051a95ae84fa8b46bfbd23a60f`, migration 015, LIVE/READY 200,
+maintenance=false, epoch `v1-21d1f8ab14ac` ve test hesabı silme 10/10 PASS
+**OPERATOR_REPORTED** girdilerdir; bu çalışmada Production bağlantısı yapılmadı.
+Auth/uygulama/Storage kalıntısının bulunmadığı bildirimi yalnız o hesaba aittir;
+yedekler, Gmail, diğer kullanıcılar ve yeni aday SHA için kabul değildir.
+
+Veri sorumlusu mevcut aydınlatmada gerçek kişi **Batuhan Parıltı**; iletişim
+**mediatracker.contact@gmail.com**. Ücretsiz, reklamsız, aboneliksiz bireysel
+portfolyo hizmeti olması KVKK yükümlülüklerini kaldırmaz. Better Auth/PG/Passenger
+yazılımdır; ayrı bir yabancı SaaS alıcısı olarak sınıflandırılmaz. Native dağıtımda
+Supabase/Vercel eski/fallback mimaridir. TürkHosting'in Türkiye, günlük yedek ve
+yaklaşık dört haftalık rotasyon yazılı yanıtı kabul edilen operatör kanıtıdır;
+yeniden sorulmaz, SMTP/Gmail/offsite'a genişletilmez.
+
+### Faaliyet, amaç ve hukuki dayanak kararı
+
+Madde 4 gereklilik/ölçülülük, madde 7 silme, madde 8/9 aktarım koşulları bütün
+satırlarda ayrıca geçerlidir. Aşağıdaki kayıt uygulanabilir dayanak ve sınırını
+belirler; profesyonel hukuk onayı veya tüm aktarım güvencelerinin tamamlandığı
+iddiası değildir. Ücretsiz hizmette de kullanıcının talep ettiği hizmet ilişkisinin
+ifası değerlendirilir; reklam, pazarlama, model eğitimi veya satış amacı yoktur.
+
+| Faaliyet / veri | Amaç ve yöntem | Dayanak ve sınırı | Yer, alıcı ve silme koşulu |
+| --- | --- | --- | --- |
+| Hesap, e-posta/ad/UUID, parola özeti, oturum/doğrulama/reset | Form ve aynı-origin Auth ile hesap/giriş sağlama | 5/2(c), talep edilen hesabın ifasına gerekli alanlar; güvenlik alt amacı 5/2(f) | TürkHosting Türkiye / özel native_auth PostgreSQL; SMTP ayrı satırda. Hesap silme Auth-last; token geçerliliği fiziksel silme süresi değildir |
+| Yerel medya/ilerleme/rating/favori/not/etiket/hedef/XP, recovery/queues | Kullanıcı girdisi, import, tarayıcı storage; takip ve bütünlük | 5/2(c), talep edilen yerel işlev; sunucuya hiç iletilmeyen kayıt sunucu envanterinde var sayılmaz | Kullanıcının tarayıcısı; kayıt/site verisi temizleme, indirilen export ve çevrimdışı cihaz ayrı |
+| Cloud medya/hedef/operasyon/revizyon/tombstone | Kullanıcının açtığı eşitleme, çatışma ve tekrar işleme koruması | 5/2(c), istenen eşitleme; özellik açma genel açık rıza değildir | Aynı-origin sunucu/native DB; owner kontrollü erasure. Güvenli replay ufku yokken yaşa göre journal/tombstone purge yok |
+| Profil/avatar/banner/tema/username/görünürlük | Form/upload ve seçilen yayın | 5/2(c), profil işlevi; 5/2(d) yalnız kişinin alenileştirme amacıyla uyumlu alanın yayını | TürkHosting native DB/özel filesystem, yetkili/görünürlük kapsamındaki ziyaretçiler; tercihle kaldırma ve hesap silme. URL expiry dosya silme değildir |
+| Takip/engel/aktivite/yorum/mesaj/tavsiye/bildirim/XP/rapor | Etkileşim ve otomatik olay; sosyal hizmet/şikâyet değerlendirme | 5/2(c) hizmet; kötüye kullanım 5/2(f) dengelemesi; somut uyuşmazlık kanıtı 5/2(e) | Native DB ve yetkili katılımcılar. Katılımcı kaybı/hold incelemesi, kontrollü detach; başkasının içeriğine blanket cascade yok |
+| Görünüm/tercih/tema çerezi ve opsiyonel sync | Seçilen görünümü uygulama | 5/2(c), kullanıcı tercihinin ifası; pazarlama izleme amacı yok | Çoğunlukla browser, sync varsa native DB. Çerez expiry ile tüm yerel kopyalar silinmez |
+| Deterministik öneri girdisi/seçilmiş bağlam/feedback | İstek ve hesaplama, oturum sürdürme | 5/2(c), talep edilen öneriyle sınırlı | Tarayıcı ve gerektiğinde native sunucu; AI/research/kalıcı embedding kapalı. Yerel-first bütün işlemlerin cihazda kaldığı anlamına gelmez |
+| Limiter/Auth sayaç/IP/UA ve safe app log | Otomatik güvenlik/erişim kontrolü | 5/2(f): kötüye kullanımı önlemek için sınırlı metadata, ham serbest metin yok, erişim sınırlı; madde 12 gereği gerekli güvenlikte 5/2(ç). Somut delil 5/2(e) ayrı | Native DB/Türkiye hosting logları; TTL/cleanup aşağıdaki native envanterde. Pseudonymous özet anonim sayılmaz; kesin hosting log süresi dış kanıt |
+| DB/dosya yedekleri | Hizmet bütünlüğü/kurtarma, otomatik veya operatör kopyası | 5/2(f): erişimi kısıtlı, gerekli kurtarma kopyası; süresiz saklamaya gerekçe değil. Hak kanıtı 5/2(e) yalnız sınırlı kayıt | Hosting Türkiye; bağımsız kopyalar ayrı envanter. Restore öncesi erasure uzlaştırması zorunlu; rotasyon tek başına son kopya silme kanıtı değil |
+| Olağan destek iletişim/metin | E-posta ve operatör yardımı | 5/2(c), talep edilen hizmet desteği; uyuşmazlık istisnası 5/2(e) | Gmail/yetkili operatör; kapanıştan 90 gün, manuel imha |
+| KVKK talebi/ölçülü doğrulama/yanıt ve imha kanıtı | E-posta, insan incelemesi; madde 11/13 hak kullanımı | 5/2(ç), başvuruya yanıt yükümlülüğü; gerekli uyuşmazlık kanıtı 5/2(e) | Gmail ve erişim sınırlı özel kayıt; kapanıştan 12 ay, fazla ek/export daha erken imha. 30 günlük yanıt saati ayrı |
+| Provider sorgu/medya kimliği ve cover URL | Katalog arama/ayrıntı/takvim ve resim istekleri | 5/2(c) yalnız istenen kataloğa gerekli veri; serbest sorgu kişisel olabilir. Doğrudan opsiyonel CDN aktarımında gereklilik otomatik kabul edilmez | Sunucu API ve browser CDN ayrı; aşağıdaki aktarım matrisi. Upstream saklama bilinmiyor; madde 9 kapanmadı |
+
+Meşru menfaat dengesi: sınırlı güvenlik ve kurtarma hizmetin korunmasına yöneliktir;
+ham sorgu/not/credential loglamak veya süresiz kullanıcı takibi bu kapsamda değildir.
+Erişim operatörle sınırlı, mevcut redaction/owner kontrolü ve bounded cleanup korunur;
+log süresi belirsizliği ayrıca kapatılmalıdır. Alternatif daha az veriyle sağlanıyorsa
+o yöntem seçilir. Kullanıcı madde 11 haklarını kullanabilir.
+
+**Madde 6:** ürün özel nitelikli veri istemez; olağan medya seçimi kendiliğinden
+bu sınıfta değildir. Serbest metin sağlığa/inanca vb. ilişkin veri içerebilir.
+5/2(c)/(f) buna yetmez. Tesadüfen gelen gereksiz hassas ekler yayılmaz ve
+minimize edilir; somut hak işlemi için gerekli ise 6/3(d), kişinin açıkça
+alenileştirme amacıyla uyumlu ise 6/3(ç), başka şart yoksa ayrı özgür/belirli
+6/3(a) açık rıza ve Kurulun yeterli önlemleri değerlendirilmeden tutulmaz.
+Genel zorunlu checkbox veya hizmete bağlı blanket rıza eklenmedi.
+
+### VERBİS gerekçeli kayıt
+
+**CONDITIONAL / MANUAL_OPERATOR_FACTS**. Resmî [2025/1572 ve 2025/2393 uygulama
+duyurusu](https://www.kvkk.gov.tr/Icerik/8577/kisisel-verileri-koruma-kurulunun-04-09-2025-tarihli-ve-2025-1572-sayili-kararinin-uygulama-esaslarina-iliskin-kamuoyu-duyurusu)
+16 Ekim 2026'da kontrol edildi. Ana faaliyeti özel nitelikli veri işleme olmayanlar
+için çalışan <50, bilanço <100 milyon TL; böyle veri işleyen ana faaliyet için
+çalışan <10, bilanço <10 milyon TL. Bilanço esasına göre defter tutanlarda iki
+koşul birlikte, tutmayanlarda yalnız çalışan kriteri esas alınır.
+MediaTracker'ın açıklanan medya takip amacı ilk gruba uygundur; rastlantısal
+hassas serbest metin ana faaliyeti sağlık hizmeti yapmaz. Ancak gerçek kişinin
+diğer faaliyetleri, yıllık çalışan sayısı, defter usulü ve varsa bilançosu
+bildirilmedi. Bunları sıfır varsaymadan özel karar kaydına doğrulanmış yıl/kaynak,
+uygulanabilir istisna ve imza/tarih girilir; değişiklikte/yıllık gözden geçirilir.
+Ücretsiz portfolyo tek başına istisna değildir. Kişisel/aile faaliyeti istisnası
+halka açık barındırılan hizmete otomatik uygulanmaz. İstisna varsa yalnız Sicil
+kaydı içindir; aydınlatma, güvenlik, haklar ve aktarım yükümlülükleri sürer.
+
+### Alıcı ve madde 9 aktarım matrisi
+
+| Akış / veri | Alıcı, rol ve ülke | Amaç / mekanizma / karar |
+| --- | --- | --- |
+| Destek/KVKK e-postası, adres/metin/ek | Gmail/Google posta altyapısı; hizmete göre veri işleyen ve kendi amaçları için bağımsız sorumlu rolü doğrulanmalı; kesin ülke/alt işleyen UNKNOWN, olası yabancı işleme | Gmail adresi korunur. Düzenli mailbox hizmeti arızi aktarım sayılmaz; yeterlilik kapsamı veya uygulanabilir uygun güvence kanıtı yok: EXTERNAL_BLOCKER. Kullanıcının kendisinin mail göndermesi sonraki depolama/yanıt aktarımını otomatik meşrulaştırmaz. Kimlik/export eklerini Gmail'de biriktirme |
+| Auth doğrulama/reset; alıcı adresi ve süreli bağlantı | Gerçek NATIVE_SMTP_HOST operatör yapılandırması; kaynak sadece TLS sözleşmesini doğrular. Sağlayıcı/tüzel kişi, kuyruk/log/backup ve ülke UNKNOWN; Gmail olduğu varsayılmaz | Kritik Auth açık kalır. Yerel Türkiye işleme teyit edilirse bu bacakta madde 9 yok; dış işleme varsa yeterlilik/uygun güvence gerekir. TLS/GDPR DPA tek başına yeterli değil. EXTERNAL_BLOCKER |
+| TVMaze API: query/show ID, server IP ve UA | TVMaze API/CDN; katalog hizmeti alıcısı, log amaçları için bağımsız sorumlu rolü incelenmeli; fiilî ülke/alt işleyen UNKNOWN | Etkinlik/attribution korunur. User IP/cookie/email/not upstream'e kasten eklenmez; kişisel içerik taşıyan serbest query yine aktarım olabilir. Kişisel olmayan katalog ID+server egress için son kullanıcı aktarımı varsayılmaz. Kişisel query/direct CDN için madde 9 kanıtı yok: EXTERNAL_BLOCKER |
+| Open Library search/cover ve uygulama UA contact | Internet Archive/Open Library; ABD kuruluşu, bütün sunucu ülkeleri doğrulanmadı; API bağımsız alıcı | Gerçek contact UA teknik kapıdır, aktarım onayı değildir. UA'da yayımlanan operatör contact'ı da kişisel veri olabilir. Onay/kapsam yoksa Production UA unset ile kapalı tut (manuel kitap ekleme açık); enablement POST_RELEASE_GATE |
+| Browser-direct img IP/UA/zaman/path, olası referrer | `static.tvmaze.com`, `covers.openlibrary.org`; legacy `image.tmdb.org`, `s4.anilist.co`, `m.media-amazon.com`, `ia.media-imdb.com`; ayrıca kullanıcı kayıt URL'leri. Ülkeler/CDN uçları UNKNOWN | `components/media-card.tsx` unoptimized Image; `next.config.ts` optimizer allowlist'i doğrudan URL çağrısını engellemez. API kapalıyken legacy resim isteği sürebilir. Lisans, GDPR SCC veya kullanıcıya genel uyarı madde 9 güvencesi değildir: EXTERNAL_BLOCKER |
+| Hosting uygulama/DB/files/log/vendor backup | TürkHosting, Türkiye; operatörün yazılı yanıtı | Bildirilen kapsamda yurt içi; madde 8, hizmet sözleşmesi/erişim-güvenlik şartları. Kesin log retention/private file backup tutarlılığı ayrı |
+| Bağımsız backup/export kopyaları | Operatörün kopya konumu, erişenleri ve ülkesi özel envanterde | Şifreleme tek başına aktarım mekanizması değil. Gerçek hedef görülmedi: MANUAL_ACTION; yurt dışıysa madde 9 ayrıca |
+
+Madde 9 sırası: 5/6 şartı + kapsamı karşılayan güncel yeterlilik kararı; yoksa
+ilgili kişinin hak/etkili başvuru imkânı ve uygun güvence (örn. doğru taraf/rol
+için Kurul standart sözleşmesi, gerekli bildirim; taahhütname+Kurul izni veya
+uygulanabilir diğer kanuni yöntem). Standart sözleşme imzadan itibaren **5 iş
+günü** içinde bildirilir. Düzenli hizmeti 9/6 arızi istisnasına veya genel rızaya
+dayandırma. EU SCC/Google genel şartları Türk standart sözleşmesi yerine geçmez.
+Sağlayıcı sözleşme kabul etti/sicile bildirildi/yeterlilik var iddiası yapılmadı.
+Resmî [aktarılma rehberi](https://www.kvkk.gov.tr/Icerik/8143/Kisisel-Verilerin-Yurt-Disina-Aktarilmasi-Rehberi)
+ve [standart sözleşme duyurusu](https://www.kvkk.gov.tr/Icerik/8170/Yurt-Disina-Kisisel-Veri-Aktariminda-Kullanilacak-Standart-Sozlesmelerde-Dikkat-Edilmesi-Gereken-Hususlara-Iliskin-Kamuoyu-Duyurusu).
+
+Sağlayıcı kaynakları: [Google aktarım çerçeveleri](https://policies.google.com/privacy/frameworks?hl=en_GB),
+[TVMaze API/lisans](https://www.tvmaze.com/api), [Open Library API](https://openlibrary.org/developers/api)
+ve [Open Library/Internet Archive ilişkisi](https://openlibrary.org/help/faq/about).
+Bu genel sayfalar operatör adına imzalanmış Türk KVKK aktarım güvencesi değildir.
+
+**Sınırlama seçeneği:** Open Library kanıt yokken mevcut UA gate ile kapatılabilir.
+Opsiyonel doğrudan dış resimleri same-origin/data/blob ile sınırlandırmak (kapak
+yerine mevcut fallback) IP aktarımını durdurur; mevcut resim/katalog davranışını
+değiştirdiği için bu pakette sessizce uygulanmadı. Same-origin proxy ancak sınırlı
+allowlist/SSRF/size/time kontrolü ve cache/lisans incelemesiyle ayrıca değerlendirilir;
+otomatik KVKK çözümü sayılmaz. `no-referrer` yalnız referrer'ı azaltır, IP aktarımını
+çözmez. TVMaze etkin ve Auth çalışır kalması talimatı korunur; bunlar için istenen
+kanıtın yokluğu release engeli olarak dürüstçe bırakılır. Yeni rıza UI'sı düzenli
+madde 9 aktarımını kendiliğinden çözmeyeceğinden eklenmedi.
+
+### Yayın kararı
+
+Kaynak metin/prosedür/test kapanışı ile hukuki ve hosting kabulü ayrıdır. Güncel
+engeller ve tek yayın kontrol listesi [işletim belgesinin 16 Ekim ekindedir](V1_CLOSURE_OPERATIONS.md#kvkk-final-kapanış--16-ekim-2026).
+Dayanak için resmî [Kanun](https://www.kvkk.gov.tr/Icerik/6649/Personal-Data-Protection-Law),
+[özel nitelikli veri](https://www.kvkk.gov.tr/Icerik/2051/Ozel-Nitelikli-Kisisel-Veriler)
+ve [aydınlatma](https://www.kvkk.gov.tr/Icerik/2033/Aydinlatma-Yukumlulugu-)
+16 Ekim 2026'da incelendi; Türkçe kanun aslı esas alınır.
+
 Güncel ek — 2026-10-14: aşağıdaki 2026-10-09 envanter, test ve UNKNOWN kayıtları
 tarihli kanıttır. Bölüm 4, operatörün bildirdiği TürkHosting yazılı yanıtları ve
 mevcut signup adayını uzlaştırır; önceki synthetic/live statülerini değiştirmez.

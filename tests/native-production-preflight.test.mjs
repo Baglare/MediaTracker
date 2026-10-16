@@ -2,6 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {productionInspection} from '../scripts/native-production-preflight.mjs';
 import {nativeRoles} from '../lib/backend/native-roles.mjs';
+import {nativeMigrationFiles} from '../scripts/native-migrations.mjs';
 test('production inspection accepts only the explicit loopback production target',async()=>{
   const roles=nativeRoles('hosting-production','shared-managed');
   const client={query:async()=>{throw new Error('must not connect');}};
@@ -17,7 +18,7 @@ test('empty target inspection stays read-only and finishes with rollback',async(
     return {rows:[]};
   }};
   const result=await productionInspection(client,{roles:nativeRoles('hosting-production','shared-managed'),url:new URL('postgresql://mt_prod_migrator:x@127.0.0.1:5433/mediatracker_prod'),kind:'migrator'},{});
-  assert.equal(result.data,'EMPTY');assert.equal(result.pending.length,13);
+  assert.equal(result.data,'EMPTY');assert.deepEqual(result.pending,nativeMigrationFiles);
   assert.equal(calls[0],'BEGIN READ ONLY');assert.equal(calls.at(-1),'ROLLBACK');
   assert.equal(calls.some(s=>/\b(?:INSERT|UPDATE|DELETE|CREATE|ALTER|DROP)\b/.test(s)),false);
 });

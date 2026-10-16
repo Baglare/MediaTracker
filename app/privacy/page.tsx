@@ -13,6 +13,7 @@ const CONTACT = "mediatracker.contact@gmail.com";
 const processingGroups = (native: boolean) => [
   {
     title: "Hesap ve kimlik doğrulama",
+    basis: "Madde 5/2(c): talep ettiğiniz hesap ve giriş hizmetinin ifası için gerekli veriler; güvenlik işlemleri için aşağıdaki ayrı kapsam geçerlidir.",
     data: native
       ? "E-posta, görünen ad, hesap kimliği, e-posta doğrulama durumu ve oturum bilgileri; girişte şifre işlenir, şifre özeti ve oturum kayıtları Better Auth'un özel PostgreSQL şemasında tutulur. Doğrulama ve şifre sıfırlama için süreli bağlantılar işlenir."
       : "E-posta, hesap kimliği ve oturum bilgileri; girişte şifre işlenir, uygulama tablosunda tutulmaz.",
@@ -28,6 +29,7 @@ const processingGroups = (native: boolean) => [
   },
   {
     title: "Yerel kütüphane, ilerleme, notlar ve hedefler",
+    basis: "Madde 5/2(c): talep ettiğiniz takip ve yerel veri bütünlüğü işlevinin yerine getirilmesi. Cihazdan iletilmeyen veri sunucuda tutulmuş sayılmaz.",
     data: "Medya, ilerleme geçmişi, puan, favori, etiket, kişisel not, hedef, takvim ve XP durumu; kurtarma kopyaları.",
     purpose: "Seçtiğiniz medya ve hedefleri takip etmek, ilerlemeyi hesaplamak ve yerel veri bütünlüğünü korumak.",
     method: "Girdi, içe aktarma ve tarayıcı yerel depolaması; otomatik işlemler.",
@@ -35,6 +37,7 @@ const processingGroups = (native: boolean) => [
   },
   {
     title: "İsteğe bağlı Cloud eşitlemesi",
+    basis: "Madde 5/2(c): seçtiğiniz eşitlemenin ifasına gerekli kayıtlar. Özelliği açmanız genel açık rıza anlamına gelmez.",
     data: "Kütüphane, ilerleme, not, hedef; eşitleme kuyruğu, revizyon ve silindi işaretleri.",
     purpose: "Talep ettiğiniz hesap kapsamlı eşitlemeyi yürütmek ve çakışmaları yönetmek.",
     method: "Etkinleştirilen Cloud yükleme/indirme ve otomatik eşitleme işlemleri.",
@@ -44,6 +47,7 @@ const processingGroups = (native: boolean) => [
   },
   {
     title: "Profil ve profil dosyaları",
+    basis: "Madde 5/2(c): profil hizmetinin ifası; madde 5/2(d): yalnız sizin alenileştirme amacınızla uyumlu alanların yayını. Özel profil bilgileri bu yayın dayanağına dahil değildir.",
     data: "Kullanıcı adı, görünen ad, bio, seçilen profil alanları, görünürlük, avatar/banner ve yayınlanan istatistikler.",
     purpose: "Profili düzenlemek ve açıkça yapılandırdığınız herkese açık alanları yayımlamak.",
     method: "Profil formu, kullanıcı dosya yüklemesi ve otomatik profil üretimi.",
@@ -53,6 +57,7 @@ const processingGroups = (native: boolean) => [
   },
   {
     title: "Sosyal özellikler",
+    basis: "Madde 5/2(c): talep ettiğiniz etkileşimlerin ifası; kötüye kullanımı önlemede ölçülü madde 5/2(f); somut uyuşmazlık kanıtında gerekli kapsamda madde 5/2(e).",
     data: "Takip/blok, aktivite, yorum, tepki, tavsiye mesajları, bildirim, rapor ve sosyal XP kayıtları.",
     purpose: "İstediğiniz sosyal etkileşimleri, bildirimleri ve ilerleme durumunu iletmek; raporları değerlendirmek.",
     method: "Sosyal etkileşimler ve otomatik olay/bildirim üretimi.",
@@ -62,6 +67,7 @@ const processingGroups = (native: boolean) => [
   },
   {
     title: "Tercihler ve temalar",
+    basis: "Madde 5/2(c): seçtiğiniz görünüm ve tercihlerin uygulanması. Tercih depolaması pazarlama veya reklam izleme amacı taşımaz.",
     data: "Görünüm, yerleşim, başlangıç, sosyal tercihler ve tema seçimleri.",
     purpose: "Seçtiğiniz görünümü uygulamak; kullanılan tema eşitlemesi ve profil tema yayınını yürütmek.",
     method: "Ayarlar girdisi, tarayıcı depolaması/çerezleri ve isteğe bağlı tema eşitlemesi; otomatik işlemler.",
@@ -71,6 +77,7 @@ const processingGroups = (native: boolean) => [
   },
   {
     title: "Öneriler ve yerel AI durumu",
+    basis: "Madde 5/2(c): talep ettiğiniz deterministik önerinin hesaplanması ve oturumun sürdürülmesi; kapalı AI hizmetlerinin etkinleştirilmesine dayanak değildir.",
     data: "Öneri girdisi, seçilmiş kütüphane/bağlam, öneri oturumları, geri bildirim ve yerel AI tercihleri.",
     purpose: "Deterministik önerileri hesaplamak ve öneri oturumunu sürdürmek.",
     method: "Öneri girdisi ve otomatik hesaplama; tarayıcı depolaması ve sunucu isteği.",
@@ -80,6 +87,7 @@ const processingGroups = (native: boolean) => [
   },
   {
     title: "Sağlayıcı aramaları",
+    basis: "Madde 5/2(c): talep ettiğiniz katalog işlemi için gerekli veriyle sınırlı. İsteğe bağlı doğrudan dış görsel erişiminde bu gereklilik otomatik varsayılmaz; madde 9 aktarım koşulları ayrıca gerekir.",
     data: "Arama sorgusu, sağlayıcı medya kimliği, alınan katalog bilgileri ve teknik istek bilgileri.",
     purpose: "İstediğiniz katalog aramasını yapmak, medya ayrıntısı/takvim bilgisi ve görsellerini göstermek.",
     method: "Arama girdisi ve otomatik ayrıntı/takvim/görsel istekleri.",
@@ -89,6 +97,7 @@ const processingGroups = (native: boolean) => [
   },
   {
     title: "Güvenlik ve kötüye kullanımın önlenmesi",
+    basis: "Madde 5/2(f): hizmeti ve kullanıcıları koruma yönündeki meşru menfaat; asgari metadata ve sınırlı erişimle hak dengesi gözetilir. Madde 12 güvenlik yükümlülüğüne gerekli kapsamda 5/2(ç), somut hak kanıtında 5/2(e).",
     data: "İstek kimliği, zaman, sabit rota, sonuç kodu; sınırlandırma için IP/kullanıcıdan türetilen takma adlı özetler ve raporlar.",
     purpose: "Rotaları kötüye kullanımdan korumak, yetki denetimi ve sınırlı güvenlik kaydı tutmak.",
     method: "Otomatik üretilen istek/güvenlik metadata'sı; kullanıcı rapor girdisi.",
@@ -98,6 +107,7 @@ const processingGroups = (native: boolean) => [
   },
   {
     title: "Destek ve gizlilik başvuruları",
+    basis: "Olağan hizmet desteği için madde 5/2(c); madde 11 ve 13 başvurularına yanıt yükümlülüğü için 5/2(ç); gerekli uyuşmazlık kanıtı için 5/2(e).",
     data: "Gönderen/iletişim bilgisi, talep konusu, gerekli doğrulama ve yanıt yazışmaları.",
     purpose: "Destek ve kişisel veri taleplerini değerlendirmek, kimliği doğrulamak ve yanıtı belgelendirmek.",
     method: "E-posta yazışması; posta altyapısında otomatik, operatör değerlendirmesinde kısmen otomatik işlemler.",
@@ -135,6 +145,7 @@ export default function PrivacyPage() {
             </p>
           </div>
         </div>
+        <p className="mt-3 text-sm text-[var(--app-text-secondary)]">Son güncelleme: 16 Ekim 2026</p>
         <dl className="mt-5 grid gap-3 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-1)] p-4 text-sm sm:grid-cols-2">
           <div>
             <dt className="text-[var(--app-text-muted)]">Veri sorumlusu / operator</dt>
@@ -187,6 +198,7 @@ export default function PrivacyPage() {
                 <dl className="mt-2 space-y-2">
                   <div><dt className="font-medium">Veriler</dt><dd>{group.data}</dd></div>
                   <div><dt className="font-medium">Amaç</dt><dd>{group.purpose}</dd></div>
+                  <div><dt className="font-medium">Hukuki dayanak ve sınırı</dt><dd>{group.basis}</dd></div>
                   <div><dt className="font-medium">Toplama yöntemi</dt><dd>{group.method}</dd></div>
                   <div><dt className="font-medium">İşleme yeri ve alıcılar</dt><dd>{group.destination}</dd></div>
                 </dl>
@@ -200,10 +212,10 @@ export default function PrivacyPage() {
             KVKK madde 5 kapsamında, hesap/özellik işlemleri için sözleşmenin kurulması veya ifasıyla doğrudan
             bağlantılı gereklilik; güvenlik için temel hak ve özgürlükleri gözeten meşru menfaat; ilgili kişi
             başvuruları için hukuki yükümlülük ve gerekli kanıtların korunması için bir hakkın tesisi, kullanılması
-            veya korunması değerlendirme adaylarıdır. Bunlar kesinleşmiş hukuki dayanak olarak sunulmaz.
+            veya korunması esas alınır. Her dayanak yalnız gerekli işlem kapsamıyla sınırlıdır.
           </p>
           <p>
-            Her faaliyet için gereklilik ve kapsamın operatör/hukuk incelemesiyle kesinleştirilmesi yayın kabul
+            Her faaliyet için gereklilik ve ölçülülük sınırı uygulanır; dış aktarım koşullarının doğrulanması yayın kabul
             koşuludur. Profil görünürlük seçimi veya isteğe bağlı Cloud kullanımı tek başına hukuken geçerli açık
             rıza kanıtı değildir. Açık rıza genel bir yedek dayanak olarak kullanılmaz; madde 6 kapsamına giren
             içerikler varsa ayrıca değerlendirilir.
@@ -215,7 +227,7 @@ export default function PrivacyPage() {
             hukuki yükümlülük varsa 5/2(ç); kurtarma yedekleri için gerekli hizmet sürekliliği bakımından
             5/2(c) veya dengeleme şartıyla 5/2(f); destek için 5/2(c), hak başvuruları için 5/2(ç), gerekli
             uyuşmazlık kanıtı için 5/2(e); sağlayıcı/görsel istekleri için talep edilen hizmete gereklilik
-            bakımından 5/2(c) adaydır. Her adayın gerekliliği ayrıca onaylanmalıdır; isteğe bağlı dış görsel
+            bakımından 5/2(c) esas alınır. İsteğe bağlı dış görsel
             ve yayın işlemlerinde bu şartlar yoksa ayrı, özgür ve belirli açık rıza veya işlemi sınırlama
             değerlendirilir. Özel nitelikli veri için madde 5 yeterli değildir; uygulanabilir madde 6/3
             şartı ve ek önlemler ayrıca belirlenmelidir.
@@ -360,7 +372,12 @@ export default function PrivacyPage() {
             Mantıksal silme (tombstone), işlem ve eşitleme kayıtları ayrı teknik yaşam döngülerine tabidir.
             Güvenlik sınırlandırma durumunun sınırlı operasyonel yaşam döngüsü fiziksel temizleme ya da platform
             yedeği/loglarının silinmesiyle aynı değildir. Platform logları kendi koşullarına tabidir. Destek posta
-            kutusu ve diğer kesinleşmemiş süreler için ayrı saklama politikası operatör tarafından tamamlanmalıdır.
+            kutusu için ayrı saklama politikası uygulanır: olağan destek yazışmaları talebin kapanışından itibaren
+            90 gün, KVKK başvuru ve yanıt kayıtları kapanıştan itibaren 12 ay tutulur. Bunlar operatörün
+            belirlediği sürelerdir; kanunun zorunlu kıldığı süreler değildir. Gereksiz kimlik kanıtı ve export
+            ekleri teslim/doğrulama tamamlanınca daha erken kaldırılır. Somut uyuşmazlık, hukuki yükümlülük veya
+            hakkın korunması için gerekli kayıtlar gerekçesi ve gözden geçirme tarihiyle ayrı tutulabilir;
+            gerekçe sona erince silinir. Silme/yok etme işlem kayıtları ilgili mevzuat gereği en az üç yıl saklanır; bu kayıtlar silinen içeriğin kopyasını içermez. Posta kutusu temizliği operatör tarafından yapılır, uygulama otomatik silmez.
           </p>
           {native && (
             <p>
@@ -385,8 +402,9 @@ export default function PrivacyPage() {
           </p>
           <p>
             Cloud/hesap verisi ayrıdır. Auth, profil dosyaları ve sosyal/bildirim geçmişinin kapsamlı dışa aktarımı
-            operatör yardımı gerektirebilir; tüm hesap dışa aktarımı ve silmenin teknik kapsamı ayrıca
-            doğrulanmaktadır. İlk sürümde self-service hesap silme ekranı yoktur. Silme talepleri operatör
+            operatör yardımı gerektirebilir; tüm hesap dışa aktarımının ve silmenin teknik kapsamı ayrıca bildirilir.
+            {native && " Native hesap export aracı ve korumalı operatör silme akışı mevcuttur; tek test hesabındaki başarılı işlem bütün kullanıcı ve yedek kopyalarının silindiği anlamına gelmez."}
+            {" "}İlk sürümde self-service hesap silme ekranı yoktur. Silme talepleri operatör
             yardımıyla değerlendirilir; teknik tamamlanma kanıtı ve bazı alıcı/platform kayıtları ayrı işlem gerektirir.
           </p>
           <p>
@@ -398,8 +416,8 @@ export default function PrivacyPage() {
 
         <Section title="İletişim ve açık değerlendirmeler">
           <p>
-            Hukuki dayanakların kesinleştirilmesi, madde 9 aktarım mekanizması, VERBİS durumunun belirlenmesi,
-            formal başvuru kanalının kapsamı ve saklama politikası ayrı operatör/hukuk değerlendirmeleridir.
+            Madde 9 aktarım mekanizması, VERBİS istisnasına ilişkin işletmesel bilgilerin doğrulanması,
+            formal başvuru kanalının kapsamı ve hosting log/yedek koşulları ayrı operatör değerlendirmeleridir.
             Bu sayfa bunların tamamlandığını göstermez.
           </p>
           <p>

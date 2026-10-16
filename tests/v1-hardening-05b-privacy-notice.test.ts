@@ -88,6 +88,9 @@ describe.each(["supabase", "native"] as const)("05B public factual notice and ma
     expect(panel).toContain("Bu bilgilendirme açık rıza talebi değildir");
     expect(panel).toContain("Girişten önce e-posta doğrulaması gerekir");
     expect(panel).not.toMatch(/type="checkbox"|privacyConsent|consentRequired/);
+    const shell = readFileSync("components/app-shell/app-shell.tsx", "utf8");
+    expect(shell).toContain('href="/privacy"');
+    expect(shell.match(/<PrivacyFooter \/>/g)).toHaveLength(2);
   });
 
   it("renders both notice sections and all ten understandable processing groups", () => {
@@ -97,7 +100,7 @@ describe.each(["supabase", "native"] as const)("05B public factual notice and ma
     for (const title of ["Hesap ve kimlik doğrulama", "Yerel kütüphane, ilerleme, notlar ve hedefler", "İsteğe bağlı Cloud eşitlemesi", "Profil ve profil dosyaları", "Sosyal özellikler", "Tercihler ve temalar", "Öneriler ve yerel AI durumu", "Sağlayıcı aramaları", "Güvenlik ve kötüye kullanımın önlenmesi", "Destek ve gizlilik başvuruları"]) {
       expect(html).toContain(`<h3 class="font-semibold text-[var(--app-text-primary)]">${title}</h3>`);
     }
-    for (const field of ["Veriler", "Amaç", "Toplama yöntemi", "İşleme yeri ve alıcılar"]) {
+    for (const field of ["Veriler", "Amaç", "Hukuki dayanak ve sınırı", "Toplama yöntemi", "İşleme yeri ve alıcılar"]) {
       expect(html.match(new RegExp(`<dt class="font-medium">${field}</dt>`, "g"))).toHaveLength(10);
     }
     expect(html).toContain("tamamen veya kısmen otomatik");
@@ -127,9 +130,10 @@ describe.each(["supabase", "native"] as const)("05B public factual notice and ma
     expect(html).not.toMatch(/KVKK uyumlu|KVKK compliant|legally approved|VERBİS.*muaf|aktarımı hukuka uygundur|madde 9.*çözülmüştür/i);
   });
 
-  it("keeps provider, AI, foreign processing and provisional basis statements accurately scoped", () => {
+  it("keeps provider, AI, foreign processing and purpose-limited basis statements accurately scoped", () => {
     const html = markup();
-    for (const phrase of ["AniList ve TMDB canlı API erişimi v1 kodunda kapalıdır", "OMDb public API erişimi kapalıdır", "Open Library yalnız geçerli", "manuel kayıt kapısı", "TVMaze", "hukuki/lisans", "kapak URL", "tarayıcıdan doğrudan", "Türkiye dışında", "IP ve istek metadata", "madde 9 mekanizması", "henüz kesinleştirilmemiştir", "meşru menfaat", "kesinleşmiş hukuki dayanak", "yayın kabul", "V1 politika hedefinde server-funded AI", "Canlı ortam değerleri", "Deterministik öneri", "özel nitelikli", "Olağan medya tercihleri"]) expect(html).toContain(phrase);
+    for (const phrase of ["AniList ve TMDB canlı API erişimi v1 kodunda kapalıdır", "OMDb public API erişimi kapalıdır", "Open Library yalnız geçerli", "manuel kayıt kapısı", "TVMaze", "hukuki/lisans", "kapak URL", "tarayıcıdan doğrudan", "Türkiye dışında", "IP ve istek metadata", "madde 9 mekanizması", "henüz kesinleştirilmemiştir", "meşru menfaat", "Her dayanak yalnız gerekli işlem kapsamıyla sınırlıdır", "yayın kabul", "V1 politika hedefinde server-funded AI", "Canlı ortam değerleri", "Deterministik öneri", "özel nitelikli", "Olağan medya tercihleri"]) expect(html).toContain(phrase);
+    for (const phrase of ["90 gün", "12 ay", "kanunun zorunlu kıldığı süreler değildir", "uygulama otomatik silmez", "Somut uyuşmazlık", "gözden geçirme tarihi"]) expect(html).toContain(phrase);
     expect(html).not.toContain("public yeni hesap kaydı kapalıdır");
     expect(html).not.toContain("kullanıcı verisi ücretli bir AI sağlayıcısına gönderilmez");
   });
