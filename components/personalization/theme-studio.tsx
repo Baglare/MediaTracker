@@ -137,17 +137,18 @@ export function ThemeStudio({ onConfirm }: { onConfirm: ConfirmAction }) {
     }
     const commit = () => {
       try {
-      const saved = draft.id
-        ? customThemes.update(draft.id, draft)
-        : customThemes.create(draft);
-      if (apply) appearance.setThemeSelection({ kind: "custom", id: saved.id });
-      appearance.clearThemePreview();
-      setDraft(null);
-      setMessage(apply ? "Özel tema kaydedildi ve uygulandı." : "Özel tema kaydedildi.");
-    } catch (error) {
-      setMessage(error instanceof Error && error.message === "custom_theme_limit"
-        ? "En fazla 20 özel tema kaydedebilirsin."
-        : "Tema kaydedilemedi. Alanları kontrol et.");
+        const saved = draft.id
+          ? customThemes.update(draft.id, draft)
+          : customThemes.create(draft);
+        if (apply) appearance.setThemeSelection({ kind: "custom", id: saved.id });
+        appearance.clearThemePreview();
+        setDraft(null);
+        setCorrectionNotice("");
+        setMessage(apply ? "Özel tema kaydedildi ve uygulandı." : "Özel tema kaydedildi.");
+      } catch (error) {
+        setMessage(error instanceof Error && error.message === "custom_theme_limit"
+          ? "En fazla 20 özel tema kaydedebilirsin."
+          : "Tema kaydedilemedi. Alanları kontrol et.");
       }
     };
     if (apply && !contrast.valid) {
